@@ -1,0 +1,32 @@
+<?php
+
+use App\Providers\ModuleServiceProvider;
+use Illuminate\Support\Facades\DB;
+
+it('discovers every module folder in app/Modules', function () {
+    $modules = array_map('basename', ModuleServiceProvider::modulePaths(app_path('Modules')));
+
+    expect($modules)->toContain(
+        'Tenancy', 'Identity', 'Asset', 'Contract', 'Service', 'Maintenance',
+        'Inventory', 'Labeling', 'Document', 'Survey', 'Reporting', 'Platform',
+    );
+});
+
+it('registers module migration folders with the migrator', function () {
+    $paths = array_map(
+        fn ($p) => str_replace('\\', '/', $p),
+        app('migrator')->paths(),
+    );
+
+    expect($paths)->toContain(str_replace('\\', '/', app_path('Modules/Tenancy/database/migrations')));
+});
+
+it('runs on PostgreSQL', function () {
+    expect(DB::connection()->getDriverName())->toBe('pgsql')
+        ->and(DB::selectOne('select version() as v')->v)->toStartWith('PostgreSQL 16');
+});
+
+it('uses Bangkok timezone and Thai locale', function () {
+    expect(config('app.timezone'))->toBe('Asia/Bangkok')
+        ->and(app()->getLocale())->toBe('th');
+});
