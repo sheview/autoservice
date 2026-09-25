@@ -19,10 +19,15 @@ Multi-tenant, SaaS instance เดียว, ทีมพัฒนา 1-2 คน
 - ทุกตารางที่เก็บข้อมูลลูกค้าต้องมี `tenant_id` (foreignId, not null, index)
 - ทุก Model ของตารางนั้นต้อง `use BelongsToTenant`
 - ทุก migration ที่สร้างตารางใหม่ ต้อง ENABLE ROW LEVEL SECURITY และสร้าง POLICY
+  โดยเรียก `Rls::enable('table')` (`App\Modules\Tenancy\Support\Rls`) ต่อจาก `Schema::create`
 - ห้ามใช้ `withoutGlobalScope()` นอก `app/Modules/Platform/CrossTenant/`
   และถ้าใช้ ต้องมี comment อธิบายเหตุผล
 - Queue job ทุกตัวต้อง `use InteractsWithTenant` เพื่อพา tenant context ไปด้วย
 - ห้ามเขียน raw SQL ที่ไม่มีเงื่อนไข tenant
+- tenant ปัจจุบันอยู่ใน `TenantContext` (singleton) — เปลี่ยน tenant ชั่วคราวด้วย
+  `app(TenantContext::class)->run($tenant, fn () => ...)` ห้ามตั้ง `app.tenant_id` เอง
+- app ต่อฐานด้วย role `autoservice_app` ที่ไม่ใช่เจ้าของตาราง (RLS จึงมีผลเสมอ)
+  migration ต้องรันด้วย `php artisan migrate --database=pgsql_migrate` — รายละเอียดใน README
 
 ### 2. โครงสร้างโมดูล
 โค้ดอยู่ใน `app/Modules/{Module}/` เท่านั้น ไม่ใช่ `app/Models` หรือ `app/Http/Controllers`

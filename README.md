@@ -1,25 +1,63 @@
-# Laravel + Vue Starter Kit
+# AutoService
 
-## Introduction
+ระบบจัดการทรัพย์สินและงานบริการ MA แบบ multi-tenant
+Laravel 12 · Inertia 2 + Vue 3 + TypeScript · PostgreSQL 16
 
-Our Vue starter kit provides a robust, modern starting point for building Laravel applications with a Vue frontend using [Inertia](https://inertiajs.com).
+กฎการพัฒนาทั้งหมดอยู่ใน [CLAUDE.md](CLAUDE.md)
 
-Inertia allows you to build modern, single-page Vue applications using classic server-side routing and controllers. This lets you enjoy the frontend power of Vue combined with the incredible backend productivity of Laravel and lightning-fast Vite compilation.
+## ติดตั้งครั้งแรก
 
-This Vue starter kit utilizes Vue 3 and the Composition API, TypeScript, Tailwind, and the [shadcn-vue](https://www.shadcn-vue.com) component library.
+```bash
+composer install
+npm install && npm run build
+cp .env.example .env && php artisan key:generate
 
-## Official Documentation
+# สร้าง role และฐานข้อมูล (รันด้วย superuser ของ PostgreSQL ครั้งเดียว)
+psql -U postgres -h 127.0.0.1 -f database/setup/pgsql-roles.sql
 
-Documentation for all Laravel starter kits can be found on the [Laravel website](https://laravel.com/docs/starter-kits).
+php artisan migrate --database=pgsql_migrate
+php artisan test
+```
 
-## Contributing
+## ฐานข้อมูล: สอง role และ Row Level Security
 
-Thank you for considering contributing to our starter kit! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+การแยกข้อมูลระหว่าง tenant มีสองชั้น
 
-## Code of Conduct
+1. **Eloquent global scope** (`BelongsToTenant`) เติม `where tenant_id = ?` ให้ทุก query ของ Model
+2. **PostgreSQL RLS** ที่ฐานข้อมูล ซึ่งยังกันได้แม้ query ไม่ผ่าน Eloquent (`DB::table`, raw SQL)
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+RLS จะมีผลจริงได้ต้องตั้งค่าสามอย่างนี้ครบ
 
-## License
+| ต้องมี | เพราะ |
+|---|---|
+| app ต่อฐานด้วย role ที่**ไม่ใช่ superuser และไม่มี `BYPASSRLS`** | superuser และ `BYPASSRLS` ข้าม policy ทุกตัว |
+| app ต่อด้วย role ที่**ไม่ใช่เจ้าของตาราง** | เจ้าของตารางสั่ง `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` ได้ |
+| ทุกตาราง tenant ใช้ `ENABLE` + `FORCE ROW LEVEL SECURITY` | `FORCE` ทำให้ policy ใช้กับเจ้าของตารางด้วย (เช่น ตอนรัน migration) |
 
-The Laravel + Vue starter kit is open-sourced software licensed under the MIT license.
+จึงมีสอง role (สร้างโดย [database/setup/pgsql-roles.sql](database/setup/pgsql-roles.sql))
+
+| role | connection | ใช้ทำอะไร | สิทธิ์ |
+|---|---|---|---|
+| `autoservice_owner` | `pgsql_migrate` | รัน migration เท่านั้น | เจ้าของ database และทุกตาราง |
+| `autoservice_app` | `pgsql` (default) | app, queue worker, test | `SELECT/INSERT/UPDATE/DELETE` ผ่าน default privileges |
+
+ผลที่ตามมา:
+
+- **migration ต้องรันด้วย `--database=pgsql_migrate` เสมอ** ถ้าลืม จะได้ error เรื่องสิทธิ์ `CREATE`
+- test สร้าง schema ด้วย role owner ครั้งเดียว (ดู `tests/TestCase.php`) แล้วรันทุก test ด้วย role app
+- ตารางใหม่ที่ owner สร้าง role app จะได้สิทธิ์อัตโนมัติ ไม่ต้อง `GRANT` เอง
+
+Policy อ่านค่าจาก setting `app.tenant_id` ของ session ฐานข้อมูล ซึ่ง `TenantContext::set()` เป็นคนตั้ง
+ถ้าไม่มี tenant ค่าจะเป็น `''` แล้ว policy จะไม่คืนแถวใดเลย
+
+บน production ให้เปลี่ยนรหัสผ่านของทั้งสอง role และใส่ใน `.env`
+(`DB_USERNAME/DB_PASSWORD` และ `DB_MIGRATE_USERNAME/DB_MIGRATE_PASSWORD`)
+
+## Tenant ของ request
+
+`ResolveTenant` (อยู่ใน web middleware group) หา tenant ตามลำดับนี้
+
+1. subdomain: `{subdomain}.{TENANCY_CENTRAL_DOMAINS}` ถ้าไม่พบให้ 404 ถ้าถูกระงับให้ 403
+   ถ้า user ที่ล็อกอินอยู่เป็นของ tenant อื่นให้ 403
+2. `tenant_id` ของ user ที่ล็อกอิน
+3. ไม่มี tenant: ตาราง tenant จะว่างทั้งหมด

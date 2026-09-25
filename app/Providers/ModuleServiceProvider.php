@@ -7,11 +7,23 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Auto-registers every module in app/Modules/{Module}:
+ *   - {Module}ServiceProvider (if the module has one)
  *   - routes/web.php          (loaded with the "web" middleware group)
  *   - database/migrations/    (added to the migrator paths)
  */
 class ModuleServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        foreach (static::modulePaths(app_path('Modules')) as $path) {
+            $module = basename($path);
+
+            if (is_file("{$path}/{$module}ServiceProvider.php")) {
+                $this->app->register("App\\Modules\\{$module}\\{$module}ServiceProvider");
+            }
+        }
+    }
+
     public function boot(): void
     {
         foreach (static::modulePaths(app_path('Modules')) as $path) {

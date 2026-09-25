@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Tenancy\Models\Tenant;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -44,7 +46,15 @@ expect()->extend('toBeOne', function () {
 |
 */
 
-function something()
+function createTenant(string $slug): Tenant
 {
-    // ..
+    return Tenant::create(['name' => ucfirst($slug), 'slug' => $slug, 'subdomain' => $slug]);
+}
+
+/**
+ * Run a callback inside a tenant, then restore the previous tenant context.
+ */
+function asTenant(Tenant $tenant, callable $callback): mixed
+{
+    return app(TenantContext::class)->run($tenant, $callback);
 }
