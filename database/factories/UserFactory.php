@@ -2,16 +2,20 @@
 
 namespace Database\Factories;
 
-use App\Models\User;
+use App\Modules\Identity\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 /**
+ * Users are created in the current tenant (TenantContext); tenant_id is filled by BelongsToTenant.
+ *
  * @extends Factory<User>
  */
 class UserFactory extends Factory
 {
+    protected $model = User::class;
+
     /**
      * The current password being used by the factory.
      */
@@ -41,5 +45,17 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_active' => false,
+        ]);
+    }
+
+    public function withRole(string $role): static
+    {
+        return $this->afterCreating(fn (User $user) => $user->assignRole($role));
     }
 }

@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Modules\Identity\Models\User;
 
 return [
 
@@ -63,7 +63,8 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
+            // Registered in IdentityServiceProvider: finds users before the tenant is known.
+            'driver' => 'tenant-eloquent',
             'model' => env('AUTH_MODEL', User::class),
         ],
 

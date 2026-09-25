@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,10 +47,12 @@ class NewPasswordController extends Controller
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user) use ($request) {
-                $user->forceFill([
+                // The guest has no tenant yet; without this the update would match
+                // no row under RLS and silently do nothing.
+                app(TenantContext::class)->run($user->tenant_id, fn () => $user->forceFill([
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
-                ])->save();
+                ])->save());
 
                 event(new PasswordReset($user));
             }

@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\User;
+use App\Modules\Identity\Models\User;
 use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -28,7 +28,7 @@ beforeEach(function () {
 // --- (a) Eloquent ------------------------------------------------------------
 
 it('(a) shows a user of tenant A only the branches of tenant A', function () {
-    $user = User::factory()->create(['tenant_id' => $this->tenantA->id]);
+    $user = asTenant($this->tenantA, fn () => User::factory()->create());
 
     $response = $this->actingAs($user)->get('/_test/branches')->assertOk();
 
@@ -44,7 +44,7 @@ it('(b) limits raw queries that bypass Eloquent to the current tenant', function
             ->and(DB::select('select name from branches'))->toHaveCount(1);
     });
 
-    $user = User::factory()->create(['tenant_id' => $this->tenantA->id]);
+    $user = asTenant($this->tenantA, fn () => User::factory()->create());
     expect($this->actingAs($user)->get('/_test/branches')->json('raw'))->toBe(['Alpha HQ']);
 });
 
@@ -134,7 +134,7 @@ it('returns 404 for an unknown subdomain', function () {
 });
 
 it('forbids a user of tenant A on the subdomain of tenant B', function () {
-    $user = User::factory()->create(['tenant_id' => $this->tenantA->id]);
+    $user = asTenant($this->tenantA, fn () => User::factory()->create());
 
     $this->actingAs($user)->get('http://bravo.localhost/_test/branches')->assertForbidden();
 });

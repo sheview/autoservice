@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -57,4 +59,24 @@ function createTenant(string $slug): Tenant
 function asTenant(Tenant $tenant, callable $callback): mixed
 {
     return app(TenantContext::class)->run($tenant, $callback);
+}
+
+/**
+ * A user with one role, created in $tenant (default: the current tenant).
+ */
+function userWithRole(string $role, array $attributes = [], ?Tenant $tenant = null): User
+{
+    $create = fn () => User::factory()->withRole($role)->create($attributes);
+
+    return $tenant ? asTenant($tenant, $create) : $create();
+}
+
+/**
+ * A superadmin: a user with the "superadmin" role in the platform tenant.
+ */
+function createSuperadmin(array $attributes = []): User
+{
+    $platform = Tenant::create(['name' => 'Platform', 'slug' => 'platform', 'subdomain' => 'admin', 'is_platform' => true]);
+
+    return userWithRole(PermissionCatalog::SUPERADMIN, $attributes, $platform);
 }

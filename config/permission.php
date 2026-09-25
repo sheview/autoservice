@@ -1,8 +1,8 @@
 <?php
 
+use App\Modules\Identity\Models\Role;
 use Spatie\Permission\DefaultTeamResolver;
 use Spatie\Permission\Models\Permission;
-use Spatie\Permission\Models\Role;
 
 return [
 
@@ -110,7 +110,7 @@ return [
          * foreign key is other than `team_id`.
          */
 
-        'team_foreign_key' => 'team_id',
+        'team_foreign_key' => 'tenant_id',
     ],
 
     /*
@@ -148,7 +148,7 @@ return [
      * (view the latest version of this package's migration file)
      */
 
-    'teams' => false,
+    'teams' => true,
 
     /*
      * The class to use to resolve the permissions team id
@@ -214,6 +214,7 @@ return [
          * file. Using 'default' here means to use the `default` set in cache.php.
          */
 
-        'store' => 'default',
+        // Per-request memory only: a shared cache would mix roles of different tenants.
+        'store' => 'array',
     ],
 ];

@@ -1,0 +1,57 @@
+<?php
+
+// Messages for the rules this project uses. Rules not listed here fall back to English (fallback_locale).
+return [
+    'accepted' => 'ต้องยอมรับ :attribute',
+    'array' => ':attribute ต้องเป็นรายการ',
+    'boolean' => ':attribute ต้องเป็นใช่หรือไม่ใช่',
+    'confirmed' => ':attribute ที่ยืนยันไม่ตรงกัน',
+    'current_password' => 'รหัสผ่านไม่ถูกต้อง',
+    'date' => ':attribute ต้องเป็นวันที่',
+    'email' => ':attribute ต้องเป็นอีเมลที่ถูกต้อง',
+    'exists' => ':attribute ที่เลือกไม่ถูกต้อง',
+    'in' => ':attribute ที่เลือกไม่ถูกต้อง',
+    'integer' => ':attribute ต้องเป็นจำนวนเต็ม',
+    'lowercase' => ':attribute ต้องเป็นตัวพิมพ์เล็ก',
+    'max' => [
+        'array' => ':attribute ต้องมีไม่เกิน :max รายการ',
+        'file' => ':attribute ต้องมีขนาดไม่เกิน :max กิโลไบต์',
+        'numeric' => ':attribute ต้องไม่เกิน :max',
+        'string' => ':attribute ต้องยาวไม่เกิน :max ตัวอักษร',
+    ],
+    'min' => [
+        'array' => ':attribute ต้องมีอย่างน้อย :min รายการ',
+        'file' => ':attribute ต้องมีขนาดอย่างน้อย :min กิโลไบต์',
+        'numeric' => ':attribute ต้องไม่น้อยกว่า :min',
+        'string' => ':attribute ต้องยาวอย่างน้อย :min ตัวอักษร',
+    ],
+    'numeric' => ':attribute ต้องเป็นตัวเลข',
+    'password' => [
+        'letters' => ':attribute ต้องมีตัวอักษรอย่างน้อยหนึ่งตัว',
+        'mixed' => ':attribute ต้องมีทั้งตัวพิมพ์ใหญ่และตัวพิมพ์เล็ก',
+        'numbers' => ':attribute ต้องมีตัวเลขอย่างน้อยหนึ่งตัว',
+        'symbols' => ':attribute ต้องมีสัญลักษณ์อย่างน้อยหนึ่งตัว',
+        'uncompromised' => ':attribute นี้เคยรั่วไหลในเหตุข้อมูลรั่ว กรุณาใช้รหัสผ่านอื่น',
+    ],
+    'regex' => 'รูปแบบของ :attribute ไม่ถูกต้อง',
+    'required' => 'กรุณากรอก:attribute',
+    'string' => ':attribute ต้องเป็นข้อความ',
+    'unique' => ':attribute นี้ถูกใช้แล้ว',
+
+    'attributes' => [
+        'name' => 'ชื่อ',
+        'email' => 'อีเมล',
+        'password' => 'รหัสผ่าน',
+        'current_password' => 'รหัสผ่านปัจจุบัน',
+        'password_confirmation' => 'การยืนยันรหัสผ่าน',
+        'branch_id' => 'สาขา',
+        'employee_code' => 'รหัสพนักงาน',
+        'position' => 'ตำแหน่ง',
+        'phone' => 'เบอร์โทรศัพท์',
+        'service_lines' => 'สายงานบริการ',
+        'is_active' => 'สถานะใช้งาน',
+        'role' => 'บทบาท',
+        'label' => 'ชื่อที่แสดง',
+        'permissions' => 'สิทธิ์',
+    ],
+];

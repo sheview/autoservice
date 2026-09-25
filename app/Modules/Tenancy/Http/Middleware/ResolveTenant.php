@@ -2,25 +2,46 @@
 
 namespace App\Modules\Tenancy\Http\Middleware;
 
+use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Sets the tenant for the request:
- *   1. from the subdomain ({sub}.{central domain}) if there is one
- *   2. otherwise from the logged-in user's tenant_id
- *   3. otherwise no tenant (tenant tables return no rows)
+ *   1. a superadmin who is impersonating: the impersonated tenant
+ *   2. the subdomain ({sub}.{central domain}) if there is one
+ *   3. otherwise the logged-in user's tenant
+ *   4. otherwise no tenant (tenant tables return no rows)
+ *
+ * A deactivated user is logged out.
  */
 class ResolveTenant
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(
+        private TenantContext $context,
+        private Impersonation $impersonation,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
+        $this->context->forget();
+        $this->impersonation->reset();
+
+        $user = $request->user();
+
+        if ($user !== null && ! $user->is_active) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login');
+        }
+
         $this->context->set($this->resolve($request));
 
         return $next($request);
@@ -28,7 +49,9 @@ class ResolveTenant
 
     private function resolve(Request $request): ?Tenant
     {
-        $userTenantId = $request->user()?->tenant_id;
+        $user = $request->user();
+        $homeTenantId = $user?->tenant_id;
+        $impersonated = $user !== null ? $this->impersonation->tenantFor($user, $request->session()) : null;
         $subdomain = $this->subdomain($request->getHost());
 
         if ($subdomain !== null) {
@@ -37,16 +60,20 @@ class ResolveTenant
             abort_if($tenant === null, 404);
             abort_unless($tenant->isActive(), 403);
             // A user of tenant A must never work inside tenant B's subdomain.
-            abort_if($request->user() !== null && $userTenantId !== $tenant->id, 403);
+            abort_if($user !== null && $homeTenantId !== $tenant->id && $impersonated?->id !== $tenant->id, 403);
 
             return $tenant;
         }
 
-        if ($userTenantId === null) {
+        if ($impersonated !== null) {
+            return $impersonated;
+        }
+
+        if ($homeTenantId === null) {
             return null;
         }
 
-        $tenant = Tenant::find($userTenantId);
+        $tenant = Tenant::find($homeTenantId);
         abort_unless($tenant?->isActive(), 403);
 
         return $tenant;

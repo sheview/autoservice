@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
-use Illuminate\Foundation\Inspiring;
+use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\Support\Impersonation;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -36,15 +38,29 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
+        $impersonation = app(Impersonation::class);
+        $tenant = app(TenantContext::class)->tenant();
+        $user = $request->user();
 
-        return array_merge(parent::share($request), [
+        return [
             ...parent::share($request),
             'name' => config('app.name'),
-            'quote' => ['message' => trim($message), 'author' => trim($author)],
             'auth' => [
-                'user' => $request->user(),
+                'user' => $user,
+                // The UI uses these only to show or hide things; the server always checks again.
+                'permissions' => fn () => match (true) {
+                    $user === null => [],
+                    $impersonation->active() => PermissionCatalog::tenantPermissions(),
+                    default => $user->getAllPermissions()->pluck('name')->values(),
+                },
             ],
-        ]);
+            'tenant' => $tenant ? ['name' => $tenant->name, 'is_platform' => $tenant->is_platform] : null,
+            'impersonation' => $impersonation->active() ? ['tenant' => ['name' => $impersonation->tenant()->name]] : null,
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+            ],
+            'locale' => app()->getLocale(),
+            'translations' => fn () => trans('ui'),
+        ];
     }
 }

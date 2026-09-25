@@ -15,14 +15,22 @@ class Rls
 {
     public const SETTING = 'app.tenant_id';
 
-    public static function enable(string $table): void
+    /** Set only by App\Modules\Platform\CrossTenant\IdentityLookup (login, session, password reset). */
+    public const IDENTITY_LOOKUP = 'app.identity_lookup';
+
+    /**
+     * @param  bool  $identityLookup  also allow rows while IdentityLookup is running (users table only)
+     */
+    public static function enable(string $table, bool $identityLookup = false): void
     {
-        $current = "NULLIF(current_setting('".self::SETTING."', true), '')::bigint";
+        $condition = "tenant_id = NULLIF(current_setting('".self::SETTING."', true), '')::bigint";
+
+        if ($identityLookup) {
+            $condition = "({$condition} OR current_setting('".self::IDENTITY_LOOKUP."', true) = 'on')";
+        }
 
         DB::statement("ALTER TABLE {$table} ENABLE ROW LEVEL SECURITY");
         DB::statement("ALTER TABLE {$table} FORCE ROW LEVEL SECURITY");
-        DB::statement(
-            "CREATE POLICY tenant_isolation ON {$table} USING (tenant_id = {$current}) WITH CHECK (tenant_id = {$current})"
-        );
+        DB::statement("CREATE POLICY tenant_isolation ON {$table} USING ({$condition}) WITH CHECK ({$condition})");
     }
 }

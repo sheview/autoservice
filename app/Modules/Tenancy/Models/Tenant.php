@@ -2,6 +2,7 @@
 
 namespace App\Modules\Tenancy\Models;
 
+use App\Modules\Tenancy\Events\TenantCreated;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -14,18 +15,24 @@ class Tenant extends Model
 
     public const STATUS_SUSPENDED = 'suspended';
 
-    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'settings'];
+    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings'];
 
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
         'plan' => 'standard',
+        'is_platform' => false,
         'settings' => '{}',
+    ];
+
+    protected $dispatchesEvents = [
+        'created' => TenantCreated::class,
     ];
 
     protected function casts(): array
     {
         return [
             'settings' => 'array',
+            'is_platform' => 'boolean',
         ];
     }
 
