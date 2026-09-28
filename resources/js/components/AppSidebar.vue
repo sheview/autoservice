@@ -4,7 +4,20 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Briefcase, Building2, Circle, FileText, HardDrive, LayoutGrid, ShieldCheck, Tags, Users, type LucideIcon } from 'lucide-vue-next';
+import {
+    Briefcase,
+    Building2,
+    CalendarDays,
+    Circle,
+    FileText,
+    HardDrive,
+    LayoutGrid,
+    ShieldCheck,
+    Tags,
+    Users,
+    Wrench,
+    type LucideIcon,
+} from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -13,6 +26,8 @@ const page = usePage<SharedData>();
 // Icon names used in config/modules.php "navigation".
 const icons: Record<string, LucideIcon> = {
     'layout-grid': LayoutGrid,
+    wrench: Wrench,
+    'calendar-days': CalendarDays,
     'hard-drive': HardDrive,
     tags: Tags,
     'file-text': FileText,

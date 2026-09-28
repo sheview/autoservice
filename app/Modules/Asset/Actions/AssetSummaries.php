@@ -15,7 +15,7 @@ class AssetSummaries
     /**
      * @param  array{ids?: list<int>, exclude?: list<int>, customer_id?: int|null, search?: string, limit?: int}  $criteria
      * @return list<array{id: int, ulid: string, asset_code: string, name: string, category: string|null,
-     *     branch: string|null, status: string, serial_number: string|null}>
+     *     branch: string|null, status: string, serial_number: string|null, customer_id: int|null}>
      */
     public function handle(User $user, array $criteria): array
     {
@@ -42,6 +42,7 @@ class AssetSummaries
                 'branch' => $asset->branch?->name,
                 'status' => $asset->status,
                 'serial_number' => $asset->serial_number,
+                'customer_id' => $asset->customer_id,
             ])
             ->all();
     }

@@ -6,15 +6,23 @@ use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Contract\Actions\AddContractAssets;
+use App\Modules\Contract\Actions\CoveringContracts;
 use App\Modules\Contract\Actions\SaveContract;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Service\Actions\AssignTicket;
+use App\Modules\Service\Actions\MoveTicket;
+use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Models\Holiday;
+use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Demo data for local development (never in production). Every password is "password".
@@ -90,11 +98,42 @@ class DemoSeeder extends Seeder
         ],
     ];
 
+    /** Thai public holidays 2026 (demo data: check against the official announcement). */
+    private const HOLIDAYS = [
+        '2026-01-01' => 'วันขึ้นปีใหม่',
+        '2026-03-03' => 'วันมาฆบูชา',
+        '2026-04-06' => 'วันจักรี',
+        '2026-04-13' => 'วันสงกรานต์',
+        '2026-04-14' => 'วันสงกรานต์',
+        '2026-04-15' => 'วันสงกรานต์',
+        '2026-05-01' => 'วันแรงงานแห่งชาติ',
+        '2026-05-04' => 'วันฉัตรมงคล',
+        '2026-06-01' => 'ชดเชยวันวิสาขบูชา',
+        '2026-06-03' => 'วันเฉลิมพระชนมพรรษาสมเด็จพระราชินี',
+        '2026-07-28' => 'วันเฉลิมพระชนมพรรษา ร.10',
+        '2026-07-29' => 'วันอาสาฬหบูชา',
+        '2026-08-12' => 'วันแม่แห่งชาติ',
+        '2026-10-13' => 'วันนวมินทรมหาราช',
+        '2026-10-23' => 'วันปิยมหาราช',
+        '2026-12-07' => 'ชดเชยวันพ่อแห่งชาติ',
+        '2026-12-10' => 'วันรัฐธรรมนูญ',
+        '2026-12-31' => 'วันสิ้นปี',
+    ];
+
+    private const PROBLEMS = [
+        'เครื่องเปิดไม่ติด', 'เชื่อมต่ออินเทอร์เน็ตไม่ได้', 'พอร์ตสวิตช์ไม่ทำงาน', 'เครื่องพิมพ์กระดาษติด',
+        'ระบบช้าผิดปกติ', 'ฮาร์ดดิสก์มีเสียงดัง', 'จอภาพไม่แสดงผล', 'ไฟแจ้งเตือนสีส้มที่เซิร์ฟเวอร์',
+    ];
+
     public function __construct(
         private TenantContext $context,
         private SaveAsset $saveAsset,
         private SaveContract $saveContract,
         private AddContractAssets $addContractAssets,
+        private CoveringContracts $coveringContracts,
+        private OpenTicket $openTicket,
+        private AssignTicket $assignTicket,
+        private MoveTicket $moveTicket,
     ) {}
 
     public function run(): void
@@ -122,13 +161,15 @@ class DemoSeeder extends Seeder
     {
         $branches = collect(self::BRANCHES)->map(fn (array $branch) => Branch::create($branch));
 
-        $this->user("admin@{$subdomain}.test", $this->name(), 'admin_company');
-        $this->user("helpdesk@{$subdomain}.test", $this->name(), 'helpdesk', ['position' => 'เจ้าหน้าที่ Helpdesk']);
-        $this->user("tech1@{$subdomain}.test", $this->name(), 'technician', [
-            'branch_id' => $branches[0]->id, 'position' => 'ช่างเทคนิค', 'service_lines' => ['network', 'datacenter'],
-        ]);
-        $this->user("tech2@{$subdomain}.test", $this->name(), 'technician', [
-            'branch_id' => $branches[1]->id, 'position' => 'ช่างเทคนิค', 'service_lines' => ['pc'],
+        $admin = $this->user("admin@{$subdomain}.test", $this->name(), 'admin_company');
+        $helpdesk = $this->user("helpdesk@{$subdomain}.test", $this->name(), 'helpdesk', ['position' => 'เจ้าหน้าที่ Helpdesk']);
+        $technicians = collect([
+            $this->user("tech1@{$subdomain}.test", $this->name(), 'technician', [
+                'branch_id' => $branches[0]->id, 'position' => 'ช่างเทคนิค', 'service_lines' => ['network', 'datacenter'],
+            ]),
+            $this->user("tech2@{$subdomain}.test", $this->name(), 'technician', [
+                'branch_id' => $branches[1]->id, 'position' => 'ช่างเทคนิค', 'service_lines' => ['pc'],
+            ]),
         ]);
         $this->user("user@{$subdomain}.test", $this->name(), 'user', ['branch_id' => $branches[0]->id]);
 
@@ -154,6 +195,73 @@ class DemoSeeder extends Seeder
             // The first customer's contract is about to expire, so the expiry e-mail has something to send.
             $this->contracts($customer, $i === 0 ? 30 : fake()->numberBetween(90, 330));
         }
+
+        foreach (self::HOLIDAYS as $date => $name) {
+            Holiday::create(['date' => $date, 'name' => $name]);
+        }
+
+        $this->tickets($admin, $helpdesk, $technicians);
+    }
+
+    /**
+     * Tickets of the last ten days in every status. Each one is opened "back then" (so SLA due
+     * times and breaches look real) and moved along the workflow by the people who would do it.
+     *
+     * @param  Collection<int, User>  $technicians
+     */
+    private function tickets(User $admin, User $helpdesk, Collection $technicians): void
+    {
+        $assets = Asset::whereNotNull('customer_id')->inRandomOrder()->limit(14)->get();
+        $plans = [
+            // [moves after opening, days ago]
+            [[], 0], [[], 1],
+            [['assign'], 0], [['assign'], 2],
+            [['assign', 'start'], 1], [['assign', 'start'], 4],
+            [['assign', 'start', 'hold'], 3],
+            [['assign', 'start', 'resolve'], 2],
+            [['assign', 'start', 'resolve', 'approve'], 5], [['assign', 'start', 'resolve', 'approve'], 8],
+            [['assign', 'start', 'resolve', 'approve'], 9],
+            [['cancel'], 6],
+        ];
+
+        // The real time: setTestNow below moves the clock for each ticket.
+        $realNow = now()->toImmutable();
+
+        foreach ($plans as $i => [$moves, $daysAgo]) {
+            $asset = $assets[$i % $assets->count()];
+            $technician = $technicians->random();
+            // Today's tickets 4 hours ago, so no step lands in the future.
+            $opened = $daysAgo === 0
+                ? $realNow->subHours(4)
+                : $realNow->subDays($daysAgo)->setTime(fake()->numberBetween(8, 16), fake()->randomElement([0, 15, 30, 45]));
+            Carbon::setTestNow($opened);
+
+            $contract = $this->coveringContracts->handle($asset->customer_id, $asset->id)[0] ?? null;
+            $ticket = $this->openTicket->handle($helpdesk, [
+                'customer_id' => $asset->customer_id,
+                'asset_id' => $asset->id,
+                'contract_id' => $contract['id'] ?? null,
+                'title' => fake()->randomElement(self::PROBLEMS)." ({$asset->asset_code})",
+                'description' => 'ลูกค้าแจ้งทางโทรศัพท์ ต้องการให้ช่างเข้าตรวจสอบ',
+                'priority' => fake()->randomElement(['critical', 'high', 'high', 'medium', 'medium', 'low']),
+                'source' => fake()->randomElement(Ticket::SOURCES),
+                'contact_name' => $this->name(),
+                'contact_phone' => fake()->phoneNumber(),
+            ]);
+
+            foreach ($moves as $move) {
+                Carbon::setTestNow(now()->addMinutes(fake()->numberBetween(20, 180)));
+                match ($move) {
+                    'assign' => $this->assignTicket->handle($ticket, $technician->id, $helpdesk),
+                    'start', 'resolve' => $this->moveTicket->handle($ticket, $move, $technician),
+                    'hold' => $this->moveTicket->handle($ticket, 'hold', $technician, 'รออะไหล่จากผู้จำหน่าย'),
+                    'approve' => $this->moveTicket->handle($ticket, 'approve', $admin),
+                    'cancel' => $this->moveTicket->handle($ticket, 'cancel', $helpdesk, 'ลูกค้าแจ้งซ้ำกับใบงานเดิม'),
+                };
+            }
+        }
+
+        Carbon::setTestNow();
     }
 
     /**

@@ -2,7 +2,7 @@
 
 namespace App\Modules\Contract\Actions;
 
-use App\Modules\Asset\Actions\AssetCustomers;
+use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Contract\Models\Contract;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -13,7 +13,7 @@ use Illuminate\Validation\ValidationException;
  */
 class AddContractAssets
 {
-    public function __construct(private AssetCustomers $assetCustomers) {}
+    public function __construct(private AssetDetails $assetDetails) {}
 
     /**
      * @param  list<int>  $assetIds
@@ -21,7 +21,7 @@ class AddContractAssets
      */
     public function handle(Contract $contract, array $assetIds): int
     {
-        $customers = $this->assetCustomers->handle($assetIds);
+        $customers = array_map(fn (array $asset) => $asset['customer_id'], $this->assetDetails->handle($assetIds));
 
         foreach ($assetIds as $assetId) {
             if (! array_key_exists($assetId, $customers)) {

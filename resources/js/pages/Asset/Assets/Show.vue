@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
+import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
+import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
@@ -50,7 +52,8 @@ const props = defineProps<{
     asset: AssetDetail;
     history: HistoryEntry[];
     contracts: AssetContract[] | null;
-    can: { update: boolean; delete: boolean };
+    tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
+    can: { update: boolean; delete: boolean; openTicket: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -99,6 +102,9 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     <Heading :title="asset.name" :description="t(`assets.statuses.${asset.status}`)" />
                 </div>
                 <div class="flex gap-2">
+                    <Button v-if="can.openTicket" variant="outline" as-child>
+                        <Link :href="route('service.tickets.create', { asset: asset.ulid })">{{ t('tickets.open_for_asset') }}</Link>
+                    </Button>
                     <Button v-if="can.delete" variant="outline" @click="destroy">{{ t('common.delete') }}</Button>
                     <Button v-if="can.update" as-child>
                         <Link :href="route('asset.assets.edit', asset.ulid)">{{ t('common.edit') }}</Link>
@@ -126,6 +132,29 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     </div>
                 </dl>
                 <p v-else class="text-sm text-muted-foreground">{{ t('assets.no_specs') }}</p>
+            </section>
+
+            <section v-if="tickets !== null" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('tickets.asset_tickets') }}</h3>
+                <ul v-if="tickets.length" class="divide-y rounded-md border text-sm">
+                    <li v-for="ticket in tickets" :key="ticket.ulid" class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                        <span>
+                            <Link
+                                :href="route('service.tickets.show', ticket.ulid)"
+                                class="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                                {{ ticket.ticket_no }}
+                            </Link>
+                            <span class="ml-2">{{ ticket.title }}</span>
+                            <span class="ml-2 text-xs text-muted-foreground">{{ dateTime(ticket.created_at) }}</span>
+                        </span>
+                        <span class="flex items-center gap-2">
+                            <TicketPriorityBadge :priority="ticket.priority" />
+                            <TicketStatusBadge :status="ticket.status" />
+                        </span>
+                    </li>
+                </ul>
+                <p v-else class="text-sm text-muted-foreground">{{ t('tickets.no_asset_tickets') }}</p>
             </section>
 
             <section v-if="contracts !== null" class="space-y-2">

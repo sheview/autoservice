@@ -16,6 +16,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
+use App\Modules\Service\Actions\TicketsForAsset;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -87,13 +88,14 @@ class AssetController extends Controller
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.created', ['code' => $asset->asset_code]));
     }
 
-    public function show(Request $request, Asset $asset, ContractsForAsset $contractsForAsset): Response
+    public function show(Request $request, Asset $asset, ContractsForAsset $contractsForAsset, TicketsForAsset $ticketsForAsset): Response
     {
         Gate::authorize('view', $asset);
 
         $asset->load(['category', 'branch:id,name']);
         $user = $request->user();
         $showContracts = $this->modules->enabled('contract') && $user->can('contract.view');
+        $serviceOn = $this->modules->enabled('service');
 
         return Inertia::render('Asset/Assets/Show', [
             'asset' => [
@@ -110,6 +112,8 @@ class AssetController extends Controller
             ],
             // null = the user cannot see contracts here (module off or no contract.view)
             'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
+            // null = the user cannot see tickets here (module off or no ticket.view)
+            'tickets' => $serviceOn && $user->can('ticket.view') ? $ticketsForAsset->handle($asset->id) : null,
             'history' => $asset->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,
                 'event' => $log->event,
@@ -120,6 +124,7 @@ class AssetController extends Controller
             'can' => [
                 'update' => $user->can('update', $asset),
                 'delete' => $user->can('delete', $asset),
+                'openTicket' => $serviceOn && $user->can('ticket.create'),
             ],
         ]);
     }

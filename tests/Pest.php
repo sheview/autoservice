@@ -8,6 +8,8 @@ use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -137,5 +139,17 @@ function createContract(Customer $customer, array $attributes = []): Contract
         'ends_on' => now()->addMonths(11)->toDateString(),
         'service_window' => '8x5',
         'notify_days_before' => 60,
+    ]);
+}
+
+/**
+ * A ticket opened by $actor through OpenTicket (number, SLA and due times as in the app).
+ */
+function openTicket(User $actor, array $attributes = []): Ticket
+{
+    return app(OpenTicket::class)->handle($actor, $attributes + [
+        'title' => 'Printer does not print',
+        'priority' => 'medium',
+        'source' => 'phone',
     ]);
 }
