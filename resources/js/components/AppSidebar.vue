@@ -2,24 +2,27 @@
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
-import { useCan } from '@/composables/useCan';
-import { t } from '@/lib/i18n';
-import { type NavItem } from '@/types';
-import { Link } from '@inertiajs/vue3';
-import { Building2, LayoutGrid, ShieldCheck, Users } from 'lucide-vue-next';
+import { type NavItem, type SharedData } from '@/types';
+import { Link, usePage } from '@inertiajs/vue3';
+import { Building2, Circle, HardDrive, LayoutGrid, ShieldCheck, Tags, Users, type LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
-const can = useCan();
+const page = usePage<SharedData>();
 
-// The menu becomes config-driven (permissions + enabled modules) in step 04.
+// Icon names used in config/modules.php "navigation".
+const icons: Record<string, LucideIcon> = {
+    'layout-grid': LayoutGrid,
+    'hard-drive': HardDrive,
+    tags: Tags,
+    users: Users,
+    'shield-check': ShieldCheck,
+    'building-2': Building2,
+};
+
+// Built on the server from config/modules.php (permission + enabled modules).
 const mainNavItems = computed<NavItem[]>(() =>
-    [
-        { title: t('nav.dashboard'), href: '/dashboard', icon: LayoutGrid },
-        { title: t('nav.users'), href: '/users', icon: Users, permission: 'user.view' },
-        { title: t('nav.roles'), href: '/roles', icon: ShieldCheck, permission: 'role.view' },
-        { title: t('nav.tenants'), href: '/platform/impersonation', icon: Building2, permission: 'platform.impersonate' },
-    ].filter((item: NavItem) => !item.permission || can(item.permission)),
+    page.props.navigation.map((item) => ({ title: item.title, href: item.href, icon: icons[item.icon] ?? Circle })),
 );
 </script>
 

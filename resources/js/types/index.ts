@@ -15,8 +15,6 @@ export interface NavItem {
     href: string;
     icon?: LucideIcon;
     isActive?: boolean;
-    /** Show the item only when the user has this permission. */
-    permission?: string;
 }
 
 export interface SharedData {
@@ -25,6 +23,8 @@ export interface SharedData {
     auth: Auth;
     tenant: { name: string; is_platform: boolean } | null;
     impersonation: { tenant: { name: string } } | null;
+    /** Sidebar items built on the server from config/modules.php; icon is a lucide icon name. */
+    navigation: { title: string; href: string; icon: string }[];
     flash: { success: string | null };
     locale: string;
     translations: Record<string, unknown>;

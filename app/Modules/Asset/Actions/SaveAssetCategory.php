@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Modules\Asset\Actions;
+
+use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Asset\Support\SpecFields;
+
+/**
+ * Creates or updates an asset category and its spec fields.
+ * Values of a removed field stay on the assets but are no longer shown or validated.
+ */
+class SaveAssetCategory
+{
+    /**
+     * @param  array{name: string, code_prefix: string, service_line?: string|null, spec_fields?: list<array<string, mixed>>}  $data
+     */
+    public function handle(?AssetCategory $category, array $data): AssetCategory
+    {
+        $category ??= new AssetCategory;
+
+        $category->fill([
+            'name' => trim($data['name']),
+            'code_prefix' => strtoupper($data['code_prefix']),
+            'service_line' => $data['service_line'] ?? null,
+            'spec_fields' => SpecFields::clean($data['spec_fields'] ?? []),
+        ])->save();
+
+        return $category;
+    }
+}

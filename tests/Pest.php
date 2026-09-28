@@ -1,5 +1,8 @@
 <?php
 
+use App\Modules\Asset\Actions\SaveAsset;
+use App\Modules\Asset\Models\Asset;
+use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Tenancy\Models\Tenant;
@@ -79,4 +82,26 @@ function createSuperadmin(array $attributes = []): User
     $platform = Tenant::create(['name' => 'Platform', 'slug' => 'platform', 'subdomain' => 'admin', 'is_platform' => true]);
 
     return userWithRole(PermissionCatalog::SUPERADMIN, $attributes, $platform);
+}
+
+/**
+ * An asset category in the current tenant.
+ */
+function createAssetCategory(array $attributes = []): AssetCategory
+{
+    static $n = 0;
+
+    return AssetCategory::create($attributes + ['name' => 'Category '.++$n, 'code_prefix' => 'PC']);
+}
+
+/**
+ * An asset in the current tenant, saved through SaveAsset (so it gets a generated code).
+ */
+function createAsset(AssetCategory $category, array $attributes = []): Asset
+{
+    return app(SaveAsset::class)->handle(null, $attributes + [
+        'category_id' => $category->id,
+        'name' => 'Asset',
+        'status' => Asset::STATUS_IN_USE,
+    ]);
 }

@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Impersonation;
+use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -41,6 +42,11 @@ class HandleInertiaRequests extends Middleware
         $impersonation = app(Impersonation::class);
         $tenant = app(TenantContext::class)->tenant();
         $user = $request->user();
+        $permissions = fn () => match (true) {
+            $user === null => [],
+            $impersonation->active() => PermissionCatalog::tenantPermissions(),
+            default => $user->getAllPermissions()->pluck('name')->values()->all(),
+        };
 
         return [
             ...parent::share($request),
@@ -48,12 +54,10 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user' => $user,
                 // The UI uses these only to show or hide things; the server always checks again.
-                'permissions' => fn () => match (true) {
-                    $user === null => [],
-                    $impersonation->active() => PermissionCatalog::tenantPermissions(),
-                    default => $user->getAllPermissions()->pluck('name')->values(),
-                },
+                'permissions' => $permissions,
             ],
+            // Sidebar from config/modules.php, filtered by permission and the tenant's modules.
+            'navigation' => fn () => $user ? app(Modules::class)->navigation($permissions()) : [],
             'tenant' => $tenant ? ['name' => $tenant->name, 'is_platform' => $tenant->is_platform] : null,
             'impersonation' => $impersonation->active() ? ['tenant' => ['name' => $impersonation->tenant()->name]] : null,
             'flash' => [
