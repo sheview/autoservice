@@ -16,5 +16,8 @@ export function t(key: string, replace: Record<string, string | number> = {}): s
         return key;
     }
 
-    return Object.entries(replace).reduce((text, [name, val]) => text.replaceAll(`:${name}`, String(val)), value);
+    // Longest name first, so ":to" does not eat the start of ":total".
+    return Object.entries(replace)
+        .sort(([a], [b]) => b.length - a.length)
+        .reduce((text, [name, val]) => text.replaceAll(`:${name}`, String(val)), value);
 }

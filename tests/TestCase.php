@@ -25,13 +25,16 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * A request switches the tenant (ResolveTenant). Put the test code back in the tenant
-     * it was in, so assertions after a request read the same tenant as before.
+     * A request starts without a tenant, like a real one: everything that runs before
+     * ResolveTenant (e.g. route model binding) must not see the test's tenant.
+     * Afterwards the test code is put back in the tenant it was in, so assertions after
+     * a request read the same tenant as before.
      */
     public function call($method, $uri, $parameters = [], $cookies = [], $files = [], $server = [], $content = null)
     {
         $context = app(TenantContext::class);
         $previous = $context->id();
+        $context->forget();
 
         try {
             return parent::call($method, $uri, $parameters, $cookies, $files, $server, $content);

@@ -8,6 +8,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,6 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);
+
+        // The tenant must be set before route model binding, or {asset} / {user} would be
+        // looked up without a tenant (tenant scope = no rows) and every such URL would 404.
+        $middleware->prependToPriorityList(SubstituteBindings::class, ResolveTenant::class);
 
         $middleware->alias([
             'module' => EnsureModuleEnabled::class,
