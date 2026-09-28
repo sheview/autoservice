@@ -10,7 +10,9 @@ export function useListFilters<T extends Record<string, unknown>>(routeName: str
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const reload = () => {
-        const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== null && value !== ''));
+        const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== null && value !== '')) as Parameters<
+            typeof router.get
+        >[1];
         router.get(route(routeName), query, { preserveState: true, preserveScroll: true, replace: true });
     };
 

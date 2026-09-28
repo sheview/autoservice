@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { Head, Link } from '@inertiajs/vue3';
+import type { SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import type { StyleValue } from 'vue';
+
+const page = usePage<SharedData>();
+
+// "plus-darker" is a valid blend mode (Safari) that the CSS type definitions do not know yet.
+const plusDarker = { mixBlendMode: 'plus-darker' } as unknown as StyleValue;
 </script>
 
 <template>
@@ -11,7 +18,7 @@ import { Head, Link } from '@inertiajs/vue3';
         <header class="not-has-[nav]:hidden mb-6 w-full max-w-[335px] text-sm lg:max-w-4xl">
             <nav class="flex items-center justify-end gap-4">
                 <Link
-                    v-if="$page.props.auth.user"
+                    v-if="page.props.auth.user"
                     :href="route('dashboard')"
                     class="inline-block rounded-sm border border-[#19140035] px-5 py-1.5 text-sm leading-normal text-[#1b1b18] hover:border-[#1915014a] dark:border-[#3E3E3A] dark:text-[#EDEDEC] dark:hover:border-[#62605b]"
                 >
@@ -209,7 +216,7 @@ import { Head, Link } from '@inertiajs/vue3';
                             />
                         </g>
                         <g
-                            :style="{ mixBlendMode: 'plus-darker' }"
+                            :style="plusDarker"
                             class="duration-750 starting:translate-y-4 starting:opacity-0 translate-y-0 opacity-100 transition-all delay-300"
                         >
                             <path

@@ -108,7 +108,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <span v-else>{{ t(`users.${column.key}`) }}</span>
                             </th>
                             <th class="px-4 py-2 font-medium">{{ t('common.status') }}</th>
-                            <th class="px-4 py-2 font-medium text-right">{{ t('common.actions') }}</th>
+                            <th class="px-4 py-2 text-right font-medium">{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>

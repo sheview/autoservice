@@ -54,9 +54,9 @@ const filters = useListFilters('identity.roles.index', props.filters);
                         <tr>
                             <th class="px-4 py-2 font-medium">{{ t('roles.label') }}</th>
                             <th class="px-4 py-2 font-medium">{{ t('roles.name') }}</th>
-                            <th class="px-4 py-2 font-medium text-right">{{ t('roles.users_count') }}</th>
-                            <th class="px-4 py-2 font-medium text-right">{{ t('roles.permissions_count') }}</th>
-                            <th class="px-4 py-2 font-medium text-right">{{ t('common.actions') }}</th>
+                            <th class="px-4 py-2 text-right font-medium">{{ t('roles.users_count') }}</th>
+                            <th class="px-4 py-2 text-right font-medium">{{ t('roles.permissions_count') }}</th>
+                            <th class="px-4 py-2 text-right font-medium">{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
