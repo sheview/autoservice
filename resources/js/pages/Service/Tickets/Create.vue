@@ -30,6 +30,7 @@ interface CoveringContract {
 
 const props = defineProps<{
     preset: { asset: AssetOption | null; customer_id: number | null };
+    customerAccount: boolean;
     customers: { id: number; code: string; name: string }[];
     assetOptions: AssetOption[];
     contracts: CoveringContract[];
@@ -124,7 +125,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
             <form class="space-y-8" @submit.prevent="submit">
                 <section class="grid gap-6 sm:grid-cols-2">
-                    <div v-if="customers.length" class="grid gap-2 sm:col-span-2">
+                    <div v-if="customers.length && !customerAccount" class="grid gap-2 sm:col-span-2">
                         <Label for="customer_id">{{ t('tickets.customer') }}</Label>
                         <select id="customer_id" v-model="form.customer_id" :class="selectClass">
                             <option :value="null">{{ t('tickets.no_customer') }}</option>
@@ -173,7 +174,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.asset_id" />
                     </div>
 
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div v-if="!customerAccount" class="grid gap-2 sm:col-span-2">
                         <Label for="contract_id">{{ t('tickets.contract') }}</Label>
                         <select v-if="contracts.length" id="contract_id" v-model="form.contract_id" :class="selectClass">
                             <option v-for="c in contracts" :key="c.id" :value="c.id">
@@ -223,7 +224,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.priority" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div v-if="!customerAccount" class="grid gap-2">
                         <Label for="source">{{ t('tickets.source') }}</Label>
                         <select id="source" v-model="form.source" :class="selectClass">
                             <option v-for="source in sources" :key="source" :value="source">{{ t(`tickets.sources.${source}`) }}</option>

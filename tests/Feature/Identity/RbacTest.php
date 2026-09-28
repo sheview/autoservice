@@ -6,10 +6,10 @@ use App\Modules\Tenancy\Models\Branch;
 
 it('seeds the default roles into every new tenant', function () {
     expect(Role::orderBy('name')->pluck('name')->all())
-        ->toBe(['admin_company', 'helpdesk', 'technician', 'user']);
+        ->toBe(['admin_company', 'customer', 'helpdesk', 'technician', 'user']);
 
     $other = createTenant('other');
-    expect(asTenant($other, fn () => Role::count()))->toBe(4);
+    expect(asTenant($other, fn () => Role::count()))->toBe(5);
 });
 
 it('does not let a technician of branch A open data of branch B', function () {

@@ -55,7 +55,9 @@ class TicketActionController extends Controller
             attributes: ['body' => __('service.fields.comment')],
         );
 
-        $commentOnTicket->handle($ticket, $validated['body'], $request->boolean('is_internal'), $request->user());
+        // Customer accounts cannot write internal notes (they would not see them either).
+        $internal = $request->boolean('is_internal') && $request->user()->customer_id === null;
+        $commentOnTicket->handle($ticket, $validated['body'], $internal, $request->user());
 
         return back()->with('success', __('service.tickets.commented'));
     }

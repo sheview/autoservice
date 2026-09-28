@@ -16,6 +16,7 @@ class AssignTicket
     public function __construct(
         private RecordTicketEvent $recordEvent,
         private UserNames $userNames,
+        private NotifyTicketEvent $notify,
     ) {}
 
     public function handle(Ticket $ticket, ?int $assigneeId, User $actor): Ticket
@@ -43,6 +44,10 @@ class AssignTicket
             'to_status' => $ticket->status,
             'body' => $assigneeId ? ($this->userNames->handle([$assigneeId])[$assigneeId] ?? null) : null,
         ]);
+
+        if ($assigneeId !== null) {
+            $this->notify->handle($ticket, 'assigned', $actor);
+        }
 
         return $ticket;
     }

@@ -17,6 +17,7 @@ interface UserRow {
     employee_code: string | null;
     position: string | null;
     branch: string | null;
+    customer: string | null;
     role: string | null;
     is_active: boolean;
 }
@@ -120,7 +121,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="px-4 py-2">{{ user.email }}</td>
                             <td class="px-4 py-2">{{ user.employee_code ?? '—' }}</td>
                             <td class="px-4 py-2">{{ user.branch ?? t('users.no_branch') }}</td>
-                            <td class="px-4 py-2">{{ user.role ?? '—' }}</td>
+                            <td class="px-4 py-2">
+                                <div>{{ user.role ?? '—' }}</div>
+                                <div v-if="user.customer" class="text-xs text-muted-foreground">{{ user.customer }}</div>
+                            </td>
                             <td class="px-4 py-2">
                                 <span :class="user.is_active ? 'text-green-700 dark:text-green-400' : 'text-muted-foreground'">
                                     {{ user.is_active ? t('common.active') : t('common.inactive') }}

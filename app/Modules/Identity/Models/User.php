@@ -31,6 +31,7 @@ class User extends Authenticatable
         'email',
         'password',
         'branch_id',
+        'customer_id',
         'employee_code',
         'position',
         'phone',
@@ -66,7 +67,7 @@ class User extends Authenticatable
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email', 'branch_id', 'employee_code', 'position', 'phone', 'service_lines', 'is_active'])
+            ->logOnly(['name', 'email', 'branch_id', 'customer_id', 'employee_code', 'position', 'phone', 'service_lines', 'is_active'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }

@@ -3,10 +3,13 @@
 namespace App\Modules\Identity\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\SaveUser;
 use App\Modules\Identity\Http\Requests\UserRequest;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -17,6 +20,11 @@ use Inertia\Response;
 class UserController extends Controller
 {
     private const SORTABLE = ['name', 'email', 'employee_code', 'created_at'];
+
+    public function __construct(
+        private Modules $modules,
+        private ListCustomers $listCustomers,
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -30,6 +38,8 @@ class UserController extends Controller
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'name',
             'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
+
+        $customerNames = collect($this->customerOptions(withTrashed: true))->pluck('name', 'id');
 
         $users = User::query()
             ->with(['branch:id,name', 'roles:id,name,label'])
@@ -51,6 +61,7 @@ class UserController extends Controller
                 'employee_code' => $user->employee_code,
                 'position' => $user->position,
                 'branch' => $user->branch?->name,
+                'customer' => $customerNames[$user->customer_id] ?? null,
                 'role' => $user->roles->first()?->label,
                 'is_active' => $user->is_active,
             ]);
@@ -100,6 +111,7 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'branch_id' => $user->branch_id,
+                'customer_id' => $user->customer_id,
                 'employee_code' => $user->employee_code,
                 'position' => $user->position,
                 'phone' => $user->phone,
@@ -109,6 +121,8 @@ class UserController extends Controller
             ] : null,
             'branches' => $this->branchOptions(),
             'roles' => $this->roleOptions(),
+            'customers' => $this->customerOptions(),
+            'customerRole' => PermissionCatalog::CUSTOMER_ROLE,
             'serviceLines' => User::SERVICE_LINES,
         ];
     }
@@ -116,6 +130,16 @@ class UserController extends Controller
     private function branchOptions(): array
     {
         return Branch::orderBy('name')->get(['id', 'name'])->toArray();
+    }
+
+    /**
+     * Customers (Contract module) a customer account can belong to; none when the module is off.
+     *
+     * @return list<array{id: int, code: string, name: string}>
+     */
+    private function customerOptions(bool $withTrashed = false): array
+    {
+        return $this->modules->enabled('contract') ? $this->listCustomers->handle($withTrashed) : [];
     }
 
     private function roleOptions(): array

@@ -6,8 +6,9 @@ use App\Modules\Identity\Models\User;
 use Illuminate\Support\Collection;
 
 /**
- * Active users of the current tenant who hold a permission through one of their roles,
- * e.g. who to notify about something (for other modules, which do not use User directly).
+ * Active staff of the current tenant who hold a permission through one of their roles,
+ * e.g. who to notify or who can be given a job (for other modules, which do not use User directly).
+ * Customer accounts are never included: they are not staff, whatever their role allows.
  */
 class UsersWithPermission
 {
@@ -16,6 +17,6 @@ class UsersWithPermission
      */
     public function handle(string $permission): Collection
     {
-        return User::permission($permission)->where('is_active', true)->get();
+        return User::permission($permission)->where('is_active', true)->whereNull('customer_id')->get();
     }
 }

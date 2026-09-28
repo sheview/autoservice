@@ -61,7 +61,7 @@ const props = defineProps<{
     actions: string[];
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
-    can: { update: boolean; comment: boolean };
+    can: { update: boolean; comment: boolean; internalNotes: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -236,7 +236,7 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                             />
                             <InputError :message="comment.errors.body" />
                             <div class="flex flex-wrap items-center justify-between gap-2">
-                                <label class="flex items-center gap-2 text-sm">
+                                <label v-if="can.internalNotes" class="flex items-center gap-2 text-sm">
                                     <input v-model="comment.is_internal" type="checkbox" class="size-4 rounded border-input" />
                                     {{ t('tickets.internal') }}
                                 </label>

@@ -28,7 +28,7 @@ php artisan migrate:fresh --database=pgsql_migrate --seed
 php artisan serve          # แอป
 npm run dev                # frontend
 php artisan queue:listen   # งานเบื้องหลัง เช่น นำเข้า Excel, อีเมลสัญญาใกล้หมดอายุ
-php artisan schedule:work  # งานตามเวลา เช่น contracts:notify-expiring ทุกวัน 08:00
+php artisan schedule:work  # งานตามเวลา: contracts:notify-expiring (08:00), tickets:notify-sla-breaches (ทุก 15 นาที)
 ```
 
 รหัสผ่านทุกบัญชีคือ `password`
@@ -38,6 +38,7 @@ php artisan schedule:work  # งานตามเวลา เช่น contrac
 | `admin@platform.test` | superadmin ของแพลตฟอร์ม (เข้าดูในนามบริษัทลูกค้า, เปิด/ปิดโมดูล) |
 | `admin@itsol.test`, `admin@netpro.test` | ผู้ดูแลระบบบริษัท |
 | `helpdesk@…`, `tech1@…`, `tech2@…`, `user@…` | บทบาทอื่นของแต่ละบริษัท (tech ถูกจำกัดสาขา) |
+| `customer@itsol.test`, `customer@netpro.test` | บัญชีลูกค้า (CUST001) เห็นเฉพาะใบงานและทรัพย์สินของตัวเอง |
 
 บน production ต้องตั้ง cron `* * * * * php artisan schedule:run` และรัน queue worker (Horizon)
 

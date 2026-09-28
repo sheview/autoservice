@@ -211,7 +211,12 @@ class AssetController extends Controller
      */
     private function customers(bool $withTrashed = false): array
     {
-        return $this->modules->enabled('contract') ? $this->listCustomers->handle($withTrashed) : [];
+        $customers = $this->modules->enabled('contract') ? $this->listCustomers->handle($withTrashed) : [];
+
+        // A customer account only ever learns about its own customer.
+        $own = request()->user()?->customer_id;
+
+        return $own === null ? $customers : array_values(array_filter($customers, fn (array $c) => $c['id'] === $own));
     }
 
     /**

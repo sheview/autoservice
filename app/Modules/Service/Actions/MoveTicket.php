@@ -23,6 +23,7 @@ class MoveTicket
     public function __construct(
         private TicketSla $sla,
         private RecordTicketEvent $recordEvent,
+        private NotifyTicketEvent $notify,
     ) {}
 
     public function handle(Ticket $ticket, string $action, User $actor, ?string $comment = null): Ticket
@@ -62,6 +63,11 @@ class MoveTicket
                 'to_status' => $ticket->status,
                 'body' => filled($comment) ? $comment : null,
             ]);
+
+            // Ask whoever confirms the fix to check it.
+            if ($action === 'resolve') {
+                $this->notify->handle($ticket, 'resolved', $actor);
+            }
 
             return $ticket;
         });

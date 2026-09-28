@@ -88,19 +88,25 @@ class TicketController extends Controller
             $asset = $found ? ($assetSummaries->handle($user, ['ids' => [$found['id']]])[0] ?? null) : null;
         }
 
-        $customerId = $request->integer('customer_id') ?: $asset['customer_id'] ?? null;
+        // A customer account always opens tickets for its own customer.
+        $customerId = $user->customer_id ?? ($request->integer('customer_id') ?: $asset['customer_id'] ?? null);
         $assetId = $request->integer('asset_id') ?: $asset['id'] ?? null;
         $assetSearch = $request->string('asset_search')->trim()->value();
 
         return Inertia::render('Service/Tickets/Create', [
             'preset' => ['asset' => $asset, 'customer_id' => $customerId],
+            // Customer accounts do not pick customer, contract, source or assignee.
+            'customerAccount' => $user->customer_id !== null,
             'customers' => $this->customers(),
             'assetOptions' => fn () => $assetSearch === '' ? [] : $assetSummaries->handle($user, array_filter([
                 'customer_id' => $customerId,
                 'search' => $assetSearch,
                 'limit' => 20,
             ], fn ($value) => $value !== null)),
-            'contracts' => fn () => $this->modules->enabled('contract') ? $coveringContracts->handle($customerId, $assetId) : [],
+            // A customer account does not choose the contract (OpenTicket picks the covering one).
+            'contracts' => fn () => $this->modules->enabled('contract') && $user->customer_id === null
+                ? $coveringContracts->handle($customerId, $assetId)
+                : [],
             'assignees' => $user->can('ticket.assign')
                 ? $usersWithPermission->handle(self::ASSIGNABLE_PERMISSION)->map(fn (User $u) => $u->only(['id', 'name']))->values()
                 : [],
@@ -148,10 +154,13 @@ class TicketController extends Controller
                 ...collect(['response_due_at', 'resolve_due_at', 'responded_at', 'on_hold_since', 'resolved_at', 'closed_at', 'cancelled_at', 'created_at'])
                     ->mapWithKeys(fn ($field) => [$field => $ticket->{$field}?->toIso8601String()]),
             ],
-            'events' => $ticket->events()->orderBy('id')->get()->map(fn (TicketEvent $event) => [
-                ...$event->only(['id', 'type', 'from_status', 'to_status', 'body', 'is_internal', 'user_name']),
-                'at' => $event->created_at->toIso8601String(),
-            ]),
+            // Internal notes are for staff only.
+            'events' => $ticket->events()
+                ->when($user->customer_id !== null, fn ($q) => $q->where('is_internal', false))
+                ->orderBy('id')->get()->map(fn (TicketEvent $event) => [
+                    ...$event->only(['id', 'type', 'from_status', 'to_status', 'body', 'is_internal', 'user_name']),
+                    'at' => $event->created_at->toIso8601String(),
+                ]),
             // Workflow buttons the user may press now.
             'actions' => collect(TicketWorkflow::ACTIONS)
                 ->filter(fn (array $action, string $name) => TicketWorkflow::allows($ticket, $name) && $user->can($action['ability'], $ticket))
@@ -164,6 +173,7 @@ class TicketController extends Controller
             'can' => [
                 'update' => $user->can('update', $ticket) && in_array($ticket->status, Ticket::OPEN_STATUSES, true),
                 'comment' => $user->can('comment', $ticket),
+                'internalNotes' => $user->customer_id === null,
             ],
         ]);
     }
@@ -193,6 +203,11 @@ class TicketController extends Controller
      */
     private function customers(bool $withTrashed = false): array
     {
-        return $this->modules->enabled('contract') ? $this->listCustomers->handle($withTrashed) : [];
+        $customers = $this->modules->enabled('contract') ? $this->listCustomers->handle($withTrashed) : [];
+
+        // A customer account only ever learns about its own customer.
+        $own = request()->user()?->customer_id;
+
+        return $own === null ? $customers : array_values(array_filter($customers, fn (array $c) => $c['id'] === $own));
     }
 }

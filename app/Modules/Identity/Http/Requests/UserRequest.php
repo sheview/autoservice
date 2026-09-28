@@ -3,6 +3,7 @@
 namespace App\Modules\Identity\Http\Requests;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\CrossTenant\UniqueUserEmail;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -33,6 +34,8 @@ class UserRequest extends FormRequest
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', new UniqueUserEmail($user?->id)],
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::defaults()],
             'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at')],
+            // Set = a customer account (Contract module customer), which must have the customer role.
+            'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
             'employee_code' => ['nullable', 'string', 'max:50'],
             'position' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
@@ -49,6 +52,12 @@ class UserRequest extends FormRequest
             function ($validator) {
                 $user = $this->route('user');
                 // Do not let an admin lock themselves out.
+                // Customer accounts and the customer role go together.
+                $isCustomerRole = $this->input('role') === PermissionCatalog::CUSTOMER_ROLE;
+                if ($this->filled('customer_id') !== $isCustomerRole) {
+                    $validator->errors()->add($isCustomerRole ? 'customer_id' : 'role', __($isCustomerRole ? 'identity.users.customer_required' : 'identity.users.customer_role_only'));
+                }
+
                 if ($user?->is($this->user()) && $this->has('is_active') && ! $this->boolean('is_active')) {
                     $validator->errors()->add('is_active', __('identity.users.cannot_deactivate_self'));
                 }

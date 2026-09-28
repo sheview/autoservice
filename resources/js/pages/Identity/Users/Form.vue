@@ -8,12 +8,14 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { computed, watch } from 'vue';
 
 interface UserForm {
     id: number;
     name: string;
     email: string;
     branch_id: number | null;
+    customer_id: number | null;
     employee_code: string | null;
     position: string | null;
     phone: string | null;
@@ -26,6 +28,8 @@ const props = defineProps<{
     user: UserForm | null;
     branches: { id: number; name: string }[];
     roles: { name: string; label: string }[];
+    customers: { id: number; code: string; name: string }[];
+    customerRole: string;
     serviceLines: string[];
 }>();
 
@@ -41,12 +45,20 @@ const form = useForm({
     password: '',
     password_confirmation: '',
     branch_id: props.user?.branch_id ?? null,
+    customer_id: props.user?.customer_id ?? null,
     employee_code: props.user?.employee_code ?? '',
     position: props.user?.position ?? '',
     phone: props.user?.phone ?? '',
     service_lines: props.user?.service_lines ?? [],
     is_active: props.user?.is_active ?? true,
     role: props.user?.role ?? props.roles[0]?.name ?? '',
+});
+
+// A customer account belongs to a customer and has the customer role only.
+const isCustomerAccount = computed(() => form.role === props.customerRole);
+watch(isCustomerAccount, (yes) => {
+    if (yes) form.branch_id = null;
+    else form.customer_id = null;
 });
 
 const submit = () => {
@@ -107,7 +119,19 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.role" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div v-if="isCustomerAccount" class="grid gap-2">
+                        <Label for="customer_id">{{ t('users.customer') }}</Label>
+                        <select id="customer_id" v-model="form.customer_id" :class="selectClass" required>
+                            <option :value="null" disabled>{{ t('users.choose_customer') }}</option>
+                            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                                {{ customer.name }} ({{ customer.code }})
+                            </option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">{{ t('users.customer_hint') }}</p>
+                        <InputError :message="form.errors.customer_id" />
+                    </div>
+
+                    <div v-else class="grid gap-2">
                         <Label for="branch_id">{{ t('users.branch') }}</Label>
                         <select id="branch_id" v-model="form.branch_id" :class="selectClass">
                             <option :value="null">{{ t('users.no_branch') }}</option>

@@ -71,13 +71,19 @@ class SearchAssets
     }
 
     /**
-     * Limit an asset query to the user's branch (and assets without a branch) unless the user has branch.all.
+     * Limit an asset query to what the user may see: the user's branch (and assets without a branch)
+     * unless the user has branch.all; a customer account: the assets of its customer.
      *
      * @param  Builder<Asset>  $query
      * @return Builder<Asset>
      */
     public static function visibleTo(Builder $query, User $user): Builder
     {
+        // A customer account sees the assets of its customer only (see TenantPolicy).
+        if ($user->customer_id !== null) {
+            return $query->where('customer_id', $user->customer_id);
+        }
+
         return $query->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn (Builder $q) => $q->where(fn ($q) => $q
             ->whereNull('branch_id')
             ->when($user->branch_id, fn ($q, $branchId) => $q->orWhere('branch_id', $branchId))));

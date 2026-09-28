@@ -24,6 +24,7 @@ class OpenTicket
         private TicketSla $sla,
         private RecordTicketEvent $recordEvent,
         private UserNames $userNames,
+        private NotifyTicketEvent $notify,
     ) {}
 
     /**
@@ -42,7 +43,7 @@ class OpenTicket
             $ticket->branch_id = $asset['branch_id'] ?? $actor->branch_id;
             $ticket->reported_by = $actor->id;
             $ticket->created_at = now();
-            $this->copySla($ticket);
+            $this->copySla($ticket, $actor);
             $this->sla->refreshDueDates($ticket);
             $ticket->save();
 
@@ -57,21 +58,31 @@ class OpenTicket
                 ]);
             }
 
+            // A ticket from the portal needs someone to pick it up.
+            if ($actor->customer_id !== null) {
+                $this->notify->handle($ticket, 'opened', $actor);
+            }
+            if ($ticket->assignee_id !== null) {
+                $this->notify->handle($ticket, 'assigned', $actor);
+            }
+
             return $ticket;
         });
     }
 
     /**
      * Copy the service window and the SLA of the ticket's priority from its contract.
+     * A customer account does not choose the contract: the first covering one is used.
      */
-    private function copySla(Ticket $ticket): void
+    private function copySla(Ticket $ticket, User $actor): void
     {
-        $contract = collect($this->coveringContracts->handle($ticket->customer_id, $ticket->asset_id))
-            ->firstWhere('id', $ticket->contract_id);
+        $covering = collect($this->coveringContracts->handle($ticket->customer_id, $ticket->asset_id));
+        $contract = $actor->customer_id !== null && $ticket->contract_id === null
+            ? $covering->first()
+            : $covering->firstWhere('id', $ticket->contract_id);
 
+        $ticket->contract_id = $contract['id'] ?? null;
         if ($contract === null) {
-            $ticket->contract_id = null;
-
             return;
         }
 

@@ -52,7 +52,7 @@ class Ticket extends Model
         'ticket_no', 'customer_id', 'asset_id', 'contract_id', 'branch_id', 'title', 'description',
         'priority', 'status', 'source', 'contact_name', 'contact_phone', 'reported_by', 'assignee_id',
         'service_window', 'response_minutes', 'resolve_minutes', 'response_due_at', 'resolve_due_at',
-        'responded_at', 'on_hold_since', 'hold_minutes', 'resolved_at', 'closed_at', 'cancelled_at',
+        'responded_at', 'response_breach_notified_at', 'resolve_breach_notified_at', 'on_hold_since', 'hold_minutes', 'resolved_at', 'closed_at', 'cancelled_at',
     ];
 
     protected $attributes = [
@@ -71,6 +71,8 @@ class Ticket extends Model
             'response_due_at' => 'datetime',
             'resolve_due_at' => 'datetime',
             'responded_at' => 'datetime',
+            'response_breach_notified_at' => 'datetime',
+            'resolve_breach_notified_at' => 'datetime',
             'on_hold_since' => 'datetime',
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',

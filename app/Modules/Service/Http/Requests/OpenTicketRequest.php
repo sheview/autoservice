@@ -16,6 +16,27 @@ class OpenTicketRequest extends FormRequest
     }
 
     /**
+     * A customer account opens tickets for its own customer, through the portal, without choosing
+     * the contract (OpenTicket picks the covering one) or an assignee.
+     */
+    protected function prepareForValidation(): void
+    {
+        $user = $this->user();
+
+        if ($user->customer_id !== null) {
+            $this->merge([
+                'customer_id' => $user->customer_id,
+                'source' => 'portal',
+                'contract_id' => null,
+                'assignee_id' => null,
+                // The person reporting is the account holder unless they name someone else.
+                'contact_name' => $this->filled('contact_name') ? $this->input('contact_name') : $user->name,
+                'contact_phone' => $this->filled('contact_phone') ? $this->input('contact_phone') : $user->phone,
+            ]);
+        }
+    }
+
+    /**
      * Customer, asset, contract and assignee must be rows of the current tenant (RLS + tenant scope).
      */
     public function rules(): array

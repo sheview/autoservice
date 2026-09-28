@@ -31,6 +31,14 @@ class TicketSla
         $ticket->resolve_due_at = $window && $ticket->resolve_minutes !== null
             ? $this->calendar()->addMinutes($start, $ticket->resolve_minutes + $ticket->hold_minutes, $window)
             : null;
+
+        // A moved due time can be missed again, so it may be e-mailed again.
+        if ($ticket->isDirty('response_due_at')) {
+            $ticket->response_breach_notified_at = null;
+        }
+        if ($ticket->isDirty('resolve_due_at')) {
+            $ticket->resolve_breach_notified_at = null;
+        }
     }
 
     /**

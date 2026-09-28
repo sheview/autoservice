@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  *
  * Each ability needs the permission "{module}.{ability}" and, for a record, that the record
  * is in the user's tenant and in the user's branch (unless the user has branch.all).
+ * For a customer account (user with customer_id) the record must belong to that customer instead.
  * Override branchIdOf() when the branch is not the "branch_id" column.
  * A superadmin who is impersonating passes every check (Gate::before in IdentityServiceProvider).
  */
@@ -54,6 +55,13 @@ abstract class TenantPolicy
     {
         if ((int) $model->getAttribute('tenant_id') !== (int) $user->tenant_id) {
             return false;
+        }
+
+        // A customer account only sees records of its own customer; anything without a
+        // customer (branches, users, categories, ...) is out of its reach.
+        if ($user->customer_id !== null) {
+            return $model->getAttribute('customer_id') !== null
+                && (int) $model->getAttribute('customer_id') === (int) $user->customer_id;
         }
 
         $branchId = $this->branchIdOf($model);

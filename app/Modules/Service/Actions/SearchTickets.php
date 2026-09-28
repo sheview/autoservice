@@ -10,7 +10,8 @@ use Illuminate\Http\Request;
 
 /**
  * The ticket list query: the user's scope + filters + sort.
- * Users without branch.all see tickets of their branch, without a branch, or assigned to them.
+ * Users without branch.all see tickets of their branch, without a branch, or assigned to them;
+ * a customer account sees the tickets of its customer.
  */
 class SearchTickets
 {
@@ -92,6 +93,11 @@ class SearchTickets
      */
     public static function visibleTo(Builder $query, User $user): Builder
     {
+        // A customer account sees the tickets of its customer only (see TenantPolicy).
+        if ($user->customer_id !== null) {
+            return $query->where('customer_id', $user->customer_id);
+        }
+
         return $query->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn (Builder $q) => $q->where(fn ($q) => $q
             ->whereNull('branch_id')
             ->orWhere('assignee_id', $user->id)

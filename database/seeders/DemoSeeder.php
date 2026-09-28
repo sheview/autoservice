@@ -15,6 +15,7 @@ use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Jobs\SendTicketNotification;
 use App\Modules\Service\Models\Holiday;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
@@ -23,12 +24,14 @@ use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Bus;
 
 /**
  * Demo data for local development (never in production). Every password is "password".
  *
  *   admin@platform.test            superadmin (platform tenant)
  *   {role}@{subdomain}.test        admin, helpdesk, tech1, tech2, user in each customer tenant
+ *   customer@{subdomain}.test      customer account of the first customer (CUST001)
  *
  * Run on an empty database: php artisan migrate:fresh --database=pgsql_migrate --seed
  */
@@ -181,6 +184,11 @@ class DemoSeeder extends Seeder
             'address' => fake()->address(),
         ]));
 
+        // A customer account of the first customer: sees only that customer's tickets and assets.
+        $this->user("customer@{$subdomain}.test", $this->name(), PermissionCatalog::CUSTOMER_ROLE, [
+            'customer_id' => $customers->first()->id, 'position' => 'เจ้าหน้าที่ไอทีของลูกค้า',
+        ]);
+
         foreach (self::CATEGORIES as $definition) {
             $category = AssetCategory::create(collect($definition)->except('brands')->all());
 
@@ -223,6 +231,9 @@ class DemoSeeder extends Seeder
             [['assign', 'start', 'resolve', 'approve'], 9],
             [['cancel'], 6],
         ];
+
+        // Demo tickets must not e-mail anyone when the queue worker starts.
+        Bus::fake([SendTicketNotification::class]);
 
         // The real time: setTestNow below moves the clock for each ticket.
         $realNow = now()->toImmutable();

@@ -33,6 +33,9 @@ class PermissionCatalog
 
     public const SUPERADMIN = 'superadmin';
 
+    /** The role of customer accounts (users with customer_id); the only role they may have. */
+    public const CUSTOMER_ROLE = 'customer';
+
     /**
      * Roles seeded into every customer tenant. '*' = every permission except platform.*.
      *
@@ -66,6 +69,11 @@ class PermissionCatalog
         'user' => [
             'label' => 'ผู้ใช้งานทั่วไป',
             'permissions' => ['asset.view', 'ticket.view', 'ticket.create'],
+        ],
+        // Staff of a customer: only ever see records of their own customer (TenantPolicy).
+        'customer' => [
+            'label' => 'บัญชีลูกค้า',
+            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'ticket.approve'],
         ],
     ];
 
