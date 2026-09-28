@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -18,6 +19,7 @@ interface AssetDetail {
     notes: string | null;
     category: string | null;
     branch: string | null;
+    customer: string | null;
     purchased_at: string | null;
     purchase_price: string | null;
     warranty_expires_at: string | null;
@@ -32,9 +34,22 @@ interface HistoryEntry {
     at: string;
 }
 
+interface AssetContract {
+    id: number;
+    contract_no: string;
+    title: string;
+    customer: string | null;
+    starts_on: string;
+    ends_on: string;
+    phase: string;
+    covering: boolean;
+    service_window: string;
+}
+
 const props = defineProps<{
     asset: AssetDetail;
     history: HistoryEntry[];
+    contracts: AssetContract[] | null;
     can: { update: boolean; delete: boolean };
 }>();
 
@@ -62,6 +77,7 @@ const fieldLabel = (field: string) => t(`assets.${field.replace(/_id$/, '')}`);
 const details: [string, (a: AssetDetail) => string | null][] = [
     ['category', (a) => a.category],
     ['branch', (a) => a.branch ?? t('assets.no_branch')],
+    ['customer', (a) => a.customer],
     ['location', (a) => a.location],
     ['brand', (a) => a.brand],
     ['model', (a) => a.model],
@@ -110,6 +126,28 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     </div>
                 </dl>
                 <p v-else class="text-sm text-muted-foreground">{{ t('assets.no_specs') }}</p>
+            </section>
+
+            <section v-if="contracts !== null" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('contracts.asset_contracts') }}</h3>
+                <ul v-if="contracts.length" class="divide-y rounded-md border text-sm">
+                    <li v-for="contract in contracts" :key="contract.id" class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                        <span>
+                            <Link
+                                :href="route('contract.contracts.show', contract.id)"
+                                class="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                                {{ contract.contract_no }}
+                            </Link>
+                            <span class="ml-2">{{ contract.title }}</span>
+                            <span class="ml-2 text-xs text-muted-foreground"
+                                >{{ contract.starts_on }} – {{ contract.ends_on }} · {{ contract.service_window }}</span
+                            >
+                        </span>
+                        <ContractPhaseBadge :phase="contract.phase" />
+                    </li>
+                </ul>
+                <p v-else class="text-sm text-muted-foreground">{{ t('contracts.no_asset_contracts') }}</p>
             </section>
 
             <section v-if="asset.notes" class="space-y-2">

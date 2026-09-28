@@ -4,7 +4,7 @@ namespace App\Modules\Asset\Exports;
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Support\AssetSheet;
-use App\Modules\Asset\Support\Money;
+use App\Modules\Platform\Support\Money;
 use Illuminate\Database\Eloquent\Builder;
 use Maatwebsite\Excel\Concerns\Exportable;
 use Maatwebsite\Excel\Concerns\FromQuery;
@@ -22,10 +22,12 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
     /**
      * @param  Builder<Asset>  $query
      * @param  array<string, string>  $specFields  key => label, one column each
+     * @param  array<int, string>  $customerCodes  customer id => code
      */
     public function __construct(
         private Builder $query,
         private array $specFields,
+        private array $customerCodes = [],
     ) {}
 
     public function query(): Builder
@@ -48,6 +50,7 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             $asset->name,
             $asset->category?->name,
             $asset->branch?->code,
+            $this->customerCodes[$asset->customer_id] ?? null,
             $asset->brand,
             $asset->model,
             $asset->serial_number,

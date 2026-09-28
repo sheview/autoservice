@@ -31,6 +31,7 @@ interface AssetForm {
     name: string;
     category_id: number;
     branch_id: number | null;
+    customer_id: number | null;
     brand: string | null;
     model: string | null;
     serial_number: string | null;
@@ -47,6 +48,7 @@ const props = defineProps<{
     asset: AssetForm | null;
     categories: Category[];
     branches: { id: number; name: string }[];
+    customers: { id: number; code: string; name: string }[];
     statuses: string[];
 }>();
 
@@ -65,6 +67,7 @@ const form = useForm({
     asset_code: props.asset?.asset_code ?? '',
     name: props.asset?.name ?? '',
     branch_id: props.asset?.branch_id ?? (props.branches.length === 1 ? props.branches[0].id : null),
+    customer_id: props.asset?.customer_id ?? null,
     brand: props.asset?.brand ?? '',
     model: props.asset?.model ?? '',
     serial_number: props.asset?.serial_number ?? '',
@@ -165,6 +168,17 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                                 <option v-for="branch in branches" :key="branch.id" :value="branch.id">{{ branch.name }}</option>
                             </select>
                             <InputError :message="form.errors.branch_id" />
+                        </div>
+
+                        <div v-if="customers.length" class="grid gap-2">
+                            <Label for="customer_id">{{ t('assets.customer') }}</Label>
+                            <select id="customer_id" v-model="form.customer_id" :class="selectClass">
+                                <option :value="null">{{ t('assets.no_customer') }}</option>
+                                <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                                    {{ customer.name }} ({{ customer.code }})
+                                </option>
+                            </select>
+                            <InputError :message="form.errors.customer_id" />
                         </div>
 
                         <div class="grid gap-2">

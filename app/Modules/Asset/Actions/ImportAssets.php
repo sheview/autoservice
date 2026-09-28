@@ -6,8 +6,10 @@ use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetImport;
 use App\Modules\Asset\Support\AssetSheet;
-use App\Modules\Asset\Support\Money;
 use App\Modules\Asset\Support\SpecFields;
+use App\Modules\Contract\Actions\ListCustomers;
+use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\Money;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
@@ -37,7 +39,14 @@ class ImportAssets
     /** @var array<string, string> status key and lower(Thai label) => status key */
     private array $statuses = [];
 
-    public function __construct(private SaveAsset $saveAsset) {}
+    /** @var array<string, int> lower(customer code) and lower(name) => customer id */
+    private array $customers = [];
+
+    public function __construct(
+        private SaveAsset $saveAsset,
+        private ListCustomers $listCustomers,
+        private Modules $modules,
+    ) {}
 
     /**
      * @param  bool  $allBranches  whether the uploader may write assets of every branch
@@ -153,6 +162,12 @@ class ImportAssets
             }
         }
 
+        // Only a file with the customer column sets the customer (an older file leaves it alone).
+        $customerText = mb_strtolower((string) ($values['customer'] ?? ''));
+        if (array_key_exists('customer', $values)) {
+            $data['customer_id'] = $customerText === '' ? null : ($this->customers[$customerText] ?? null);
+        }
+
         if (! $allBranches && $branch === null && $branchText === '') {
             $data['branch_id'] = $ownBranchId;
         }
@@ -188,6 +203,9 @@ class ImportAssets
         if ($branchText !== '' && $branch === null) {
             $messages[] = __('asset.imports.unknown_branch', ['value' => $values['branch']]);
         }
+        if ($customerText !== '' && ! isset($this->customers[$customerText])) {
+            $messages[] = __('asset.imports.unknown_customer', ['value' => $values['customer']]);
+        }
         if (! $allBranches && ! in_array($data['branch_id'], [null, $ownBranchId], true)) {
             $messages[] = __('asset.imports.branch_not_allowed');
         }
@@ -219,6 +237,12 @@ class ImportAssets
         foreach (Asset::STATUSES as $status) {
             $this->statuses[$status] = $status;
             $this->statuses[mb_strtolower(__("asset.statuses.{$status}"))] = $status;
+        }
+
+        $customers = $this->modules->enabled('contract') ? $this->listCustomers->handle() : [];
+        foreach ($customers as $customer) {
+            $this->customers[mb_strtolower($customer['name'])] = $customer['id'];
+            $this->customers[mb_strtolower($customer['code'])] = $customer['id'];
         }
     }
 

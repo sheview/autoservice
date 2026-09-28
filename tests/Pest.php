@@ -3,6 +3,9 @@
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Contract\Actions\SaveContract;
+use App\Modules\Contract\Models\Contract;
+use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Tenancy\Models\Tenant;
@@ -103,5 +106,36 @@ function createAsset(AssetCategory $category, array $attributes = []): Asset
         'category_id' => $category->id,
         'name' => 'Asset',
         'status' => Asset::STATUS_IN_USE,
+    ]);
+}
+
+/**
+ * A customer (Contract module) in the current tenant.
+ */
+function createCustomer(array $attributes = []): Customer
+{
+    static $n = 0;
+    $n++;
+
+    return Customer::create($attributes + ['code' => "C{$n}", 'name' => "Customer {$n}"]);
+}
+
+/**
+ * An active contract that runs from a month ago to 11 months from now.
+ */
+function createContract(Customer $customer, array $attributes = []): Contract
+{
+    static $n = 0;
+    $n++;
+
+    return app(SaveContract::class)->handle(null, $attributes + [
+        'customer_id' => $customer->id,
+        'contract_no' => "MA-{$n}",
+        'title' => "Contract {$n}",
+        'status' => Contract::STATUS_ACTIVE,
+        'starts_on' => now()->subMonth()->toDateString(),
+        'ends_on' => now()->addMonths(11)->toDateString(),
+        'service_window' => '8x5',
+        'notify_days_before' => 60,
     ]);
 }

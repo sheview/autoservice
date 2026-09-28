@@ -4,7 +4,7 @@ import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
-import { Building2, Circle, HardDrive, LayoutGrid, ShieldCheck, Tags, Users, type LucideIcon } from 'lucide-vue-next';
+import { Briefcase, Building2, Circle, FileText, HardDrive, LayoutGrid, ShieldCheck, Tags, Users, type LucideIcon } from 'lucide-vue-next';
 import { computed } from 'vue';
 import AppLogo from './AppLogo.vue';
 
@@ -15,6 +15,8 @@ const icons: Record<string, LucideIcon> = {
     'layout-grid': LayoutGrid,
     'hard-drive': HardDrive,
     tags: Tags,
+    'file-text': FileText,
+    briefcase: Briefcase,
     users: Users,
     'shield-check': ShieldCheck,
     'building-2': Building2,

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Modules\Asset\Support;
+namespace App\Modules\Platform\Support;
 
 /**
  * Money is stored as integer satang. Forms and Excel use baht with up to 2 decimals.

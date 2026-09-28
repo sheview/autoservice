@@ -20,12 +20,15 @@
 return [
     'toggleable' => [
         'asset' => ['default' => true],
+        'contract' => ['default' => true],
     ],
 
     'navigation' => [
         ['title' => 'nav.dashboard', 'route' => 'dashboard', 'icon' => 'layout-grid'],
         ['title' => 'nav.assets', 'route' => 'asset.assets.index', 'icon' => 'hard-drive', 'permission' => 'asset.view', 'module' => 'asset'],
         ['title' => 'nav.asset_categories', 'route' => 'asset.categories.index', 'icon' => 'tags', 'permission' => 'asset_category.view', 'module' => 'asset'],
+        ['title' => 'nav.contracts', 'route' => 'contract.contracts.index', 'icon' => 'file-text', 'permission' => 'contract.view', 'module' => 'contract'],
+        ['title' => 'nav.customers', 'route' => 'contract.customers.index', 'icon' => 'briefcase', 'permission' => 'customer.view', 'module' => 'contract'],
         ['title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'user.view'],
         ['title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'role.view'],
         ['title' => 'nav.tenants', 'route' => 'platform.impersonation.index', 'icon' => 'building-2', 'permission' => 'platform.impersonate'],

@@ -33,6 +33,7 @@ class Asset extends Model
 
     protected $fillable = [
         'branch_id',
+        'customer_id',
         'category_id',
         'asset_code',
         'name',
@@ -90,7 +91,7 @@ class Asset extends Model
     {
         return LogOptions::defaults()
             ->logOnly([
-                'branch_id', 'category_id', 'asset_code', 'name', 'brand', 'model', 'serial_number', 'status',
+                'branch_id', 'customer_id', 'category_id', 'asset_code', 'name', 'brand', 'model', 'serial_number', 'status',
                 'location', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'specs', 'notes',
             ])
             ->logOnlyDirty()

@@ -128,13 +128,13 @@ it('exports the filtered list and imports the same file back as updates', functi
     $spareOnly = $this->actingAs($this->admin)->get('/assets/export?status=spare')->assertOk();
     $rows = sheetRows($spareOnly->getFile()->getPathname());
     expect($rows[0])->toBe([
-        'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ยี่ห้อ', 'รุ่น', 'Serial Number', 'สถานะ', 'ตำแหน่งที่ตั้ง',
+        'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'Serial Number', 'สถานะ', 'ตำแหน่งที่ตั้ง',
         'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
     ])
         ->and(count($rows))->toBe(2)
         ->and($rows[1][1])->toBe('Spare PC')
-        ->and($rows[1][7])->toBe('สำรอง')
-        ->and($rows[1][10])->toEqual(9900.5);
+        ->and($rows[1][8])->toBe('สำรอง')
+        ->and($rows[1][11])->toEqual(9900.5);
 
     $all = $this->actingAs($this->admin)->get('/assets/export')->assertOk();
     $file = new UploadedFile($all->getFile()->getPathname(), 'export.xlsx', null, null, true);

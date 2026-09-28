@@ -23,7 +23,7 @@ class SearchAssets
     public const EXPIRING_DAYS = 90;
 
     /**
-     * @return array{search: string, branch_id: int|null, category_id: int|null, status: string|null,
+     * @return array{search: string, branch_id: int|null, customer_id: int|null, category_id: int|null, status: string|null,
      *     warranty: string|null, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
@@ -31,6 +31,7 @@ class SearchAssets
         return [
             'search' => $request->string('search')->trim()->value(),
             'branch_id' => $request->integer('branch_id') ?: null,
+            'customer_id' => $request->integer('customer_id') ?: null,
             'category_id' => $request->integer('category_id') ?: null,
             'status' => in_array($request->input('status'), Asset::STATUSES, true) ? $request->input('status') : null,
             'warranty' => in_array($request->input('warranty'), self::WARRANTY_FILTERS, true) ? $request->input('warranty') : null,
@@ -48,10 +49,7 @@ class SearchAssets
         $today = now()->toDateString();
         $search = $filters['search'] ?? '';
 
-        return Asset::query()
-            ->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn (Builder $q) => $q->where(fn ($q) => $q
-                ->whereNull('branch_id')
-                ->when($user->branch_id, fn ($q, $branchId) => $q->orWhere('branch_id', $branchId))))
+        return self::visibleTo(Asset::query(), $user)
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->where('asset_code', 'ilike', "%{$search}%")
                 ->orWhere('name', 'ilike', "%{$search}%")
@@ -60,6 +58,7 @@ class SearchAssets
                 ->orWhere('model', 'ilike', "%{$search}%")
                 ->orWhere('location', 'ilike', "%{$search}%")))
             ->when($filters['branch_id'] ?? null, fn (Builder $q, $id) => $q->where('branch_id', $id))
+            ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['category_id'] ?? null, fn (Builder $q, $id) => $q->where('category_id', $id))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
             ->when(($filters['warranty'] ?? null) === 'active', fn (Builder $q) => $q->where('warranty_expires_at', '>=', $today))
@@ -69,5 +68,18 @@ class SearchAssets
             ->when(($filters['warranty'] ?? null) === 'none', fn (Builder $q) => $q->whereNull('warranty_expires_at'))
             ->orderBy($filters['sort'] ?? 'asset_code', $filters['direction'] ?? 'asc')
             ->orderBy('id');
+    }
+
+    /**
+     * Limit an asset query to the user's branch (and assets without a branch) unless the user has branch.all.
+     *
+     * @param  Builder<Asset>  $query
+     * @return Builder<Asset>
+     */
+    public static function visibleTo(Builder $query, User $user): Builder
+    {
+        return $query->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn (Builder $q) => $q->where(fn ($q) => $q
+            ->whereNull('branch_id')
+            ->when($user->branch_id, fn ($q, $branchId) => $q->orWhere('branch_id', $branchId))));
     }
 }

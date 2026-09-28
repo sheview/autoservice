@@ -19,6 +19,7 @@ interface AssetRow {
     serial_number: string | null;
     category: string | null;
     branch: string | null;
+    customer: string | null;
     status: string;
     warranty_expires_at: string | null;
 }
@@ -26,6 +27,7 @@ interface AssetRow {
 interface Filters {
     search: string;
     branch_id: number | null;
+    customer_id: number | null;
     category_id: number | null;
     status: string | null;
     warranty: string | null;
@@ -38,6 +40,7 @@ const props = defineProps<{
     assets: Paginated<AssetRow>;
     filters: Filters;
     branches: { id: number; name: string }[];
+    customers: { id: number; code: string; name: string }[];
     categories: { id: number; name: string }[];
     statuses: string[];
     expiringDays: number;
@@ -65,6 +68,8 @@ const columns = [
     { key: 'name', sortable: true },
     { key: 'category', sortable: false },
     { key: 'branch', sortable: false },
+    // Customers exist only when the contract module is on.
+    ...(props.customers.length ? [{ key: 'customer', sortable: false }] : []),
     { key: 'status', sortable: true },
     { key: 'warranty_expires_at', sortable: true },
 ];
@@ -116,6 +121,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <option :value="null">{{ t('assets.all_branches') }}</option>
                     <option v-for="branch in branches" :key="branch.id" :value="branch.id">{{ branch.name }}</option>
                 </select>
+                <select v-if="customers.length" v-model="filters.customer_id" :class="selectClass" :aria-label="t('assets.customer')">
+                    <option :value="null">{{ t('assets.all_customers') }}</option>
+                    <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
+                </select>
                 <select v-model="filters.status" :class="selectClass" :aria-label="t('assets.status')">
                     <option :value="null">{{ t('assets.all_statuses') }}</option>
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`assets.statuses.${status}`) }}</option>
@@ -159,6 +168,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             </td>
                             <td class="px-4 py-2">{{ asset.category ?? t('common.none') }}</td>
                             <td class="px-4 py-2">{{ asset.branch ?? t('assets.no_branch') }}</td>
+                            <td v-if="customers.length" class="px-4 py-2">{{ asset.customer ?? t('common.none') }}</td>
                             <td class="px-4 py-2">
                                 <span class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs" :class="statusClass[asset.status]">
                                     {{ t(`assets.statuses.${asset.status}`) }}

@@ -4,9 +4,9 @@ namespace App\Modules\Asset\Http\Requests;
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
-use App\Modules\Asset\Support\Money;
 use App\Modules\Asset\Support\SpecFields;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\Support\Money;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,6 +34,7 @@ class AssetRequest extends FormRequest
         return [
             'category_id' => ['required', 'integer', Rule::exists('asset_categories', 'id')->whereNull('deleted_at')],
             'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at')],
+            'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
             // Empty = next code of the category. Unique including deleted assets.
             'asset_code' => ['nullable', 'string', 'max:50', Rule::unique('assets', 'asset_code')->ignore($asset?->id)],
             'name' => ['required', 'string', 'max:255'],

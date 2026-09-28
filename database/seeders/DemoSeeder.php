@@ -5,6 +5,10 @@ namespace Database\Seeders;
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Contract\Actions\AddContractAssets;
+use App\Modules\Contract\Actions\SaveContract;
+use App\Modules\Contract\Models\Contract;
+use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Tenancy\Models\Branch;
@@ -33,6 +37,14 @@ class DemoSeeder extends Seeder
         ['code' => 'BKK', 'name' => 'สำนักงานใหญ่ กรุงเทพ', 'province' => 'กรุงเทพมหานคร'],
         ['code' => 'CNX', 'name' => 'สาขาเชียงใหม่', 'province' => 'เชียงใหม่'],
         ['code' => 'KKC', 'name' => 'สาขาขอนแก่น', 'province' => 'ขอนแก่น'],
+    ];
+
+    /** Customers of each MA company (codes CUST001...). */
+    private const CUSTOMERS = [
+        ['name' => 'บริษัท สยามค้าปลีก จำกัด (มหาชน)', 'tax_id' => '0107551000011'],
+        ['name' => 'โรงพยาบาลเมืองใหม่', 'tax_id' => '0994000123456'],
+        ['name' => 'บริษัท ขนส่งด่วนไทย จำกัด', 'tax_id' => '0105560123457'],
+        ['name' => 'มหาวิทยาลัยเทคโนโลยีภาคเหนือ', 'tax_id' => '0994000654321'],
     ];
 
     private const CATEGORIES = [
@@ -81,6 +93,8 @@ class DemoSeeder extends Seeder
     public function __construct(
         private TenantContext $context,
         private SaveAsset $saveAsset,
+        private SaveContract $saveContract,
+        private AddContractAssets $addContractAssets,
     ) {}
 
     public function run(): void
@@ -118,11 +132,63 @@ class DemoSeeder extends Seeder
         ]);
         $this->user("user@{$subdomain}.test", $this->name(), 'user', ['branch_id' => $branches[0]->id]);
 
+        $customers = collect(self::CUSTOMERS)->map(fn (array $customer, int $i) => Customer::create($customer + [
+            'code' => sprintf('CUST%03d', $i + 1),
+            'contact_name' => $this->name(),
+            'phone' => fake()->phoneNumber(),
+            'email' => fake()->companyEmail(),
+            'address' => fake()->address(),
+        ]));
+
         foreach (self::CATEGORIES as $definition) {
             $category = AssetCategory::create(collect($definition)->except('brands')->all());
 
             foreach (range(1, fake()->numberBetween(6, 12)) as $i) {
-                $this->asset($category, $definition['brands'], $branches->random());
+                // Most assets belong to a customer; the rest are the MA company's own.
+                $customer = fake()->boolean(85) ? $customers->random() : null;
+                $this->asset($category, $definition['brands'], $branches->random(), $customer);
+            }
+        }
+
+        foreach ($customers as $i => $customer) {
+            // The first customer's contract is about to expire, so the expiry e-mail has something to send.
+            $this->contracts($customer, $i === 0 ? 30 : fake()->numberBetween(90, 330));
+        }
+    }
+
+    /**
+     * Last year's (expired) contract and this year's, which ends in $daysLeft days,
+     * each covering the customer's assets.
+     */
+    private function contracts(Customer $customer, int $daysLeft): void
+    {
+        $assetIds = Asset::where('customer_id', $customer->id)->pluck('id')->all();
+        $window = fake()->randomElement(Contract::SERVICE_WINDOWS);
+        $ends = now()->addDays($daysLeft)->startOfDay();
+        $starts = $ends->copy()->subYear()->addDay();
+
+        foreach ([[$starts->copy()->subYear(), $starts->copy()->subDay()], [$starts, $ends]] as [$from, $to]) {
+            $contract = $this->saveContract->handle(null, [
+                'customer_id' => $customer->id,
+                'contract_no' => sprintf('MA-%s-%s', $from->year + 543, $customer->code),
+                'title' => 'สัญญาบำรุงรักษาระบบ '.$customer->name.' ปี '.($from->year + 543),
+                'status' => Contract::STATUS_ACTIVE,
+                'starts_on' => $from->toDateString(),
+                'ends_on' => $to->toDateString(),
+                'value' => fake()->numberBetween(5, 60) * 10_000_00, // satang
+                'service_window' => $window,
+                'pm_interval_months' => fake()->randomElement([3, 6, 12]),
+                'notify_days_before' => 60,
+                // [response, resolve] minutes per priority
+                'slas' => collect($window === '24x7'
+                    ? ['critical' => [30, 240], 'high' => [60, 480], 'medium' => [240, 1440], 'low' => [480, 2880]]
+                    : ['critical' => [120, 480], 'high' => [240, 960], 'medium' => [480, 2400]])
+                    ->map(fn (array $minutes) => ['response_minutes' => $minutes[0], 'resolve_minutes' => $minutes[1]])
+                    ->all(),
+            ]);
+
+            if ($assetIds !== []) {
+                $this->addContractAssets->handle($contract, $assetIds);
             }
         }
     }
@@ -130,7 +196,7 @@ class DemoSeeder extends Seeder
     /**
      * @param  list<string>  $models  "Brand Model ..."
      */
-    private function asset(AssetCategory $category, array $models, Branch $branch): void
+    private function asset(AssetCategory $category, array $models, Branch $branch, ?Customer $customer): void
     {
         [$brand, $model] = explode(' ', fake()->randomElement($models), 2);
         $purchased = fake()->dateTimeBetween('-5 years', '-1 month');
@@ -140,6 +206,7 @@ class DemoSeeder extends Seeder
         $this->saveAsset->handle(null, [
             'category_id' => $category->id,
             'branch_id' => fake()->boolean(90) ? $branch->id : null,
+            'customer_id' => $customer?->id,
             'name' => "{$category->name} {$brand}",
             'brand' => $brand,
             'model' => $model,

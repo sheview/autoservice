@@ -16,7 +16,7 @@ use Throwable;
 class AssetSheet
 {
     public const COLUMNS = [
-        'asset_code', 'name', 'category', 'branch', 'brand', 'model', 'serial_number', 'status',
+        'asset_code', 'name', 'category', 'branch', 'customer', 'brand', 'model', 'serial_number', 'status',
         'location', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'notes',
     ];
 

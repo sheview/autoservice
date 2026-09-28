@@ -10,9 +10,12 @@ use App\Modules\Asset\Exports\AssetsExport;
 use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
-use App\Modules\Asset\Support\Money;
+use App\Modules\Contract\Actions\ContractsForAsset;
+use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\Money;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,12 +27,18 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class AssetController extends Controller
 {
+    public function __construct(
+        private Modules $modules,
+        private ListCustomers $listCustomers,
+    ) {}
+
     public function index(Request $request, SearchAssets $search): Response
     {
         Gate::authorize('viewAny', Asset::class);
 
         $filters = SearchAssets::filtersFrom($request);
         $user = $request->user();
+        $customerNames = collect($this->customers(withTrashed: true))->pluck('name', 'id');
 
         $assets = $search->handle($user, $filters)
             ->with(['category:id,name', 'branch:id,name'])
@@ -43,6 +52,7 @@ class AssetController extends Controller
                 'serial_number' => $asset->serial_number,
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
+                'customer' => $customerNames[$asset->customer_id] ?? null,
                 'status' => $asset->status,
                 'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
             ]);
@@ -51,6 +61,7 @@ class AssetController extends Controller
             'assets' => $assets,
             'filters' => $filters,
             'branches' => $this->branchOptions($user),
+            'customers' => $this->customers(),
             'categories' => AssetCategory::orderBy('name')->get(['id', 'name']),
             'statuses' => Asset::STATUSES,
             'expiringDays' => SearchAssets::EXPIRING_DAYS,
@@ -76,18 +87,20 @@ class AssetController extends Controller
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.created', ['code' => $asset->asset_code]));
     }
 
-    public function show(Request $request, Asset $asset): Response
+    public function show(Request $request, Asset $asset, ContractsForAsset $contractsForAsset): Response
     {
         Gate::authorize('view', $asset);
 
         $asset->load(['category', 'branch:id,name']);
         $user = $request->user();
+        $showContracts = $this->modules->enabled('contract') && $user->can('contract.view');
 
         return Inertia::render('Asset/Assets/Show', [
             'asset' => [
                 ...$asset->only(['ulid', 'asset_code', 'name', 'brand', 'model', 'serial_number', 'status', 'location', 'notes']),
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
+                'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $asset->customer_id)['name'] ?? null,
                 'purchased_at' => $asset->purchased_at?->toDateString(),
                 'purchase_price' => Money::toBaht($asset->purchase_price),
                 'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
@@ -95,6 +108,8 @@ class AssetController extends Controller
                     ->map(fn (array $field) => ['label' => $field['label'], 'value' => $asset->specs[$field['key']] ?? null])
                     ->values(),
             ],
+            // null = the user cannot see contracts here (module off or no contract.view)
+            'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
             'history' => $asset->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,
                 'event' => $log->event,
@@ -141,7 +156,7 @@ class AssetController extends Controller
 
         $query = $search->handle($request->user(), SearchAssets::filtersFrom($request));
 
-        return Excel::download(new AssetsExport($query, $this->specFieldLabels()), 'assets-'.now()->format('Ymd-His').'.xlsx');
+        return Excel::download($this->sheet($query), 'assets-'.now()->format('Ymd-His').'.xlsx');
     }
 
     /**
@@ -151,36 +166,47 @@ class AssetController extends Controller
     {
         Gate::authorize('import', Asset::class);
 
-        return Excel::download(new AssetsExport(Asset::query()->whereRaw('false'), $this->specFieldLabels()), 'asset-import-template.xlsx');
+        return Excel::download($this->sheet(Asset::query()->whereRaw('false')), 'asset-import-template.xlsx');
     }
 
-    /**
-     * Spec fields of every category (key => label), one Excel column each.
-     *
-     * @return array<string, string>
-     */
-    private function specFieldLabels(): array
+    private function sheet($query): AssetsExport
     {
-        return AssetCategory::orderBy('name')->get(['spec_fields'])
+        // Spec fields of every category (key => label), one Excel column each.
+        $specFields = AssetCategory::orderBy('name')->get(['spec_fields'])
             ->flatMap(fn (AssetCategory $category) => $category->spec_fields)
             ->unique('key')
             ->mapWithKeys(fn (array $field) => [$field['key'] => $field['label']])
             ->all();
+
+        $customerCodes = collect($this->customers(withTrashed: true))->pluck('code', 'id')->all();
+
+        return new AssetsExport($query, $specFields, $customerCodes);
     }
 
     private function formProps(User $user, ?Asset $asset): array
     {
         return [
             'asset' => $asset ? [
-                ...$asset->only(['ulid', 'asset_code', 'name', 'category_id', 'branch_id', 'brand', 'model', 'serial_number', 'status', 'location', 'notes', 'specs']),
+                ...$asset->only(['ulid', 'asset_code', 'name', 'category_id', 'branch_id', 'customer_id', 'brand', 'model', 'serial_number', 'status', 'location', 'notes', 'specs']),
                 'purchased_at' => $asset->purchased_at?->toDateString(),
                 'purchase_price' => Money::toBaht($asset->purchase_price),
                 'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
             ] : null,
             'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'code_prefix', 'spec_fields']),
             'branches' => $this->branchOptions($user),
+            'customers' => $this->customers(),
             'statuses' => Asset::STATUSES,
         ];
+    }
+
+    /**
+     * Customers (Contract module) to pick from; none when the tenant has the module off.
+     *
+     * @return list<array{id: int, code: string, name: string}>
+     */
+    private function customers(bool $withTrashed = false): array
+    {
+        return $this->modules->enabled('contract') ? $this->listCustomers->handle($withTrashed) : [];
     }
 
     /**

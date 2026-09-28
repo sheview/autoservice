@@ -17,6 +17,7 @@ class PermissionCatalog
         'branch' => ['view', 'create', 'update', 'delete', 'all'],
         'asset' => ['view', 'create', 'update', 'delete', 'import', 'export'],
         'asset_category' => ['view', 'create', 'update', 'delete'],
+        'customer' => ['view', 'create', 'update', 'delete'],
         'contract' => ['view', 'create', 'update', 'delete'],
         'ticket' => ['view', 'create', 'update', 'assign', 'approve', 'close'],
         'sticker' => ['print'],
@@ -45,7 +46,7 @@ class PermissionCatalog
             'label' => 'เจ้าหน้าที่ Helpdesk',
             'permissions' => [
                 'branch.view', 'branch.all',
-                'asset.view', 'asset_category.view', 'contract.view',
+                'asset.view', 'asset_category.view', 'customer.view', 'contract.view',
                 'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
                 'user.view', 'report.view',
             ],
@@ -55,6 +56,7 @@ class PermissionCatalog
             'permissions' => [
                 'branch.view',
                 'asset.view', 'asset.update',
+                'customer.view', 'contract.view',
                 'ticket.view', 'ticket.update', 'ticket.close',
                 'sticker.print',
             ],

@@ -19,6 +19,28 @@ php artisan migrate --database=pgsql_migrate
 php artisan test
 ```
 
+## ข้อมูลตัวอย่างและการรันบนเครื่อง dev
+
+```bash
+# ล้างฐานแล้วใส่ข้อมูลตัวอย่าง (DemoSeeder ไม่ทำงานบน production)
+php artisan migrate:fresh --database=pgsql_migrate --seed
+
+php artisan serve          # แอป
+npm run dev                # frontend
+php artisan queue:listen   # งานเบื้องหลัง เช่น นำเข้า Excel, อีเมลสัญญาใกล้หมดอายุ
+php artisan schedule:work  # งานตามเวลา เช่น contracts:notify-expiring ทุกวัน 08:00
+```
+
+รหัสผ่านทุกบัญชีคือ `password`
+
+| บัญชี | บทบาท |
+|---|---|
+| `admin@platform.test` | superadmin ของแพลตฟอร์ม (เข้าดูในนามบริษัทลูกค้า, เปิด/ปิดโมดูล) |
+| `admin@itsol.test`, `admin@netpro.test` | ผู้ดูแลระบบบริษัท |
+| `helpdesk@…`, `tech1@…`, `tech2@…`, `user@…` | บทบาทอื่นของแต่ละบริษัท (tech ถูกจำกัดสาขา) |
+
+บน production ต้องตั้ง cron `* * * * * php artisan schedule:run` และรัน queue worker (Horizon)
+
 ## ฐานข้อมูล: สอง role และ Row Level Security
 
 การแยกข้อมูลระหว่าง tenant มีสองชั้น
