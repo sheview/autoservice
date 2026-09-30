@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
+import PmResultBadge from '@/components/PmResultBadge.vue';
+import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -53,6 +55,7 @@ const props = defineProps<{
     history: HistoryEntry[];
     contracts: AssetContract[] | null;
     tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
+    pmHistory: { visit_ulid: string; visit_no: string; visit_status: string; due_on: string; result: string; checked_at: string | null }[] | null;
     can: { update: boolean; delete: boolean; openTicket: boolean };
 }>();
 
@@ -155,6 +158,29 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     </li>
                 </ul>
                 <p v-else class="text-sm text-muted-foreground">{{ t('tickets.no_asset_tickets') }}</p>
+            </section>
+
+            <section v-if="pmHistory !== null" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('pm_visits.asset_history') }}</h3>
+                <ul v-if="pmHistory.length" class="divide-y rounded-md border text-sm">
+                    <li v-for="entry in pmHistory" :key="entry.visit_ulid" class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                        <span>
+                            <Link
+                                :href="route('maintenance.visits.show', entry.visit_ulid)"
+                                class="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                                {{ entry.visit_no }}
+                            </Link>
+                            <span class="ml-2 text-xs text-muted-foreground">{{ t('pm_visits.due_on') }} {{ entry.due_on }}</span>
+                            <span v-if="entry.checked_at" class="ml-2 text-xs text-muted-foreground">{{ dateTime(entry.checked_at) }}</span>
+                        </span>
+                        <span class="flex items-center gap-2">
+                            <PmResultBadge :result="entry.result" />
+                            <PmVisitStatusBadge :status="entry.visit_status" />
+                        </span>
+                    </li>
+                </ul>
+                <p v-else class="text-sm text-muted-foreground">{{ t('pm_visits.no_asset_history') }}</p>
             </section>
 
             <section v-if="contracts !== null" class="space-y-2">

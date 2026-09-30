@@ -14,6 +14,7 @@ use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Maintenance\Actions\PmHistoryForAsset;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\TicketsForAsset;
@@ -88,8 +89,13 @@ class AssetController extends Controller
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.created', ['code' => $asset->asset_code]));
     }
 
-    public function show(Request $request, Asset $asset, ContractsForAsset $contractsForAsset, TicketsForAsset $ticketsForAsset): Response
-    {
+    public function show(
+        Request $request,
+        Asset $asset,
+        ContractsForAsset $contractsForAsset,
+        TicketsForAsset $ticketsForAsset,
+        PmHistoryForAsset $pmHistoryForAsset,
+    ): Response {
         Gate::authorize('view', $asset);
 
         $asset->load(['category', 'branch:id,name']);
@@ -114,6 +120,8 @@ class AssetController extends Controller
             'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
             // null = the user cannot see tickets here (module off or no ticket.view)
             'tickets' => $serviceOn && $user->can('ticket.view') ? $ticketsForAsset->handle($asset->id) : null,
+            // null = the user cannot see PM rounds here (module off or no pm.view)
+            'pmHistory' => $this->modules->enabled('maintenance') && $user->can('pm.view') ? $pmHistoryForAsset->handle($asset->id) : null,
             'history' => $asset->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,
                 'event' => $log->event,

@@ -12,6 +12,12 @@ use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Maintenance\Actions\CompletePmVisit;
+use App\Modules\Maintenance\Actions\RecordPmItem;
+use App\Modules\Maintenance\Actions\SavePmPlan;
+use App\Modules\Maintenance\Actions\StartPmVisit;
+use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\OpenTicket;
@@ -128,6 +134,14 @@ class DemoSeeder extends Seeder
         'ระบบช้าผิดปกติ', 'ฮาร์ดดิสก์มีเสียงดัง', 'จอภาพไม่แสดงผล', 'ไฟแจ้งเตือนสีส้มที่เซิร์ฟเวอร์',
     ];
 
+    /** PM checklists: category code_prefix (null = general) => [name, [key, label, type]...] */
+    private const CHECKLISTS = [
+        null => ['PM ทั่วไป', [['look', 'ตรวจสภาพภายนอก', 'check'], ['clean', 'ทำความสะอาด', 'check'], ['remark', 'ข้อสังเกต', 'text']]],
+        'PC' => ['PM คอมพิวเตอร์', [['clean', 'เป่าฝุ่นภายในเครื่อง', 'check'], ['update', 'อัปเดต Windows / Antivirus', 'check'], ['disk_free_gb', 'พื้นที่ดิสก์คงเหลือ (GB)', 'number']]],
+        'SW' => ['PM สวิตช์', [['fan', 'ตรวจพัดลมและอุณหภูมิ', 'check'], ['log', 'ตรวจ log error', 'check'], ['firmware', 'เวอร์ชัน firmware', 'text']]],
+        'SV' => ['PM เซิร์ฟเวอร์', [['raid', 'สถานะ RAID ปกติ', 'check'], ['psu', 'Power supply ทั้งสองชุดทำงาน', 'check'], ['temp_c', 'อุณหภูมิ (°C)', 'number']]],
+    ];
+
     public function __construct(
         private TenantContext $context,
         private SaveAsset $saveAsset,
@@ -137,6 +151,10 @@ class DemoSeeder extends Seeder
         private OpenTicket $openTicket,
         private AssignTicket $assignTicket,
         private MoveTicket $moveTicket,
+        private SavePmPlan $savePmPlan,
+        private StartPmVisit $startPmVisit,
+        private RecordPmItem $recordPmItem,
+        private CompletePmVisit $completePmVisit,
     ) {}
 
     public function run(): void
@@ -209,6 +227,7 @@ class DemoSeeder extends Seeder
         }
 
         $this->tickets($admin, $helpdesk, $technicians);
+        $this->maintenance($technicians);
     }
 
     /**
@@ -269,6 +288,73 @@ class DemoSeeder extends Seeder
                     'approve' => $this->moveTicket->handle($ticket, 'approve', $admin),
                     'cancel' => $this->moveTicket->handle($ticket, 'cancel', $helpdesk, 'ลูกค้าแจ้งซ้ำกับใบงานเดิม'),
                 };
+            }
+        }
+
+        Carbon::setTestNow();
+    }
+
+    /**
+     * PM checklists, and a plan for each running contract. Rounds that are already due were
+     * done "back then" (a few found issues); the current round is half done.
+     *
+     * @param  Collection<int, User>  $technicians
+     */
+    private function maintenance(Collection $technicians): void
+    {
+        $categories = AssetCategory::pluck('id', 'code_prefix');
+        foreach (self::CHECKLISTS as $prefix => [$name, $items]) {
+            PmChecklist::create([
+                'name' => $name,
+                'asset_category_id' => $prefix === '' ? null : $categories[$prefix] ?? null,
+                'items' => array_map(fn (array $item) => ['key' => $item[0], 'label' => $item[1], 'type' => $item[2]], $items),
+            ]);
+        }
+
+        $realNow = now()->toImmutable();
+        $contracts = Contract::where('status', Contract::STATUS_ACTIVE)->where('ends_on', '>=', $realNow->toDateString())->get();
+
+        foreach ($contracts as $contract) {
+            $technician = $technicians->random();
+            // Planned on the first day of the contract, so every round exists.
+            Carbon::setTestNow($contract->starts_on->copy()->setTime(9, 0));
+            $plan = $this->savePmPlan->handle(null, [
+                'contract_id' => $contract->id,
+                'title' => 'PM '.$contract->title,
+                'interval_months' => $contract->pm_interval_months ?? 6,
+                'assignee_id' => $technician->id,
+            ]);
+
+            foreach ($plan->visits()->orderBy('round')->get() as $visit) {
+                $current = $visit->period_starts_on->lte($realNow) && $visit->due_on->gte($realNow->startOfDay());
+                if (! $current && $visit->due_on->gte($realNow)) {
+                    break;
+                }
+
+                $day = $current ? $realNow->subDay() : $visit->due_on->copy()->subDays(fake()->numberBetween(3, 20));
+                Carbon::setTestNow($day->setTime(9, 30));
+                $this->startPmVisit->handle($visit, $technician);
+
+                foreach ($visit->items()->get() as $i => $item) {
+                    if ($current && $i % 2 === 1) {
+                        continue;
+                    }
+                    Carbon::setTestNow(now()->addMinutes(fake()->numberBetween(10, 40)));
+                    $issue = fake()->boolean(10);
+                    $this->recordPmItem->handle($item, $technician, [
+                        'result' => $issue ? PmVisitItem::RESULT_ISSUE : PmVisitItem::RESULT_OK,
+                        'answers' => collect($item->checklist)->mapWithKeys(fn (array $field) => [$field['key'] => match ($field['type']) {
+                            'check' => true,
+                            'number' => fake()->numberBetween(20, 60),
+                            default => 'ปกติ',
+                        }])->all(),
+                        'note' => $issue ? fake()->randomElement(self::PROBLEMS) : null,
+                    ]);
+                }
+
+                if (! $current) {
+                    $this->completePmVisit->handle($visit, 'ทำ PM ครบทุกเครื่องตามแผน');
+                }
             }
         }
 

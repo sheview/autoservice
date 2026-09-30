@@ -46,7 +46,8 @@ class Ticket extends Model
 
     public const PRIORITIES = ['critical', 'high', 'medium', 'low'];
 
-    public const SOURCES = ['phone', 'email', 'walk_in', 'portal'];
+    /** pm = found during a PM round (Maintenance module). */
+    public const SOURCES = ['phone', 'email', 'walk_in', 'portal', 'pm'];
 
     protected $fillable = [
         'ticket_no', 'customer_id', 'asset_id', 'contract_id', 'branch_id', 'title', 'description',
