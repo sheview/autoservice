@@ -11,6 +11,8 @@ use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Actions\IssuableParts;
+use App\Modules\Inventory\Actions\TicketParts;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SearchTickets;
@@ -128,10 +130,13 @@ class TicketController extends Controller
         AssetDetails $assetDetails,
         ContractLabels $contractLabels,
         UsersWithPermission $usersWithPermission,
+        TicketParts $ticketParts,
+        IssuableParts $issuableParts,
     ): Response {
         Gate::authorize('view', $ticket);
 
         $user = $request->user();
+        $canIssueParts = TicketPartController::allows($user, $ticket) && in_array($ticket->status, TicketPartController::STATUSES, true);
         $names = $this->userNames->handle([$ticket->assignee_id, $ticket->reported_by]);
         $asset = $ticket->asset_id ? ($assetDetails->handle([$ticket->asset_id])[$ticket->asset_id] ?? null) : null;
         $contract = $ticket->contract_id ? ($contractLabels->handle([$ticket->contract_id])[$ticket->contract_id] ?? null) : null;
@@ -170,6 +175,12 @@ class TicketController extends Controller
             'assignees' => $canAssign && in_array($ticket->status, Ticket::OPEN_STATUSES, true)
                 ? $usersWithPermission->handle(self::ASSIGNABLE_PERMISSION)->map(fn (User $u) => $u->only(['id', 'name']))->values()
                 : null,
+            // Spare parts used on the job (Inventory module); null = the user does not see stock.
+            'parts' => $this->modules->enabled('inventory') && $user->can('part.view') ? [
+                'items' => $ticketParts->handle($ticket->id),
+                'options' => $canIssueParts ? $issuableParts->handle() : [],
+                'canIssue' => $canIssueParts,
+            ] : null,
             'can' => [
                 'update' => $user->can('update', $ticket) && in_array($ticket->status, Ticket::OPEN_STATUSES, true),
                 'comment' => $user->can('comment', $ticket),

@@ -23,6 +23,8 @@ class PermissionCatalog
         'holiday' => ['view', 'create', 'delete'],
         'pm' => ['view', 'create', 'update', 'delete', 'perform'],
         'sticker' => ['print'],
+        'part' => ['view', 'create', 'update', 'delete'],
+        'stock' => ['view', 'receive', 'issue', 'adjust'],
         'report' => ['view'],
         'platform' => ['impersonate', 'tenants'],
     ];
@@ -55,6 +57,7 @@ class PermissionCatalog
                 'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
                 'holiday.view',
                 'pm.view', 'pm.create', 'pm.update',
+                'part.view', 'stock.view',
                 'user.view', 'report.view',
             ],
         ],
@@ -67,6 +70,8 @@ class PermissionCatalog
                 'ticket.view', 'ticket.update', 'ticket.close',
                 'pm.view', 'pm.perform',
                 'sticker.print',
+                // A technician takes parts for the jobs they work on; receiving and counting is office work.
+                'part.view', 'stock.view', 'stock.issue',
             ],
         ],
         'user' => [

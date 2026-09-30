@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 interface TicketDetail {
@@ -55,12 +55,29 @@ interface TicketEvent {
     at: string;
 }
 
+interface TicketPart {
+    part_id: number;
+    code: string;
+    name: string;
+    unit: string;
+    quantity: number;
+}
+
+interface PartOption {
+    id: number;
+    code: string;
+    name: string;
+    unit: string;
+    qty_on_hand: number;
+}
+
 const props = defineProps<{
     ticket: TicketDetail;
     events: TicketEvent[];
     actions: string[];
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
+    parts: { items: TicketPart[]; options: PartOption[]; canIssue: boolean } | null;
     can: { update: boolean; comment: boolean; internalNotes: boolean };
 }>();
 
@@ -105,6 +122,23 @@ const addComment = () =>
         preserveScroll: true,
         onSuccess: () => comment.reset(),
     });
+
+// --- spare parts (Inventory module) --------------------------------------------
+const issue = useForm({ part_id: null as number | null, quantity: 1 });
+const issuePart = () =>
+    issue.post(route('service.tickets.parts.store', props.ticket.ulid), {
+        preserveScroll: true,
+        onSuccess: () => issue.reset(),
+    });
+
+const returnPart = (part: TicketPart) => {
+    const answer = prompt(t('ticket_parts.confirm_return', { name: part.name, qty: part.quantity }), String(part.quantity));
+    const quantity = Number(answer);
+    if (answer === null || !Number.isInteger(quantity) || quantity < 1) {
+        return;
+    }
+    router.post(route('service.tickets.parts.return', props.ticket.ulid), { part_id: part.part_id, quantity }, { preserveScroll: true });
+};
 
 // --- display -------------------------------------------------------------------
 const hours = (minutes: number | null) => (minutes === null ? '' : t('contracts.hours', { hours: minutes / 60 }));
@@ -203,6 +237,69 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                     <section v-if="ticket.description" class="space-y-2">
                         <h3 class="text-sm font-semibold">{{ t('tickets.description_field') }}</h3>
                         <p class="whitespace-pre-line text-sm">{{ ticket.description }}</p>
+                    </section>
+
+                    <section v-if="parts" class="space-y-3">
+                        <h3 class="text-sm font-semibold">{{ t('ticket_parts.title') }}</h3>
+                        <ul v-if="parts.items.length" class="divide-y rounded-md border text-sm">
+                            <li v-for="part in parts.items" :key="part.part_id" class="flex flex-wrap items-center gap-2 px-3 py-2">
+                                <span class="font-mono text-xs text-muted-foreground">{{ part.code }}</span>
+                                <span>{{ part.name }}</span>
+                                <span class="ml-auto whitespace-nowrap font-medium">{{ part.quantity }} {{ part.unit }}</span>
+                                <button
+                                    v-if="parts.canIssue"
+                                    type="button"
+                                    class="text-primary underline-offset-4 hover:underline"
+                                    @click="returnPart(part)"
+                                >
+                                    {{ t('ticket_parts.give_back') }}
+                                </button>
+                            </li>
+                        </ul>
+                        <p v-else class="text-sm text-muted-foreground">{{ t('ticket_parts.none') }}</p>
+
+                        <form v-if="parts.canIssue && parts.options.length" class="flex flex-wrap items-end gap-2" @submit.prevent="issuePart">
+                            <div class="grid min-w-0 flex-1 gap-1">
+                                <label for="part" class="text-xs text-muted-foreground">{{ t('ticket_parts.part') }}</label>
+                                <select
+                                    id="part"
+                                    v-model="issue.part_id"
+                                    required
+                                    class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                                >
+                                    <option :value="null" disabled>{{ t('ticket_parts.select') }}</option>
+                                    <option v-for="option in parts.options" :key="option.id" :value="option.id">
+                                        {{ option.code }} {{ option.name }} ({{
+                                            t('ticket_parts.available', { qty: option.qty_on_hand, unit: option.unit })
+                                        }})
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="grid w-24 gap-1">
+                                <label for="part_quantity" class="text-xs text-muted-foreground">{{ t('ticket_parts.quantity') }}</label>
+                                <input
+                                    id="part_quantity"
+                                    v-model="issue.quantity"
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    required
+                                    class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                                />
+                            </div>
+                            <Button size="sm" class="h-9" :disabled="issue.processing || issue.part_id === null">{{
+                                t('ticket_parts.issue')
+                            }}</Button>
+                        </form>
+                        <p v-else-if="parts.canIssue" class="text-sm text-muted-foreground">{{ t('ticket_parts.no_stock') }}</p>
+                        <InputError
+                            :message="
+                                issue.errors.part_id ??
+                                issue.errors.quantity ??
+                                (page.props.errors as Record<string, string>).quantity ??
+                                (page.props.errors as Record<string, string>).part_id
+                            "
+                        />
                     </section>
 
                     <section class="space-y-3">

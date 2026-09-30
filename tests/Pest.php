@@ -8,6 +8,10 @@ use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\RecordStockMovement;
+use App\Modules\Inventory\Actions\SavePart;
+use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Tenant;
@@ -140,6 +144,22 @@ function createContract(Customer $customer, array $attributes = []): Contract
         'service_window' => '8x5',
         'notify_days_before' => 60,
     ]);
+}
+
+/**
+ * A part (Inventory module) in the current tenant, with $stock pieces received into stock.
+ */
+function createPart(array $attributes = [], int $stock = 0): Part
+{
+    static $n = 0;
+    $n++;
+
+    $part = app(SavePart::class)->handle(null, $attributes + ['code' => "P{$n}", 'name' => "Part {$n}", 'unit' => 'pcs']);
+    if ($stock > 0) {
+        app(RecordStockMovement::class)->handle($part, StockMovement::TYPE_RECEIVE, $stock, null);
+    }
+
+    return $part;
 }
 
 /**

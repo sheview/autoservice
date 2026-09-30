@@ -12,6 +12,9 @@ use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\IssuePartToTicket;
+use App\Modules\Inventory\Actions\RecordStockMovement;
+use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Maintenance\Actions\CompletePmVisit;
 use App\Modules\Maintenance\Actions\RecordPmItem;
 use App\Modules\Maintenance\Actions\SavePmPlan;
@@ -142,6 +145,20 @@ class DemoSeeder extends Seeder
         'SV' => ['PM เซิร์ฟเวอร์', [['raid', 'สถานะ RAID ปกติ', 'check'], ['psu', 'Power supply ทั้งสองชุดทำงาน', 'check'], ['temp_c', 'อุณหภูมิ (°C)', 'number']]],
     ];
 
+    /** Spare parts: [code, name, brand, part number, unit, reorder point, cost in baht, pieces received]. */
+    private const PARTS = [
+        ['RAM-DDR4-8G', 'RAM DDR4 8GB 2666', 'Kingston', 'KVR26N19S8/8', 'ชิ้น', 4, 890, 12],
+        ['RAM-DDR4-16G', 'RAM DDR4 16GB 3200', 'Kingston', 'KVR32N22S8/16', 'ชิ้น', 2, 1590, 3],
+        ['SSD-SATA-500', 'SSD SATA 500GB', 'WD', 'WDS500G3B0A', 'ชิ้น', 3, 1490, 8],
+        ['HDD-SAS-1T2', 'HDD SAS 1.2TB 10K', 'Dell', '400-ATJL', 'ชิ้น', 2, 7900, 2],
+        ['PSU-ATX-550', 'Power supply ATX 550W', 'Corsair', 'CV550', 'ชิ้น', 2, 1690, 5],
+        ['FAN-SW-C9200', 'พัดลมสวิตช์ Catalyst 9200', 'Cisco', 'C9200-FAN', 'ชิ้น', 1, 4200, 0],
+        ['SFP-10G-SR', 'SFP+ 10G SR module', 'Cisco', 'SFP-10G-SR', 'ชิ้น', 4, 2900, 10],
+        ['CAB-UTP-C6-3M', 'สาย UTP Cat6 3 เมตร', 'Link', 'US-5103', 'เส้น', 20, 65, 60],
+        ['TONER-HP-59A', 'ตลับหมึก HP 59A', 'HP', 'CF259A', 'กล่อง', 3, 3450, 4],
+        ['THERMAL-PASTE', 'ซิลิโคนระบายความร้อน', 'Arctic', 'MX-4', 'หลอด', 2, 250, 6],
+    ];
+
     public function __construct(
         private TenantContext $context,
         private SaveAsset $saveAsset,
@@ -155,6 +172,9 @@ class DemoSeeder extends Seeder
         private StartPmVisit $startPmVisit,
         private RecordPmItem $recordPmItem,
         private CompletePmVisit $completePmVisit,
+        private SavePart $savePart,
+        private RecordStockMovement $recordStockMovement,
+        private IssuePartToTicket $issuePartToTicket,
     ) {}
 
     public function run(): void
@@ -228,6 +248,48 @@ class DemoSeeder extends Seeder
 
         $this->tickets($admin, $helpdesk, $technicians);
         $this->maintenance($technicians);
+        $this->inventory($admin);
+    }
+
+    /**
+     * Spare parts received two weeks ago (some at or below their reorder point, one never in
+     * stock), and a part or two used on every ticket that a technician has worked on.
+     */
+    private function inventory(User $admin): void
+    {
+        $realNow = now()->toImmutable();
+        Carbon::setTestNow($realNow->subDays(14)->setTime(10, 0));
+
+        $parts = collect(self::PARTS)->map(function (array $row) use ($admin) {
+            [$code, $name, $brand, $partNumber, $unit, $minQty, $baht, $received] = $row;
+            $part = $this->savePart->handle(null, [
+                'code' => $code, 'name' => $name, 'brand' => $brand, 'part_number' => $partNumber,
+                'unit' => $unit, 'min_qty' => $minQty, 'unit_cost' => $baht * 100, // satang
+            ]);
+            if ($received > 0) {
+                $this->recordStockMovement->handle($part, 'receive', $received, $admin, [
+                    'unit_cost' => $baht * 100,
+                    'reference' => 'DN-'.fake()->numerify('69####'),
+                ]);
+            }
+
+            return $part;
+        });
+
+        $worked = Ticket::whereIn('status', [Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_ON_HOLD, Ticket::STATUS_RESOLVED, Ticket::STATUS_CLOSED])
+            ->whereNotNull('assignee_id')->orderBy('id')->get();
+
+        foreach ($worked as $ticket) {
+            $technician = User::find($ticket->assignee_id);
+            Carbon::setTestNow($ticket->created_at->copy()->addHours(3));
+
+            foreach ($parts->filter(fn ($part) => $part->qty_on_hand > 1)->random(fake()->numberBetween(1, 2)) as $part) {
+                $this->issuePartToTicket->handle($ticket->id, $part->id, 1, $technician);
+                $part->refresh();
+            }
+        }
+
+        Carbon::setTestNow();
     }
 
     /**

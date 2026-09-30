@@ -5,6 +5,7 @@ import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, Sid
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
+    ArrowLeftRight,
     Briefcase,
     Building2,
     CalendarCheck,
@@ -15,6 +16,7 @@ import {
     HardDrive,
     LayoutGrid,
     ListChecks,
+    Package,
     QrCode,
     ShieldCheck,
     Tags,
@@ -36,6 +38,8 @@ const icons: Record<string, LucideIcon> = {
     'clipboard-list': ClipboardList,
     'list-checks': ListChecks,
     'qr-code': QrCode,
+    package: Package,
+    'arrow-left-right': ArrowLeftRight,
     'hard-drive': HardDrive,
     tags: Tags,
     'file-text': FileText,
