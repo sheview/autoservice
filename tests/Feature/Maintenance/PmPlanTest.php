@@ -149,8 +149,8 @@ it('lets technicians look at plans but not change them', function () {
     $this->actingAs($this->tech)->get('/pm-plans/create')->assertForbidden();
     $this->actingAs($this->tech)->put("/pm-plans/{$plan->id}", planPayload())->assertForbidden();
 
-    // a customer account has no PM pages at all
+    // a customer account never sees plans (its rounds: PmExtrasTest)
     $customerUser = userWithRole('customer', ['customer_id' => $this->customer->id]);
     $this->actingAs($customerUser)->get('/pm-plans')->assertForbidden();
-    $this->actingAs($customerUser)->get('/pm-visits')->assertForbidden();
+    $this->actingAs($customerUser)->get("/pm-plans/{$plan->id}")->assertForbidden();
 });

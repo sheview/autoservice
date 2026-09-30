@@ -51,7 +51,7 @@ class SearchPmVisits
         $assignee = (string) ($filters['assignee'] ?? '');
         $today = today()->toDateString();
 
-        return PmVisit::query()
+        return self::visibleTo(PmVisit::query(), $user)
             ->with('plan:id,title')
             ->withCount([
                 'items',
@@ -73,5 +73,17 @@ class SearchPmVisits
             ]))
             ->orderBy($filters['sort'] ?? 'due_on', $filters['direction'] ?? 'asc')
             ->orderBy('id');
+    }
+
+    /**
+     * Staff see every round (rounds have no branch: a contract's assets may be in many branches);
+     * a customer account sees the rounds of its customer only (see TenantPolicy).
+     *
+     * @param  Builder<PmVisit>  $query
+     * @return Builder<PmVisit>
+     */
+    public static function visibleTo(Builder $query, User $user): Builder
+    {
+        return $query->when($user->customer_id !== null, fn (Builder $q) => $q->where('customer_id', $user->customer_id));
     }
 }

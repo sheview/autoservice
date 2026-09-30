@@ -66,15 +66,19 @@ class Modules
      * Sidebar items the user may see in the current tenant.
      *
      * @param  iterable<string>  $permissions  the permission names the UI already received
+     * @param  bool  $customerAccount  hide items marked "staff" (pages a customer account may not open)
      * @return list<array{title: string, href: string, icon: string}>
      */
-    public function navigation(iterable $permissions): array
+    public function navigation(iterable $permissions, bool $customerAccount = false): array
     {
         $permissions = collect($permissions)->all();
         $items = [];
 
         foreach (config('modules.navigation', []) as $item) {
             if (isset($item['permission']) && ! in_array($item['permission'], $permissions, true)) {
+                continue;
+            }
+            if ($customerAccount && ($item['staff'] ?? false)) {
                 continue;
             }
             if (isset($item['module']) && ! $this->enabled($item['module'])) {

@@ -20,7 +20,7 @@ interface VisitDetail {
     status: string;
     summary: string | null;
     assignee_id: number | null;
-    plan: { id: number; title: string } | null;
+    plan: { id: number; title: string; can_view: boolean } | null;
     customer: string | null;
     contract: { id: number; contract_no: string; title: string; can_view: boolean } | null;
     contract_assets_count: number;
@@ -92,7 +92,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
             </p>
-            <InputError :message="errors.visit" />
+            <InputError :message="errors.visit ?? errors.photo" />
 
             <form v-if="cancelling" class="space-y-2 rounded-md border p-4" @submit.prevent="submitCancel">
                 <Label for="reason">{{ t('pm_visits.cancel_reason') }}</Label>
@@ -115,8 +115,9 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 <div>
                     <dt class="text-xs text-muted-foreground">{{ t('pm_visits.plan') }}</dt>
                     <dd>
+                        <span v-if="visit.plan && !visit.plan.can_view">{{ visit.plan.title }}</span>
                         <Link
-                            v-if="visit.plan"
+                            v-else-if="visit.plan"
                             :href="route('maintenance.plans.show', visit.plan.id)"
                             class="text-primary underline-offset-4 hover:underline"
                         >

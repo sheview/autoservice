@@ -12,7 +12,8 @@
 | always on and are not listed here. The platform tenant never gets business modules.
 |
 | "navigation": the sidebar, in order. An item is shown when the user has "permission" (if set)
-| and the tenant has "module" switched on (if set). "icon" is a lucide icon name that
+| and the tenant has "module" switched on (if set); "staff" items are hidden from customer
+| accounts. "icon" is a lucide icon name that
 | resources/js/components/AppSidebar.vue knows. "title" is a key of lang/{locale}/ui.php.
 |
 */
@@ -33,8 +34,8 @@ return [
         ['title' => 'nav.asset_categories', 'route' => 'asset.categories.index', 'icon' => 'tags', 'permission' => 'asset_category.view', 'module' => 'asset'],
         ['title' => 'nav.contracts', 'route' => 'contract.contracts.index', 'icon' => 'file-text', 'permission' => 'contract.view', 'module' => 'contract'],
         ['title' => 'nav.customers', 'route' => 'contract.customers.index', 'icon' => 'briefcase', 'permission' => 'customer.view', 'module' => 'contract'],
-        ['title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'clipboard-list', 'permission' => 'pm.view', 'module' => 'maintenance'],
-        ['title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm.view', 'module' => 'maintenance'],
+        ['title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'clipboard-list', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
+        ['title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
         ['title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holiday.view', 'module' => 'service'],
         ['title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'user.view'],
         ['title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'role.view'],

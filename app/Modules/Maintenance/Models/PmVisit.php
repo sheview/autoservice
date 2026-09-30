@@ -35,7 +35,7 @@ class PmVisit extends Model
 
     protected $fillable = [
         'pm_plan_id', 'contract_id', 'customer_id', 'visit_no', 'round', 'period_starts_on', 'due_on', 'scheduled_on',
-        'status', 'assignee_id', 'started_at', 'completed_at', 'cancelled_at', 'summary',
+        'status', 'assignee_id', 'started_at', 'completed_at', 'cancelled_at', 'reminded_at', 'summary',
     ];
 
     protected $attributes = [
@@ -52,6 +52,7 @@ class PmVisit extends Model
             'started_at' => 'datetime',
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'reminded_at' => 'datetime',
         ];
     }
 

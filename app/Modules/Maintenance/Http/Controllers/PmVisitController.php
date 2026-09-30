@@ -45,6 +45,7 @@ class PmVisitController extends Controller
         Gate::authorize('viewAny', PmVisit::class);
 
         $filters = SearchPmVisits::filtersFrom($request);
+        $staff = $request->user()->customer_id === null;
         $visits = $search->handle($request->user(), $filters)->paginate(20)->withQueryString();
         $customers = collect($this->listCustomers->handle(withTrashed: true))->pluck('name', 'id');
         $assignees = $this->userNames->handle($visits->pluck('assignee_id')->all());
@@ -61,8 +62,9 @@ class PmVisitController extends Controller
             ]),
             'filters' => $filters,
             'statuses' => PmVisit::STATUSES,
-            'customers' => $this->listCustomers->handle(),
-            'assignees' => $this->assignees(),
+            // A customer account does not filter by customer or technician.
+            'customers' => $staff ? $this->listCustomers->handle() : [],
+            'assignees' => $staff ? $this->assignees() : [],
         ]);
     }
 
@@ -71,7 +73,7 @@ class PmVisitController extends Controller
         Gate::authorize('view', $visit);
 
         $user = $request->user();
-        $items = $visit->items()->orderBy('id')->get();
+        $items = $visit->items()->with('media')->orderBy('id')->get();
         $assets = $assetDetails->handle($items->pluck('asset_id')->all());
         $tickets = $ticketLabels->handle($items->pluck('ticket_id')->all());
         $names = $this->userNames->handle([$visit->assignee_id, ...$items->pluck('checked_by')->all()]);
@@ -82,7 +84,7 @@ class PmVisitController extends Controller
         return Inertia::render('Maintenance/Visits/Show', [
             'visit' => [
                 ...$visit->only(['ulid', 'visit_no', 'round', 'status', 'summary', 'assignee_id']),
-                'plan' => $visit->plan ? ['id' => $visit->plan->id, 'title' => $visit->plan->title] : null,
+                'plan' => $visit->plan ? ['id' => $visit->plan->id, 'title' => $visit->plan->title, 'can_view' => $user->can('view', $visit->plan)] : null,
                 'customer' => collect($this->listCustomers->handle(withTrashed: true))->firstWhere('id', $visit->customer_id)['name'] ?? null,
                 'contract' => $contract ? [...collect($contract)->only(['id', 'contract_no', 'title'])->all(), 'can_view' => $user->can('contract.view')] : null,
                 // Before the round starts: how many assets it will cover.
@@ -100,6 +102,11 @@ class PmVisitController extends Controller
                     ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name'])->all(), 'can_view' => $user->can('asset.view')]
                     : null,
                 'ticket' => $tickets[$item->ticket_id] ?? null,
+                'photos' => $item->getMedia(PmVisitItem::PHOTOS)->map(fn ($media) => [
+                    'id' => $media->id,
+                    'name' => $media->file_name,
+                    'url' => route('maintenance.visits.items.photos.show', [$visit, $item, $media->id]),
+                ])->values(),
                 'checked_by' => $names[$item->checked_by] ?? null,
                 'checked_at' => $item->checked_at?->toIso8601String(),
             ]),

@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
+import PmVisitViewSwitch from '@/components/PmVisitViewSwitch.vue';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -73,7 +74,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         <Head :title="t('pm_visits.title')" />
 
         <div class="space-y-6 p-4">
-            <Heading :title="t('pm_visits.title')" :description="t('pm_visits.description')" />
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <Heading :title="t('pm_visits.title')" :description="t('pm_visits.description')" />
+                <PmVisitViewSwitch current="list" />
+            </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
@@ -87,11 +91,11 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`pm_visits.statuses.${status}`) }}</option>
                     <option value="all">{{ t('pm_visits.all_statuses') }}</option>
                 </select>
-                <select v-model="filters.customer_id" :class="selectClass" :aria-label="t('pm_visits.customer')">
+                <select v-if="customers.length" v-model="filters.customer_id" :class="selectClass" :aria-label="t('pm_visits.customer')">
                     <option :value="null">{{ t('pm_visits.all_customers') }}</option>
                     <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
                 </select>
-                <select v-model="filters.assignee" :class="selectClass" :aria-label="t('pm_visits.assignee')">
+                <select v-if="assignees.length" v-model="filters.assignee" :class="selectClass" :aria-label="t('pm_visits.assignee')">
                     <option :value="null">{{ t('pm_visits.all_assignees') }}</option>
                     <option value="me">{{ t('pm_visits.mine') }}</option>
                     <option value="none">{{ t('pm_visits.unassigned') }}</option>

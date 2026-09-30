@@ -5,17 +5,24 @@ namespace App\Modules\Maintenance\Models;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * The result of one asset in a PM round. "checklist" is a copy of the checklist items when the
- * round started; "answers" maps their keys to what the technician recorded.
+ * round started; "answers" maps their keys to what the technician recorded. Site photos are
+ * the "photos" media collection.
  *
  * @property list<array{key: string, label: string, type: string}> $checklist
  * @property array<string, bool|string|float|null> $answers
  */
-class PmVisitItem extends Model
+class PmVisitItem extends Model implements HasMedia
 {
-    use BelongsToTenant;
+    use BelongsToTenant, InteractsWithMedia;
+
+    public const PHOTOS = 'photos';
+
+    public const MAX_PHOTOS = 10;
 
     public const RESULT_PENDING = 'pending';
 
@@ -48,5 +55,11 @@ class PmVisitItem extends Model
     public function visit(): BelongsTo
     {
         return $this->belongsTo(PmVisit::class, 'pm_visit_id');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::PHOTOS)
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
     }
 }

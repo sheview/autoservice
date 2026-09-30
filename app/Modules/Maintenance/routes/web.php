@@ -1,6 +1,8 @@
 <?php
 
+use App\Modules\Maintenance\Http\Controllers\PmCalendarController;
 use App\Modules\Maintenance\Http\Controllers\PmChecklistController;
+use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitController;
 use Illuminate\Support\Facades\Route;
@@ -12,6 +14,8 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::resource('pm-plans', PmPlanController::class)
         ->names('plans')->parameters(['pm-plans' => 'plan']);
 
+    Route::get('pm-calendar', [PmCalendarController::class, 'index'])->name('calendar');
+
     Route::resource('pm-visits', PmVisitController::class)->only(['index', 'show', 'update'])
         ->names('visits')->parameters(['pm-visits' => 'visit']);
     Route::post('pm-visits/{visit}/start', [PmVisitController::class, 'start'])->name('visits.start');
@@ -20,5 +24,10 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::scopeBindings()->group(function () {
         Route::put('pm-visits/{visit}/items/{item}', [PmVisitController::class, 'recordItem'])->name('visits.items.update');
         Route::post('pm-visits/{visit}/items/{item}/ticket', [PmVisitController::class, 'openTicket'])->name('visits.items.ticket');
+        Route::post('pm-visits/{visit}/items/{item}/photos', [PmPhotoController::class, 'store'])->name('visits.items.photos.store');
+        Route::get('pm-visits/{visit}/items/{item}/photos/{photo}', [PmPhotoController::class, 'show'])
+            ->whereNumber('photo')->name('visits.items.photos.show');
+        Route::delete('pm-visits/{visit}/items/{item}/photos/{photo}', [PmPhotoController::class, 'destroy'])
+            ->whereNumber('photo')->name('visits.items.photos.destroy');
     });
 });

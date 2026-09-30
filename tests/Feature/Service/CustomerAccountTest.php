@@ -62,7 +62,7 @@ it('keeps a customer account out of the staff pages', function () {
 
     $this->actingAs($this->client)->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(collect($page->toArray()['props']['navigation'])->pluck('title')->all())
-            ->toBe(['หน้าหลัก', 'ใบงาน', 'ทรัพย์สิน']));
+            ->toBe(['หน้าหลัก', 'ใบงาน', 'รอบ PM', 'ทรัพย์สิน']));
 });
 
 it('lets a customer account open a ticket for its own asset, and tells the dispatchers', function () {

@@ -76,7 +76,7 @@ class PermissionCatalog
         // Staff of a customer: only ever see records of their own customer (TenantPolicy).
         'customer' => [
             'label' => 'บัญชีลูกค้า',
-            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'ticket.approve'],
+            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'ticket.approve', 'pm.view'],
         ],
     ];
 

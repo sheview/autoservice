@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
-import { Link, useForm } from '@inertiajs/vue3';
+import { Link, router, useForm } from '@inertiajs/vue3';
+import { Camera, X } from 'lucide-vue-next';
 
 export interface PmItem {
     id: number;
@@ -18,6 +19,7 @@ export interface PmItem {
     ticket: { ulid: string; ticket_no: string; status: string } | null;
     checked_by: string | null;
     checked_at: string | null;
+    photos: { id: number; name: string; url: string }[];
 }
 
 const props = defineProps<{
@@ -42,6 +44,28 @@ const save = () => form.put(route('maintenance.visits.items.update', [props.visi
 
 const ticket = useForm({ priority: 'medium' });
 const openTicket = () => ticket.post(route('maintenance.visits.items.ticket', [props.visitUlid, props.item.id]), { preserveScroll: true });
+
+// Photos upload one by one as soon as they are picked.
+const photo = useForm<{ photo: File | null }>({ photo: null });
+const uploadPhotos = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    for (const file of Array.from(input.files ?? [])) {
+        photo.photo = file;
+        await new Promise<void>((resolve) =>
+            photo.post(route('maintenance.visits.items.photos.store', [props.visitUlid, props.item.id]), {
+                preserveScroll: true,
+                forceFormData: true,
+                onFinish: () => resolve(),
+            }),
+        );
+    }
+    input.value = '';
+};
+const deletePhoto = (id: number) => {
+    if (confirm(t('pm_visits.confirm_delete_photo'))) {
+        router.delete(route('maintenance.visits.items.photos.destroy', [props.visitUlid, props.item.id, id]), { preserveScroll: true });
+    }
+};
 
 const answerText = (field: { key: string; type: string }) => {
     const value = props.item.answers[field.key];
@@ -144,6 +168,32 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             </dl>
             <p v-if="item.note" class="whitespace-pre-line text-sm">{{ item.note }}</p>
         </template>
+
+        <!-- Site photos -->
+        <div v-if="item.photos.length || editable" class="space-y-2">
+            <div v-if="item.photos.length" class="flex flex-wrap gap-2">
+                <div v-for="p in item.photos" :key="p.id" class="relative">
+                    <a :href="p.url" target="_blank" rel="noopener">
+                        <img :src="p.url" :alt="p.name" loading="lazy" class="h-24 w-24 rounded-md border object-cover" />
+                    </a>
+                    <button
+                        v-if="editable"
+                        type="button"
+                        class="absolute right-1 top-1 rounded-full bg-background/90 p-1 text-destructive shadow"
+                        :aria-label="t('pm_visits.delete_photo')"
+                        @click="deletePhoto(p.id)"
+                    >
+                        <X class="h-3 w-3" />
+                    </button>
+                </div>
+            </div>
+            <label v-if="editable" class="inline-flex cursor-pointer items-center gap-2 text-sm text-primary">
+                <Camera class="h-4 w-4" />
+                {{ photo.processing ? t('pm_visits.uploading') : t('pm_visits.add_photo') }}
+                <input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple class="hidden" @change="uploadPhotos" />
+            </label>
+            <InputError :message="(photo.errors as Record<string, string>).photo" />
+        </div>
 
         <!-- A found issue can become a repair ticket -->
         <div v-if="canOpenTicket && item.result === 'issue' && !item.ticket" class="flex flex-wrap items-center gap-2 border-t pt-3">

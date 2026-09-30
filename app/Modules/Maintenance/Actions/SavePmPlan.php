@@ -77,7 +77,7 @@ class SavePmPlan
             $plan->visits()
                 ->where('status', PmVisit::STATUS_SCHEDULED)
                 ->where(fn ($q) => $q->whereNull('assignee_id')->when($oldAssignee, fn ($q, $id) => $q->orWhere('assignee_id', $id)))
-                ->update(['assignee_id' => $plan->assignee_id]);
+                ->update(['assignee_id' => $plan->assignee_id, 'reminded_at' => null]);
         }
 
         return $plan;
