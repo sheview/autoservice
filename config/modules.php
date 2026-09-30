@@ -24,6 +24,7 @@ return [
         'contract' => ['default' => true],
         'service' => ['default' => true],
         'maintenance' => ['default' => true],
+        'labeling' => ['default' => true],
     ],
 
     'navigation' => [
@@ -35,6 +36,7 @@ return [
         ['title' => 'nav.contracts', 'route' => 'contract.contracts.index', 'icon' => 'file-text', 'permission' => 'contract.view', 'module' => 'contract'],
         ['title' => 'nav.customers', 'route' => 'contract.customers.index', 'icon' => 'briefcase', 'permission' => 'customer.view', 'module' => 'contract'],
         ['title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'clipboard-list', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
+        ['title' => 'nav.labels', 'route' => 'labeling.labels.index', 'icon' => 'qr-code', 'permission' => 'sticker.print', 'module' => 'labeling', 'staff' => true],
         ['title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
         ['title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holiday.view', 'module' => 'service'],
         ['title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'user.view'],

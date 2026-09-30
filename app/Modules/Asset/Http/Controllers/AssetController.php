@@ -133,6 +133,7 @@ class AssetController extends Controller
                 'update' => $user->can('update', $asset),
                 'delete' => $user->can('delete', $asset),
                 'openTicket' => $serviceOn && $user->can('ticket.create'),
+                'printLabel' => $this->modules->enabled('labeling') && $user->can('sticker.print'),
             ],
         ]);
     }

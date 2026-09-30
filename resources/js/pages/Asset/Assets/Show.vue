@@ -56,7 +56,7 @@ const props = defineProps<{
     contracts: AssetContract[] | null;
     tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
     pmHistory: { visit_ulid: string; visit_no: string; visit_status: string; due_on: string; result: string; checked_at: string | null }[] | null;
-    can: { update: boolean; delete: boolean; openTicket: boolean };
+    can: { update: boolean; delete: boolean; openTicket: boolean; printLabel: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -107,6 +107,11 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                 <div class="flex gap-2">
                     <Button v-if="can.openTicket" variant="outline" as-child>
                         <Link :href="route('service.tickets.create', { asset: asset.ulid })">{{ t('tickets.open_for_asset') }}</Link>
+                    </Button>
+                    <Button v-if="can.printLabel" variant="outline" as-child>
+                        <a :href="route('labeling.labels.print', { assets: asset.ulid })" target="_blank" rel="noopener">{{
+                            t('labels.print_one')
+                        }}</a>
                     </Button>
                     <Button v-if="can.delete" variant="outline" @click="destroy">{{ t('common.delete') }}</Button>
                     <Button v-if="can.update" as-child>
