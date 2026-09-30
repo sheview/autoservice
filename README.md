@@ -28,7 +28,7 @@ php artisan migrate:fresh --database=pgsql_migrate --seed
 php artisan serve          # แอป
 npm run dev                # frontend
 php artisan queue:listen   # งานเบื้องหลัง เช่น นำเข้า Excel, อีเมลสัญญาใกล้หมดอายุ
-php artisan schedule:work  # งานตามเวลา: contracts:notify-expiring (08:00), tickets:notify-sla-breaches (ทุก 15 นาที)
+php artisan schedule:work  # งานตามเวลา: pm:notify-upcoming (07:30), contracts:notify-expiring (08:00), inventory:notify-low-stock (08:00), tickets:notify-sla-breaches (ทุก 15 นาที)
 ```
 
 รหัสผ่านทุกบัญชีคือ `password`

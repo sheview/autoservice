@@ -48,6 +48,10 @@ class RecordStockMovement
             $unitCost = $type === StockMovement::TYPE_RECEIVE ? ($details['unit_cost'] ?? null) : null;
 
             $locked->qty_on_hand = $balance;
+            if (! $locked->isLow()) {
+                // Restocked: the next shortage is e-mailed again (NotifyLowStock).
+                $locked->low_stock_notified_at = null;
+            }
             if ($unitCost !== null) {
                 $locked->unit_cost = $unitCost;
             }

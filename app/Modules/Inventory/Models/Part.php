@@ -35,6 +35,7 @@ class Part extends Model
             'unit_cost' => 'integer',
             'qty_on_hand' => 'integer',
             'is_active' => 'boolean',
+            'low_stock_notified_at' => 'datetime',
         ];
     }
 

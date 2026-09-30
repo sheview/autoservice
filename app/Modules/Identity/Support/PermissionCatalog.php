@@ -23,7 +23,7 @@ class PermissionCatalog
         'holiday' => ['view', 'create', 'delete'],
         'pm' => ['view', 'create', 'update', 'delete', 'perform'],
         'sticker' => ['print'],
-        'part' => ['view', 'create', 'update', 'delete'],
+        'part' => ['view', 'create', 'update', 'delete', 'import', 'export'],
         'stock' => ['view', 'receive', 'issue', 'adjust'],
         'report' => ['view'],
         'platform' => ['impersonate', 'tenants'],

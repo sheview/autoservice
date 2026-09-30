@@ -26,6 +26,44 @@ return [
         'ticket_closed' => 'ใบงานนี้ปิดหรือยกเลิกแล้ว จึงเบิกหรือคืนอะไหล่ไม่ได้',
     ],
 
+    'imports' => [
+        'file' => 'ไฟล์ Excel',
+        'unreadable' => 'อ่านไฟล์ไม่ได้ กรุณาตรวจสอบว่าเป็นไฟล์ Excel หรือ CSV ที่ถูกต้อง',
+        'missing_headings' => 'ไม่พบหัวคอลัมน์ "รหัสอะไหล่" และ "ชื่ออะไหล่" ในแถวแรก กรุณาใช้ไฟล์ต้นแบบ',
+        'too_many_rows' => 'ไฟล์มีข้อมูลเกิน :max แถว กรุณาแบ่งเป็นหลายไฟล์',
+        'unknown_status' => 'ไม่รู้จักสถานะ ":value"',
+        'code_deleted' => 'รหัส :code เป็นของอะไหล่ที่ถูกลบไปแล้ว ใช้ซ้ำไม่ได้',
+        'opening_reference' => 'ยอดยกมา (นำเข้า Excel)',
+    ],
+
+    // Excel headings (export, template and import).
+    'columns' => [
+        'code' => 'รหัสอะไหล่',
+        'name' => 'ชื่ออะไหล่',
+        'brand' => 'ยี่ห้อ',
+        'part_number' => 'Part number',
+        'unit' => 'หน่วยนับ',
+        'min_qty' => 'จุดสั่งซื้อ',
+        'unit_cost' => 'ราคาต่อหน่วย (บาท)',
+        'qty_on_hand' => 'คงเหลือ',
+        'status' => 'สถานะ',
+        'notes' => 'หมายเหตุ',
+    ],
+
+    'statuses' => [
+        'active' => 'ใช้งาน',
+        'inactive' => 'ปิดใช้งาน',
+    ],
+
+    'low_stock_mail' => [
+        'subject' => 'อะไหล่ใกล้หมด :count รายการ',
+        'greeting' => 'เรียน คุณ:name',
+        'intro' => 'อะไหล่ต่อไปนี้คงเหลือไม่เกินจุดสั่งซื้อ กรุณาพิจารณาสั่งซื้อเพิ่ม',
+        'item' => ':code :name — คงเหลือ :qty :unit (จุดสั่งซื้อ :min)',
+        'item_out' => ':code :name — หมดสต็อก (จุดสั่งซื้อ :min :unit)',
+        'action' => 'เปิดรายการอะไหล่',
+    ],
+
     // Field names for validation messages.
     'fields' => [
         'code' => 'รหัสอะไหล่',

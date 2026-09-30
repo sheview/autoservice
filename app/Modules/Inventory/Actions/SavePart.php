@@ -18,7 +18,12 @@ class SavePart
         $part ??= new Part;
         $data['code'] = strtoupper(trim($data['code']));
         $data['min_qty'] = (int) ($data['min_qty'] ?? 0);
-        $part->fill($data)->save();
+        $part->fill($data);
+        if ($part->isDirty('min_qty')) {
+            // A new reorder point re-arms the low stock e-mail (NotifyLowStock).
+            $part->low_stock_notified_at = null;
+        }
+        $part->save();
 
         return $part;
     }

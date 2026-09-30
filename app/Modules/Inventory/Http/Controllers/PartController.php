@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Inventory\Actions\DeletePart;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Actions\SearchParts;
+use App\Modules\Inventory\Exports\PartsExport;
 use App\Modules\Inventory\Http\Requests\PartRequest;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
@@ -17,9 +18,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PartController extends Controller
 {
+    public const EXPORT_PERMISSION = 'part.export';
+
     public function index(Request $request, SearchParts $search): Response
     {
         Gate::authorize('viewAny', Part::class);
@@ -40,8 +45,20 @@ class PartController extends Controller
                 'create' => $user->can('create', Part::class),
                 'update' => $user->can('part.update'),
                 'delete' => $user->can('part.delete'),
+                'import' => $user->can(PartImportController::PERMISSION),
+                'export' => $user->can(self::EXPORT_PERMISSION),
             ],
         ]);
+    }
+
+    /**
+     * The parts of the list (same filters) as Excel.
+     */
+    public function export(Request $request, SearchParts $search): BinaryFileResponse
+    {
+        abort_unless($request->user()->can('viewAny', Part::class) && $request->user()->can(self::EXPORT_PERMISSION), 403);
+
+        return Excel::download(new PartsExport($search->handle(SearchParts::filtersFrom($request))), 'parts-'.now()->format('Ymd-His').'.xlsx');
     }
 
     public function create(): Response

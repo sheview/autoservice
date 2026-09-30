@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 interface PartRow {
     id: number;
@@ -39,7 +40,7 @@ const props = defineProps<{
     filters: Filters;
     statuses: string[];
     stockLevels: string[];
-    can: { create: boolean; update: boolean; delete: boolean };
+    can: { create: boolean; update: boolean; delete: boolean; import: boolean; export: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -51,6 +52,12 @@ const sortBy = (column: string) => {
     filters.direction = filters.sort === column && filters.direction === 'asc' ? 'desc' : 'asc';
     filters.sort = column;
 };
+
+// Export what is on screen: the same filters and sort, without the page number.
+const exportUrl = computed(() => {
+    const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== null && value !== ''));
+    return route('inventory.parts.export', query);
+});
 
 const columns = [
     { key: 'code', sortable: true, right: false },
@@ -78,9 +85,17 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('parts.title')" :description="t('parts.description')" />
-                <Button v-if="can.create" as-child>
-                    <Link :href="route('inventory.parts.create')">{{ t('parts.create') }}</Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button v-if="can.export" variant="outline" as-child>
+                        <a :href="exportUrl">{{ t('parts.export') }}</a>
+                    </Button>
+                    <Button v-if="can.import" variant="outline" as-child>
+                        <Link :href="route('inventory.parts.import')">{{ t('parts.import') }}</Link>
+                    </Button>
+                    <Button v-if="can.create" as-child>
+                        <Link :href="route('inventory.parts.create')">{{ t('parts.create') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
