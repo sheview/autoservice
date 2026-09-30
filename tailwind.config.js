@@ -12,7 +12,7 @@ export default {
     theme: {
         extend: {
             fontFamily: {
-                sans: ['Instrument Sans', ...defaultTheme.fontFamily.sans],
+                sans: ['Anuphan', ...defaultTheme.fontFamily.sans],
             },
             borderRadius: {
                 lg: 'var(--radius)',
