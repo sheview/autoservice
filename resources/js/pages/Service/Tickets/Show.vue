@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import SlaBadge from '@/components/SlaBadge.vue';
+import StarRating from '@/components/StarRating.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Printer } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 interface TicketDetail {
@@ -71,6 +73,18 @@ interface PartOption {
     qty_on_hand: number;
 }
 
+interface TicketSurvey {
+    answered: boolean;
+    score: number | null;
+    comment: string | null;
+    answered_name: string | null;
+    answered_at: string | null;
+    canAnswer: boolean;
+    // The public link and its QR code: only for staff, while the survey is unanswered.
+    url: string | null;
+    qr: string | null;
+}
+
 const props = defineProps<{
     ticket: TicketDetail;
     events: TicketEvent[];
@@ -78,6 +92,7 @@ const props = defineProps<{
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
     parts: { items: TicketPart[]; options: PartOption[]; canIssue: boolean } | null;
+    survey: TicketSurvey | null;
     can: { update: boolean; comment: boolean; internalNotes: boolean };
 }>();
 
@@ -122,6 +137,18 @@ const addComment = () =>
         preserveScroll: true,
         onSuccess: () => comment.reset(),
     });
+
+// --- satisfaction survey (Survey module) ---------------------------------------
+const rating = useForm({ score: null as number | null, comment: '' });
+const submitRating = () => rating.post(route('service.tickets.survey.store', props.ticket.ulid), { preserveScroll: true });
+
+const copied = ref(false);
+const copyLink = async () => {
+    if (props.survey?.url) {
+        await navigator.clipboard.writeText(props.survey.url);
+        copied.value = true;
+    }
+};
 
 // --- spare parts (Inventory module) --------------------------------------------
 const issue = useForm({ part_id: null as number | null, quantity: 1 });
@@ -168,7 +195,7 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`${ticket.ticket_no} ${ticket.title}`" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p class="flex items-center gap-2 font-mono text-sm text-muted-foreground">
@@ -178,9 +205,17 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                     </p>
                     <Heading :title="ticket.title" :description="ticket.customer ?? t('tickets.no_customer')" />
                 </div>
-                <Button v-if="can.update" variant="outline" as-child>
-                    <Link :href="route('service.tickets.edit', ticket.ulid)">{{ t('common.edit') }}</Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <Link :href="route('service.tickets.print', ticket.ulid)">
+                            <Printer class="h-4 w-4" />
+                            {{ t('ticket_print.button') }}
+                        </Link>
+                    </Button>
+                    <Button v-if="can.update" variant="outline" as-child>
+                        <Link :href="route('service.tickets.edit', ticket.ulid)">{{ t('common.edit') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
@@ -344,6 +379,47 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                 </div>
 
                 <aside class="space-y-6">
+                    <section v-if="survey" class="space-y-3 rounded-md border p-4 text-sm">
+                        <h3 class="font-semibold">{{ t('ticket_survey.title') }}</h3>
+
+                        <template v-if="survey.answered">
+                            <StarRating :model-value="survey.score" />
+                            <p v-if="survey.comment" class="whitespace-pre-line">{{ survey.comment }}</p>
+                            <p class="text-xs text-muted-foreground">
+                                <template v-if="survey.answered_name"
+                                    >{{ t('ticket_survey.answered_by', { name: survey.answered_name }) }} ·
+                                </template>
+                                {{ dateTime(survey.answered_at) }}
+                            </p>
+                        </template>
+
+                        <form v-else-if="survey.canAnswer" class="space-y-3" @submit.prevent="submitRating">
+                            <p>{{ t('ticket_survey.ask') }}</p>
+                            <StarRating v-model="rating.score" size="lg" editable />
+                            <textarea
+                                v-model="rating.comment"
+                                rows="2"
+                                maxlength="2000"
+                                :aria-label="t('surveys.comment')"
+                                :placeholder="t('ticket_survey.comment_placeholder')"
+                                class="shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                            />
+                            <InputError :message="rating.errors.score ?? rating.errors.comment" />
+                            <Button size="sm" :disabled="rating.processing || rating.score === null">{{ t('ticket_survey.submit') }}</Button>
+                        </form>
+
+                        <p v-else class="text-muted-foreground">{{ t('ticket_survey.pending') }}</p>
+
+                        <div v-if="survey.url" class="space-y-2 border-t pt-3">
+                            <p class="text-xs text-muted-foreground">{{ t('ticket_survey.share_hint') }}</p>
+                            <!-- eslint-disable-next-line vue/no-v-html -- SVG generated on the server from the link -->
+                            <div v-if="survey.qr" class="mx-auto size-32 [&>svg]:size-full" v-html="survey.qr" />
+                            <p class="break-all font-mono text-xs">{{ survey.url }}</p>
+                            <Button size="sm" variant="outline" type="button" @click="copyLink">
+                                {{ copied ? t('ticket_survey.copied') : t('ticket_survey.copy') }}
+                            </Button>
+                        </div>
+                    </section>
                     <section class="space-y-2 rounded-md border p-4 text-sm">
                         <h3 class="font-semibold">{{ t('tickets.sla') }}</h3>
                         <template v-if="ticket.contract">

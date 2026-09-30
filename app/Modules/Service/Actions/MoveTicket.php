@@ -3,10 +3,12 @@
 namespace App\Modules\Service\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
 use App\Modules\Service\Support\TicketSla;
 use App\Modules\Service\Support\TicketWorkflow;
+use App\Modules\Survey\Actions\CreateTicketSurvey;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -24,6 +26,8 @@ class MoveTicket
         private TicketSla $sla,
         private RecordTicketEvent $recordEvent,
         private NotifyTicketEvent $notify,
+        private Modules $modules,
+        private CreateTicketSurvey $createSurvey,
     ) {}
 
     public function handle(Ticket $ticket, string $action, User $actor, ?string $comment = null): Ticket
@@ -67,6 +71,14 @@ class MoveTicket
             // Ask whoever confirms the fix to check it.
             if ($action === 'resolve') {
                 $this->notify->handle($ticket, 'resolved', $actor);
+            }
+
+            // The job is closed: ask the customer how it went (Survey module).
+            if ($action === 'approve' && $this->modules->enabled('survey')) {
+                $this->createSurvey->handle(
+                    $ticket->only(['id', 'ulid', 'ticket_no', 'title', 'customer_id', 'assignee_id', 'reported_by']),
+                    $actor,
+                );
             }
 
             return $ticket;

@@ -25,6 +25,7 @@ class PermissionCatalog
         'sticker' => ['print'],
         'part' => ['view', 'create', 'update', 'delete', 'import', 'export'],
         'stock' => ['view', 'receive', 'issue', 'adjust'],
+        'survey' => ['view', 'answer'],
         'report' => ['view'],
         'platform' => ['impersonate', 'tenants'],
     ];
@@ -58,6 +59,7 @@ class PermissionCatalog
                 'holiday.view',
                 'pm.view', 'pm.create', 'pm.update',
                 'part.view', 'stock.view',
+                'survey.view',
                 'user.view', 'report.view',
             ],
         ],
@@ -81,7 +83,7 @@ class PermissionCatalog
         // Staff of a customer: only ever see records of their own customer (TenantPolicy).
         'customer' => [
             'label' => 'บัญชีลูกค้า',
-            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'ticket.approve', 'pm.view'],
+            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'ticket.approve', 'pm.view', 'survey.answer'],
         ],
     ];
 

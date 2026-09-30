@@ -27,6 +27,8 @@ use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Jobs\SendTicketNotification;
 use App\Modules\Service\Models\Holiday;
 use App\Modules\Service\Models\Ticket;
+use App\Modules\Survey\Actions\AnswerTicketSurvey;
+use App\Modules\Survey\Models\TicketSurvey;
 use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -175,6 +177,7 @@ class DemoSeeder extends Seeder
         private SavePart $savePart,
         private RecordStockMovement $recordStockMovement,
         private IssuePartToTicket $issuePartToTicket,
+        private AnswerTicketSurvey $answerTicketSurvey,
     ) {}
 
     public function run(): void
@@ -249,6 +252,29 @@ class DemoSeeder extends Seeder
         $this->tickets($admin, $helpdesk, $technicians);
         $this->maintenance($technicians);
         $this->inventory($admin);
+        $this->surveys();
+    }
+
+    /**
+     * Closing a ticket created its survey (MoveTicket). Most are answered through the public
+     * link a day later; the newest one is still waiting.
+     */
+    private function surveys(): void
+    {
+        $answers = [
+            [5, 'ช่างมาเร็วและอธิบายปัญหาชัดเจน'],
+            [4, 'แก้ไขได้เรียบร้อย แต่รออะไหล่นานไปหน่อย'],
+            [2, 'ต้องแจ้งซ้ำสองครั้งกว่าจะมีคนติดต่อกลับ'],
+            [5, null],
+        ];
+
+        foreach (TicketSurvey::orderBy('id')->get()->slice(0, -1)->values() as $i => $survey) {
+            [$score, $comment] = $answers[$i % count($answers)];
+            Carbon::setTestNow($survey->created_at->copy()->addDay());
+            $this->answerTicketSurvey->handle($survey, ['score' => $score, 'comment' => $comment, 'name' => $this->name()]);
+        }
+
+        Carbon::setTestNow();
     }
 
     /**

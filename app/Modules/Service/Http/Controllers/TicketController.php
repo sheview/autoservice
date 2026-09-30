@@ -13,6 +13,7 @@ use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\TicketParts;
+use App\Modules\Labeling\Actions\QrSvg;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SearchTickets;
@@ -23,6 +24,7 @@ use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
 use App\Modules\Service\Support\TicketSlaState;
 use App\Modules\Service\Support\TicketWorkflow;
+use App\Modules\Survey\Actions\SurveyOfTicket;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -132,6 +134,8 @@ class TicketController extends Controller
         UsersWithPermission $usersWithPermission,
         TicketParts $ticketParts,
         IssuableParts $issuableParts,
+        SurveyOfTicket $surveyOfTicket,
+        QrSvg $qrSvg,
     ): Response {
         Gate::authorize('view', $ticket);
 
@@ -181,12 +185,44 @@ class TicketController extends Controller
                 'options' => $canIssueParts ? $issuableParts->handle() : [],
                 'canIssue' => $canIssueParts,
             ] : null,
+            'survey' => $this->survey($ticket, $user, $surveyOfTicket, $qrSvg),
             'can' => [
                 'update' => $user->can('update', $ticket) && in_array($ticket->status, Ticket::OPEN_STATUSES, true),
                 'comment' => $user->can('comment', $ticket),
                 'internalNotes' => $user->customer_id === null,
             ],
         ]);
+    }
+
+    /**
+     * The satisfaction survey of a closed ticket (Survey module). Staff with survey.view see the
+     * answer, and while there is none the public link (with its QR code) to send to the customer;
+     * whoever may answer gets the form. Null = nothing to show to this user.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function survey(Ticket $ticket, User $user, SurveyOfTicket $surveyOfTicket, QrSvg $qrSvg): ?array
+    {
+        $canView = $user->can('survey.view');
+        $canAnswer = TicketSurveyController::allows($user, $ticket);
+
+        if (! $this->modules->enabled('survey') || ! ($canView || $canAnswer)) {
+            return null;
+        }
+
+        $survey = $surveyOfTicket->handle($ticket->id);
+        if ($survey === null) {
+            return null;
+        }
+
+        $shareLink = $canView && ! $survey['answered'];
+
+        return [
+            ...collect($survey)->except('url')->all(),
+            'canAnswer' => $canAnswer && ! $survey['answered'],
+            'url' => $shareLink ? $survey['url'] : null,
+            'qr' => $shareLink ? $qrSvg->handle($survey['url']) : null,
+        ];
     }
 
     public function edit(Ticket $ticket): Response
