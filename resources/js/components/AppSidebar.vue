@@ -6,6 +6,7 @@ import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
+    BarChart3,
     Briefcase,
     Building2,
     CalendarCheck,
@@ -42,6 +43,7 @@ const icons: Record<string, LucideIcon> = {
     package: Package,
     'arrow-left-right': ArrowLeftRight,
     star: Star,
+    'bar-chart-3': BarChart3,
     'hard-drive': HardDrive,
     tags: Tags,
     'file-text': FileText,

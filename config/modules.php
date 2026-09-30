@@ -27,6 +27,7 @@ return [
         'labeling' => ['default' => true],
         'inventory' => ['default' => true],
         'survey' => ['default' => true],
+        'reporting' => ['default' => true],
     ],
 
     'navigation' => [
@@ -42,6 +43,7 @@ return [
         ['title' => 'nav.parts', 'route' => 'inventory.parts.index', 'icon' => 'package', 'permission' => 'part.view', 'module' => 'inventory', 'staff' => true],
         ['title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock.view', 'module' => 'inventory', 'staff' => true],
         ['title' => 'nav.surveys', 'route' => 'survey.surveys.index', 'icon' => 'star', 'permission' => 'survey.view', 'module' => 'survey', 'staff' => true],
+        ['title' => 'nav.reports', 'route' => 'reporting.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'report.view', 'module' => 'reporting', 'staff' => true],
         ['title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
         ['title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holiday.view', 'module' => 'service'],
         ['title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'user.view'],
