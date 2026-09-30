@@ -19,7 +19,7 @@ class PmVisitPolicy extends TenantPolicy
     public function perform(User $user, Model $visit): bool
     {
         return $this->permits($user, 'perform') && $this->inScope($user, $visit)
-            && ($this->isAssignee($user, $visit) || $this->permits($user, 'update'));
+            && ($this->isAssignee($user, $visit) || $this->permits($user, 'update') || $this->actsFromPlatform($user));
     }
 
     public function cancel(User $user, Model $visit): bool

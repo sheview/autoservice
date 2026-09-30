@@ -8,6 +8,7 @@ beforeEach(function () {
     // Monday 09:00
     $this->travelTo('2026-06-15 09:00');
 
+    allowAllBranches('helpdesk'); // a head-office dispatcher
     $this->helpdesk = userWithRole('helpdesk', ['name' => 'Helpdesk Here']);
     $this->north = Branch::create(['code' => 'N', 'name' => 'North']);
     $this->south = Branch::create(['code' => 'S', 'name' => 'South']);

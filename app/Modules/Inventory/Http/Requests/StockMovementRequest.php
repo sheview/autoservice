@@ -8,8 +8,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * A stock change entered on the part page: receive, issue (not for a ticket) or adjust.
- * Each type needs its own permission: stock.receive, stock.issue, stock.adjust.
+ * A stock change entered on the part page (not for a ticket): receive, issue, loan, spare,
+ * return or adjust. The permission of each type is StockMovement::permissionFor().
  */
 class StockMovementRequest extends FormRequest
 {
@@ -21,7 +21,7 @@ class StockMovementRequest extends FormRequest
 
         return in_array($type, StockMovement::MANUAL_TYPES, true)
             && $this->user()->can('view', $this->route('part'))
-            && $this->user()->can("stock.{$type}");
+            && $this->user()->can(StockMovement::permissionFor($type));
     }
 
     public function rules(): array

@@ -25,7 +25,7 @@ it('creates a part with an upper-case code, cost in satang and no stock', functi
         ->assertInertia(fn (Assert $page) => $page->component('Inventory/Parts/Show')
             ->where('part.unit_cost', '1250.50')
             ->where('movements.total', 0)
-            ->where('movementTypes', ['receive', 'issue', 'adjust']));
+            ->where('movementTypes', ['receive', 'issue', 'loan', 'spare', 'return', 'adjust']));
 });
 
 it('rejects a duplicate code ignoring case and bad numbers', function () {

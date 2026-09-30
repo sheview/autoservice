@@ -9,7 +9,8 @@ use App\Modules\Tenancy\Support\TenantContext;
 
 /**
  * Creates the default roles of a tenant.
- * Customer tenants get DEFAULT_ROLES; the platform tenant gets only "superadmin".
+ * Customer tenants get DEFAULT_ROLES; the platform tenant gets PLATFORM_ROLES (superadmin and
+ * the central staff roles).
  */
 class SeedDefaultRoles
 {
@@ -24,7 +25,9 @@ class SeedDefaultRoles
 
         $this->context->run($tenant, function () use ($tenant) {
             if ($tenant->is_platform) {
-                $this->seed(PermissionCatalog::SUPERADMIN, 'ผู้ดูแลแพลตฟอร์ม', PermissionCatalog::all());
+                foreach (PermissionCatalog::PLATFORM_ROLES as $name => $role) {
+                    $this->seed($name, $role['label'], PermissionCatalog::platformPermissionsFor($name));
+                }
 
                 return;
             }

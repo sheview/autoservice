@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
+import PhotoSlots from '@/components/PhotoSlots.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -43,6 +44,7 @@ interface MovementRow {
 const props = defineProps<{
     part: PartDetail;
     movements: Paginated<MovementRow> | null;
+    photos: { slot: number; action: string; url: string | null }[];
     movementTypes: string[];
     can: { update: boolean; delete: boolean; viewTickets: boolean };
 }>();
@@ -83,7 +85,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`${part.code} ${part.name}`" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p class="font-mono text-sm text-muted-foreground">{{ part.code }}</p>
@@ -101,6 +103,8 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ page.props.flash.success }}
             </p>
             <InputError :message="(page.props.errors as Record<string, string>).part" />
+
+            <PhotoSlots :photos="photos" :editable="can.update" />
 
             <div class="grid gap-6 lg:grid-cols-3">
                 <dl class="space-y-3 rounded-md border p-4 text-sm">

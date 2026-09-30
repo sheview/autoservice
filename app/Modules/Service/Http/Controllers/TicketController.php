@@ -183,7 +183,10 @@ class TicketController extends Controller
             'parts' => $this->modules->enabled('inventory') && $user->can('part.view') ? [
                 'items' => $ticketParts->handle($ticket->id),
                 'options' => $canIssueParts ? $issuableParts->handle() : [],
+                'types' => IssuableParts::TYPES,
                 'canIssue' => $canIssueParts,
+                // Loans and spares may come back after the job is closed.
+                'canReturn' => TicketPartController::allows($user, $ticket),
             ] : null,
             'survey' => $this->survey($ticket, $user, $surveyOfTicket, $qrSvg),
             'can' => [

@@ -41,6 +41,8 @@ use Illuminate\Support\Facades\Bus;
  * Demo data for local development (never in production). Every password is "password".
  *
  *   admin@platform.test            superadmin (platform tenant)
+ *   helpdesk@platform.test         central helpdesk: enters any company, works there, configures nothing
+ *   tech@platform.test             central technician: the same, with technician permissions
  *   {role}@{subdomain}.test        admin, helpdesk, tech1, tech2, user in each customer tenant
  *   customer@{subdomain}.test      customer account of the first customer (CUST001)
  *
@@ -191,7 +193,12 @@ class DemoSeeder extends Seeder
         fake()->seed(2026);
 
         $platform = Tenant::create(['name' => 'AutoService Platform', 'slug' => 'platform', 'subdomain' => 'admin', 'is_platform' => true]);
-        $this->context->run($platform, fn () => $this->user('admin@platform.test', 'ผู้ดูแลแพลตฟอร์ม', PermissionCatalog::SUPERADMIN));
+        $this->context->run($platform, function () {
+            $this->user('admin@platform.test', 'ผู้ดูแลแพลตฟอร์ม', PermissionCatalog::SUPERADMIN);
+            // Central staff: enter any company and work there, but configure nothing.
+            $this->user('helpdesk@platform.test', $this->name(), PermissionCatalog::CENTRAL_HELPDESK, ['position' => 'Helpdesk ส่วนกลาง']);
+            $this->user('tech@platform.test', $this->name(), PermissionCatalog::CENTRAL_TECHNICIAN, ['position' => 'ช่างส่วนกลาง']);
+        });
 
         foreach (self::TENANTS as $subdomain => $name) {
             $tenant = Tenant::create(['name' => $name, 'slug' => $subdomain, 'subdomain' => $subdomain]);
@@ -206,7 +213,10 @@ class DemoSeeder extends Seeder
         $branches = collect(self::BRANCHES)->map(fn (array $branch) => Branch::create($branch));
 
         $admin = $this->user("admin@{$subdomain}.test", $this->name(), 'admin_company');
-        $helpdesk = $this->user("helpdesk@{$subdomain}.test", $this->name(), 'helpdesk', ['position' => 'เจ้าหน้าที่ Helpdesk']);
+        // Helpdesk works in its own branch (head office); only the company admin sees every branch.
+        $helpdesk = $this->user("helpdesk@{$subdomain}.test", $this->name(), 'helpdesk', [
+            'branch_id' => $branches[0]->id, 'position' => 'เจ้าหน้าที่ Helpdesk',
+        ]);
         $technicians = collect([
             $this->user("tech1@{$subdomain}.test", $this->name(), 'technician', [
                 'branch_id' => $branches[0]->id, 'position' => 'ช่างเทคนิค', 'service_lines' => ['network', 'datacenter'],
@@ -303,7 +313,9 @@ class DemoSeeder extends Seeder
         });
 
         $worked = Ticket::whereIn('status', [Ticket::STATUS_IN_PROGRESS, Ticket::STATUS_ON_HOLD, Ticket::STATUS_RESOLVED, Ticket::STATUS_CLOSED])
-            ->whereNotNull('assignee_id')->orderBy('id')->get();
+            // Oldest first: the ledger's running balance must follow the dates (the demo tickets
+            // were not created in date order).
+            ->whereNotNull('assignee_id')->orderBy('created_at')->orderBy('id')->get();
 
         foreach ($worked as $ticket) {
             $technician = User::find($ticket->assignee_id);

@@ -49,8 +49,42 @@ it('adjusts stock to the counted quantity and needs a reason', function () {
         ->and(StockMovement::where('type', 'adjust')->orderBy('id')->pluck('quantity')->all())->toBe([-3, -5]);
 });
 
-it('rejects a return or an unknown type entered by hand', function () {
-    ($this->move)(['type' => 'return', 'quantity' => 1])->assertForbidden();
+it('lends parts and puts them in as spares, and takes them back', function () {
+    ($this->move)(['type' => 'receive', 'quantity' => 5]);
+
+    ($this->move)(['type' => 'loan', 'quantity' => 2, 'note' => 'ลูกค้ายืมทดสอบ'])->assertSessionHasNoErrors();
+    ($this->move)(['type' => 'spare', 'quantity' => 1])->assertSessionHasNoErrors();
+    ($this->move)(['type' => 'loan', 'quantity' => 3])->assertSessionHasErrors('quantity');
+    ($this->move)(['type' => 'return', 'quantity' => 2, 'note' => 'ลูกค้าคืน'])->assertSessionHasNoErrors();
+
+    expect($this->part->fresh()->qty_on_hand)->toBe(4)
+        ->and(StockMovement::orderBy('id')->get(['type', 'quantity', 'balance_after'])->toArray())->toBe([
+            ['type' => 'receive', 'quantity' => 5, 'balance_after' => 5],
+            ['type' => 'loan', 'quantity' => -2, 'balance_after' => 3],
+            ['type' => 'spare', 'quantity' => -1, 'balance_after' => 2],
+            ['type' => 'return', 'quantity' => 2, 'balance_after' => 4],
+        ]);
+
+    $this->actingAs($this->admin)->get('/stock-movements?type=loan')
+        ->assertInertia(fn (Assert $page) => $page->where('movements.total', 1)
+            ->where('types', ['receive', 'issue', 'loan', 'spare', 'return', 'adjust']));
+});
+
+it('shows the history of a part newest first by date', function () {
+    // entered late for an earlier day (as the demo seeder does): the date decides, not the row id
+    $this->travelTo('2026-06-10 09:00');
+    ($this->move)(['type' => 'receive', 'quantity' => 10, 'reference' => 'second']);
+    $this->travelTo('2026-06-01 09:00');
+    ($this->move)(['type' => 'receive', 'quantity' => 5, 'reference' => 'first']);
+    $this->travelTo('2026-06-20 09:00');
+    ($this->move)(['type' => 'issue', 'quantity' => 1, 'reference' => 'third']);
+
+    $this->actingAs($this->admin)->get("/parts/{$this->part->id}")
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('movements.data', fn ($rows) => collect($rows)->pluck('reference')->all() === ['third', 'second', 'first']));
+});
+
+it('rejects an unknown type', function () {
     ($this->move)(['type' => 'steal', 'quantity' => 1])->assertForbidden();
     expect(StockMovement::count())->toBe(0);
 });
@@ -65,10 +99,12 @@ it('checks the permission of each movement type', function () {
     ($this->move)(['type' => 'receive', 'quantity' => 1], $technician)->assertForbidden();
     ($this->move)(['type' => 'adjust', 'quantity' => 1, 'note' => 'x'], $technician)->assertForbidden();
     ($this->move)(['type' => 'issue', 'quantity' => 1], $helpdesk)->assertForbidden();
+    ($this->move)(['type' => 'loan', 'quantity' => 1], $helpdesk)->assertForbidden();
+    ($this->move)(['type' => 'return', 'quantity' => 1], $helpdesk)->assertForbidden();
     ($this->move)(['type' => 'issue', 'quantity' => 1], userWithRole('user'))->assertForbidden();
 
     $this->actingAs($technician)->get("/parts/{$this->part->id}")
-        ->assertInertia(fn (Assert $page) => $page->where('movementTypes', ['issue'])->where('part.qty_on_hand', 4));
+        ->assertInertia(fn (Assert $page) => $page->where('movementTypes', ['issue', 'loan', 'spare', 'return'])->where('part.qty_on_hand', 4));
     $this->actingAs($helpdesk)->get("/parts/{$this->part->id}")
         ->assertInertia(fn (Assert $page) => $page->where('movementTypes', [])->where('movements.total', 2));
 });

@@ -19,8 +19,10 @@ class IdentityServiceProvider extends ServiceProvider
 
         Event::listen(TenantCreated::class, SeedRolesForNewTenant::class);
 
-        // A superadmin working inside a customer tenant may do everything there.
-        // Everything they do is logged with their real name (see Platform module).
-        Gate::before(fn ($user) => $this->app->make(Impersonation::class)->active() ? true : null);
+        // A superadmin working inside a customer tenant may do everything there. Central staff
+        // (who also enter tenants) are not let through here: the policies decide, with the
+        // permissions of their platform role (User::checkPermissionTo).
+        // Everything either does is logged with their real name (see Platform module).
+        Gate::before(fn ($user) => $this->app->make(Impersonation::class)->fullAccess() ? true : null);
     }
 }

@@ -36,7 +36,7 @@ it('lets the technician take parts for a ticket and shows them on the ticket', f
 
     $this->actingAs($this->tech)->get($this->url)
         ->assertInertia(fn (Assert $page) => $page
-            ->where('parts.items', [['part_id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'quantity' => 3]])
+            ->where('parts.items', [['part_id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'quantity' => 3, 'types' => ['issue']]])
             ->where('parts.options.0.qty_on_hand', 2));
 
     // the ledger links the movement to the ticket
@@ -99,6 +99,34 @@ it('stops booking parts once the ticket is closed or cancelled', function () {
 
     $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasErrors('part_id');
     $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts.canIssue', false));
+});
+
+it('lends parts and puts in spares for a ticket, and takes them back after the job is closed', function () {
+    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1, 'type' => 'loan'])->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 2, 'type' => 'spare'])->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1, 'type' => 'receive'])->assertSessionHasErrors('type');
+
+    expect($this->ram->fresh()->qty_on_hand)->toBe(2)
+        ->and(StockMovement::where('ticket_id', $this->ticket->id)->orderBy('id')->get(['type', 'quantity'])->toArray())
+        ->toBe([['type' => 'loan', 'quantity' => -1], ['type' => 'spare', 'quantity' => -2]]);
+
+    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
+        ->where('parts.types', ['issue', 'loan', 'spare'])
+        ->where('parts.items.0.quantity', 3)
+        ->where('parts.items.0.types', ['loan', 'spare']));
+
+    // the job is closed; nothing more can be taken, but what was lent still comes back
+    app(MoveTicket::class)->handle($this->ticket, 'start', $this->tech);
+    app(MoveTicket::class)->handle($this->ticket, 'resolve', $this->tech);
+    app(MoveTicket::class)->handle($this->ticket, 'approve', userWithRole('admin_company'));
+
+    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
+        ->where('parts.canIssue', false)->where('parts.canReturn', true));
+    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1, 'type' => 'loan'])->assertSessionHasErrors('part_id');
+    $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 3])->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasErrors('quantity');
+
+    expect($this->ram->fresh()->qty_on_hand)->toBe(5);
 });
 
 it('drops the parts section when the inventory module is switched off', function () {

@@ -12,6 +12,7 @@ use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
+use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Maintenance\Actions\PmHistoryForAsset;
@@ -116,6 +117,7 @@ class AssetController extends Controller
                     ->map(fn (array $field) => ['label' => $field['label'], 'value' => $asset->specs[$field['key']] ?? null])
                     ->values(),
             ],
+            'photos' => PhotoSlots::list($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
             // null = the user cannot see contracts here (module off or no contract.view)
             'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
             // null = the user cannot see tickets here (module off or no ticket.view)

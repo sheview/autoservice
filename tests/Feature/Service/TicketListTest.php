@@ -7,6 +7,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 beforeEach(function () {
     $this->travelTo('2026-06-15 09:00');
 
+    allowAllBranches('helpdesk'); // a head-office dispatcher
     $this->helpdesk = userWithRole('helpdesk');
     $this->north = Branch::create(['code' => 'N', 'name' => 'North']);
     $this->tech = userWithRole('technician', ['branch_id' => $this->north->id]);

@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\StockMovement;
 
 /**
  * Active parts that have stock, as plain arrays, for other modules (the ticket page) that let
@@ -11,6 +12,9 @@ use App\Modules\Inventory\Models\Part;
 class IssuableParts
 {
     public const LIMIT = 500;
+
+    /** How a part can leave stock for a ticket: used up, lent, or put in as a spare/replacement. */
+    public const TYPES = StockMovement::OUT_TYPES;
 
     /**
      * @return list<array{id: int, code: string, name: string, unit: string, qty_on_hand: int}>

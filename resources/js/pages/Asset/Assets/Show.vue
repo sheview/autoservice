@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
+import PhotoSlots from '@/components/PhotoSlots.vue';
 import PmResultBadge from '@/components/PmResultBadge.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
@@ -52,6 +53,7 @@ interface AssetContract {
 
 const props = defineProps<{
     asset: AssetDetail;
+    photos: { slot: number; action: string; url: string | null }[];
     history: HistoryEntry[];
     contracts: AssetContract[] | null;
     tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
@@ -98,7 +100,7 @@ const details: [string, (a: AssetDetail) => string | null][] = [
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`${asset.asset_code} ${asset.name}`" />
 
-        <div class="max-w-4xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p class="font-mono text-sm text-muted-foreground">{{ asset.asset_code }}</p>
@@ -124,7 +126,9 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                 {{ page.props.flash.success }}
             </p>
 
-            <dl class="grid gap-x-6 gap-y-4 rounded-md border p-4 sm:grid-cols-3">
+            <PhotoSlots :photos="photos" :editable="can.update" />
+
+            <dl class="grid gap-x-6 gap-y-4 rounded-md border p-4 sm:grid-cols-3 lg:grid-cols-5">
                 <div v-for="[key, value] in details" :key="key">
                     <dt class="text-xs text-muted-foreground">{{ t(`assets.${key}`) }}</dt>
                     <dd class="text-sm">{{ value(asset) ?? t('common.none') }}</dd>
@@ -133,7 +137,7 @@ const details: [string, (a: AssetDetail) => string | null][] = [
 
             <section class="space-y-2">
                 <h3 class="text-sm font-semibold">{{ t('assets.specs') }}</h3>
-                <dl v-if="asset.specs.length" class="grid gap-x-6 gap-y-4 rounded-md border p-4 sm:grid-cols-3">
+                <dl v-if="asset.specs.length" class="grid gap-x-6 gap-y-4 rounded-md border p-4 sm:grid-cols-3 lg:grid-cols-5">
                     <div v-for="spec in asset.specs" :key="spec.label">
                         <dt class="text-xs text-muted-foreground">{{ spec.label }}</dt>
                         <dd class="text-sm">{{ spec.value ?? t('common.none') }}</dd>

@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Inventory\Actions\DeletePart;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Actions\SearchParts;
@@ -82,7 +83,8 @@ class PartController extends Controller
         $user = $request->user();
         $movements = null;
         if ($user->can('stock.view')) {
-            $movements = $part->movements()->orderByDesc('id')->paginate(20)->withQueryString();
+            // Newest first, like the ledger page (id breaks ties within the same second).
+            $movements = $part->movements()->orderByDesc('created_at')->orderByDesc('id')->paginate(20)->withQueryString();
             $tickets = $modules->enabled('service') ? $ticketLabels->handle($movements->pluck('ticket_id')->all()) : [];
             $movements = $movements->through(fn (StockMovement $movement) => [
                 ...$movement->only(['id', 'type', 'quantity', 'balance_after', 'reference', 'note', 'user_name']),
@@ -98,9 +100,10 @@ class PartController extends Controller
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
             ],
+            'photos' => PhotoSlots::list($part, fn (int $slot) => route('inventory.parts.photos.show', [$part, $slot])),
             'movements' => $movements,
-            // Stock changes the user may enter here (each type has its own permission).
-            'movementTypes' => array_values(array_filter(StockMovement::MANUAL_TYPES, fn (string $type) => $user->can("stock.{$type}"))),
+            // Stock changes the user may enter here.
+            'movementTypes' => array_values(array_filter(StockMovement::MANUAL_TYPES, fn (string $type) => $user->can(StockMovement::permissionFor($type)))),
             'can' => [
                 'update' => $user->can('update', $part),
                 'delete' => $user->can('delete', $part),

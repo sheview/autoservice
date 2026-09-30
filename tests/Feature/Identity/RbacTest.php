@@ -25,9 +25,15 @@ it('does not let a technician of branch A open data of branch B', function () {
         // records with a branch_id column follow the same rule
         ->and($technician->can('view', $colleagueInB))->toBeFalse();
 
-    // helpdesk has branch.all and sees every branch
+    // helpdesk works in its own branch too; only the company admin sees every branch ...
     $helpdesk = userWithRole('helpdesk', ['branch_id' => $branchA->id]);
-    expect($helpdesk->can('view', $branchB))->toBeTrue();
+    expect($helpdesk->can('view', $branchA))->toBeTrue()
+        ->and($helpdesk->can('view', $branchB))->toBeFalse()
+        ->and(userWithRole('admin_company', ['branch_id' => $branchA->id])->can('view', $branchB))->toBeTrue();
+
+    // ... unless the company gives the role branch.all (a head-office dispatcher)
+    allowAllBranches('helpdesk');
+    expect($helpdesk->fresh()->can('view', $branchB))->toBeTrue();
 });
 
 it('does not give helpdesk ticket.approve', function () {

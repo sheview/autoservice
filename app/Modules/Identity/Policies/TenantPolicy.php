@@ -4,6 +4,7 @@ namespace App\Modules\Identity\Policies;
 
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\Support\Impersonation;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -16,6 +17,8 @@ use Illuminate\Database\Eloquent\Model;
  * For a customer account (user with customer_id) the record must belong to that customer instead.
  * Override branchIdOf() when the branch is not the "branch_id" column.
  * A superadmin who is impersonating passes every check (Gate::before in IdentityServiceProvider).
+ * Central staff who entered the tenant are checked here like anyone else, with the permissions
+ * of their platform role and the tenant they entered.
  */
 abstract class TenantPolicy
 {
@@ -53,7 +56,7 @@ abstract class TenantPolicy
 
     protected function inScope(User $user, Model $model): bool
     {
-        if ((int) $model->getAttribute('tenant_id') !== (int) $user->tenant_id) {
+        if ((int) $model->getAttribute('tenant_id') !== $this->tenantIdOf($user)) {
             return false;
         }
 
@@ -69,6 +72,25 @@ abstract class TenantPolicy
         return $branchId === null
             || $user->checkPermissionTo(PermissionCatalog::ALL_BRANCHES)
             || (int) $branchId === (int) $user->branch_id;
+    }
+
+    /**
+     * The tenant the user is working in: their own, or the one a platform user has entered.
+     */
+    protected function tenantIdOf(User $user): int
+    {
+        $impersonation = app(Impersonation::class);
+
+        return (int) ($impersonation->actingAs($user) ? $impersonation->tenant()->id : $user->tenant_id);
+    }
+
+    /**
+     * Central staff of the platform working inside this tenant. They are not users of it, so
+     * nobody can assign work to them: where a rule says "be the assignee", they count as one.
+     */
+    protected function actsFromPlatform(User $user): bool
+    {
+        return app(Impersonation::class)->actingAs($user);
     }
 
     protected function branchIdOf(Model $model): ?int

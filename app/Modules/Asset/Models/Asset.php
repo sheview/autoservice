@@ -3,6 +3,7 @@
 namespace App\Modules\Asset\Models;
 
 use App\Modules\Asset\Policies\AssetPolicy;
+use App\Modules\Document\Concerns\HasPhotoSlots;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
@@ -12,14 +13,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\HasMedia;
 
 /**
  * An asset (device) of the tenant. Public URLs use "ulid"; purchase_price is in satang.
+ * It carries up to four photos (HasPhotoSlots).
  */
 #[UsePolicy(AssetPolicy::class)]
-class Asset extends Model
+class Asset extends Model implements HasMedia
 {
-    use BelongsToTenant, HasUlids, LogsActivity, SoftDeletes;
+    use BelongsToTenant, HasPhotoSlots, HasUlids, LogsActivity, SoftDeletes;
 
     public const STATUS_IN_USE = 'in_use';
 

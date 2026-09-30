@@ -10,7 +10,8 @@ use Carbon\CarbonInterface;
 /**
  * Stock figures of the current tenant, as plain arrays, for the Reporting module (which must not
  * use the Inventory models directly): what moved in a period, and how the stock stands today.
- * "Used" is what was issued minus what came back; its value uses each part's latest unit cost.
+ * "Used" is what left stock (issued, lent or put in as a spare) minus what came back; its value
+ * uses each part's latest unit cost.
  */
 class PartUsageReport
 {
@@ -23,7 +24,8 @@ class PartUsageReport
     public function handle(CarbonInterface $from, CarbonInterface $to): array
     {
         $inPeriod = fn () => StockMovement::query()->whereBetween('created_at', [$from, $to]);
-        $usage = [StockMovement::TYPE_ISSUE, StockMovement::TYPE_RETURN];
+        // Everything that left stock (used, lent, put in as a spare) minus what came back.
+        $usage = [...StockMovement::OUT_TYPES, StockMovement::TYPE_RETURN];
 
         $used = $inPeriod()->whereIn('type', $usage)
             ->groupBy('part_id')

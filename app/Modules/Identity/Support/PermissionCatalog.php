@@ -27,7 +27,8 @@ class PermissionCatalog
         'stock' => ['view', 'receive', 'issue', 'adjust'],
         'survey' => ['view', 'answer'],
         'report' => ['view'],
-        'platform' => ['impersonate', 'tenants'],
+        // impersonate = enter a customer tenant; full_access = pass every check while inside.
+        'platform' => ['impersonate', 'tenants', 'full_access'],
     ];
 
     /**
@@ -36,6 +37,51 @@ class PermissionCatalog
     public const ALL_BRANCHES = 'branch.all';
 
     public const SUPERADMIN = 'superadmin';
+
+    public const CENTRAL_HELPDESK = 'central_helpdesk';
+
+    public const CENTRAL_TECHNICIAN = 'central_technician';
+
+    /**
+     * Roles of the platform tenant. '*' = every permission. Central staff enter any customer
+     * tenant (platform.impersonate) and work there with the tenant permissions listed here:
+     * they see every branch and do the daily work, but hold nothing that configures the
+     * company (users, roles, branches, categories, checklists, holidays, imports, modules).
+     *
+     * @var array<string, array{label: string, permissions: list<string>|string}>
+     */
+    public const PLATFORM_ROLES = [
+        self::SUPERADMIN => [
+            'label' => 'ผู้ดูแลแพลตฟอร์ม',
+            'permissions' => '*',
+        ],
+        self::CENTRAL_HELPDESK => [
+            'label' => 'Helpdesk ส่วนกลาง',
+            'permissions' => [
+                'platform.impersonate',
+                'branch.view', 'branch.all',
+                'asset.view', 'asset_category.view', 'customer.view', 'contract.view',
+                'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
+                'holiday.view',
+                'pm.view', 'pm.update',
+                'part.view', 'stock.view',
+                'survey.view', 'report.view',
+            ],
+        ],
+        self::CENTRAL_TECHNICIAN => [
+            'label' => 'ช่างส่วนกลาง',
+            'permissions' => [
+                'platform.impersonate',
+                'branch.view', 'branch.all',
+                'asset.view', 'asset.update',
+                'customer.view', 'contract.view',
+                'ticket.view', 'ticket.update', 'ticket.close',
+                'pm.view', 'pm.perform',
+                'sticker.print',
+                'part.view', 'stock.view', 'stock.issue',
+            ],
+        ],
+    ];
 
     /** The role of customer accounts (users with customer_id); the only role they may have. */
     public const CUSTOMER_ROLE = 'customer';
@@ -52,8 +98,9 @@ class PermissionCatalog
         ],
         'helpdesk' => [
             'label' => 'เจ้าหน้าที่ Helpdesk',
+            // No branch.all: like every company role but the admin, helpdesk works in its own branch.
             'permissions' => [
-                'branch.view', 'branch.all',
+                'branch.view',
                 'asset.view', 'asset_category.view', 'customer.view', 'contract.view',
                 'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
                 'holiday.view',
@@ -120,5 +167,15 @@ class PermissionCatalog
         $permissions = self::DEFAULT_ROLES[$role]['permissions'];
 
         return $permissions === '*' ? self::tenantPermissions() : $permissions;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function platformPermissionsFor(string $role): array
+    {
+        $permissions = self::PLATFORM_ROLES[$role]['permissions'];
+
+        return $permissions === '*' ? self::all() : $permissions;
     }
 }

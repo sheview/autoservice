@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -44,7 +43,7 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
         $permissions = fn () => match (true) {
             $user === null => [],
-            $impersonation->active() => PermissionCatalog::tenantPermissions(),
+            $impersonation->active() => $impersonation->permissions(),
             default => $user->getAllPermissions()->pluck('name')->values()->all(),
         };
 

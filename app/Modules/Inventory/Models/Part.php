@@ -2,6 +2,7 @@
 
 namespace App\Modules\Inventory\Models;
 
+use App\Modules\Document\Concerns\HasPhotoSlots;
 use App\Modules\Inventory\Policies\PartPolicy;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
@@ -10,15 +11,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\MediaLibrary\HasMedia;
 
 /**
  * A spare part or consumable the MA company keeps in stock. "qty_on_hand" is changed only by
  * RecordStockMovement, which writes the matching row of the ledger (stock_movements).
+ * It carries up to four photos (HasPhotoSlots).
  */
 #[UsePolicy(PartPolicy::class)]
-class Part extends Model
+class Part extends Model implements HasMedia
 {
-    use BelongsToTenant, LogsActivity, SoftDeletes;
+    use BelongsToTenant, HasPhotoSlots, LogsActivity, SoftDeletes;
 
     protected $fillable = ['code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'unit_cost', 'is_active', 'notes'];
 

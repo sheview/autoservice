@@ -19,14 +19,36 @@ class StockMovement extends Model
 
     public const TYPE_ISSUE = 'issue';
 
+    /** Lent out: expected to come back (a "return"). */
+    public const TYPE_LOAN = 'loan';
+
+    /** Put in as a spare or replacement while the customer's own unit is away or broken. */
+    public const TYPE_SPARE = 'spare';
+
     public const TYPE_RETURN = 'return';
 
     public const TYPE_ADJUST = 'adjust';
 
-    public const TYPES = [self::TYPE_RECEIVE, self::TYPE_ISSUE, self::TYPE_RETURN, self::TYPE_ADJUST];
+    public const TYPES = [self::TYPE_RECEIVE, self::TYPE_ISSUE, self::TYPE_LOAN, self::TYPE_SPARE, self::TYPE_RETURN, self::TYPE_ADJUST];
 
-    /** Types entered on the part page; each needs the permission "stock.{type}". */
-    public const MANUAL_TYPES = [self::TYPE_RECEIVE, self::TYPE_ISSUE, self::TYPE_ADJUST];
+    /** Types that take stock out, on the part page or for a ticket. */
+    public const OUT_TYPES = [self::TYPE_ISSUE, self::TYPE_LOAN, self::TYPE_SPARE];
+
+    /** Types entered on the part page. */
+    public const MANUAL_TYPES = self::TYPES;
+
+    /**
+     * The permission a movement type needs: receiving and counting have their own; taking stock
+     * out in any way, and bringing it back, is stock.issue.
+     */
+    public static function permissionFor(string $type): string
+    {
+        return match ($type) {
+            self::TYPE_RECEIVE => 'stock.receive',
+            self::TYPE_ADJUST => 'stock.adjust',
+            default => 'stock.issue',
+        };
+    }
 
     protected $fillable = ['type', 'quantity', 'balance_after', 'unit_cost', 'ticket_id', 'reference', 'note', 'user_id', 'user_name'];
 

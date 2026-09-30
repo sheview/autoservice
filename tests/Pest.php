@@ -6,6 +6,7 @@ use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Contract\Actions\SaveContract;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
+use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\RecordStockMovement;
@@ -81,6 +82,15 @@ function userWithRole(string $role, array $attributes = [], ?Tenant $tenant = nu
     $create = fn () => User::factory()->withRole($role)->create($attributes);
 
     return $tenant ? asTenant($tenant, $create) : $create();
+}
+
+/**
+ * Lets a role of the current tenant see every branch (branch.all), as a company does for its
+ * head-office dispatchers. By default only the company admin has it.
+ */
+function allowAllBranches(string $role): void
+{
+    Role::findByName($role)->givePermissionTo(PermissionCatalog::ALL_BRANCHES);
 }
 
 /**

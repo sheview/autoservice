@@ -3,6 +3,7 @@ import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
+import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -63,6 +64,8 @@ interface TicketPart {
     name: string;
     unit: string;
     quantity: number;
+    // How it left stock for this ticket: issue, loan, spare.
+    types: string[];
 }
 
 interface PartOption {
@@ -91,7 +94,7 @@ const props = defineProps<{
     actions: string[];
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
-    parts: { items: TicketPart[]; options: PartOption[]; canIssue: boolean } | null;
+    parts: { items: TicketPart[]; options: PartOption[]; types: string[]; canIssue: boolean; canReturn: boolean } | null;
     survey: TicketSurvey | null;
     can: { update: boolean; comment: boolean; internalNotes: boolean };
 }>();
@@ -151,7 +154,7 @@ const copyLink = async () => {
 };
 
 // --- spare parts (Inventory module) --------------------------------------------
-const issue = useForm({ part_id: null as number | null, quantity: 1 });
+const issue = useForm({ part_id: null as number | null, quantity: 1, type: 'issue' });
 const issuePart = () =>
     issue.post(route('service.tickets.parts.store', props.ticket.ulid), {
         preserveScroll: true,
@@ -280,9 +283,10 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                             <li v-for="part in parts.items" :key="part.part_id" class="flex flex-wrap items-center gap-2 px-3 py-2">
                                 <span class="font-mono text-xs text-muted-foreground">{{ part.code }}</span>
                                 <span>{{ part.name }}</span>
+                                <StockMovementTypeBadge v-for="type in part.types" :key="type" :type="type" />
                                 <span class="ml-auto whitespace-nowrap font-medium">{{ part.quantity }} {{ part.unit }}</span>
                                 <button
-                                    v-if="parts.canIssue"
+                                    v-if="parts.canReturn"
                                     type="button"
                                     class="text-primary underline-offset-4 hover:underline"
                                     @click="returnPart(part)"
@@ -308,6 +312,12 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                                             t('ticket_parts.available', { qty: option.qty_on_hand, unit: option.unit })
                                         }})
                                     </option>
+                                </select>
+                            </div>
+                            <div class="grid gap-1">
+                                <label for="part_type" class="text-xs text-muted-foreground">{{ t('ticket_parts.type') }}</label>
+                                <select id="part_type" v-model="issue.type" class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
+                                    <option v-for="type in parts.types" :key="type" :value="type">{{ t(`stock_movements.types.${type}`) }}</option>
                                 </select>
                             </div>
                             <div class="grid w-24 gap-1">

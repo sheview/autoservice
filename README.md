@@ -35,9 +35,10 @@ php artisan schedule:work  # งานตามเวลา: pm:notify-upcoming 
 
 | บัญชี | บทบาท |
 |---|---|
-| `admin@platform.test` | superadmin ของแพลตฟอร์ม (เข้าดูในนามบริษัทลูกค้า, เปิด/ปิดโมดูล) |
-| `admin@itsol.test`, `admin@netpro.test` | ผู้ดูแลระบบบริษัท |
-| `helpdesk@…`, `tech1@…`, `tech2@…`, `user@…` | บทบาทอื่นของแต่ละบริษัท (tech ถูกจำกัดสาขา) |
+| `admin@platform.test` | superadmin ของแพลตฟอร์ม (เข้าดูในนามบริษัทลูกค้าและทำได้ทุกอย่าง, เปิด/ปิดโมดูล) |
+| `helpdesk@platform.test`, `tech@platform.test` | Helpdesk / ช่างส่วนกลาง: เข้าได้ทุกบริษัท เห็นทุกสาขา ทำงานประจำวันได้ แต่ตั้งค่าไม่ได้ |
+| `admin@itsol.test`, `admin@netpro.test` | ผู้ดูแลระบบบริษัท (เห็นทุกสาขาของบริษัท) |
+| `helpdesk@…`, `tech1@…`, `tech2@…`, `user@…` | บทบาทอื่นของแต่ละบริษัท เห็นเฉพาะสาขาของตัวเอง |
 | `customer@itsol.test`, `customer@netpro.test` | บัญชีลูกค้า (CUST001) เห็นเฉพาะใบงานและทรัพย์สินของตัวเอง |
 
 บน production ต้องตั้ง cron `* * * * * php artisan schedule:run` และรัน queue worker (Horizon)

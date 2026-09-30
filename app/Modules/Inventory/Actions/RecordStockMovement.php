@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
  * The only place stock changes: adds a row to the ledger and moves the part's qty_on_hand with it.
  *
  *   receive, return   $quantity goes into stock
- *   issue             $quantity comes out of stock (never below zero)
+ *   issue, loan, spare   $quantity comes out of stock (never below zero)
  *   adjust            $quantity is the counted stock; the movement is the difference
  *
  * The part row is locked, so two people issuing the last piece cannot both succeed.
@@ -30,7 +30,7 @@ class RecordStockMovement
 
             $change = match ($type) {
                 StockMovement::TYPE_RECEIVE, StockMovement::TYPE_RETURN => $quantity,
-                StockMovement::TYPE_ISSUE => -$quantity,
+                StockMovement::TYPE_ISSUE, StockMovement::TYPE_LOAN, StockMovement::TYPE_SPARE => -$quantity,
                 StockMovement::TYPE_ADJUST => $quantity - $locked->qty_on_hand,
             };
 

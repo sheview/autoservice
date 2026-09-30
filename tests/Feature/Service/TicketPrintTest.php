@@ -42,7 +42,7 @@ it('renders the job sheet with the work notes and the parts used, without intern
         ->where('ticket.responded_at', fn ($at) => $at !== null)
         ->where('ticket.closed_at', null)
         ->where('notes', fn ($notes) => collect($notes)->pluck('body')->all() === ['เปลี่ยนลูกยางดึงกระดาษ'])
-        ->where('parts', [['part_id' => $roller->id, 'code' => 'ROLLER', 'name' => 'Pickup roller', 'unit' => 'pcs', 'quantity' => 2]]));
+        ->where('parts', [['part_id' => $roller->id, 'code' => 'ROLLER', 'name' => 'Pickup roller', 'unit' => 'pcs', 'quantity' => 2, 'types' => ['issue']]]));
 });
 
 it('leaves the parts table out for users who do not see stock, or with the module off', function () {

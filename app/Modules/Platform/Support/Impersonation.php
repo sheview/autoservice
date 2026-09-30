@@ -3,16 +3,23 @@
 namespace App\Modules\Platform\Support;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Contracts\Session\Session;
 
 /**
- * A superadmin working inside another tenant ("view as tenant").
+ * A platform user working inside a customer tenant ("view as tenant").
  *
- * The superadmin stays logged in as themselves (so every log shows the real person);
- * only the tenant changes. The target tenant is kept in the session and re-checked on
- * every request by ResolveTenant through tenantFor().
+ * The user stays logged in as themselves (so every log shows the real person); only the tenant
+ * changes. The target tenant is kept in the session and re-checked on every request by
+ * ResolveTenant through tenantFor().
+ *
+ * What they may do there comes from their role in the platform tenant:
+ *   - platform.full_access (superadmin): everything, policies are not even asked
+ *   - otherwise (central helpdesk, central technician): the tenant permissions their platform
+ *     role holds, checked by the normal policies. They hold no settings permissions, so they
+ *     see and work on the company's data but cannot configure it.
  */
 class Impersonation
 {
@@ -20,7 +27,16 @@ class Impersonation
 
     public const PERMISSION = 'platform.impersonate';
 
+    public const FULL_ACCESS = 'platform.full_access';
+
     private ?Tenant $tenant = null;
+
+    private ?int $userId = null;
+
+    private bool $fullAccess = false;
+
+    /** @var list<string> tenant permissions the user holds while inside the tenant */
+    private array $permissions = [];
 
     public function __construct(private TenantContext $context) {}
 
@@ -32,7 +48,7 @@ class Impersonation
     public function stop(Session $session): void
     {
         $session->forget(self::SESSION_KEY);
-        $this->tenant = null;
+        $this->reset();
     }
 
     /**
@@ -41,6 +57,9 @@ class Impersonation
     public function reset(): void
     {
         $this->tenant = null;
+        $this->userId = null;
+        $this->fullAccess = false;
+        $this->permissions = [];
     }
 
     /**
@@ -55,12 +74,19 @@ class Impersonation
         }
 
         $tenant = Tenant::find($tenantId);
+        $home = $this->homePermissions($user);
 
-        if ($tenant === null || $tenant->is_platform || ! $this->mayImpersonate($user)) {
+        if ($tenant === null || $tenant->is_platform || ! in_array(self::PERMISSION, $home, true)) {
             $this->stop($session);
 
             return null;
         }
+
+        $this->userId = $user->id;
+        $this->fullAccess = in_array(self::FULL_ACCESS, $home, true);
+        $this->permissions = $this->fullAccess
+            ? PermissionCatalog::tenantPermissions()
+            : array_values(array_intersect(PermissionCatalog::tenantPermissions(), $home));
 
         return $this->tenant = $tenant;
     }
@@ -70,13 +96,7 @@ class Impersonation
      */
     public function mayImpersonate(User $user): bool
     {
-        $user->unsetRelation('roles')->unsetRelation('permissions');
-        $allowed = $this->context->run($user->tenant_id, fn () => $user->checkPermissionTo(self::PERMISSION));
-
-        // Roles were loaded for the home tenant; drop them so the current tenant reloads its own.
-        $user->unsetRelation('roles')->unsetRelation('permissions');
-
-        return $allowed;
+        return in_array(self::PERMISSION, $this->homePermissions($user), true);
     }
 
     public function active(): bool
@@ -87,5 +107,53 @@ class Impersonation
     public function tenant(): ?Tenant
     {
         return $this->tenant;
+    }
+
+    /**
+     * Whether $user is the one working inside another tenant on this request.
+     */
+    public function actingAs(User $user): bool
+    {
+        return $this->tenant !== null && $this->userId === $user->id;
+    }
+
+    /**
+     * Passes every check inside the tenant (superadmin).
+     */
+    public function fullAccess(): bool
+    {
+        return $this->tenant !== null && $this->fullAccess;
+    }
+
+    /**
+     * Whether the impersonating user holds a tenant permission inside the tenant.
+     */
+    public function allows(string $permission): bool
+    {
+        return in_array($permission, $this->permissions, true);
+    }
+
+    /**
+     * @return list<string> the tenant permissions of the impersonating user
+     */
+    public function permissions(): array
+    {
+        return $this->permissions;
+    }
+
+    /**
+     * The permission names the user holds through their roles in their own (home) tenant.
+     *
+     * @return list<string>
+     */
+    private function homePermissions(User $user): array
+    {
+        $user->unsetRelation('roles')->unsetRelation('permissions');
+        $names = $this->context->run($user->tenant_id, fn () => $user->getAllPermissions()->pluck('name')->all());
+
+        // Roles were loaded for the home tenant; drop them so the current tenant reloads its own.
+        $user->unsetRelation('roles')->unsetRelation('permissions');
+
+        return $names;
     }
 }

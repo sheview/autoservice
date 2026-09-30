@@ -61,12 +61,13 @@ class TicketPolicy extends TenantPolicy
 
     private function ownsOrManages(User $user, Model $ticket): bool
     {
-        return $this->isAssignee($user, $ticket) || $this->assign($user, $ticket);
+        return $this->isAssignee($user, $ticket) || $this->assign($user, $ticket)
+            || ($this->actsFromPlatform($user) && $this->inScope($user, $ticket));
     }
 
     private function isAssignee(User $user, Model $ticket): bool
     {
-        return (int) $ticket->getAttribute('tenant_id') === (int) $user->tenant_id
+        return (int) $ticket->getAttribute('tenant_id') === $this->tenantIdOf($user)
             && $ticket->getAttribute('assignee_id') !== null
             && (int) $ticket->getAttribute('assignee_id') === (int) $user->id;
     }
