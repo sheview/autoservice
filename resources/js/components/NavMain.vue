@@ -1,22 +1,38 @@
 <script setup lang="ts">
-import { SidebarGroup, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps<{
+const props = defineProps<{
     items: NavItem[];
 }>();
 
 const page = usePage<SharedData>();
 
 const isActive = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`);
+
+// Items in their sections, in the order the server sent them (a section with nothing the user may open is not there).
+const sections = computed(() =>
+    props.items.reduce<{ label: string | null; items: NavItem[] }[]>((list, item) => {
+        const label = item.group ?? null;
+        const last = list[list.length - 1];
+        if (last && last.label === label) {
+            last.items.push(item);
+        } else {
+            list.push({ label, items: [item] });
+        }
+        return list;
+    }, []),
+);
 </script>
 
 <template>
-    <SidebarGroup class="px-2 py-0">
+    <SidebarGroup v-for="(section, index) in sections" :key="section.label ?? `top-${index}`" class="px-2 py-0" :class="{ 'pt-1': section.label }">
+        <SidebarGroupLabel v-if="section.label">{{ section.label }}</SidebarGroupLabel>
         <SidebarMenu>
-            <SidebarMenuItem v-for="item in items" :key="item.href">
-                <SidebarMenuButton as-child :is-active="isActive(item.href)">
+            <SidebarMenuItem v-for="item in section.items" :key="item.href">
+                <SidebarMenuButton as-child :is-active="isActive(item.href)" :tooltip="item.title">
                     <Link :href="item.href">
                         <component :is="item.icon" />
                         <span>{{ item.title }}</span>

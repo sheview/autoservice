@@ -139,8 +139,19 @@ it('adds comments and internal notes', function () {
 
     $this->actingAs($this->helpdesk)->get("/tickets/{$this->ticket->ulid}")
         ->assertInertia(fn (Assert $page) => $page
-            ->where('events.1.type', 'comment')
-            ->where('events.1.body', 'โทรหาลูกค้าแล้ว')
-            ->where('events.1.is_internal', true)
-            ->where('events.1.user_name', 'Helpdesk Here'));
+            ->where('events', fn ($events) => collect($events)->where('type', 'comment')
+                ->map(fn ($e) => [$e['body'], $e['is_internal'], $e['user_name']])->values()->all() === [['โทรหาลูกค้าแล้ว', true, 'Helpdesk Here']]));
+});
+
+it('needs the warranty checked before work starts', function () {
+    $ticket = openTicket($this->helpdesk, ['title' => 'No warranty yet'], warrantyChecked: false);
+    $this->actingAs($this->helpdesk)->post("/tickets/{$ticket->ulid}/assign", ['assignee_id' => $this->tech->id]);
+
+    $this->actingAs($this->tech);
+    moveTicket($ticket, 'start')->assertSessionHasErrors(['action' => 'กรุณาตรวจสอบการรับประกันของเครื่องก่อนเริ่มดำเนินการ']);
+    expect($ticket->fresh()->status)->toBe(Ticket::STATUS_ASSIGNED);
+
+    $this->post("/tickets/{$ticket->ulid}/warranty", ['warranty_status' => 'in_warranty'])->assertSessionHasNoErrors();
+    moveTicket($ticket, 'start')->assertSessionHasNoErrors();
+    expect($ticket->fresh())->warranty_status->toBe('in_warranty')->status->toBe(Ticket::STATUS_IN_PROGRESS);
 });

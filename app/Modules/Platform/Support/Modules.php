@@ -67,7 +67,7 @@ class Modules
      *
      * @param  iterable<string>  $permissions  the permission names the UI already received
      * @param  bool  $customerAccount  hide items marked "staff" (pages a customer account may not open)
-     * @return list<array{title: string, href: string, icon: string}>
+     * @return list<array{title: string, href: string, icon: string, group: string|null}>
      */
     public function navigation(iterable $permissions, bool $customerAccount = false): array
     {
@@ -84,11 +84,16 @@ class Modules
             if (isset($item['module']) && ! $this->enabled($item['module'])) {
                 continue;
             }
+            // Pages about the company itself: not in the platform tenant (it is no company).
+            if (($item['company'] ?? false) && (app(TenantContext::class)->tenant()?->is_platform ?? true)) {
+                continue;
+            }
 
             $items[] = [
                 'title' => __("ui.{$item['title']}"),
                 'href' => route($item['route'], absolute: false),
                 'icon' => $item['icon'],
+                'group' => isset($item['group']) ? __("ui.nav_groups.{$item['group']}") : null,
             ];
         }
 

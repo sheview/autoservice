@@ -62,6 +62,27 @@ it('lists categories with search, filter and asset counts', function () {
         ->assertInertia(fn (Assert $page) => $page->where('categories.total', 1)->where('categories.data.0.name', 'Router'));
 });
 
+it('keeps hardware or software on the category', function () {
+    $this->actingAs($this->admin)->post('/asset-categories', ['name' => 'Licence', 'code_prefix' => 'LIC', 'asset_type' => 'software'])
+        ->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/asset-categories', ['name' => 'Desktop', 'code_prefix' => 'PC'])
+        ->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/asset-categories', ['name' => 'Bad', 'code_prefix' => 'BD', 'asset_type' => 'firmware'])
+        ->assertSessionHasErrors('asset_type');
+
+    $licence = AssetCategory::where('name', 'Licence')->sole();
+    expect($licence->asset_type)->toBe('software')
+        ->and(AssetCategory::where('name', 'Desktop')->sole()->asset_type)->toBe('hardware');
+
+    // an edit that leaves the type out keeps it
+    $this->actingAs($this->admin)->put("/asset-categories/{$licence->id}", ['name' => 'Licences', 'code_prefix' => 'LIC'])
+        ->assertSessionHasNoErrors();
+    expect($licence->fresh()->asset_type)->toBe('software');
+
+    $this->actingAs($this->admin)->get('/asset-categories?asset_type=software')
+        ->assertInertia(fn (Assert $page) => $page->where('categories.total', 1)->where('categories.data.0.asset_type', 'software'));
+});
+
 it('deletes only a category without assets', function () {
     $used = createAssetCategory(['name' => 'Used']);
     $empty = createAssetCategory(['name' => 'Empty']);

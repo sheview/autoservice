@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
+import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -29,6 +31,8 @@ interface ContractForm {
 
 const props = defineProps<{
     contract: ContractForm | null;
+    // Files already attached (editing).
+    documents: Attachment[];
     customers: { id: number; code: string; name: string }[];
     statuses: string[];
     serviceWindows: string[];
@@ -65,6 +69,7 @@ const form = useForm({
             { response_hours: existingSlas[p]?.response_hours ?? undefined, resolve_hours: existingSlas[p]?.resolve_hours ?? undefined },
         ]),
     ) as Record<string, SlaInput>,
+    attachments: [] as File[],
 });
 
 const submit = () => {
@@ -78,10 +83,12 @@ const submit = () => {
                 { response_hours: hoursOrNull(sla.response_hours), resolve_hours: hoursOrNull(sla.resolve_hours) },
             ]),
         ),
+        // Files go as multipart, which PHP only reads on POST: an edit is a POST that says PUT.
+        ...(props.contract ? { _method: 'put' } : {}),
     }));
 
     if (props.contract) {
-        transformed.put(route('contract.contracts.update', props.contract.id), { preserveScroll: true });
+        transformed.post(route('contract.contracts.update', props.contract.id), { preserveScroll: true });
     } else {
         transformed.post(route('contract.contracts.store'), { preserveScroll: true });
     }
@@ -96,14 +103,14 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-3xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-8" @submit.prevent="submit">
                 <section class="space-y-4">
                     <h3 class="text-sm font-semibold">{{ t('contracts.general') }}</h3>
                     <div class="grid gap-6 sm:grid-cols-2">
-                        <div class="grid gap-2 sm:col-span-2">
+                        <div class="grid content-start gap-2 sm:col-span-2">
                             <Label for="customer_id">{{ t('contracts.customer') }}</Label>
                             <select id="customer_id" v-model="form.customer_id" :class="selectClass" required>
                                 <option :value="null" disabled>{{ t('contracts.choose_customer') }}</option>
@@ -114,12 +121,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <InputError :message="form.errors.customer_id" />
                         </div>
 
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="contract_no">{{ t('contracts.contract_no') }}</Label>
                             <Input id="contract_no" v-model="form.contract_no" class="font-mono" required autocomplete="off" />
                             <InputError :message="form.errors.contract_no" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="status">{{ t('contracts.status') }}</Label>
                             <select id="status" v-model="form.status" :class="selectClass" required>
                                 <option v-for="status in statuses" :key="status" :value="status">{{ t(`contracts.statuses.${status}`) }}</option>
@@ -127,29 +134,29 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <InputError :message="form.errors.status" />
                         </div>
 
-                        <div class="grid gap-2 sm:col-span-2">
+                        <div class="grid content-start gap-2 sm:col-span-2">
                             <Label for="title">{{ t('contracts.title_field') }}</Label>
                             <Input id="title" v-model="form.title" required />
                             <InputError :message="form.errors.title" />
                         </div>
 
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="starts_on">{{ t('contracts.starts_on') }}</Label>
                             <Input id="starts_on" v-model="form.starts_on" type="date" required />
                             <InputError :message="form.errors.starts_on" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="ends_on">{{ t('contracts.ends_on') }}</Label>
                             <Input id="ends_on" v-model="form.ends_on" type="date" required />
                             <InputError :message="form.errors.ends_on" />
                         </div>
 
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="value">{{ t('contracts.value') }}</Label>
                             <Input id="value" v-model="form.value" type="number" min="0" step="0.01" />
                             <InputError :message="form.errors.value" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="service_window">{{ t('contracts.service_window') }}</Label>
                             <select id="service_window" v-model="form.service_window" :class="selectClass" required>
                                 <option v-for="window in serviceWindows" :key="window" :value="window">
@@ -159,7 +166,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <InputError :message="form.errors.service_window" />
                         </div>
 
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="pm_interval_months">{{ t('contracts.pm_interval_months') }}</Label>
                             <select id="pm_interval_months" v-model="form.pm_interval_months" :class="selectClass">
                                 <option :value="null">{{ t('contracts.no_pm') }}</option>
@@ -169,7 +176,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             </select>
                             <InputError :message="form.errors.pm_interval_months" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="notify_days_before">{{ t('contracts.notify_days_before') }}</Label>
                             <Input id="notify_days_before" v-model="form.notify_days_before" type="number" min="0" max="365" required />
                             <p class="text-xs text-muted-foreground">{{ t('contracts.notify_hint') }}</p>
@@ -221,7 +228,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
                 </section>
 
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="notes">{{ t('contracts.notes') }}</Label>
                     <textarea
                         id="notes"
@@ -231,6 +238,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     />
                     <InputError :message="form.errors.notes" />
                 </div>
+
+                <section class="space-y-2">
+                    <h3 class="text-sm font-semibold">{{ t('contracts.documents') }}</h3>
+                    <AttachmentList v-if="contract" :attachments="documents" :title="false" can-delete />
+                    <AttachmentPicker v-model="form.attachments" images :errors="form.errors" />
+                </section>
 
                 <div class="flex items-center gap-3">
                     <Button :disabled="form.processing">{{ t('common.save') }}</Button>

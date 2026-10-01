@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ interface AssetRow {
     name: string;
     brand_model: string | null;
     serial_number: string | null;
+    property_no: string | null;
     category: string | null;
     branch: string | null;
     customer: string | null;
@@ -76,13 +78,6 @@ const columns = [
 
 // Local date as YYYY-MM-DD (toISOString would give the UTC date).
 const today = new Date().toLocaleDateString('sv-SE');
-
-const statusClass: Record<string, string> = {
-    in_use: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-    spare: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
-    in_repair: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-    retired: 'bg-muted text-muted-foreground',
-};
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
@@ -159,6 +154,9 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <Link :href="route('asset.assets.show', asset.ulid)" class="text-primary underline-offset-4 hover:underline">
                                     {{ asset.asset_code }}
                                 </Link>
+                                <div v-if="asset.property_no" class="text-muted-foreground">
+                                    {{ t('assets.property_no_short') }} {{ asset.property_no }}
+                                </div>
                             </td>
                             <td class="px-4 py-2">
                                 <div class="font-medium">{{ asset.name }}</div>
@@ -170,9 +168,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="px-4 py-2">{{ asset.branch ?? t('assets.no_branch') }}</td>
                             <td v-if="customers.length" class="px-4 py-2">{{ asset.customer ?? t('common.none') }}</td>
                             <td class="px-4 py-2">
-                                <span class="whitespace-nowrap rounded-full px-2 py-0.5 text-xs" :class="statusClass[asset.status]">
-                                    {{ t(`assets.statuses.${asset.status}`) }}
-                                </span>
+                                <AssetStatusBadge :status="asset.status" />
                             </td>
                             <td
                                 class="whitespace-nowrap px-4 py-2"

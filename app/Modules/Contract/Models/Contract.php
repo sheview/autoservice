@@ -3,6 +3,7 @@
 namespace App\Modules\Contract\Models;
 
 use App\Modules\Contract\Policies\ContractPolicy;
+use App\Modules\Document\Concerns\HasAttachments;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
@@ -21,7 +22,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 #[UsePolicy(ContractPolicy::class)]
 class Contract extends Model implements HasMedia
 {
-    use BelongsToTenant, InteractsWithMedia, LogsActivity, SoftDeletes;
+    use BelongsToTenant, HasAttachments, InteractsWithMedia, LogsActivity, SoftDeletes;
 
     public const STATUS_DRAFT = 'draft';
 
@@ -79,8 +80,19 @@ class Contract extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection(self::DOCUMENTS)
-            ->acceptsMimeTypes(['application/pdf', 'image/jpeg', 'image/png']);
+        $this->registerAttachmentCollection();
+    }
+
+    /** Contract files were here before HasAttachments, so they keep their collection. */
+    public function attachmentCollection(): string
+    {
+        return self::DOCUMENTS;
+    }
+
+    /** A signed contract is often a scan. */
+    public function attachmentsTakeImages(): bool
+    {
+        return true;
     }
 
     public function getActivitylogOptions(): LogOptions

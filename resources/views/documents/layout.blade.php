@@ -35,6 +35,14 @@
         .pre { white-space: pre-line; }
         tr { page-break-inside: avoid; }
     </style>
+    @if (! empty($forBrowser))
+        {{-- Printed from the browser instead of the PDF service: set the page here and open the print dialog. --}}
+        <style>
+            @page { size: A4; margin: 12mm 14mm; }
+            @media screen { body { max-width: 182mm; margin: 12mm auto; } }
+        </style>
+        <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
+    @endif
 </head>
 <body>
     @yield('content')

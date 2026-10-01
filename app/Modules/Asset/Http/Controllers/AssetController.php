@@ -3,18 +3,28 @@
 namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\AssetSuggestions;
+use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
+use App\Modules\Asset\Actions\RequestCheckout;
+use App\Modules\Asset\Actions\SameModelAssets;
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Actions\SearchAssets;
 use App\Modules\Asset\Exports\AssetsExport;
 use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Support\CheckoutRow;
 use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
+use App\Modules\Document\Actions\AddAttachments;
+use App\Modules\Document\Support\Attachments;
 use App\Modules\Document\Support\PhotoSlots;
+use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\PurchaseRequestDetails;
 use App\Modules\Maintenance\Actions\PmHistoryForAsset;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
@@ -33,6 +43,7 @@ class AssetController extends Controller
     public function __construct(
         private Modules $modules,
         private ListCustomers $listCustomers,
+        private AssetSuggestions $suggestions,
     ) {}
 
     public function index(Request $request, SearchAssets $search): Response
@@ -53,6 +64,7 @@ class AssetController extends Controller
                 'name' => $asset->name,
                 'brand_model' => trim("{$asset->brand} {$asset->model}") ?: null,
                 'serial_number' => $asset->serial_number,
+                'property_no' => $asset->property_no,
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
                 'customer' => $customerNames[$asset->customer_id] ?? null,
@@ -76,16 +88,55 @@ class AssetController extends Controller
         ]);
     }
 
-    public function create(Request $request): Response
+    /**
+     * ?from={ulid}: start from a copy of that asset (same model), with no code, serial or
+     * equipment number, to add more devices of that model.
+     * ?purchase_request={ulid}: register what a received purchase request brought (Inventory
+     * module): its name, price and date, one row per unit bought.
+     */
+    public function create(Request $request, PurchaseRequestDetails $purchaseRequestDetails): Response
     {
         Gate::authorize('create', Asset::class);
 
-        return Inertia::render('Asset/Assets/Form', $this->formProps($request->user(), null));
+        $from = $request->filled('from') ? Asset::where('ulid', $request->string('from'))->first() : null;
+        if ($from !== null && ! $request->user()->can('view', $from)) {
+            $from = null;
+        }
+
+        $purchase = $request->filled('purchase_request') && $this->modules->enabled('inventory')
+            ? $purchaseRequestDetails->handle($request->string('purchase_request')->value(), $request->user())
+            : null;
+
+        return Inertia::render('Asset/Assets/Form', [
+            ...$this->formProps($request->user(), null),
+            'copy' => match (true) {
+                $from !== null => [
+                    ...collect($this->assetForm($from))->except(['ulid', 'asset_code', 'serials', 'property_no'])->all(),
+                    'asset_code' => $from->asset_code,
+                ],
+                $purchase !== null => [
+                    'name' => $purchase['item_name'],
+                    'status' => Asset::STATUS_SPARE,
+                    'purchased_at' => $purchase['received_on'],
+                    'purchase_price' => $purchase['unit_price'],
+                    'quantity' => $purchase['quantity'],
+                    'notes' => __('asset.assets.from_purchase', ['no' => $purchase['pr_no'], 'name' => $purchase['requested_by_name'] ?? '-']),
+                ],
+                default => null,
+            },
+            'purchase' => $purchase ? ['pr_no' => $purchase['pr_no'], 'quantity' => $purchase['quantity']] : null,
+        ]);
     }
 
-    public function store(AssetRequest $request, SaveAsset $saveAsset): RedirectResponse
+    public function store(AssetRequest $request, CreateAsset $createAsset): RedirectResponse
     {
-        $asset = $saveAsset->handle(null, $request->assetData());
+        $asset = $createAsset->handle(
+            $request->assetData(),
+            $request->serials(),
+            $request->attachments(),
+            $request->handedOut(),
+            $request->user(),
+        );
 
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.created', ['code' => $asset->asset_code]));
     }
@@ -96,17 +147,23 @@ class AssetController extends Controller
         ContractsForAsset $contractsForAsset,
         TicketsForAsset $ticketsForAsset,
         PmHistoryForAsset $pmHistoryForAsset,
+        SameModelAssets $sameModelAssets,
+        UsersWithPermission $usersWithPermission,
     ): Response {
         Gate::authorize('view', $asset);
 
-        $asset->load(['category', 'branch:id,name']);
+        $asset->load(['category', 'branch:id,name', 'serials']);
         $user = $request->user();
         $showContracts = $this->modules->enabled('contract') && $user->can('contract.view');
         $serviceOn = $this->modules->enabled('service');
 
         return Inertia::render('Asset/Assets/Show', [
             'asset' => [
-                ...$asset->only(['ulid', 'asset_code', 'name', 'brand', 'model', 'serial_number', 'status', 'location', 'notes']),
+                ...$asset->only([
+                    'ulid', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit', 'property_no', 'status',
+                    'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes',
+                ]),
+                'serials' => $asset->serials->pluck('serial_number'),
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
                 'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $asset->customer_id)['name'] ?? null,
@@ -117,7 +174,11 @@ class AssetController extends Controller
                     ->map(fn (array $field) => ['label' => $field['label'], 'value' => $asset->specs[$field['key']] ?? null])
                     ->values(),
             ],
+            // Every device of the same category, brand and model (this one included).
+            'sameModel' => $sameModelAssets->handle($user, $asset),
+            'checkouts' => $this->checkouts($request, $asset, $usersWithPermission),
             'photos' => PhotoSlots::list($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
+            'attachments' => Attachments::list($asset, $asset->attachmentCollection(), fn (int $id) => route('asset.assets.attachments.show', [$asset, $id])),
             // null = the user cannot see contracts here (module off or no contract.view)
             'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
             // null = the user cannot see tickets here (module off or no ticket.view)
@@ -132,6 +193,7 @@ class AssetController extends Controller
                 'at' => $log->created_at->toIso8601String(),
             ]),
             'can' => [
+                'create' => $user->can('create', Asset::class),
                 'update' => $user->can('update', $asset),
                 'delete' => $user->can('delete', $asset),
                 'openTicket' => $serviceOn && $user->can('ticket.create'),
@@ -147,9 +209,10 @@ class AssetController extends Controller
         return Inertia::render('Asset/Assets/Form', $this->formProps($request->user(), $asset));
     }
 
-    public function update(AssetRequest $request, Asset $asset, SaveAsset $saveAsset): RedirectResponse
+    public function update(AssetRequest $request, Asset $asset, SaveAsset $saveAsset, AddAttachments $addAttachments): RedirectResponse
     {
-        $saveAsset->handle($asset, $request->assetData());
+        $saveAsset->handle($asset, $request->assetData(), $request->serials());
+        $addAttachments->handle($asset, $request->attachments());
 
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.updated'));
     }
@@ -202,16 +265,68 @@ class AssetController extends Controller
     private function formProps(User $user, ?Asset $asset): array
     {
         return [
-            'asset' => $asset ? [
-                ...$asset->only(['ulid', 'asset_code', 'name', 'category_id', 'branch_id', 'customer_id', 'brand', 'model', 'serial_number', 'status', 'location', 'notes', 'specs']),
-                'purchased_at' => $asset->purchased_at?->toDateString(),
-                'purchase_price' => Money::toBaht($asset->purchase_price),
-                'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
-            ] : null,
-            'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'code_prefix', 'spec_fields']),
+            'asset' => $asset ? $this->assetForm($asset) : null,
+            'attachments' => $asset
+                ? Attachments::list($asset, $asset->attachmentCollection(), fn (int $id) => route('asset.assets.attachments.show', [$asset, $id]))
+                : [],
+            'copy' => null,
+            'purchase' => null,
+            'maxSerials' => AssetRequest::MAX_SERIALS,
+            'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'code_prefix', 'requires_serial', 'spec_fields']),
             'branches' => $this->branchOptions($user),
             'customers' => $this->customers(),
             'statuses' => Asset::STATUSES,
+            // Creating only: the asset is already out with someone.
+            'handedOutStatuses' => $asset ? [] : array_keys(AssetRequest::HANDED_OUT),
+            ...$this->suggestions->handle(),
+        ];
+    }
+
+    /**
+     * Issue/loan on the asset page: the form in progress, the last ones, and whether a new one can
+     * be asked for (with the staff to choose from). Null when the user has nothing to do with them.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function checkouts(Request $request, Asset $asset, UsersWithPermission $usersWithPermission): ?array
+    {
+        $can = AssetCheckoutController::abilities($request);
+        if (! $can['request'] && ! $can['approve']) {
+            return null;
+        }
+
+        $recent = AssetCheckout::query()->where('asset_id', $asset->id)->latest('id')->limit(10)->get();
+        $current = $recent->first(fn (AssetCheckout $checkout) => in_array($checkout->status, AssetCheckout::OPEN_STATUSES, true));
+        $available = $current === null && RequestCheckout::available($asset);
+
+        return [
+            'current' => $current ? CheckoutRow::of($current) : null,
+            'history' => $recent->reject(fn (AssetCheckout $checkout) => $checkout->is($current))->map(fn (AssetCheckout $checkout) => CheckoutRow::of($checkout))->values(),
+            'available' => $available,
+            'borrowers' => $available && $can['request']
+                ? $usersWithPermission->handle('asset.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
+                : [],
+            'can' => [...$can, 'userId' => $request->user()->id],
+        ];
+    }
+
+    /**
+     * An asset's fields as the form edits them.
+     *
+     * @return array<string, mixed>
+     */
+    private function assetForm(Asset $asset): array
+    {
+        return [
+            ...$asset->only([
+                'ulid', 'asset_code', 'name', 'category_id', 'branch_id', 'customer_id', 'brand', 'model', 'subtype',
+                'quantity', 'unit', 'property_no', 'status', 'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes', 'specs',
+            ]),
+            'owner' => $asset->customer_id === null ? 'company' : 'customer',
+            'serials' => $asset->serials()->pluck('serial_number')->all(),
+            'purchased_at' => $asset->purchased_at?->toDateString(),
+            'purchase_price' => Money::toBaht($asset->purchase_price),
+            'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
         ];
     }
 

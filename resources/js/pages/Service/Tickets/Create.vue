@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,8 @@ interface AssetOption {
     category: string | null;
     branch: string | null;
     customer_id: number | null;
+    // Who uses it day to day: offered as the person reporting.
+    used_by: string | null;
 }
 
 interface CoveringContract {
@@ -55,9 +58,29 @@ const form = useForm({
     contact_name: '',
     contact_phone: '',
     assignee_id: null as number | null,
+    // A device not in the system, described by hand (ignored when an asset is picked).
+    device_name: '',
+    device_brand: '',
+    device_model: '',
+    device_serial: '',
+    device_serial_unknown: false,
+    device_location: '',
+    device_ip: '',
+    attachments: [] as File[],
 });
 
 const selectedAsset = ref<AssetOption | null>(props.preset.asset);
+// Is the device a registered asset, or one described by hand?
+const deviceMode = ref<'registered' | 'unregistered'>('registered');
+watch(deviceMode, (mode) => {
+    if (mode === 'unregistered' && selectedAsset.value) clearAsset();
+});
+
+// The regular user of the asset is most likely the one reporting: offered, never overwriting what was typed.
+const offerContact = (asset: AssetOption | null) => {
+    if (asset?.used_by && form.contact_name.trim() === '') form.contact_name = asset.used_by;
+};
+offerContact(props.preset.asset);
 const assetSearch = ref('');
 
 // Ask the server for the assets / covering contracts that match what is filled in so far.
@@ -89,6 +112,7 @@ const pickAsset = (asset: AssetOption) => {
     selectedAsset.value = asset;
     form.asset_id = asset.id;
     if (asset.customer_id) form.customer_id = asset.customer_id;
+    offerContact(asset);
     assetSearch.value = '';
     reload(['contracts']);
 };
@@ -120,12 +144,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="t('tickets.create')" />
 
-        <div class="max-w-3xl p-4">
+        <div class="p-4">
             <Heading :title="t('tickets.create')" />
 
             <form class="space-y-8" @submit.prevent="submit">
                 <section class="grid gap-6 sm:grid-cols-2">
-                    <div v-if="customers.length && !customerAccount" class="grid gap-2 sm:col-span-2">
+                    <div v-if="customers.length && !customerAccount" class="grid content-start gap-2 sm:col-span-2">
                         <Label for="customer_id">{{ t('tickets.customer') }}</Label>
                         <select id="customer_id" v-model="form.customer_id" :class="selectClass">
                             <option :value="null">{{ t('tickets.no_customer') }}</option>
@@ -136,7 +160,60 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.customer_id" />
                     </div>
 
-                    <div class="grid gap-2 sm:col-span-2">
+                    <fieldset class="grid content-start gap-2 sm:col-span-2">
+                        <legend class="mb-2 text-sm font-medium">{{ t('tickets.device_mode') }}</legend>
+                        <div class="flex flex-wrap gap-6">
+                            <label v-for="mode in ['registered', 'unregistered'] as const" :key="mode" class="flex items-start gap-2 text-sm">
+                                <input v-model="deviceMode" type="radio" :value="mode" class="mt-0.5 size-4" />
+                                <span>
+                                    {{ t(`tickets.device_modes.${mode}`) }}
+                                    <span class="block text-xs text-muted-foreground">{{ t(`tickets.device_modes_hint.${mode}`) }}</span>
+                                </span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <!-- A device not in the system: what it is, as told -->
+                    <div v-if="deviceMode === 'unregistered'" class="grid gap-6 rounded-md border p-4 sm:col-span-2 sm:grid-cols-2">
+                        <div class="grid content-start gap-2 sm:col-span-2">
+                            <Label for="device_name">{{ t('tickets.device_name') }} <span class="text-red-600">*</span></Label>
+                            <Input id="device_name" v-model="form.device_name" :placeholder="t('tickets.device_name_placeholder')" />
+                            <InputError :message="form.errors.device_name" />
+                        </div>
+                        <div class="grid content-start gap-2">
+                            <Label for="device_brand">{{ t('tickets.device_brand') }} <span class="text-red-600">*</span></Label>
+                            <Input id="device_brand" v-model="form.device_brand" />
+                            <InputError :message="form.errors.device_brand" />
+                        </div>
+                        <div class="grid content-start gap-2">
+                            <Label for="device_model">{{ t('tickets.device_model') }} <span class="text-red-600">*</span></Label>
+                            <Input id="device_model" v-model="form.device_model" />
+                            <InputError :message="form.errors.device_model" />
+                        </div>
+                        <div class="grid content-start gap-2">
+                            <Label for="device_serial">
+                                {{ t('tickets.device_serial') }} <span v-if="!form.device_serial_unknown" class="text-red-600">*</span>
+                            </Label>
+                            <Input id="device_serial" v-model="form.device_serial" class="font-mono" :disabled="form.device_serial_unknown" />
+                            <label class="flex items-center gap-2 text-sm">
+                                <input v-model="form.device_serial_unknown" type="checkbox" class="size-4 rounded border-input" />
+                                {{ t('tickets.device_serial_unknown') }}
+                            </label>
+                            <InputError :message="form.errors.device_serial" />
+                        </div>
+                        <div class="grid content-start gap-2">
+                            <Label for="device_ip">{{ t('tickets.device_ip') }}</Label>
+                            <Input id="device_ip" v-model="form.device_ip" class="font-mono" placeholder="192.168.1.10" />
+                            <InputError :message="form.errors.device_ip" />
+                        </div>
+                        <div class="grid content-start gap-2 sm:col-span-2">
+                            <Label for="device_location">{{ t('tickets.device_location') }}</Label>
+                            <Input id="device_location" v-model="form.device_location" />
+                            <InputError :message="form.errors.device_location" />
+                        </div>
+                    </div>
+
+                    <div v-else class="grid content-start gap-2 sm:col-span-2">
                         <Label for="asset_search">{{ t('tickets.asset') }}</Label>
                         <div v-if="selectedAsset" class="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
                             <span>
@@ -174,7 +251,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.asset_id" />
                     </div>
 
-                    <div v-if="!customerAccount" class="grid gap-2 sm:col-span-2">
+                    <div v-if="!customerAccount" class="grid content-start gap-2 sm:col-span-2">
                         <Label for="contract_id">{{ t('tickets.contract') }}</Label>
                         <select v-if="contracts.length" id="contract_id" v-model="form.contract_id" :class="selectClass">
                             <option v-for="c in contracts" :key="c.id" :value="c.id">
@@ -190,13 +267,13 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 </section>
 
                 <section class="grid gap-6 sm:grid-cols-2">
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="title">{{ t('tickets.title_field') }}</Label>
                         <Input id="title" v-model="form.title" required />
                         <InputError :message="form.errors.title" />
                     </div>
 
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="description">{{ t('tickets.description_field') }}</Label>
                         <textarea
                             id="description"
@@ -207,7 +284,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.description" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="priority">{{ t('tickets.priority') }}</Label>
                         <select id="priority" v-model="form.priority" :class="selectClass">
                             <option v-for="priority in priorities" :key="priority" :value="priority">
@@ -224,7 +301,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.priority" />
                     </div>
 
-                    <div v-if="!customerAccount" class="grid gap-2">
+                    <div v-if="!customerAccount" class="grid content-start gap-2">
                         <Label for="source">{{ t('tickets.source') }}</Label>
                         <select id="source" v-model="form.source" :class="selectClass">
                             <option v-for="source in sources" :key="source" :value="source">{{ t(`tickets.sources.${source}`) }}</option>
@@ -232,25 +309,30 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.source" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="contact_name">{{ t('tickets.contact_name') }}</Label>
                         <Input id="contact_name" v-model="form.contact_name" />
                         <InputError :message="form.errors.contact_name" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="contact_phone">{{ t('tickets.contact_phone') }}</Label>
                         <Input id="contact_phone" v-model="form.contact_phone" type="tel" />
                         <InputError :message="form.errors.contact_phone" />
                     </div>
 
-                    <div v-if="assignees.length" class="grid gap-2 sm:col-span-2">
+                    <div v-if="assignees.length" class="grid content-start gap-2 sm:col-span-2">
                         <Label for="assignee_id">{{ t('tickets.assignee') }}</Label>
                         <select id="assignee_id" v-model="form.assignee_id" :class="selectClass">
                             <option :value="null">{{ t('tickets.unassigned') }}</option>
                             <option v-for="user in assignees" :key="user.id" :value="user.id">{{ user.name }}</option>
                         </select>
                         <InputError :message="form.errors.assignee_id" />
+                    </div>
+
+                    <div class="grid content-start gap-2 sm:col-span-2">
+                        <Label>{{ t('attachments.title') }}</Label>
+                        <AttachmentPicker v-model="form.attachments" :errors="form.errors" />
                     </div>
                 </section>
 

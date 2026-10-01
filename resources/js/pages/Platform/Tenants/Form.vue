@@ -70,23 +70,23 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-2xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-2">
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="name">{{ t('tenants.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="subdomain">{{ t('tenants.subdomain') }}</Label>
                         <Input id="subdomain" v-model="form.subdomain" required maxlength="30" class="font-mono lowercase" autocomplete="off" />
                         <p class="text-xs text-muted-foreground">{{ t('tenants.subdomain_hint') }}</p>
                         <InputError :message="form.errors.subdomain" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="status">{{ t('tenants.status') }}</Label>
                         <select id="status" v-model="form.status" :class="selectClass">
                             <option v-for="status in statuses" :key="status" :value="status">{{ t(`impersonation.status.${status}`) }}</option>
@@ -104,12 +104,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </span>
                     </p>
                     <div class="grid gap-6 sm:grid-cols-2">
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="starts_on">{{ t('tenants.starts_on') }}</Label>
                             <Input id="starts_on" v-model="form.subscription_starts_on" type="date" />
                             <InputError :message="form.errors.subscription_starts_on" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="ends_on">{{ t('tenants.ends_on') }}</Label>
                             <Input id="ends_on" v-model="form.subscription_ends_on" type="date" />
                             <InputError :message="form.errors.subscription_ends_on" />
@@ -122,22 +122,22 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     <legend class="px-1 text-sm font-semibold">{{ t('tenants.admin') }}</legend>
                     <p class="text-xs text-muted-foreground">{{ t('tenants.admin_hint') }}</p>
                     <div class="grid gap-6 sm:grid-cols-2">
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="admin_name">{{ t('tenants.admin_name') }}</Label>
                             <Input id="admin_name" v-model="form.admin_name" required autocomplete="off" />
                             <InputError :message="form.errors.admin_name" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="admin_email">{{ t('tenants.admin_email') }}</Label>
                             <Input id="admin_email" v-model="form.admin_email" type="email" required autocomplete="off" />
                             <InputError :message="form.errors.admin_email" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="admin_password">{{ t('tenants.admin_password') }}</Label>
                             <Input id="admin_password" v-model="form.admin_password" type="password" required autocomplete="new-password" />
                             <InputError :message="form.errors.admin_password" />
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="admin_password_confirmation">{{ t('tenants.admin_password_confirmation') }}</Label>
                             <Input
                                 id="admin_password_confirmation"

@@ -3,6 +3,7 @@ import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PmVisitItemCard, { type PmItem } from '@/components/PmVisitItemCard.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
+import StepProgress, { type Step } from '@/components/StepProgress.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,6 +65,26 @@ const submitCancel = () =>
 
 const pending = computed(() => props.items.filter((item) => item.result === 'pending').length);
 
+// --- step bar: scheduled → checking → done; a cancelled round stops where it was ---
+const stepBar = computed(() => {
+    const steps: Step[] = [
+        { key: 'scheduled', label: t('steps.pm_visit.scheduled'), at: props.visit.scheduled_on },
+        { key: 'in_progress', label: t('steps.pm_visit.in_progress'), at: props.visit.started_at ? dateTime(props.visit.started_at) : null },
+        { key: 'completed', label: t('steps.pm_visit.completed'), at: props.visit.completed_at ? dateTime(props.visit.completed_at) : null },
+    ];
+
+    switch (props.visit.status) {
+        case 'cancelled':
+            return { steps, current: props.visit.started_at ? 1 : 0, state: 'cancelled' as const };
+        case 'completed':
+            return { steps, current: 2, state: 'done' as const };
+        case 'in_progress':
+            return { steps, current: 1, state: 'active' as const };
+        default:
+            return { steps, current: 0, state: 'active' as const };
+    }
+});
+
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
 
@@ -71,7 +92,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="visit.visit_no" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p class="flex items-center gap-2 font-mono text-sm text-muted-foreground">
@@ -91,6 +112,8 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     <Button v-if="can.cancel && !cancelling" variant="outline" @click="cancelling = true">{{ t('pm_visits.cancel') }}</Button>
                 </div>
             </div>
+
+            <StepProgress :steps="stepBar.steps" :current="stepBar.current" :state="stepBar.state" />
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
@@ -177,12 +200,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             <form v-if="can.update && assignees" class="space-y-3 rounded-md border p-4" @submit.prevent="saveSchedule">
                 <h3 class="text-sm font-semibold">{{ t('pm_visits.schedule') }}</h3>
                 <div class="grid gap-4 sm:grid-cols-2">
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="scheduled_on">{{ t('pm_visits.scheduled_on') }}</Label>
                         <Input id="scheduled_on" v-model="schedule.scheduled_on as string" type="date" />
                         <InputError :message="schedule.errors.scheduled_on" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="assignee_id">{{ t('pm_visits.assignee') }}</Label>
                         <select id="assignee_id" v-model="schedule.assignee_id" :class="selectClass">
                             <option :value="null">{{ t('pm_visits.unassigned') }}</option>

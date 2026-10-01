@@ -16,9 +16,22 @@ use Throwable;
 class AssetSheet
 {
     public const COLUMNS = [
-        'asset_code', 'name', 'category', 'branch', 'customer', 'brand', 'model', 'serial_number', 'status',
-        'location', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'notes',
+        'asset_code', 'name', 'category', 'branch', 'customer', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit',
+        'property_no', 'status', 'location', 'ip_address', 'mac_address', 'used_by', 'department', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'notes',
     ];
+
+    /** Several serial numbers of one asset share a cell, one per line or separated by commas. */
+    public const SERIAL_SEPARATOR = ', ';
+
+    /**
+     * @return list<string>
+     */
+    public static function serials(mixed $cell): array
+    {
+        $parts = preg_split('/[,\r\n]+/', (string) ($cell ?? ''));
+
+        return array_values(array_unique(array_filter(array_map('trim', $parts), fn (string $s) => $s !== '')));
+    }
 
     /**
      * @param  array<string, string>  $specFields  key => label

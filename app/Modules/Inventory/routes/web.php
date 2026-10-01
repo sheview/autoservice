@@ -3,6 +3,7 @@
 use App\Modules\Inventory\Http\Controllers\PartController;
 use App\Modules\Inventory\Http\Controllers\PartImportController;
 use App\Modules\Inventory\Http\Controllers\PartPhotoController;
+use App\Modules\Inventory\Http\Controllers\PurchaseRequestController;
 use App\Modules\Inventory\Http\Controllers\StockMovementController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,4 +24,16 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     Route::post('parts/{part}/movements', [StockMovementController::class, 'store'])->name('parts.movements.store');
 
     Route::get('stock-movements', [StockMovementController::class, 'index'])->name('movements.index');
+
+    // Purchase requests
+    Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);
+    Route::post('purchase-requests/{purchase_request}/move', [PurchaseRequestController::class, 'move'])->name('purchase-requests.move');
+    Route::get('purchase-requests/{purchase_request}/print', [PurchaseRequestController::class, 'print'])->name('purchase-requests.print');
+    Route::get('purchase-requests/{purchase_request}/pdf', [PurchaseRequestController::class, 'pdf'])->name('purchase-requests.pdf');
+    Route::post('purchase-requests/{purchase_request}/attachments', [PurchaseRequestController::class, 'storeAttachment'])
+        ->name('purchase-requests.attachments.store');
+    Route::get('purchase-requests/{purchase_request}/attachments/{attachment}', [PurchaseRequestController::class, 'attachment'])
+        ->whereNumber('attachment')->name('purchase-requests.attachments.show');
+    Route::delete('purchase-requests/{purchase_request}/attachments/{attachment}', [PurchaseRequestController::class, 'removeAttachment'])
+        ->whereNumber('attachment')->name('purchase-requests.attachments.destroy');
 });

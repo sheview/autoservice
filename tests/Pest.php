@@ -13,6 +13,7 @@ use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Tenant;
@@ -174,12 +175,23 @@ function createPart(array $attributes = [], int $stock = 0): Part
 
 /**
  * A ticket opened by $actor through OpenTicket (number, SLA and due times as in the app).
+ * Its warranty is already checked (work cannot start before that) unless $warrantyChecked is false.
  */
-function openTicket(User $actor, array $attributes = []): Ticket
+function openTicket(User $actor, array $attributes = [], bool $warrantyChecked = true): Ticket
 {
-    return app(OpenTicket::class)->handle($actor, $attributes + [
+    $ticket = app(OpenTicket::class)->handle($actor, $attributes + [
         'title' => 'Printer does not print',
         'priority' => 'medium',
         'source' => 'phone',
     ]);
+
+    return $warrantyChecked ? checkWarranty($ticket, $actor) : $ticket;
+}
+
+/**
+ * Records the device's warranty on $ticket through CheckTicketWarranty, so work on it can start.
+ */
+function checkWarranty(Ticket $ticket, User $actor, string $status = 'out_of_warranty'): Ticket
+{
+    return app(CheckTicketWarranty::class)->handle($ticket, $actor, $status, null);
 }

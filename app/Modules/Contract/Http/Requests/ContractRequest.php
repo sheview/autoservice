@@ -3,8 +3,10 @@
 namespace App\Modules\Contract\Http\Requests;
 
 use App\Modules\Contract\Models\Contract;
+use App\Modules\Document\Support\Attachments;
 use App\Modules\Platform\Support\Money;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 
 class ContractRequest extends FormRequest
@@ -42,6 +44,8 @@ class ContractRequest extends FormRequest
             'notify_days_before' => ['required', 'integer', 'min:0', 'max:365'],
             'notes' => ['nullable', 'string', 'max:5000'],
             'slas' => ['array:'.implode(',', Contract::PRIORITIES)],
+            // Files attached when saving: Word, Excel, PDF or a scanned page.
+            ...Attachments::rules(images: true),
         ];
 
         foreach (Contract::PRIORITIES as $priority) {
@@ -55,7 +59,7 @@ class ContractRequest extends FormRequest
 
     public function attributes(): array
     {
-        $attributes = __('contract.fields');
+        $attributes = [...__('contract.fields'), ...Attachments::attributes()];
         foreach (Contract::PRIORITIES as $priority) {
             $label = __("contract.priorities.{$priority}");
             $attributes["slas.{$priority}.response_hours"] = __('contract.fields.response_hours')." ({$label})";
@@ -72,7 +76,7 @@ class ContractRequest extends FormRequest
      */
     public function contractData(): array
     {
-        $data = $this->validated();
+        $data = $this->safe()->except('attachments');
         $data['value'] = Money::toSatang($data['value'] ?? null);
 
         $slas = [];
@@ -88,5 +92,11 @@ class ContractRequest extends FormRequest
         $data['slas'] = $slas;
 
         return $data;
+    }
+
+    /** @return list<UploadedFile> */
+    public function attachments(): array
+    {
+        return array_values($this->file('attachments', []));
     }
 }

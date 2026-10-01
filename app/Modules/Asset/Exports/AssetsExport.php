@@ -32,7 +32,7 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
 
     public function query(): Builder
     {
-        return $this->query->with(['category:id,name', 'branch:id,code,name']);
+        return $this->query->with(['category:id,name', 'branch:id,code,name', 'serials']);
     }
 
     public function headings(): array
@@ -53,9 +53,17 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             $this->customerCodes[$asset->customer_id] ?? null,
             $asset->brand,
             $asset->model,
-            $asset->serial_number,
+            $asset->subtype,
+            $asset->serials->pluck('serial_number')->implode(AssetSheet::SERIAL_SEPARATOR),
+            $asset->quantity,
+            $asset->unit,
+            $asset->property_no,
             __("asset.statuses.{$asset->status}"),
             $asset->location,
+            $asset->ip_address,
+            $asset->mac_address,
+            $asset->used_by,
+            $asset->department,
             $asset->purchased_at?->toDateString(),
             Money::toBaht($asset->purchase_price),
             $asset->warranty_expires_at?->toDateString(),

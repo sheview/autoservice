@@ -15,7 +15,7 @@ class SurveyOfTicket
     public function __construct(private SurveyLink $link) {}
 
     /**
-     * @return array{answered: bool, score: int|null, comment: string|null, answered_name: string|null,
+     * @return array{answered: bool, score: int|null, comment: string|null, answered_name: string|null, on_paper: bool,
      *     answered_at: string|null, url: string}|null
      */
     public function handle(int $ticketId): ?array
@@ -24,7 +24,7 @@ class SurveyOfTicket
 
         return $survey === null ? null : [
             'answered' => $survey->isAnswered(),
-            ...$survey->only(['score', 'comment', 'answered_name']),
+            ...$survey->only(['score', 'comment', 'answered_name', 'on_paper']),
             'answered_at' => $survey->answered_at?->toIso8601String(),
             'url' => $this->link->for($survey),
         ];

@@ -8,18 +8,22 @@ import {
     ArrowLeftRight,
     BarChart3,
     Briefcase,
+    Building,
     Building2,
     CalendarCheck,
     CalendarDays,
     Circle,
     ClipboardList,
     FileText,
+    HandHelping,
     HardDrive,
     LayoutGrid,
     ListChecks,
     Package,
     QrCode,
+    Settings,
     ShieldCheck,
+    ShoppingCart,
     Star,
     Tags,
     Users,
@@ -45,17 +49,21 @@ const icons: Record<string, LucideIcon> = {
     star: Star,
     'bar-chart-3': BarChart3,
     'hard-drive': HardDrive,
+    'hand-helping': HandHelping,
     tags: Tags,
     'file-text': FileText,
     briefcase: Briefcase,
     users: Users,
     'shield-check': ShieldCheck,
+    building: Building,
     'building-2': Building2,
+    settings: Settings,
+    'shopping-cart': ShoppingCart,
 };
 
 // Built on the server from config/modules.php (permission + enabled modules).
 const mainNavItems = computed<NavItem[]>(() =>
-    page.props.navigation.map((item) => ({ title: item.title, href: item.href, icon: icons[item.icon] ?? Circle })),
+    page.props.navigation.map((item) => ({ title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group })),
 );
 </script>
 

@@ -1,14 +1,16 @@
 <script setup lang="ts">
+import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import StepProgress, { type Step } from '@/components/StepProgress.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { ref, watch } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed, ref, watch } from 'vue';
 
 interface AssetRow {
     id: number;
@@ -44,7 +46,7 @@ const props = defineProps<{
     assets: AssetRow[];
     assetSearch: string;
     candidates: AssetRow[];
-    documents: { id: number; name: string; size: number; uploaded_at: string | null }[];
+    documents: Attachment[];
     history: { id: number; description: string; event: string | null; actor: string | null; at: string }[];
     can: { update: boolean; delete: boolean; manageAssets: boolean };
 }>();
@@ -94,31 +96,28 @@ const removeAsset = (asset: AssetRow) => {
     }
 };
 
-// --- documents -----------------------------------------------------------------
-const upload = useForm<{ file: File | null }>({ file: null });
-const fileInput = ref<HTMLInputElement | null>(null);
-
-const uploadFile = () =>
-    upload.post(route('contract.contracts.documents.store', props.contract.id), {
-        forceFormData: true,
-        preserveScroll: true,
-        onSuccess: () => {
-            upload.reset();
-            if (fileInput.value) fileInput.value.value = '';
-        },
-    });
-
-const deleteDocument = (doc: { id: number; name: string }) => {
-    if (confirm(t('common.confirm_delete', { name: doc.name }))) {
-        router.delete(route('contract.contracts.documents.destroy', [props.contract.id, doc.id]), { preserveScroll: true });
-    }
-};
-
 // --- formatting ----------------------------------------------------------------
 const money = (baht: string | null) =>
     baht === null ? t('common.none') : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const hours = (minutes: number | null) => (minutes === null ? t('contracts.no_sla') : t('contracts.hours', { hours: minutes / 60 }));
-const fileSize = (bytes: number) => (bytes < 1024 * 1024 ? `${Math.ceil(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`);
+// --- step bar: the contract's life follows its phase; a cancelled one stops before or after its start ---
+const PHASE_STEPS = ['draft', 'upcoming', 'active', 'expiring', 'expired'];
+const stepBar = computed(() => {
+    const steps: Step[] = PHASE_STEPS.map((key) => ({
+        key,
+        label: t(`steps.contract.${key}`),
+        at: key === 'active' ? props.contract.starts_on : key === 'expired' ? props.contract.ends_on : null,
+    }));
+
+    if (props.contract.phase === 'cancelled') {
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+        return { steps, current: today < props.contract.starts_on ? 1 : 2, state: 'cancelled' as const };
+    }
+
+    const current = PHASE_STEPS.indexOf(props.contract.phase);
+    return { steps, current, state: props.contract.phase === 'expired' ? ('done' as const) : ('active' as const) };
+});
+
 const dateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Bangkok' });
 </script>
 
@@ -126,7 +125,7 @@ const dateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateSt
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="`${contract.contract_no} ${contract.title}`" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <p class="font-mono text-sm text-muted-foreground">{{ contract.contract_no }}</p>
@@ -140,6 +139,8 @@ const dateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateSt
                     </Button>
                 </div>
             </div>
+
+            <StepProgress :steps="stepBar.steps" :current="stepBar.current" :state="stepBar.state" />
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
@@ -264,46 +265,15 @@ const dateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateSt
                 <p v-else-if="assetCount === 0" class="text-sm text-muted-foreground">{{ t('contracts.no_assets') }}</p>
             </section>
 
-            <section class="space-y-3">
+            <section class="space-y-2">
                 <h3 class="text-sm font-semibold">{{ t('contracts.documents') }}</h3>
-                <ul v-if="documents.length" class="divide-y rounded-md border text-sm">
-                    <li v-for="doc in documents" :key="doc.id" class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
-                        <a
-                            :href="route('contract.contracts.documents.show', [contract.id, doc.id])"
-                            target="_blank"
-                            class="text-primary underline-offset-4 hover:underline"
-                        >
-                            {{ doc.name }}
-                        </a>
-                        <span class="flex items-center gap-3 text-xs text-muted-foreground">
-                            {{ fileSize(doc.size) }}
-                            <span v-if="doc.uploaded_at">· {{ dateTime(doc.uploaded_at) }}</span>
-                            <button
-                                v-if="can.update"
-                                type="button"
-                                class="text-red-700 underline-offset-4 hover:underline dark:text-red-400"
-                                @click="deleteDocument(doc)"
-                            >
-                                {{ t('common.delete') }}
-                            </button>
-                        </span>
-                    </li>
-                </ul>
-                <p v-else class="text-sm text-muted-foreground">{{ t('contracts.no_documents') }}</p>
-
-                <form v-if="can.update" class="flex flex-wrap items-center gap-3" @submit.prevent="uploadFile">
-                    <input
-                        ref="fileInput"
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        class="text-sm"
-                        :aria-label="t('contracts.upload')"
-                        @input="upload.file = ($event.target as HTMLInputElement).files?.[0] ?? null"
-                    />
-                    <Button size="sm" :disabled="!upload.file || upload.processing">{{ t('contracts.upload') }}</Button>
-                    <span class="text-xs text-muted-foreground">{{ t('contracts.upload_hint') }}</span>
-                    <InputError class="w-full" :message="upload.errors.file" />
-                </form>
+                <AttachmentList
+                    :attachments="documents"
+                    :title="false"
+                    images
+                    :can-delete="can.update"
+                    :upload-url="can.update ? route('contract.contracts.documents.store', contract.id) : null"
+                />
             </section>
 
             <section class="space-y-2">

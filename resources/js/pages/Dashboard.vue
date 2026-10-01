@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ColumnChart from '@/components/ColumnChart.vue';
+import PlatformOverview from '@/components/PlatformOverview.vue';
 import StarRating from '@/components/StarRating.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
@@ -7,8 +9,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed, ref } from 'vue';
 
 // The home page: what needs attention now. Each card is null when the user may not see it.
 const props = defineProps<{
@@ -24,6 +26,17 @@ const props = defineProps<{
     contracts: { expiring: number } | null;
     parts: { low: number; out: number } | null;
     surveys: { average: number | null; answered: number; sent: number } | null;
+    trends: {
+        year: number;
+        years: number[];
+        tickets: { monthly: { opened: number[]; closed: number[] }; yearly: { years: number[]; opened: number[]; closed: number[] } } | null;
+        assets: {
+            monthly: { hardware: number[]; software: number[] };
+            yearly: { years: number[]; hardware: number[]; software: number[] };
+        } | null;
+    } | null;
+    // The platform's own workspace: its customer companies (null inside a company).
+    platform: InstanceType<typeof PlatformOverview>['$props']['platform'] | null;
     can: { createTicket: boolean; reports: boolean };
 }>();
 
@@ -99,6 +112,49 @@ const tiles = computed<Tile[]>(() => {
     }
     return list;
 });
+
+// --- charts: one calendar year per month, or the years up to it ----------------
+const period = ref<'monthly' | 'yearly'>('monthly');
+const MONTHS = Array.from({ length: 12 }, (_, m) => new Date(2000, m, 1).toLocaleString('th-TH', { month: 'short' }));
+
+const pickYear = (event: Event) => {
+    const year = Number((event.target as HTMLSelectElement).value);
+    const isThisYear = year === props.trends?.years[0];
+    router.get(route('dashboard'), isThisYear ? {} : { year }, { only: ['trends'], preserveState: true, preserveScroll: true, replace: true });
+};
+
+const charts = computed(() => {
+    const trends = props.trends;
+    if (!trends) {
+        return null;
+    }
+    const monthly = period.value === 'monthly';
+    const yearly = trends.tickets?.yearly.years ?? trends.assets?.yearly.years ?? [];
+    const subtitle = monthly
+        ? t('dashboard.charts.monthly_of', { year: trends.year })
+        : t('dashboard.charts.yearly_of', { from: yearly[0], to: yearly[yearly.length - 1] });
+    const categories = monthly ? MONTHS : yearly.map(String);
+
+    return {
+        tickets: trends.tickets && {
+            title: `${t('dashboard.charts.tickets')} · ${subtitle}`,
+            categories,
+            series: [
+                { key: 'opened', label: t('dashboard.charts.opened'), values: trends.tickets[period.value].opened },
+                { key: 'closed', label: t('dashboard.charts.closed'), values: trends.tickets[period.value].closed },
+            ],
+        },
+        assets: trends.assets && {
+            title: `${t('dashboard.charts.assets')} · ${subtitle}`,
+            categories,
+            series: (['hardware', 'software'] as const).map((type) => ({
+                key: type,
+                label: t(`asset_categories.asset_types.${type}`),
+                values: trends.assets![period.value][type],
+            })),
+        },
+    };
+});
 </script>
 
 <template>
@@ -118,6 +174,9 @@ const tiles = computed<Tile[]>(() => {
                     <Button v-if="can.createTicket" as-child>
                         <Link :href="route('service.tickets.create')">{{ t('tickets.create') }}</Link>
                     </Button>
+                    <Button v-if="platform?.can.manage" as-child>
+                        <Link :href="route('platform.tenants.create')">{{ t('tenants.create') }}</Link>
+                    </Button>
                 </div>
             </div>
 
@@ -133,6 +192,42 @@ const tiles = computed<Tile[]>(() => {
                     <p class="text-2xl font-semibold" :class="{ 'text-red-700 dark:text-red-400': tile.alert }">{{ tile.value }}</p>
                 </Link>
             </div>
+
+            <section v-if="trends && charts" class="space-y-3">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <h2 class="text-sm font-semibold">{{ t('dashboard.charts.title') }}</h2>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <div class="inline-flex rounded-md border p-0.5" role="group">
+                            <button
+                                v-for="option in ['monthly', 'yearly'] as const"
+                                :key="option"
+                                type="button"
+                                class="rounded px-3 py-1 text-sm transition-colors"
+                                :class="period === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'"
+                                :aria-pressed="period === option"
+                                @click="period = option"
+                            >
+                                {{ t(`dashboard.charts.${option}`) }}
+                            </button>
+                        </div>
+                        <select
+                            :value="trends.year"
+                            :aria-label="t('dashboard.charts.year')"
+                            class="shadow-xs h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                            @change="pickYear"
+                        >
+                            <option v-for="year in trends.years" :key="year" :value="year">{{ year }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid gap-4 lg:grid-cols-2">
+                    <ColumnChart v-if="charts.tickets" v-bind="charts.tickets" />
+                    <div v-if="charts.assets" class="space-y-1">
+                        <ColumnChart v-bind="charts.assets" stacked />
+                        <p class="text-xs text-muted-foreground">{{ t('dashboard.charts.assets_hint') }}</p>
+                    </div>
+                </div>
+            </section>
 
             <div class="grid gap-6 lg:grid-cols-3">
                 <section v-if="tickets" class="space-y-2 lg:col-span-2">
@@ -179,7 +274,9 @@ const tiles = computed<Tile[]>(() => {
                 </section>
             </div>
 
-            <p v-if="!tiles.length && !tickets" class="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
+            <PlatformOverview v-if="platform" :platform="platform" />
+
+            <p v-else-if="!tiles.length && !tickets" class="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
                 {{ page.props.tenant?.is_platform ? t('dashboard.platform_hint') : t('dashboard.nothing') }}
             </p>
         </div>

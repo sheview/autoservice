@@ -19,6 +19,7 @@ interface CustomerRow {
     phone: string | null;
     email: string | null;
     contracts_count: number;
+    short_name: string | null;
 }
 
 interface Filters {
@@ -97,7 +98,10 @@ const destroy = (customer: CustomerRow) => {
                     <tbody>
                         <tr v-for="customer in customers.data" :key="customer.id" class="border-t">
                             <td class="px-4 py-2 font-mono text-xs">{{ customer.code }}</td>
-                            <td class="px-4 py-2 font-medium">{{ customer.name }}</td>
+                            <td class="px-4 py-2">
+                                <div class="font-medium">{{ customer.name }}</div>
+                                <div v-if="customer.short_name" class="text-xs text-muted-foreground">{{ customer.short_name }}</div>
+                            </td>
                             <td class="px-4 py-2">
                                 <div>{{ customer.contact_name ?? t('common.none') }}</div>
                                 <div v-if="customer.phone || customer.email" class="text-xs text-muted-foreground">

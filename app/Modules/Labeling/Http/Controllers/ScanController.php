@@ -43,7 +43,7 @@ class ScanController extends Controller
             : null;
 
         return Inertia::render('Labeling/Scan', [
-            'asset' => [...collect($row)->only(['ulid', 'asset_code', 'name', 'category', 'branch', 'status', 'serial_number'])->all(), 'customer' => $customer],
+            'asset' => [...collect($row)->only(['ulid', 'asset_code', 'name', 'category', 'branch', 'status', 'serial_number', 'property_no'])->all(), 'customer' => $customer],
             'tickets' => $serviceOn && $user->can('ticket.view') ? array_slice($ticketsForAsset->handle($row['id']), 0, 3) : null,
             'lastPm' => $modules->enabled('maintenance') && $user->can('pm.view') ? ($pmHistory->handle($row['id'], 1)[0] ?? null) : null,
             'can' => [

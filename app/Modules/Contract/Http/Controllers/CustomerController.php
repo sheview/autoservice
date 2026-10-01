@@ -7,6 +7,8 @@ use App\Modules\Contract\Actions\DeleteCustomer;
 use App\Modules\Contract\Actions\SaveCustomer;
 use App\Modules\Contract\Http\Requests\CustomerRequest;
 use App\Modules\Contract\Models\Customer;
+use App\Modules\Document\Actions\AddAttachments;
+use App\Modules\Document\Support\Attachments;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -32,6 +34,7 @@ class CustomerController extends Controller
             ->when($filters['search'] !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('code', 'ilike', "%{$filters['search']}%")
                 ->orWhere('name', 'ilike', "%{$filters['search']}%")
+                ->orWhere('short_name', 'ilike', "%{$filters['search']}%")
                 ->orWhere('contact_name', 'ilike', "%{$filters['search']}%")
                 ->orWhere('tax_id', 'ilike', "%{$filters['search']}%")))
             ->orderBy($filters['sort'], $filters['direction'])
@@ -39,7 +42,7 @@ class CustomerController extends Controller
             ->paginate(20)
             ->withQueryString()
             ->through(fn (Customer $customer) => [
-                ...$customer->only(['id', 'code', 'name', 'contact_name', 'phone', 'email']),
+                ...$customer->only(['id', 'code', 'name', 'short_name', 'contact_name', 'phone', 'email']),
                 'contracts_count' => $customer->contracts_count,
             ]);
 
@@ -61,28 +64,32 @@ class CustomerController extends Controller
     {
         Gate::authorize('create', Customer::class);
 
-        return Inertia::render('Contract/Customers/Form', ['customer' => null]);
+        return Inertia::render('Contract/Customers/Form', ['customer' => null, 'attachments' => []]);
     }
 
-    public function store(CustomerRequest $request, SaveCustomer $saveCustomer): RedirectResponse
+    public function store(CustomerRequest $request, SaveCustomer $saveCustomer, AddAttachments $addAttachments): RedirectResponse
     {
-        $saveCustomer->handle(null, $request->validated());
+        $customer = $saveCustomer->handle(null, $request->customerData());
+        $addAttachments->handle($customer, $request->attachments());
 
         return redirect()->route('contract.customers.index')->with('success', __('contract.customers.created'));
     }
 
+    /** The edit page is also where a customer's files are seen (there is no separate detail page). */
     public function edit(Customer $customer): Response
     {
         Gate::authorize('update', $customer);
 
         return Inertia::render('Contract/Customers/Form', [
-            'customer' => $customer->only(['id', 'code', 'name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes']),
+            'customer' => $customer->only(['id', 'code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes']),
+            'attachments' => Attachments::list($customer, $customer->attachmentCollection(), fn (int $id) => route('contract.customers.attachments.show', [$customer, $id])),
         ]);
     }
 
-    public function update(CustomerRequest $request, Customer $customer, SaveCustomer $saveCustomer): RedirectResponse
+    public function update(CustomerRequest $request, Customer $customer, SaveCustomer $saveCustomer, AddAttachments $addAttachments): RedirectResponse
     {
-        $saveCustomer->handle($customer, $request->validated());
+        $saveCustomer->handle($customer, $request->customerData());
+        $addAttachments->handle($customer, $request->attachments());
 
         return redirect()->route('contract.customers.index')->with('success', __('contract.customers.updated'));
     }

@@ -4,10 +4,13 @@ namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
+use App\Modules\Asset\Actions\AssetDevices;
 use App\Modules\Asset\Actions\AssetSummaries;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\CoveringContracts;
 use App\Modules\Contract\Actions\ListCustomers;
+use App\Modules\Document\Actions\AddAttachments;
+use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
@@ -15,6 +18,7 @@ use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\TicketParts;
 use App\Modules\Labeling\Actions\QrSvg;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SearchTickets;
 use App\Modules\Service\Actions\UpdateTicket;
@@ -119,9 +123,10 @@ class TicketController extends Controller
         ]);
     }
 
-    public function store(OpenTicketRequest $request, OpenTicket $openTicket): RedirectResponse
+    public function store(OpenTicketRequest $request, OpenTicket $openTicket, AddAttachments $addAttachments): RedirectResponse
     {
-        $ticket = $openTicket->handle($request->user(), $request->validated());
+        $ticket = $openTicket->handle($request->user(), $request->ticketData());
+        $addAttachments->handle($ticket, $request->attachments());
 
         return redirect()->route('service.tickets.show', $ticket)->with('success', __('service.tickets.created', ['no' => $ticket->ticket_no]));
     }
@@ -130,6 +135,7 @@ class TicketController extends Controller
         Request $request,
         Ticket $ticket,
         AssetDetails $assetDetails,
+        AssetDevices $assetDevices,
         ContractLabels $contractLabels,
         UsersWithPermission $usersWithPermission,
         TicketParts $ticketParts,
@@ -143,6 +149,7 @@ class TicketController extends Controller
         $canIssueParts = TicketPartController::allows($user, $ticket) && in_array($ticket->status, TicketPartController::STATUSES, true);
         $names = $this->userNames->handle([$ticket->assignee_id, $ticket->reported_by]);
         $asset = $ticket->asset_id ? ($assetDetails->handle([$ticket->asset_id])[$ticket->asset_id] ?? null) : null;
+        $device = $asset ? ($assetDevices->handle([$asset['id']])[$asset['id']] ?? null) : null;
         $contract = $ticket->contract_id ? ($contractLabels->handle([$ticket->contract_id])[$ticket->contract_id] ?? null) : null;
         $canAssign = $user->can('assign', $ticket);
 
@@ -154,6 +161,24 @@ class TicketController extends Controller
                 ]),
                 'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $ticket->customer_id)['name'] ?? null,
                 'asset' => $asset ? [...$asset, 'can_view' => $user->can('asset.view')] : null,
+                'device' => [
+                    ...$ticket->only(['device_name', 'device_brand', 'device_model', 'device_serial', 'device_serial_unknown', 'device_location', 'device_ip']),
+                    'property_no' => $device['property_no'] ?? null,
+                ],
+                // The repair report is for staff; extra_cost in baht.
+                'report' => $user->customer_id === null ? [
+                    'cause' => $ticket->cause,
+                    'extra_cost' => Money::toBaht($ticket->extra_cost),
+                    'approver_name' => $ticket->approver_name,
+                ] : null,
+                'warranty' => [
+                    'status' => $ticket->warranty_status,
+                    'expires_on' => $ticket->warranty_expires_on?->toDateString(),
+                    'checked_by' => $ticket->warranty_checked_by_name,
+                    'checked_at' => $ticket->warranty_checked_at?->toIso8601String(),
+                    // A registered asset: what its warranty date says today, for staff to confirm.
+                    'asset_expires_on' => $device['warranty_expires_at'] ?? null,
+                ],
                 'contract' => $contract ? [...$contract, 'can_view' => $user->can('contract.view')] : null,
                 'branch' => $ticket->branch?->name,
                 'assignee_id' => $ticket->assignee_id,
@@ -189,10 +214,14 @@ class TicketController extends Controller
                 'canReturn' => TicketPartController::allows($user, $ticket),
             ] : null,
             'survey' => $this->survey($ticket, $user, $surveyOfTicket, $qrSvg),
+            'attachments' => $this->attachments($ticket),
             'can' => [
                 'update' => $user->can('update', $ticket) && in_array($ticket->status, Ticket::OPEN_STATUSES, true),
                 'comment' => $user->can('comment', $ticket),
+                'deleteAttachments' => $user->can('update', $ticket),
                 'internalNotes' => $user->customer_id === null,
+                'checkWarranty' => TicketActionController::canCheckWarranty($user, $ticket),
+                'report' => TicketActionController::canReport($user, $ticket),
             ],
         ]);
     }
@@ -208,8 +237,9 @@ class TicketController extends Controller
     {
         $canView = $user->can('survey.view');
         $canAnswer = TicketSurveyController::allows($user, $ticket);
+        $canPaper = TicketSurveyController::allowsPaper($user, $ticket);
 
-        if (! $this->modules->enabled('survey') || ! ($canView || $canAnswer)) {
+        if (! $this->modules->enabled('survey') || ! ($canView || $canAnswer || $canPaper)) {
             return null;
         }
 
@@ -223,6 +253,8 @@ class TicketController extends Controller
         return [
             ...collect($survey)->except('url')->all(),
             'canAnswer' => $canAnswer && ! $survey['answered'],
+            // The score ticked on the printed job sheet, keyed in by staff.
+            'canPaper' => $canPaper && ! $survey['answered'],
             'url' => $shareLink ? $survey['url'] : null,
             'qr' => $shareLink ? $qrSvg->handle($survey['url']) : null,
         ];
@@ -235,17 +267,27 @@ class TicketController extends Controller
 
         return Inertia::render('Service/Tickets/Edit', [
             'ticket' => $ticket->only(['ulid', 'ticket_no', 'title', 'description', 'priority', 'source', 'contact_name', 'contact_phone']),
+            'attachments' => $this->attachments($ticket),
             'outOfContract' => $ticket->contract_id === null,
             'priorities' => Ticket::PRIORITIES,
             'sources' => Ticket::SOURCES,
         ]);
     }
 
-    public function update(UpdateTicketRequest $request, Ticket $ticket, UpdateTicket $updateTicket): RedirectResponse
+    public function update(UpdateTicketRequest $request, Ticket $ticket, UpdateTicket $updateTicket, AddAttachments $addAttachments): RedirectResponse
     {
-        $updateTicket->handle($ticket, $request->validated(), $request->user());
+        $updateTicket->handle($ticket, $request->ticketData(), $request->user());
+        $addAttachments->handle($ticket, $request->attachments());
 
         return redirect()->route('service.tickets.show', $ticket)->with('success', __('service.tickets.updated'));
+    }
+
+    /**
+     * @return list<array{id: int, name: string, size: int, uploaded_at: string|null, url: string}>
+     */
+    private function attachments(Ticket $ticket): array
+    {
+        return Attachments::list($ticket, $ticket->attachmentCollection(), fn (int $id) => route('service.tickets.attachments.show', [$ticket, $id]));
     }
 
     /**

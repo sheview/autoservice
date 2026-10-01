@@ -59,17 +59,17 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-4xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-8" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-2">
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="name">{{ t('pm_checklists.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="asset_category_id">{{ t('pm_checklists.category') }}</Label>
                         <select id="asset_category_id" v-model="form.asset_category_id" :class="selectClass">
                             <option :value="null">{{ t('pm_checklists.general') }}</option>
@@ -86,18 +86,18 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
 
                     <div v-for="(item, index) in form.items" :key="index" class="grid gap-4 rounded-md border p-4 sm:grid-cols-12">
-                        <div class="grid gap-2 sm:col-span-5">
+                        <div class="grid content-start gap-2 sm:col-span-5">
                             <Label :for="`item_label_${index}`">{{ t('pm_checklists.item_label') }}</Label>
                             <Input :id="`item_label_${index}`" v-model="item.label" required />
                             <InputError :message="itemError(index, 'label')" />
                         </div>
-                        <div class="grid gap-2 sm:col-span-3">
+                        <div class="grid content-start gap-2 sm:col-span-3">
                             <Label :for="`item_key_${index}`">{{ t('pm_checklists.item_key') }}</Label>
                             <Input :id="`item_key_${index}`" v-model="item.key" class="font-mono" required pattern="[a-z][a-z0-9_]*" />
                             <p class="text-xs text-muted-foreground">{{ t('pm_checklists.item_key_hint') }}</p>
                             <InputError :message="itemError(index, 'key')" />
                         </div>
-                        <div class="grid gap-2 sm:col-span-3">
+                        <div class="grid content-start gap-2 sm:col-span-3">
                             <Label :for="`item_type_${index}`">{{ t('pm_checklists.item_type') }}</Label>
                             <select :id="`item_type_${index}`" v-model="item.type" :class="selectClass">
                                 <option v-for="type in itemTypes" :key="type" :value="type">{{ t(`pm_checklists.item_types.${type}`) }}</option>

@@ -27,7 +27,7 @@ const submit = () => form.put(route('platform.tenants.modules.update', props.ten
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-2xl p-4">
+        <div class="p-4">
             <Heading :title="title" :description="t('tenant_modules.description')" />
 
             <form class="space-y-6" @submit.prevent="submit">

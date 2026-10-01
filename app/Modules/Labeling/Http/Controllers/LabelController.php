@@ -10,11 +10,12 @@ use App\Modules\Asset\Actions\PaginateAssets;
 use App\Modules\Asset\Actions\SearchAssets;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Models\User;
+use App\Modules\Labeling\Actions\BuildLabels;
 use App\Modules\Labeling\Actions\LastLabelPrints;
-use App\Modules\Labeling\Actions\QrSvg;
 use App\Modules\Labeling\Actions\RecordLabelPrint;
 use App\Modules\Labeling\Support\LabelTemplates;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Tenancy\Support\CompanyProfile;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -79,7 +80,7 @@ class LabelController extends Controller
      * The print page: ?assets=ulid,ulid,...&template=... It is opened in a new tab, so a bad link
      * is a 404 (redirecting "back" with errors would land on the same URL again and loop).
      */
-    public function print(Request $request, QrSvg $qr, TenantContext $context): Response
+    public function print(Request $request, BuildLabels $buildLabels, TenantContext $context): Response
     {
         Gate::authorize(self::PERMISSION);
 
@@ -93,20 +94,18 @@ class LabelController extends Controller
             'template' => ['nullable', Rule::in(LabelTemplates::keys())],
         ])->fails(), 404);
 
-        $customers = collect($this->customers(withTrashed: true))->pluck('name', 'id');
-        $labels = collect($this->visibleAssets($request->user(), $data['assets']))
-            ->map(fn (array $asset) => [
-                ...collect($asset)->only(['ulid', 'asset_code', 'name', 'category', 'serial_number'])->all(),
-                'customer' => $customers[$asset['customer_id']] ?? null,
-                'qr' => $qr->handle(route('labeling.scan', $asset['ulid'])),
-            ]);
-        abort_if($labels->isEmpty(), 404);
+        $template = $data['template'] ?? LabelTemplates::DEFAULT;
+        $assets = $this->visibleAssets($request->user(), $data['assets']);
+        abort_if($assets === [], 404);
+        $tenant = $context->tenant();
 
         return Inertia::render('Labeling/Print', [
-            'labels' => $labels->values(),
-            'template' => $data['template'] ?? LabelTemplates::DEFAULT,
+            'labels' => $buildLabels->handle($assets, LabelTemplates::isDetailed($template)),
+            'template' => $template,
             'templates' => LabelTemplates::all(),
-            'company' => $context->tenant()?->name,
+            // Name, logo and service phone/e-mail for the header of detailed labels.
+            'company' => $tenant ? CompanyProfile::of($tenant) : null,
+            'canEditCompany' => $request->user()->can(CompanyProfile::PERMISSION),
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Modules\Service\Actions;
 
 use App\Modules\Asset\Actions\AssetDetails;
+use App\Modules\Asset\Actions\AssetDevices;
 use App\Modules\Contract\Actions\CoveringContracts;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
@@ -20,6 +21,7 @@ class OpenTicket
     public function __construct(
         private GenerateTicketNumber $generateNumber,
         private AssetDetails $assetDetails,
+        private AssetDevices $assetDevices,
         private CoveringContracts $coveringContracts,
         private TicketSla $sla,
         private RecordTicketEvent $recordEvent,
@@ -30,7 +32,10 @@ class OpenTicket
     /**
      * @param  array{customer_id?: int|null, asset_id?: int|null, contract_id?: int|null, title: string,
      *     description?: string|null, priority: string, source: string, contact_name?: string|null,
-     *     contact_phone?: string|null, assignee_id?: int|null}  $data  validated (asset, contract and customer agree)
+     *     contact_phone?: string|null, assignee_id?: int|null, device_name?: string|null, device_brand?: string|null,
+     *     device_model?: string|null, device_serial?: string|null, device_serial_unknown?: bool, device_location?: string|null,
+     *     device_ip?: string|null}  $data
+     *     validated (asset, contract and customer agree); the device fields describe a device that is not in the system
      */
     public function handle(User $actor, array $data): Ticket
     {
@@ -38,6 +43,9 @@ class OpenTicket
             $asset = isset($data['asset_id']) ? ($this->assetDetails->handle([$data['asset_id']])[$data['asset_id']] ?? null) : null;
 
             $ticket = new Ticket(collect($data)->except('assignee_id')->all());
+            if ($asset !== null) {
+                $this->copyDevice($ticket, $asset['id']);
+            }
             $ticket->ticket_no = $this->generateNumber->handle();
             $ticket->customer_id = $asset['customer_id'] ?? $data['customer_id'] ?? null;
             $ticket->branch_id = $asset['branch_id'] ?? $actor->branch_id;
@@ -68,6 +76,28 @@ class OpenTicket
 
             return $ticket;
         });
+    }
+
+    /**
+     * A registered asset: the job sheet keeps the device as it was when the job was opened, so nobody
+     * types it again.
+     */
+    private function copyDevice(Ticket $ticket, int $assetId): void
+    {
+        $device = $this->assetDevices->handle([$assetId])[$assetId] ?? null;
+        if ($device === null) {
+            return;
+        }
+
+        $ticket->fill([
+            'device_name' => $device['name'],
+            'device_brand' => $device['brand'],
+            'device_model' => $device['model'],
+            'device_serial' => $device['serial_number'],
+            'device_serial_unknown' => false,
+            'device_location' => $device['location'],
+            'device_ip' => $device['ip_address'],
+        ]);
     }
 
     /**

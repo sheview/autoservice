@@ -3,6 +3,7 @@
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Tenancy\Models\Branch;
+use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Pennant\Feature;
@@ -67,9 +68,27 @@ it('leaves out the cards of modules that are switched off', function () {
         ->where('can.createTicket', false));
 });
 
-it('gives the platform staff the shortcuts only', function () {
+it('gives the platform its customer companies, and the ones to renew first', function () {
+    $this->travelTo('2026-10-01 10:00');
     $superadmin = createSuperadmin();
+    // the test's default company has no dates (unlimited); a few more:
+    Tenant::create(['name' => 'Soon', 'slug' => 'soon', 'subdomain' => 'soon', 'subscription_ends_on' => '2026-10-10']);
+    Tenant::create(['name' => 'Later', 'slug' => 'later', 'subdomain' => 'later', 'subscription_ends_on' => '2026-11-20']);
+    Tenant::create(['name' => 'Far', 'slug' => 'far', 'subdomain' => 'far', 'subscription_ends_on' => '2027-09-30']);
+    Tenant::create(['name' => 'Gone', 'slug' => 'gone', 'subdomain' => 'gone', 'subscription_ends_on' => '2026-09-20']);
+    Tenant::create(['name' => 'Long gone', 'slug' => 'longgone', 'subdomain' => 'longgone', 'subscription_ends_on' => '2026-06-01', 'status' => 'suspended']);
 
     $this->actingAs($superadmin)->get('/dashboard')->assertOk()->assertInertia(fn (Assert $page) => $page
-        ->where('tickets', null)->where('pm', null)->where('tenant.is_platform', true));
+        ->where('tickets', null)->where('pm', null)->where('tenant.is_platform', true)
+        ->where('platform.counts', ['total' => 6, 'active' => 3, 'expiring' => 1, 'grace' => 1, 'locked' => 1, 'not_started' => 0, 'suspended' => 1])
+        // ended longest ago first, then the soonest to end; "Far" is not due yet
+        ->where('platform.renewals', fn ($rows) => collect($rows)->pluck('name')->all() === ['Long gone', 'Gone', 'Soon', 'Later'])
+        ->where('platform.renewals.2.subscription.days_left', 9)
+        ->where('platform.can.manage', true)
+        ->has('platform.newest', 6));
+
+    // inside a company, or for company users, there is no platform overview
+    $this->actingAs($this->admin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('platform', null));
+    $this->actingAs($superadmin)->post("/platform/impersonation/{$this->tenant->ulid}");
+    $this->actingAs($superadmin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('platform', null));
 });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Modules\Platform\Http\Middleware\ApplySessionTimeout;
 use App\Modules\Platform\Http\Middleware\EnsureModuleEnabled;
 use App\Modules\Platform\Http\Middleware\LogImpersonatedRequests;
 use App\Modules\Tenancy\Http\Middleware\EnforceSubscription;
@@ -18,6 +19,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Before StartSession, which reads session.lifetime.
+        $middleware->web(prepend: [ApplySessionTimeout::class]);
+
         $middleware->web(append: [
             ResolveTenant::class,
             EnforceSubscription::class,

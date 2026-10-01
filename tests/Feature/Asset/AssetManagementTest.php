@@ -24,6 +24,8 @@ function assetPayload(array $overrides = []): array
         'category_id' => test()->pc->id,
         'name' => 'PC ฝ่ายบัญชี',
         'status' => 'in_use',
+        'owner' => 'company',
+        'location' => 'ห้องบัญชี ชั้น 2',
         'specs' => ['cpu' => 'Core i5'],
     ];
 }

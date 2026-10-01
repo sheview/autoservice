@@ -24,6 +24,7 @@ class AssetCategoryController extends Controller
         $filters = [
             'search' => $request->string('search')->trim()->value(),
             'service_line' => in_array($request->input('service_line'), AssetCategory::SERVICE_LINES, true) ? $request->input('service_line') : null,
+            'asset_type' => in_array($request->input('asset_type'), AssetCategory::ASSET_TYPES, true) ? $request->input('asset_type') : null,
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'name',
             'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
@@ -34,6 +35,7 @@ class AssetCategoryController extends Controller
                 ->where('name', 'ilike', "%{$filters['search']}%")
                 ->orWhere('code_prefix', 'ilike', "%{$filters['search']}%")))
             ->when($filters['service_line'], fn ($q, $line) => $q->where('service_line', $line))
+            ->when($filters['asset_type'], fn ($q, $type) => $q->where('asset_type', $type))
             ->orderBy($filters['sort'], $filters['direction'])
             ->orderBy('id')
             ->paginate(20)
@@ -43,6 +45,7 @@ class AssetCategoryController extends Controller
                 'name' => $category->name,
                 'code_prefix' => $category->code_prefix,
                 'service_line' => $category->service_line,
+                'asset_type' => $category->asset_type,
                 'spec_fields_count' => count($category->spec_fields),
                 'assets_count' => $category->assets_count,
             ]);
@@ -53,6 +56,7 @@ class AssetCategoryController extends Controller
             'categories' => $categories,
             'filters' => $filters,
             'serviceLines' => AssetCategory::SERVICE_LINES,
+            'assetTypes' => AssetCategory::ASSET_TYPES,
             'can' => [
                 'create' => $user->can('create', AssetCategory::class),
                 'update' => $user->can('asset_category.update'),
@@ -101,8 +105,9 @@ class AssetCategoryController extends Controller
     private function formProps(?AssetCategory $category): array
     {
         return [
-            'category' => $category?->only(['id', 'name', 'code_prefix', 'service_line', 'spec_fields']),
+            'category' => $category?->only(['id', 'name', 'code_prefix', 'service_line', 'asset_type', 'requires_serial', 'spec_fields']),
             'serviceLines' => AssetCategory::SERVICE_LINES,
+            'assetTypes' => AssetCategory::ASSET_TYPES,
             'fieldTypes' => AssetCategory::FIELD_TYPES,
         ];
     }

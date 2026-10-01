@@ -76,31 +76,31 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-2xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-2">
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="name">{{ t('users.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
 
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="email">{{ t('users.email') }}</Label>
                         <Input id="email" v-model="form.email" type="email" required autocomplete="off" />
                         <InputError :message="form.errors.email" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="password">{{ t('users.password') }}</Label>
                         <Input id="password" v-model="form.password" type="password" :required="!user" autocomplete="new-password" />
                         <p v-if="user" class="text-xs text-muted-foreground">{{ t('users.password_hint_edit') }}</p>
                         <InputError :message="form.errors.password" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="password_confirmation">{{ t('users.password_confirmation') }}</Label>
                         <Input
                             id="password_confirmation"
@@ -111,7 +111,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="role">{{ t('users.role') }}</Label>
                         <select id="role" v-model="form.role" :class="selectClass" required>
                             <option v-for="role in roles" :key="role.name" :value="role.name">{{ role.label }}</option>
@@ -119,7 +119,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.role" />
                     </div>
 
-                    <div v-if="isCustomerAccount" class="grid gap-2">
+                    <div v-if="isCustomerAccount" class="grid content-start gap-2">
                         <Label for="customer_id">{{ t('users.customer') }}</Label>
                         <select id="customer_id" v-model="form.customer_id" :class="selectClass" required>
                             <option :value="null" disabled>{{ t('users.choose_customer') }}</option>
@@ -131,7 +131,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.customer_id" />
                     </div>
 
-                    <div v-else class="grid gap-2">
+                    <div v-else class="grid content-start gap-2">
                         <Label for="branch_id">{{ t('users.branch') }}</Label>
                         <select id="branch_id" v-model="form.branch_id" :class="selectClass">
                             <option :value="null">{{ t('users.no_branch') }}</option>
@@ -140,26 +140,26 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.branch_id" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="employee_code">{{ t('users.employee_code') }}</Label>
                         <Input id="employee_code" v-model="form.employee_code" />
                         <InputError :message="form.errors.employee_code" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="position">{{ t('users.position') }}</Label>
                         <Input id="position" v-model="form.position" />
                         <InputError :message="form.errors.position" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="phone">{{ t('users.phone') }}</Label>
                         <Input id="phone" v-model="form.phone" type="tel" />
                         <InputError :message="form.errors.phone" />
                     </div>
                 </div>
 
-                <fieldset class="grid gap-2">
+                <fieldset class="grid content-start gap-2">
                     <legend class="mb-2 text-sm font-medium">{{ t('users.service_lines') }}</legend>
                     <div class="flex flex-wrap gap-4">
                         <label v-for="line in serviceLines" :key="line" class="flex items-center gap-2 text-sm">
@@ -170,7 +170,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     <InputError :message="form.errors.service_lines" />
                 </fieldset>
 
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <label class="flex items-center gap-2 text-sm">
                         <input v-model="form.is_active" type="checkbox" class="size-4 rounded border-input" />
                         {{ t('users.is_active') }}

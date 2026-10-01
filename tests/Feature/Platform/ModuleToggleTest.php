@@ -17,10 +17,26 @@ function navigationTitles(Assert $page): array
 it('builds the sidebar from config, filtered by permission', function () {
     $this->actingAs(userWithRole('admin_company'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))
-            ->toBe(['หน้าหลัก', 'ใบงาน', 'รอบ PM', 'ทรัพย์สิน', 'หมวดทรัพย์สิน', 'สัญญา MA', 'ลูกค้า', 'แผน PM', 'พิมพ์ป้าย QR', 'อะไหล่', 'ความเคลื่อนไหวสต็อก', 'ผลประเมินความพึงพอใจ', 'รายงาน', 'Checklist PM', 'วันหยุด', 'ผู้ใช้งาน', 'บทบาทและสิทธิ์']));
+            ->toBe([
+                'หน้าหลัก',
+                'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM',
+                'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
+                'ลูกค้า', 'สัญญา MA',
+                'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
+                'รายงาน', 'ผลประเมินความพึงพอใจ',
+                'ผู้ใช้งาน', 'บทบาทและสิทธิ์', 'วันหยุด', 'ข้อมูลบริษัท',
+            ]));
+
+    // each item carries its section
+    $this->actingAs(userWithRole('admin_company'))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('navigation.0.group', null)
+        ->where('navigation.1.group', 'งานบริการ'));
 
     $this->actingAs(userWithRole('technician'))->get('/dashboard')
-        ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe(['หน้าหลัก', 'ใบงาน', 'รอบ PM', 'ทรัพย์สิน', 'สัญญา MA', 'ลูกค้า', 'แผน PM', 'พิมพ์ป้าย QR', 'อะไหล่', 'ความเคลื่อนไหวสต็อก', 'Checklist PM']));
+        ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe([
+            'หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'ทรัพย์สิน', 'เบิก / ยืม', 'พิมพ์ป้าย QR',
+            'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
+        ]));
 });
 
 it('turns the asset module on by default', function () {

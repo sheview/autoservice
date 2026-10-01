@@ -55,7 +55,7 @@ const destroy = () => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="plan.title" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="plan.title" :description="plan.customer ?? ''" />
                 <div class="flex gap-2">

@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import AssetCheckoutPanel from '@/components/AssetCheckoutPanel.vue';
+import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
+import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
 import PhotoSlots from '@/components/PhotoSlots.vue';
@@ -11,6 +14,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Barcode, Plus } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 interface AssetDetail {
     ulid: string;
@@ -18,9 +23,18 @@ interface AssetDetail {
     name: string;
     brand: string | null;
     model: string | null;
+    subtype: string | null;
     serial_number: string | null;
+    serials: string[];
+    quantity: number;
+    unit: string | null;
+    property_no: string | null;
     status: string;
     location: string | null;
+    ip_address: string | null;
+    mac_address: string | null;
+    used_by: string | null;
+    department: string | null;
     notes: string | null;
     category: string | null;
     branch: string | null;
@@ -29,6 +43,18 @@ interface AssetDetail {
     purchase_price: string | null;
     warranty_expires_at: string | null;
     specs: { label: string; value: string | number | null }[];
+}
+
+interface SameModelUnit {
+    ulid: string;
+    asset_code: string;
+    serial_number: string | null;
+    property_no: string | null;
+    status: string;
+    location: string | null;
+    branch: string | null;
+    // Who has it now (issued or lent).
+    holder: string | null;
 }
 
 interface HistoryEntry {
@@ -53,13 +79,19 @@ interface AssetContract {
 
 const props = defineProps<{
     asset: AssetDetail;
+    sameModel: SameModelUnit[];
+    // Issue/loan; null = the user has nothing to do with it.
+    checkouts: InstanceType<typeof AssetCheckoutPanel>['$props']['checkouts'] | null;
     photos: { slot: number; action: string; url: string | null }[];
+    attachments: Attachment[];
     history: HistoryEntry[];
     contracts: AssetContract[] | null;
     tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
     pmHistory: { visit_ulid: string; visit_no: string; visit_status: string; due_on: string; result: string; checked_at: string | null }[] | null;
-    can: { update: boolean; delete: boolean; openTicket: boolean; printLabel: boolean };
+    can: { create: boolean; update: boolean; delete: boolean; openTicket: boolean; printLabel: boolean };
 }>();
+
+const spareCount = computed(() => props.sameModel.filter((unit) => unit.status === 'spare').length);
 
 const page = usePage<SharedData>();
 const breadcrumbs: BreadcrumbItem[] = [
@@ -85,11 +117,17 @@ const fieldLabel = (field: string) => t(`assets.${field.replace(/_id$/, '')}`);
 const details: [string, (a: AssetDetail) => string | null][] = [
     ['category', (a) => a.category],
     ['branch', (a) => a.branch ?? t('assets.no_branch')],
-    ['customer', (a) => a.customer],
+    ['customer', (a) => a.customer ?? t('assets.owner_company')],
     ['location', (a) => a.location],
+    ['used_by', (a) => [a.used_by, a.department].filter(Boolean).join(' · ') || null],
+    ['ip_address', (a) => a.ip_address],
+    ['mac_address', (a) => a.mac_address],
     ['brand', (a) => a.brand],
     ['model', (a) => a.model],
-    ['serial_number', (a) => a.serial_number],
+    ['subtype', (a) => a.subtype],
+    ['serial_number', (a) => (a.serials.length ? a.serials.join(', ') : null)],
+    ['quantity', (a) => [a.quantity.toLocaleString('th-TH'), a.unit].filter(Boolean).join(' ')],
+    ['property_no', (a) => a.property_no],
     ['purchased_at', (a) => a.purchased_at],
     ['purchase_price', (a) => money(a.purchase_price)],
     ['warranty_expires_at', (a) => a.warranty_expires_at],
@@ -106,7 +144,10 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     <p class="font-mono text-sm text-muted-foreground">{{ asset.asset_code }}</p>
                     <Heading :title="asset.name" :description="t(`assets.statuses.${asset.status}`)" />
                 </div>
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
+                    <Button v-if="can.create && !sameModel.length" variant="outline" as-child>
+                        <Link :href="route('asset.assets.create', { from: asset.ulid })">{{ t('assets.add_same_model') }}</Link>
+                    </Button>
                     <Button v-if="can.openTicket" variant="outline" as-child>
                         <Link :href="route('service.tickets.create', { asset: asset.ulid })">{{ t('tickets.open_for_asset') }}</Link>
                     </Button>
@@ -124,6 +165,9 @@ const details: [string, (a: AssetDetail) => string | null][] = [
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
+            </p>
+            <p v-if="page.props.flash.error" class="rounded-md bg-red-50 px-4 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+                {{ page.props.flash.error }}
             </p>
 
             <PhotoSlots :photos="photos" :editable="can.update" />
@@ -144,6 +188,75 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     </div>
                 </dl>
                 <p v-else class="text-sm text-muted-foreground">{{ t('assets.no_specs') }}</p>
+            </section>
+
+            <AssetCheckoutPanel v-if="checkouts" :asset-ulid="asset.ulid" :checkouts="checkouts" />
+
+            <AttachmentList
+                :attachments="attachments"
+                :can-delete="can.update"
+                :upload-url="can.update ? route('asset.assets.attachments.store', asset.ulid) : null"
+            />
+
+            <!-- Every device of this category, brand and model -->
+            <section v-if="sameModel.length" class="space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h3 class="flex items-center gap-2 text-sm font-semibold">
+                        <Barcode class="h-4 w-4" />
+                        {{ t('assets.same_model') }}
+                        <span class="rounded-md border px-2 py-0.5 text-xs font-normal">
+                            {{ t('assets.same_model_count', { spare: spareCount, total: sameModel.length }) }}
+                        </span>
+                        <span class="text-xs font-normal text-muted-foreground">{{ t('assets.same_model_hint') }}</span>
+                    </h3>
+                    <Button v-if="can.create" size="sm" variant="outline" as-child>
+                        <Link :href="route('asset.assets.create', { from: asset.ulid })">
+                            <Plus class="h-4 w-4" />
+                            {{ t('assets.add_same_model') }}
+                        </Link>
+                    </Button>
+                </div>
+                <div class="overflow-x-auto rounded-md border">
+                    <table class="w-full text-sm">
+                        <thead class="bg-muted/50 text-left">
+                            <tr>
+                                <th class="px-4 py-2 font-medium">{{ t('assets.serial_number') }}</th>
+                                <th class="px-4 py-2 font-medium">{{ t('assets.property_no') }}</th>
+                                <th class="px-4 py-2 font-medium">{{ t('assets.asset_code') }}</th>
+                                <th class="px-4 py-2 font-medium">{{ t('assets.status') }}</th>
+                                <th class="px-4 py-2 font-medium">{{ t('checkouts.holder') }}</th>
+                                <th class="px-4 py-2 font-medium">{{ t('assets.location') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr
+                                v-for="unit in sameModel"
+                                :key="unit.ulid"
+                                class="border-t"
+                                :class="{ 'bg-muted/40': unit.ulid === asset.ulid }"
+                                :aria-current="unit.ulid === asset.ulid ? 'true' : undefined"
+                            >
+                                <td class="whitespace-nowrap px-4 py-2 font-mono">{{ unit.serial_number ?? '-' }}</td>
+                                <td class="whitespace-nowrap px-4 py-2 font-mono">{{ unit.property_no ?? '-' }}</td>
+                                <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">
+                                    <span v-if="unit.ulid === asset.ulid">
+                                        {{ unit.asset_code }} <span class="font-sans text-muted-foreground">({{ t('assets.this_asset') }})</span>
+                                    </span>
+                                    <Link
+                                        v-else
+                                        :href="route('asset.assets.show', unit.ulid)"
+                                        class="text-primary underline-offset-4 hover:underline"
+                                    >
+                                        {{ unit.asset_code }}
+                                    </Link>
+                                </td>
+                                <td class="px-4 py-2"><AssetStatusBadge :status="unit.status" /></td>
+                                <td class="px-4 py-2">{{ unit.holder ?? '-' }}</td>
+                                <td class="px-4 py-2">{{ [unit.branch, unit.location].filter(Boolean).join(' · ') || '-' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </section>
 
             <section v-if="tickets !== null" class="space-y-2">

@@ -2,9 +2,11 @@
 
 namespace App\Modules\Asset\Actions;
 
+use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetImport;
+use App\Modules\Asset\Models\AssetSerial;
 use App\Modules\Asset\Support\AssetSheet;
 use App\Modules\Asset\Support\SpecFields;
 use App\Modules\Contract\Actions\ListCustomers;
@@ -12,7 +14,9 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Throwable;
 
@@ -98,7 +102,7 @@ class ImportAssets
             foreach ($columns as $cell => $column) {
                 $value = $row[$cell] ?? null;
                 // A text column may come back as a number (e.g. serial 12345); dates and prices stay as read.
-                $isText = ! in_array($column, ['purchased_at', 'warranty_expires_at', 'purchase_price'], true);
+                $isText = ! in_array($column, ['purchased_at', 'warranty_expires_at', 'purchase_price', 'quantity'], true);
                 $values[$column] = match (true) {
                     is_string($value) => trim($value) === '' ? null : trim($value),
                     $isText && is_scalar($value) => (string) $value,
@@ -145,7 +149,6 @@ class ImportAssets
             'branch_id' => $branch?->id,
             'brand' => $values['brand'] ?? null,
             'model' => $values['model'] ?? null,
-            'serial_number' => $values['serial_number'] ?? null,
             'status' => $this->statuses[mb_strtolower((string) ($values['status'] ?? ''))] ?? ($values['status'] ?? null),
             'location' => $values['location'] ?? null,
             'purchased_at' => AssetSheet::date($values['purchased_at'] ?? null),
@@ -160,6 +163,19 @@ class ImportAssets
             if (str_starts_with($column, 'spec.')) {
                 $data['specs'][substr($column, 5)] = $value;
             }
+        }
+
+        // Columns added later (sub-type, quantity, unit) are only set by a file that has them.
+        foreach (['subtype', 'quantity', 'unit', 'ip_address', 'mac_address', 'used_by', 'department'] as $column) {
+            if (array_key_exists($column, $values)) {
+                $data[$column] = $values[$column];
+            }
+        }
+        $serials = array_key_exists('serial_number', $values) ? AssetSheet::serials($values['serial_number']) : null;
+
+        // Only a file with the equipment number column sets it (an older file leaves it alone).
+        if (array_key_exists('property_no', $values)) {
+            $data['property_no'] = $values['property_no'];
         }
 
         // Only a file with the customer column sets the customer (an older file leaves it alone).
@@ -179,7 +195,15 @@ class ImportAssets
             'category_id' => ['required'],
             'brand' => ['nullable', 'string', 'max:255'],
             'model' => ['nullable', 'string', 'max:255'],
-            'serial_number' => ['nullable', 'string', 'max:255'],
+            'subtype' => ['nullable', 'string', 'max:100'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.AssetRequest::MAX_QUANTITY],
+            'unit' => ['nullable', 'string', 'max:30'],
+            'ip_address' => ['nullable', 'ip'],
+            'mac_address' => ['nullable', 'string', 'max:17'],
+            'used_by' => ['nullable', 'string', 'max:255'],
+            'department' => ['nullable', 'string', 'max:255'],
+            // Rows already imported count too, so a number twice in the file fails on its second row.
+            'property_no' => ['nullable', 'string', 'max:100', Rule::unique('assets', 'property_no')->ignore($existing?->id)],
             'status' => ['required', 'in:'.implode(',', Asset::STATUSES)],
             'location' => ['nullable', 'string', 'max:255'],
             'purchased_at' => ['nullable', 'date'],
@@ -215,14 +239,46 @@ class ImportAssets
             $messages[] = __('asset.imports.branch_not_allowed');
         }
 
+        foreach ($this->serialsTaken($serials ?? [], $existing) as $serial => $assetCode) {
+            $messages[] = __('asset.assets.serial_taken', ['serial' => $serial, 'code' => $assetCode]);
+        }
+
         if ($messages !== []) {
             return array_values(array_unique($messages));
         }
 
         $data['purchase_price'] = Money::toSatang($data['purchase_price']);
-        $this->saveAsset->handle($existing, $data);
+        if (($data['quantity'] ?? null) === null) {
+            unset($data['quantity']);
+        }
+        $this->saveAsset->handle($existing, $data, $serials);
 
         return $existing ? 'updated_rows' : 'created_rows';
+    }
+
+    /**
+     * Serial numbers already on another asset (rows imported before count too).
+     *
+     * @param  list<string>  $serials
+     * @return array<string, string> serial as written in the file => asset code
+     */
+    private function serialsTaken(array $serials, ?Asset $existing): array
+    {
+        if ($serials === []) {
+            return [];
+        }
+
+        $written = collect($serials)->keyBy(fn (string $serial) => mb_strtolower($serial));
+
+        return AssetSerial::query()
+            ->with('asset:id,asset_code')
+            ->whereIn(DB::raw('lower(serial_number)'), $written->keys()->all())
+            ->when($existing, fn ($q) => $q->where('asset_id', '!=', $existing->id))
+            ->get()
+            ->mapWithKeys(fn (AssetSerial $serial) => [
+                $written[mb_strtolower($serial->serial_number)] => $serial->asset?->asset_code ?? '-',
+            ])
+            ->all();
     }
 
     private function loadLookups(): void

@@ -23,7 +23,7 @@ class TicketSurvey extends Model
 
     protected $fillable = [
         'ticket_id', 'ticket_ulid', 'ticket_no', 'ticket_title', 'customer_id', 'assignee_id', 'token',
-        'score', 'comment', 'answered_at', 'answered_by', 'answered_name',
+        'score', 'comment', 'answered_at', 'answered_by', 'answered_name', 'on_paper',
     ];
 
     protected $hidden = ['token'];
@@ -33,6 +33,7 @@ class TicketSurvey extends Model
         return [
             'score' => 'integer',
             'answered_at' => 'datetime',
+            'on_paper' => 'boolean',
         ];
     }
 

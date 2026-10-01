@@ -19,7 +19,7 @@ function pdfUpload(string $name = 'signed.pdf'): UploadedFile
 }
 
 it('attaches a file in the tenant folder and lists it', function () {
-    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['file' => pdfUpload()])
+    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['attachments' => [pdfUpload()]])
         ->assertSessionHasNoErrors();
 
     $media = Media::first();
@@ -29,11 +29,13 @@ it('attaches a file in the tenant folder and lists it', function () {
     Storage::disk('local')->assertExists($media->getPathRelativeToRoot());
 
     $this->actingAs($this->admin)->get("/contracts/{$this->contract->id}")
-        ->assertInertia(fn (Assert $page) => $page->where('documents.0.name', 'signed.pdf'));
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('documents.0.name', 'signed.pdf')
+            ->where('documents.0.url', route('contract.contracts.documents.show', [$this->contract, $media->id])));
 });
 
 it('serves the file only through the contract', function () {
-    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['file' => pdfUpload()]);
+    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['attachments' => [pdfUpload()]]);
     $media = Media::first();
     $otherContract = createContract(createCustomer());
 
@@ -45,11 +47,15 @@ it('serves the file only through the contract', function () {
     $this->actingAs(userWithRole('user'))->get("/contracts/{$this->contract->id}/documents/{$media->id}")->assertForbidden();
 });
 
-it('rejects other file types and deletes a file', function () {
-    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['file' => UploadedFile::fake()->create('run.exe', 10)])
-        ->assertSessionHasErrors('file');
+it('takes a scan, rejects other file types and files over 2 MB, and deletes a file', function () {
+    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['attachments' => [UploadedFile::fake()->image('scan.jpg')]])
+        ->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['attachments' => [UploadedFile::fake()->create('run.exe', 10)]])
+        ->assertSessionHasErrors('attachments.0');
+    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['attachments' => [UploadedFile::fake()->create('big.pdf', 2049, 'application/pdf')]])
+        ->assertSessionHasErrors('attachments.0');
 
-    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/documents", ['file' => pdfUpload()]);
+    expect(Media::count())->toBe(1);
     $media = Media::first();
     $path = $media->getPathRelativeToRoot();
 
@@ -62,5 +68,5 @@ it('rejects other file types and deletes a file', function () {
 it('does not let a viewer upload or delete', function () {
     $technician = userWithRole('technician');
 
-    $this->actingAs($technician)->post("/contracts/{$this->contract->id}/documents", ['file' => pdfUpload()])->assertForbidden();
+    $this->actingAs($technician)->post("/contracts/{$this->contract->id}/documents", ['attachments' => [pdfUpload()]])->assertForbidden();
 });

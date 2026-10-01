@@ -2,6 +2,7 @@
 
 use App\Modules\Platform\Http\Controllers\DashboardController;
 use App\Modules\Platform\Http\Controllers\ImpersonationController;
+use App\Modules\Platform\Http\Controllers\PlatformSettingsController;
 use App\Modules\Platform\Http\Controllers\TenantController;
 use App\Modules\Platform\Http\Controllers\TenantModuleController;
 use Illuminate\Support\Facades\Route;
@@ -21,4 +22,7 @@ Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(functi
 
     Route::get('tenants/{tenant:ulid}/modules', [TenantModuleController::class, 'edit'])->name('tenants.modules.edit');
     Route::put('tenants/{tenant:ulid}/modules', [TenantModuleController::class, 'update'])->name('tenants.modules.update');
+
+    Route::get('settings', [PlatformSettingsController::class, 'edit'])->name('settings.edit');
+    Route::put('settings', [PlatformSettingsController::class, 'update'])->name('settings.update');
 });

@@ -46,7 +46,7 @@ it('rejects a customer or asset of another tenant', function () {
     ])->assertSessionHasErrors('customer_id');
 
     $this->actingAs($this->admin)->post('/assets', [
-        'category_id' => createAssetCategory()->id, 'customer_id' => $this->theirCustomer->id, 'name' => 'X', 'status' => 'in_use',
+        'category_id' => createAssetCategory()->id, 'owner' => 'customer', 'customer_id' => $this->theirCustomer->id, 'name' => 'X', 'status' => 'in_use', 'location' => 'Stock',
     ])->assertSessionHasErrors('customer_id');
 
     $this->actingAs($this->admin)->post("/contracts/{$this->mine->id}/assets", ['asset_ids' => [$this->theirAsset->id]])

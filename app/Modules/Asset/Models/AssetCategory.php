@@ -12,6 +12,9 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
+ * requires_serial: assets of this category are devices and need at least one serial number;
+ * the others are counted by quantity and unit.
+ *
  * @property list<array{key: string, label: string, type: string, options?: list<string>, required?: bool}> $spec_fields
  */
 #[UsePolicy(AssetCategoryPolicy::class)]
@@ -23,15 +26,25 @@ class AssetCategory extends Model
 
     public const FIELD_TYPES = ['text', 'number', 'date', 'select'];
 
-    protected $fillable = ['name', 'code_prefix', 'service_line', 'spec_fields'];
+    public const TYPE_HARDWARE = 'hardware';
+
+    public const TYPE_SOFTWARE = 'software';
+
+    /** Every asset takes the type of its category. */
+    public const ASSET_TYPES = [self::TYPE_HARDWARE, self::TYPE_SOFTWARE];
+
+    protected $fillable = ['name', 'code_prefix', 'service_line', 'asset_type', 'requires_serial', 'spec_fields'];
 
     protected $attributes = [
+        'asset_type' => self::TYPE_HARDWARE,
+        'requires_serial' => false,
         'spec_fields' => '[]',
     ];
 
     protected function casts(): array
     {
         return [
+            'requires_serial' => 'boolean',
             'spec_fields' => 'array',
         ];
     }
@@ -44,7 +57,7 @@ class AssetCategory extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'code_prefix', 'service_line', 'spec_fields'])
+            ->logOnly(['name', 'code_prefix', 'service_line', 'asset_type', 'requires_serial', 'spec_fields'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }

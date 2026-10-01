@@ -74,11 +74,11 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-3xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-6" @submit.prevent="submit">
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="contract_id">{{ t('pm_plans.contract') }}</Label>
                     <template v-if="plan">
                         <p class="font-mono text-sm">{{ plan.contract_no }}</p>
@@ -105,14 +105,14 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </template>
                 </div>
 
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="title">{{ t('pm_plans.title_field') }}</Label>
                     <Input id="title" v-model="form.title" required autocomplete="off" />
                     <InputError :message="form.errors.title" />
                 </div>
 
                 <div class="grid gap-6 sm:grid-cols-2">
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="interval_months">{{ t('pm_plans.interval') }}</Label>
                         <select id="interval_months" v-model="form.interval_months" :class="selectClass" :disabled="intervalLocked">
                             <option v-for="months in intervals" :key="months" :value="months">
@@ -124,7 +124,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </p>
                         <InputError :message="form.errors.interval_months" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="assignee_id">{{ t('pm_plans.assignee') }}</Label>
                         <select id="assignee_id" v-model="form.assignee_id" :class="selectClass">
                             <option :value="null">{{ t('pm_plans.no_assignee') }}</option>
@@ -134,7 +134,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
                 </div>
 
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="notes">{{ t('pm_plans.notes') }}</Label>
                     <textarea
                         id="notes"

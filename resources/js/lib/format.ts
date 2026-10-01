@@ -6,6 +6,13 @@ export function dateTime(iso: string | null): string {
 }
 
 /**
+ * A file size for people: 820 KB, 1.4 MB.
+ */
+export function formatBytes(bytes: number): string {
+    return bytes < 1024 * 1024 ? `${Math.max(1, Math.ceil(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/**
  * Date/time for printed documents: Buddhist year (the th-TH calendar), Bangkok time.
  */
 export function documentDateTime(iso: string | null): string {

@@ -15,7 +15,7 @@ class AnswerSurveyOfTicket
     public function __construct(private AnswerTicketSurvey $answerSurvey) {}
 
     /**
-     * @param  array{score: int, comment?: string|null}  $answer
+     * @param  array{score: int, comment?: string|null, name?: string|null, on_paper?: bool}  $answer  see AnswerTicketSurvey
      */
     public function handle(int $ticketId, array $answer, User $user): TicketSurvey
     {

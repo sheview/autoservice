@@ -3,13 +3,16 @@
 namespace App\Modules\Tenancy\Models;
 
 use App\Modules\Tenancy\Events\TenantCreated;
+use App\Modules\Tenancy\Support\CompanyProfile;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Tenant extends Model
+class Tenant extends Model implements HasMedia
 {
-    use HasUlids, SoftDeletes;
+    use HasUlids, InteractsWithMedia, SoftDeletes;
 
     public const STATUS_ACTIVE = 'active';
 
@@ -49,5 +52,11 @@ class Tenant extends Model
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /** The company's logo (CompanyProfile), one image. */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(CompanyProfile::LOGO)->singleFile()->acceptsMimeTypes(CompanyProfile::LOGO_MIME_TYPES);
     }
 }

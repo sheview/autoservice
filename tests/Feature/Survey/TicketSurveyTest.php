@@ -119,8 +119,10 @@ it('shows staff the link to send while unanswered, then the answer', function ()
         ->where('survey.qr', fn ($svg) => str_starts_with($svg, '<svg')));
     $this->actingAs($this->helpdesk)->post("{$url}/survey", ['score' => 5])->assertForbidden();
 
-    // the technician who did the job sees nothing of it
-    $this->actingAs($this->tech)->get($url)->assertInertia(fn (Assert $page) => $page->where('survey', null));
+    // the technician who did the job gets no link to share and cannot answer online,
+    // only key in what the customer ticked on the printed job sheet
+    $this->actingAs($this->tech)->get($url)->assertInertia(fn (Assert $page) => $page
+        ->where('survey.canAnswer', false)->where('survey.canPaper', true)->where('survey.url', null)->where('survey.qr', null));
     $this->actingAs($this->tech)->post("{$url}/survey", ['score' => 5])->assertForbidden();
 
     // an admin may record the customer's answer (e.g. given on the phone)
@@ -132,6 +134,21 @@ it('shows staff the link to send while unanswered, then the answer', function ()
     $open = ($this->closedTicket)(closer: false);
     $this->actingAs($this->admin)->get("/tickets/{$open->ulid}")->assertInertia(fn (Assert $page) => $page->where('survey', null));
     $this->actingAs($this->admin)->post("/tickets/{$open->ulid}/survey", ['score' => 5])->assertSessionHasErrors('score');
+});
+
+it('lets staff key in the score ticked on the printed job sheet, but not a customer account', function () {
+    $ticket = ($this->closedTicket)();
+    $url = "/tickets/{$ticket->ulid}/survey/paper";
+
+    $this->actingAs($this->client)->post($url, ['score' => 4, 'name' => 'Somchai'])->assertForbidden();
+    $this->actingAs($this->tech)->post($url, ['score' => 4])->assertSessionHasErrors('name');
+
+    $this->actingAs($this->tech)->post($url, ['score' => 4, 'name' => 'Somchai', 'comment' => 'ok'])
+        ->assertSessionHasNoErrors()->assertSessionHas('success', 'บันทึกผลประเมินจากใบงานเรียบร้อยแล้ว');
+    expect(TicketSurvey::sole())->score->toBe(4)->on_paper->toBeTrue()->answered_name->toBe('Somchai');
+
+    $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('survey.on_paper', true)->where('survey.canPaper', false));
 });
 
 it('lists the surveys with search, filters, sort and a summary', function () {

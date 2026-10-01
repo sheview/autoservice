@@ -36,11 +36,11 @@ const submit = () => form.post(route('inventory.parts.import.store'), { forceFor
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="t('part_imports.title')" />
 
-        <div class="max-w-3xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <Heading :title="t('part_imports.title')" :description="t('part_imports.description')" />
 
             <form class="space-y-4 rounded-md border p-4" @submit.prevent="submit">
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="file">{{ t('part_imports.file') }}</Label>
                     <input
                         id="file"

@@ -37,6 +37,9 @@ class AssetCategoryRequest extends FormRequest
             }],
             'code_prefix' => ['required', 'string', 'regex:/^[A-Za-z0-9]{1,10}$/'],
             'service_line' => ['nullable', Rule::in(AssetCategory::SERVICE_LINES)],
+            // Left out (e.g. an older client): a new category is hardware, an existing one keeps its type.
+            'asset_type' => ['sometimes', 'required', Rule::in(AssetCategory::ASSET_TYPES)],
+            'requires_serial' => ['sometimes', 'boolean'],
             'spec_fields' => ['array', 'max:'.self::MAX_SPEC_FIELDS],
             'spec_fields.*.key' => ['required', 'string', 'regex:/^[a-z][a-z0-9_]{0,39}$/', 'distinct'],
             'spec_fields.*.label' => ['required', 'string', 'max:100'],
@@ -52,6 +55,8 @@ class AssetCategoryRequest extends FormRequest
         return [
             'name' => __('asset.categories.fields.name'),
             'code_prefix' => __('asset.categories.fields.code_prefix'),
+            'asset_type' => __('asset.categories.fields.asset_type'),
+            'requires_serial' => __('asset.categories.fields.requires_serial'),
             'spec_fields.*.key' => __('asset.categories.fields.spec_key'),
             'spec_fields.*.label' => __('asset.categories.fields.spec_label'),
             'spec_fields.*.type' => __('asset.categories.fields.spec_type'),

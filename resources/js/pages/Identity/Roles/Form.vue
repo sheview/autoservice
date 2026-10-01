@@ -50,18 +50,18 @@ const submit = () => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-3xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-2">
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="label">{{ t('roles.label') }}</Label>
                         <Input id="label" v-model="form.label" required />
                         <InputError :message="form.errors.label" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="name">{{ t('roles.name') }}</Label>
                         <Input id="name" v-model="form.name" class="font-mono" :disabled="!!role?.is_system" :required="!role" />
                         <p class="text-xs text-muted-foreground">{{ role?.is_system ? t('roles.system_hint') : t('roles.name_hint') }}</p>

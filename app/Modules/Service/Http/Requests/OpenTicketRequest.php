@@ -4,8 +4,10 @@ namespace App\Modules\Service\Http\Requests;
 
 use App\Modules\Asset\Actions\AssetSummaries;
 use App\Modules\Contract\Actions\CoveringContracts;
+use App\Modules\Document\Support\Attachments;
 use App\Modules\Service\Models\Ticket;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Validation\Rule;
 
 class OpenTicketRequest extends FormRequest
@@ -34,6 +36,14 @@ class OpenTicketRequest extends FormRequest
                 'contact_phone' => $this->filled('contact_phone') ? $this->input('contact_phone') : $user->phone,
             ]);
         }
+
+        $this->merge(['device_serial_unknown' => $this->boolean('device_serial_unknown')]);
+    }
+
+    /** No asset picked: the device is not in the system and must be described by hand. */
+    private function unregistered(): bool
+    {
+        return ! $this->filled('asset_id');
     }
 
     /**
@@ -52,12 +62,46 @@ class OpenTicketRequest extends FormRequest
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:50'],
             'assignee_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('is_active', true)->whereNull('deleted_at')],
+            // A device not in the system: what it is, and its serial unless that is knowingly unknown.
+            'device_name' => [Rule::requiredIf($this->unregistered()), 'nullable', 'string', 'max:255'],
+            'device_brand' => [Rule::requiredIf($this->unregistered()), 'nullable', 'string', 'max:255'],
+            'device_model' => [Rule::requiredIf($this->unregistered()), 'nullable', 'string', 'max:255'],
+            'device_serial' => [Rule::requiredIf($this->unregistered() && ! $this->boolean('device_serial_unknown')), 'nullable', 'string', 'max:255'],
+            'device_serial_unknown' => ['boolean'],
+            'device_location' => ['nullable', 'string', 'max:255'],
+            'device_ip' => ['nullable', 'ip'],
+            ...Attachments::rules(),
         ];
     }
 
     public function attributes(): array
     {
-        return __('service.fields');
+        return [...__('service.fields'), ...Attachments::attributes()];
+    }
+
+    /**
+     * @return array<string, mixed> the ticket fields, without the files. A registered asset brings its
+     *                              own device facts (OpenTicket), so what was typed for it is dropped.
+     */
+    public function ticketData(): array
+    {
+        $data = $this->safe()->except('attachments');
+        if (! $this->unregistered()) {
+            return collect($data)->except(self::DEVICE_FIELDS)->all();
+        }
+        if ($data['device_serial_unknown']) {
+            $data['device_serial'] = null;
+        }
+
+        return $data;
+    }
+
+    private const DEVICE_FIELDS = ['device_name', 'device_brand', 'device_model', 'device_serial', 'device_serial_unknown', 'device_location', 'device_ip'];
+
+    /** @return list<UploadedFile> */
+    public function attachments(): array
+    {
+        return array_values($this->file('attachments', []));
     }
 
     /**

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetImport;
 use App\Modules\Identity\Models\Role;
@@ -123,18 +124,20 @@ it('keeps an importer without branch.all inside their branch', function () {
 
 it('exports the filtered list and imports the same file back as updates', function () {
     createAsset($this->pc, ['name' => 'Spare PC', 'status' => Asset::STATUS_SPARE, 'purchase_price' => 990050, 'specs' => ['cpu' => 'i3', 'ram_gb' => 4]]);
-    createAsset($this->pc, ['name' => 'Busy PC', 'specs' => ['cpu' => 'i9']]);
+    $busy = createAsset($this->pc, ['name' => 'Busy PC', 'specs' => ['cpu' => 'i9']]);
+    app(SaveAsset::class)->handle($busy, ['category_id' => $this->pc->id, 'name' => 'Busy PC', 'status' => 'in_use', 'specs' => ['cpu' => 'i9']], ['SN-1', 'SN-2']);
 
     $spareOnly = $this->actingAs($this->admin)->get('/assets/export?status=spare')->assertOk();
     $rows = sheetRows($spareOnly->getFile()->getPathname());
     expect($rows[0])->toBe([
-        'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'Serial Number', 'สถานะ', 'ตำแหน่งที่ตั้ง',
+        'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'ประเภทย่อย', 'Serial Number', 'จำนวน', 'หน่วย',
+        'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'IP Address', 'MAC Address', 'ผู้ใช้งานประจำเครื่อง', 'แผนก',
         'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
     ])
         ->and(count($rows))->toBe(2)
         ->and($rows[1][1])->toBe('Spare PC')
-        ->and($rows[1][8])->toBe('สำรอง')
-        ->and($rows[1][11])->toEqual(9900.5);
+        ->and($rows[1][12])->toBe('สำรอง')
+        ->and($rows[1][19])->toEqual(9900.5);
 
     $all = $this->actingAs($this->admin)->get('/assets/export')->assertOk();
     $file = new UploadedFile($all->getFile()->getPathname(), 'export.xlsx', null, null, true);
@@ -145,7 +148,23 @@ it('exports the filtered list and imports the same file back as updates', functi
     expect($import->only(['created_rows', 'updated_rows', 'failed_rows']))->toBe(['created_rows' => 0, 'updated_rows' => 2, 'failed_rows' => 0])
         ->and(Asset::count())->toBe(2)
         ->and(Asset::where('name', 'Spare PC')->first()->only(['status', 'purchase_price', 'specs']))
-        ->toBe(['status' => Asset::STATUS_SPARE, 'purchase_price' => 990050, 'specs' => ['cpu' => 'i3', 'ram_gb' => 4]]);
+        ->toBe(['status' => Asset::STATUS_SPARE, 'purchase_price' => 990050, 'specs' => ['cpu' => 'i3', 'ram_gb' => 4]])
+        // Several serials share one cell and come back as they were.
+        ->and($busy->fresh()->serials->pluck('serial_number')->all())->toBe(['SN-1', 'SN-2']);
+});
+
+it('rejects an imported serial number that another asset already has', function () {
+    $taken = createAsset($this->pc, ['serial_number' => 'DUP-1', 'specs' => ['cpu' => 'x']]);
+
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([
+        ['ชื่อ', 'หมวด', 'Serial Number', 'CPU [spec.cpu]'],
+        ['New', 'คอมพิวเตอร์', 'NEW-1, dup-1', 'i5'],
+    ])])->assertSessionHasNoErrors();
+
+    $import = AssetImport::first();
+    expect($import->failed_rows)->toBe(1)
+        ->and($import->errors[0]['messages'])->toBe(["Serial Number dup-1 ซ้ำกับทรัพย์สิน {$taken->asset_code}"])
+        ->and(Asset::count())->toBe(1);
 });
 
 it('downloads an empty template with the spec columns', function () {

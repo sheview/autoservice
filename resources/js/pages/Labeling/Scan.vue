@@ -18,6 +18,7 @@ const props = defineProps<{
         branch: string | null;
         status: string;
         serial_number: string | null;
+        property_no: string | null;
         customer: string | null;
     };
     tickets: { ulid: string; ticket_no: string; title: string; status: string; created_at: string }[] | null;
@@ -32,6 +33,7 @@ const facts = [
     { label: 'scan.category', value: props.asset.category },
     { label: 'scan.branch', value: props.asset.branch },
     { label: 'scan.serial', value: props.asset.serial_number },
+    { label: 'scan.property_no', value: props.asset.property_no },
 ].filter((fact) => fact.value);
 </script>
 

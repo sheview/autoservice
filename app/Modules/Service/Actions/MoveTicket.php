@@ -15,6 +15,7 @@ use Illuminate\Validation\ValidationException;
 /**
  * Moves a ticket along TicketWorkflow (start, hold, resolve, approve, reject, cancel) and keeps
  * the SLA clock right:
+ *   - "start" needs the device's warranty checked (CheckTicketWarranty)
  *   - the first "start" is the response time (responded_at)
  *   - "hold" stops the resolve clock; leaving hold adds the business minutes spent on hold to
  *     hold_minutes and moves resolve_due_at
@@ -34,6 +35,10 @@ class MoveTicket
     {
         if (! TicketWorkflow::allows($ticket, $action)) {
             throw ValidationException::withMessages(['action' => __('service.tickets.not_allowed')]);
+        }
+        // Whether the repair is a warranty claim decides how the job is done: check it first.
+        if ($action === 'start' && $ticket->warranty_checked_at === null) {
+            throw ValidationException::withMessages(['action' => __('service.tickets.warranty_first')]);
         }
         if (in_array($action, TicketWorkflow::NEEDS_COMMENT, true) && blank($comment)) {
             throw ValidationException::withMessages(['comment' => __('service.tickets.reason_required')]);

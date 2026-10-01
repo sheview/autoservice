@@ -63,7 +63,7 @@ const statusClass: Record<string, string> = {
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="t('asset_imports.title')" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <Heading :title="t('asset_imports.title')" :description="t('asset_imports.description')" />
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
@@ -71,7 +71,7 @@ const statusClass: Record<string, string> = {
             </p>
 
             <form class="space-y-4 rounded-md border p-4" @submit.prevent="submit">
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="file">{{ t('asset_imports.file') }}</Label>
                     <input
                         id="file"

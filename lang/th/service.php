@@ -12,6 +12,10 @@ return [
         'asset_other_customer' => 'ทรัพย์สินนี้ไม่ใช่ของลูกค้าที่เลือก',
         'contract_not_covering' => 'สัญญานี้ไม่ได้คุ้มครองงานนี้ในวันนี้',
         'cannot_assign' => 'คุณไม่มีสิทธิ์มอบหมายงาน',
+        'warranty_first' => 'กรุณาตรวจสอบการรับประกันของเครื่องก่อนเริ่มดำเนินการ',
+        'warranty_checked' => 'บันทึกการตรวจสอบประกันเรียบร้อยแล้ว',
+        'paper_rated' => 'บันทึกผลประเมินจากใบงานเรียบร้อยแล้ว',
+        'report_saved' => 'บันทึกผลการซ่อมเรียบร้อยแล้ว',
         'moved' => [
             'start' => 'เริ่มดำเนินการแล้ว',
             'hold' => 'พักงานแล้ว (หยุดนับเวลา SLA)',
@@ -66,6 +70,28 @@ return [
         'contact_phone' => 'เบอร์ติดต่อ',
         'assignee_id' => 'ผู้รับผิดชอบ',
         'comment' => 'ความเห็น',
+        'device_name' => 'ประเภท/ชื่อเครื่อง',
+        'device_brand' => 'ยี่ห้อ',
+        'device_model' => 'รุ่น',
+        'device_serial' => 'Serial',
+        'device_serial_unknown' => 'ไม่ทราบ Serial',
+        'device_location' => 'สถานที่ติดตั้ง',
+        'device_ip' => 'IP Address',
+        'cause' => 'สาเหตุที่พบ',
+        'extra_cost' => 'ค่าใช้จ่ายเพิ่มเติม',
+        'approver_name' => 'ผู้อนุมัติการซ่อม',
+        'repair_report' => 'ผลการซ่อม',
+        'warranty_status' => 'สถานะประกัน',
+        'warranty_expires_on' => 'วันหมดประกัน',
+        'score' => 'คะแนน',
+        'rater_name' => 'ผู้ประเมิน',
+    ],
+
+    // Event body of a warranty check, kept in the timeline.
+    'warranty' => [
+        'in_warranty' => 'อยู่ในประกัน',
+        'out_of_warranty' => 'หมดประกัน',
+        'until' => 'ถึง :date',
     ],
 
     'holiday_fields' => [

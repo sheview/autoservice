@@ -3,11 +3,18 @@
 use App\Modules\Contract\Http\Controllers\ContractAssetController;
 use App\Modules\Contract\Http\Controllers\ContractController;
 use App\Modules\Contract\Http\Controllers\ContractDocumentController;
+use App\Modules\Contract\Http\Controllers\CustomerAttachmentController;
 use App\Modules\Contract\Http\Controllers\CustomerController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:contract'])->name('contract.')->group(function () {
     Route::resource('customers', CustomerController::class)->except(['show']);
+    Route::post('customers/{customer}/attachments', [CustomerAttachmentController::class, 'store'])->name('customers.attachments.store');
+    Route::get('customers/{customer}/attachments/{attachment}', [CustomerAttachmentController::class, 'show'])
+        ->whereNumber('attachment')->name('customers.attachments.show');
+    Route::delete('customers/{customer}/attachments/{attachment}', [CustomerAttachmentController::class, 'destroy'])
+        ->whereNumber('attachment')->name('customers.attachments.destroy');
+
     Route::resource('contracts', ContractController::class);
 
     Route::post('contracts/{contract}/assets', [ContractAssetController::class, 'store'])->name('contracts.assets.store');

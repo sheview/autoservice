@@ -51,6 +51,8 @@ it('rejects a category or branch of another tenant', function () {
         'branch_id' => $this->theirBranch->id,
         'name' => 'Sneaky',
         'status' => 'in_use',
+        'owner' => 'company',
+        'location' => 'Stock',
     ])->assertSessionHasErrors(['category_id', 'branch_id']);
 });
 

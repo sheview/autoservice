@@ -2,6 +2,7 @@
 
 namespace App\Modules\Service\Models;
 
+use App\Modules\Document\Concerns\HasAttachments;
 use App\Modules\Service\Policies\TicketPolicy;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Branch;
@@ -11,16 +12,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * A service job (ticket). Public URLs use "ulid". The SLA values are copied from the contract
  * when the ticket is opened; contract_id null = out of contract (no SLA).
  * Customer, asset, contract and users belong to other modules and are read through their actions.
+ * Files (quotations, logs, reports) are attached through HasAttachments.
  */
 #[UsePolicy(TicketPolicy::class)]
-class Ticket extends Model
+class Ticket extends Model implements HasMedia
 {
-    use BelongsToTenant, HasUlids, SoftDeletes;
+    use BelongsToTenant, HasAttachments, HasUlids, InteractsWithMedia, SoftDeletes;
 
     public const STATUS_NEW = 'new';
 
@@ -54,7 +58,14 @@ class Ticket extends Model
         'priority', 'status', 'source', 'contact_name', 'contact_phone', 'reported_by', 'assignee_id',
         'service_window', 'response_minutes', 'resolve_minutes', 'response_due_at', 'resolve_due_at',
         'responded_at', 'response_breach_notified_at', 'resolve_breach_notified_at', 'on_hold_since', 'hold_minutes', 'resolved_at', 'closed_at', 'cancelled_at',
+        'device_name', 'device_brand', 'device_model', 'device_serial', 'device_serial_unknown', 'device_location', 'device_ip',
+        'warranty_status', 'warranty_expires_on', 'warranty_checked_by_name', 'warranty_checked_at',
+        // Repair report of the job sheet (SaveRepairReport); extra_cost in satang.
+        'cause', 'extra_cost', 'approver_name',
     ];
+
+    /** What staff found when they checked the device's warranty before starting work. */
+    public const WARRANTY_STATUSES = ['in_warranty', 'out_of_warranty'];
 
     protected $attributes = [
         'status' => self::STATUS_NEW,
@@ -78,6 +89,10 @@ class Ticket extends Model
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'device_serial_unknown' => 'boolean',
+            'extra_cost' => 'integer',
+            'warranty_expires_on' => 'date',
+            'warranty_checked_at' => 'datetime',
         ];
     }
 
@@ -102,5 +117,10 @@ class Ticket extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->registerAttachmentCollection();
     }
 }

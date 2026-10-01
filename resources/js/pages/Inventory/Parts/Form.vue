@@ -57,45 +57,45 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <div class="max-w-2xl p-4">
+        <div class="p-4">
             <Heading :title="title" />
 
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-3">
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="code">{{ t('parts.code') }}</Label>
                         <Input id="code" v-model="form.code" class="font-mono uppercase" required maxlength="30" autocomplete="off" />
                         <p class="text-xs text-muted-foreground">{{ t('parts.code_hint') }}</p>
                         <InputError :message="form.errors.code" />
                     </div>
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="name">{{ t('parts.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="brand">{{ t('parts.brand') }}</Label>
                         <Input id="brand" v-model="form.brand" maxlength="100" />
                         <InputError :message="form.errors.brand" />
                     </div>
-                    <div class="grid gap-2 sm:col-span-2">
+                    <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="part_number">{{ t('parts.part_number') }}</Label>
                         <Input id="part_number" v-model="form.part_number" class="font-mono" maxlength="100" />
                         <InputError :message="form.errors.part_number" />
                     </div>
 
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="unit">{{ t('parts.unit') }}</Label>
                         <Input id="unit" v-model="form.unit" required maxlength="30" :placeholder="t('parts.unit_placeholder')" />
                         <InputError :message="form.errors.unit" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="min_qty">{{ t('parts.min_qty') }}</Label>
                         <Input id="min_qty" v-model="form.min_qty" type="number" min="0" step="1" />
                         <InputError :message="form.errors.min_qty" />
                     </div>
-                    <div class="grid gap-2">
+                    <div class="grid content-start gap-2">
                         <Label for="unit_cost">{{ t('parts.unit_cost') }}</Label>
                         <Input id="unit_cost" v-model="form.unit_cost" type="number" min="0" step="0.01" />
                         <InputError :message="form.errors.unit_cost" />
@@ -103,7 +103,7 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                 </div>
                 <p class="text-xs text-muted-foreground">{{ t('parts.min_qty_hint') }} · {{ t('parts.unit_cost_hint') }}</p>
 
-                <div class="grid gap-2">
+                <div class="grid content-start gap-2">
                     <Label for="notes">{{ t('parts.notes') }}</Label>
                     <textarea id="notes" v-model="form.notes" rows="3" :class="textareaClass" />
                     <InputError :message="form.errors.notes" />

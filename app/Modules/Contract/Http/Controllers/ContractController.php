@@ -11,6 +11,8 @@ use App\Modules\Contract\Actions\SearchContracts;
 use App\Modules\Contract\Http\Requests\ContractRequest;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Support\ContractPhase;
+use App\Modules\Document\Actions\AddAttachments;
+use App\Modules\Document\Support\Attachments;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use Illuminate\Http\RedirectResponse;
@@ -64,9 +66,10 @@ class ContractController extends Controller
         ]);
     }
 
-    public function store(ContractRequest $request, SaveContract $saveContract): RedirectResponse
+    public function store(ContractRequest $request, SaveContract $saveContract, AddAttachments $addAttachments): RedirectResponse
     {
         $contract = $saveContract->handle(null, $request->contractData());
+        $addAttachments->handle($contract, $request->attachments());
 
         return redirect()->route('contract.contracts.show', $contract)->with('success', __('contract.contracts.created'));
     }
@@ -114,12 +117,7 @@ class ContractController extends Controller
                     'limit' => 20,
                 ])
                 : [],
-            'documents' => $contract->getMedia(Contract::DOCUMENTS)->map(fn ($media) => [
-                'id' => $media->id,
-                'name' => $media->file_name,
-                'size' => $media->size,
-                'uploaded_at' => $media->created_at?->toIso8601String(),
-            ]),
+            'documents' => $this->documents($contract),
             'history' => $contract->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,
                 'description' => $log->description,
@@ -142,9 +140,10 @@ class ContractController extends Controller
         return Inertia::render('Contract/Contracts/Form', $this->formProps($contract, $listCustomers));
     }
 
-    public function update(ContractRequest $request, Contract $contract, SaveContract $saveContract): RedirectResponse
+    public function update(ContractRequest $request, Contract $contract, SaveContract $saveContract, AddAttachments $addAttachments): RedirectResponse
     {
         $saveContract->handle($contract, $request->contractData());
+        $addAttachments->handle($contract, $request->attachments());
 
         return redirect()->route('contract.contracts.show', $contract)->with('success', __('contract.contracts.updated'));
     }
@@ -158,9 +157,18 @@ class ContractController extends Controller
         return redirect()->route('contract.contracts.index')->with('success', __('contract.contracts.deleted'));
     }
 
+    /**
+     * @return list<array{id: int, name: string, size: int, uploaded_at: string|null, url: string}>
+     */
+    private function documents(Contract $contract): array
+    {
+        return Attachments::list($contract, $contract->attachmentCollection(), fn (int $id) => route('contract.contracts.documents.show', [$contract, $id]));
+    }
+
     private function formProps(?Contract $contract, ListCustomers $listCustomers): array
     {
         return [
+            'documents' => $contract ? $this->documents($contract) : [],
             'contract' => $contract ? [
                 ...$contract->only(['id', 'customer_id', 'contract_no', 'title', 'status', 'service_window', 'pm_interval_months', 'notify_days_before', 'notes']),
                 'starts_on' => $contract->starts_on->toDateString(),

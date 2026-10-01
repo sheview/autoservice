@@ -3,9 +3,13 @@
 namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\AssignTicket;
+use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\CommentOnTicket;
 use App\Modules\Service\Actions\MoveTicket;
+use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Support\TicketWorkflow;
 use Illuminate\Http\RedirectResponse;
@@ -14,7 +18,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 
 /**
- * What people do on an open ticket: assign, move along the workflow, comment.
+ * What people do on an open ticket: assign, check the warranty, move along the workflow, comment.
  */
 class TicketActionController extends Controller
 {
@@ -44,6 +48,58 @@ class TicketActionController extends Controller
         $moveTicket->handle($ticket, $validated['action'], $request->user(), $validated['comment'] ?? null);
 
         return back()->with('success', __("service.tickets.moved.{$validated['action']}"));
+    }
+
+    /**
+     * The technician or helpdesk (whoever may work on the job, never the customer) records whether
+     * the device is under warranty, while the job is open.
+     */
+    public function warranty(Request $request, Ticket $ticket, CheckTicketWarranty $checkWarranty): RedirectResponse
+    {
+        abort_unless(self::canCheckWarranty($request->user(), $ticket), 403);
+
+        $validated = $request->validate([
+            'warranty_status' => ['required', Rule::in(Ticket::WARRANTY_STATUSES)],
+            'warranty_expires_on' => ['nullable', 'date'],
+        ], attributes: __('service.fields'));
+
+        $checkWarranty->handle($ticket, $request->user(), $validated['warranty_status'], $validated['warranty_expires_on'] ?? null);
+
+        return back()->with('success', __('service.tickets.warranty_checked'));
+    }
+
+    /**
+     * The repair report of the job sheet (cause, extra cost, approver), by whoever works on the job,
+     * until it is closed.
+     */
+    public function report(Request $request, Ticket $ticket, SaveRepairReport $saveReport): RedirectResponse
+    {
+        abort_unless(self::canReport($request->user(), $ticket), 403);
+
+        $validated = $request->validate([
+            'cause' => ['nullable', 'string', 'max:5000'],
+            'extra_cost' => ['nullable', 'numeric', 'min:0', 'max:9999999999', 'decimal:0,2'], // baht
+            'approver_name' => ['nullable', 'string', 'max:255'],
+        ], attributes: __('service.fields'));
+
+        $saveReport->handle($ticket, $request->user(), [
+            'cause' => $validated['cause'] ?? null,
+            'extra_cost' => Money::toSatang($validated['extra_cost'] ?? null),
+            'approver_name' => $validated['approver_name'] ?? null,
+        ]);
+
+        return back()->with('success', __('service.tickets.report_saved'));
+    }
+
+    public static function canReport(User $user, Ticket $ticket): bool
+    {
+        return $user->customer_id === null && $user->can('work', $ticket)
+            && in_array($ticket->status, [...Ticket::OPEN_STATUSES, Ticket::STATUS_RESOLVED], true);
+    }
+
+    public static function canCheckWarranty(User $user, Ticket $ticket): bool
+    {
+        return $user->customer_id === null && $user->can('work', $ticket) && in_array($ticket->status, Ticket::OPEN_STATUSES, true);
     }
 
     public function comment(Request $request, Ticket $ticket, CommentOnTicket $commentOnTicket): RedirectResponse

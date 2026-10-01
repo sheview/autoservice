@@ -19,7 +19,7 @@ class PaginateAssets
      * @param  list<int>|null  $onlyIds  keep only these assets (null = no limit)
      * @param  list<int>  $exceptIds  leave these assets out
      * @return LengthAwarePaginator<array{id: int, ulid: string, asset_code: string, name: string, category: string|null,
-     *     branch: string|null, customer_id: int|null, serial_number: string|null, location: string|null, status: string}>
+     *     branch: string|null, customer_id: int|null, serial_number: string|null, property_no: string|null, location: string|null, status: string}>
      */
     public function handle(User $user, array $filters, ?array $onlyIds = null, array $exceptIds = [], int $perPage = 20): LengthAwarePaginator
     {
@@ -30,7 +30,7 @@ class PaginateAssets
             ->paginate($perPage)
             ->withQueryString()
             ->through(fn (Asset $asset) => [
-                ...$asset->only(['id', 'ulid', 'asset_code', 'name', 'customer_id', 'serial_number', 'location', 'status']),
+                ...$asset->only(['id', 'ulid', 'asset_code', 'name', 'customer_id', 'serial_number', 'property_no', 'location', 'status']),
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
             ]);

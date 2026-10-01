@@ -15,6 +15,8 @@ export interface NavItem {
     href: string;
     icon?: LucideIcon;
     isActive?: boolean;
+    // The sidebar section it belongs to (null = above the sections).
+    group?: string | null;
 }
 
 export interface SharedData {
@@ -24,7 +26,7 @@ export interface SharedData {
     tenant: { name: string; is_platform: boolean } | null;
     impersonation: { tenant: { name: string } } | null;
     /** Sidebar items built on the server from config/modules.php; icon is a lucide icon name. */
-    navigation: { title: string; href: string; icon: string }[];
+    navigation: { title: string; href: string; icon: string; group: string | null }[];
     flash: { success: string | null; error: string | null };
     /** The company's paid period; null for the platform tenant and customer accounts. */
     subscription: {

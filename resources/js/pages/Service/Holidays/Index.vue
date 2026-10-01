@@ -37,7 +37,7 @@ const longDate = (date: string) =>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="t('holidays.title')" />
 
-        <div class="max-w-3xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <Heading :title="t('holidays.title')" :description="t('holidays.description')" />
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

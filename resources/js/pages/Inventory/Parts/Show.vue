@@ -148,19 +148,19 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <form v-if="movementTypes.length" class="space-y-4 rounded-md border p-4 lg:col-span-2" @submit.prevent="submit">
                     <h3 class="text-sm font-semibold">{{ t('stock_movements.new') }}</h3>
                     <div class="grid gap-4 sm:grid-cols-3">
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="type">{{ t('stock_movements.type') }}</Label>
                             <select id="type" v-model="form.type" :class="selectClass">
                                 <option v-for="type in movementTypes" :key="type" :value="type">{{ t(`stock_movements.types.${type}`) }}</option>
                             </select>
                         </div>
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="quantity">
                                 {{ form.type === 'adjust' ? t('stock_movements.counted_field') : t('stock_movements.quantity_field') }}
                             </Label>
                             <Input id="quantity" v-model="form.quantity" type="number" :min="form.type === 'adjust' ? 0 : 1" step="1" required />
                         </div>
-                        <div v-if="form.type === 'receive'" class="grid gap-2">
+                        <div v-if="form.type === 'receive'" class="grid content-start gap-2">
                             <Label for="movement_unit_cost">{{ t('stock_movements.unit_cost') }}</Label>
                             <Input id="movement_unit_cost" v-model="form.unit_cost" type="number" min="0" step="0.01" />
                         </div>
@@ -168,7 +168,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <InputError :message="form.errors.quantity ?? form.errors.unit_cost ?? form.errors.type" />
 
                     <div class="grid gap-4 sm:grid-cols-3">
-                        <div class="grid gap-2">
+                        <div class="grid content-start gap-2">
                             <Label for="reference">{{ t('stock_movements.reference_field') }}</Label>
                             <Input
                                 id="reference"
@@ -178,7 +178,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             />
                             <InputError :message="form.errors.reference" />
                         </div>
-                        <div class="grid gap-2 sm:col-span-2">
+                        <div class="grid content-start gap-2 sm:col-span-2">
                             <Label for="note">{{ t('stock_movements.note') }}</Label>
                             <Input
                                 id="note"

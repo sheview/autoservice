@@ -22,6 +22,9 @@ class TicketEvent extends Model
 
     public const TYPE_UPDATED = 'updated';
 
+    /** The device's warranty was checked (body: what was found). */
+    public const TYPE_WARRANTY = 'warranty';
+
     protected $fillable = ['user_id', 'user_name', 'type', 'from_status', 'to_status', 'body', 'is_internal'];
 
     protected function casts(): array

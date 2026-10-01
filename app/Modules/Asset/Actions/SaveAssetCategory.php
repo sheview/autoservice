@@ -12,7 +12,8 @@ use App\Modules\Asset\Support\SpecFields;
 class SaveAssetCategory
 {
     /**
-     * @param  array{name: string, code_prefix: string, service_line?: string|null, spec_fields?: list<array<string, mixed>>}  $data
+     * @param  array{name: string, code_prefix: string, service_line?: string|null, asset_type?: string, requires_serial?: bool,
+     *     spec_fields?: list<array<string, mixed>>}  $data
      */
     public function handle(?AssetCategory $category, array $data): AssetCategory
     {
@@ -22,6 +23,8 @@ class SaveAssetCategory
             'name' => trim($data['name']),
             'code_prefix' => strtoupper($data['code_prefix']),
             'service_line' => $data['service_line'] ?? null,
+            'asset_type' => $data['asset_type'] ?? $category->asset_type ?? AssetCategory::TYPE_HARDWARE,
+            'requires_serial' => (bool) ($data['requires_serial'] ?? $category->requires_serial ?? false),
             'spec_fields' => SpecFields::clean($data['spec_fields'] ?? []),
         ])->save();
 

@@ -16,6 +16,7 @@ interface CategoryRow {
     name: string;
     code_prefix: string;
     service_line: string | null;
+    asset_type: string;
     spec_fields_count: number;
     assets_count: number;
 }
@@ -23,6 +24,7 @@ interface CategoryRow {
 interface Filters {
     search: string;
     service_line: string | null;
+    asset_type: string | null;
     sort: string;
     direction: 'asc' | 'desc';
     [key: string]: unknown;
@@ -32,6 +34,7 @@ const props = defineProps<{
     categories: Paginated<CategoryRow>;
     filters: Filters;
     serviceLines: string[];
+    assetTypes: string[];
     can: { create: boolean; update: boolean; delete: boolean };
 }>();
 
@@ -49,6 +52,7 @@ const columns = [
     { key: 'name', sortable: true },
     { key: 'code_prefix', sortable: true },
     { key: 'service_line', sortable: false },
+    { key: 'asset_type', sortable: false },
     { key: 'spec_fields_count', sortable: false },
     { key: 'assets_count', sortable: true },
 ];
@@ -85,6 +89,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <option :value="null">{{ t('asset_categories.all_service_lines') }}</option>
                     <option v-for="line in serviceLines" :key="line" :value="line">{{ t(`service_lines.${line}`) }}</option>
                 </select>
+                <select v-model="filters.asset_type" :class="selectClass" :aria-label="t('asset_categories.asset_type')">
+                    <option :value="null">{{ t('asset_categories.all_asset_types') }}</option>
+                    <option v-for="type in assetTypes" :key="type" :value="type">{{ t(`asset_categories.asset_types.${type}`) }}</option>
+                </select>
             </div>
 
             <div class="overflow-x-auto rounded-md border">
@@ -111,6 +119,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="px-4 py-2">
                                 {{ category.service_line ? t(`service_lines.${category.service_line}`) : t('asset_categories.no_service_line') }}
                             </td>
+                            <td class="px-4 py-2">{{ t(`asset_categories.asset_types.${category.asset_type}`) }}</td>
                             <td class="px-4 py-2">{{ category.spec_fields_count }}</td>
                             <td class="px-4 py-2">{{ category.assets_count }}</td>
                             <td class="whitespace-nowrap px-4 py-2 text-right">

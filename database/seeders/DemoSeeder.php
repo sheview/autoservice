@@ -112,6 +112,21 @@ class DemoSeeder extends Seeder
             'brands' => ['HP LaserJet Pro M404', 'Brother HL-L2375', 'Epson L6270'],
             'spec_fields' => [],
         ],
+        [
+            'name' => 'อุปกรณ์สำนักงาน', 'code_prefix' => 'OE', 'service_line' => 'pc',
+            'brands' => ['Canon imageRUNNER 2630', 'Epson EB-X51', 'APC Back-UPS 1100', 'Fujitsu fi-7160', 'Yealink T31P'],
+            'spec_fields' => [
+                ['key' => 'equipment_type', 'label' => 'ประเภทอุปกรณ์', 'type' => 'select', 'options' => ['เครื่องถ่ายเอกสาร', 'โปรเจกเตอร์', 'สแกนเนอร์', 'เครื่องสำรองไฟ (UPS)', 'โทรศัพท์ IP', 'อื่น ๆ'], 'required' => true],
+            ],
+        ],
+        [
+            'name' => 'ซอฟต์แวร์ลิขสิทธิ์', 'code_prefix' => 'LIC', 'service_line' => 'pc', 'asset_type' => 'software',
+            'brands' => ['Microsoft 365 Business Standard', 'Windows Server 2022 Standard', 'Veeam Backup & Replication', 'Kaspersky Endpoint Security'],
+            'spec_fields' => [
+                ['key' => 'seats', 'label' => 'จำนวนสิทธิ์ใช้งาน', 'type' => 'number', 'options' => [], 'required' => true],
+                ['key' => 'license_key', 'label' => 'License Key', 'type' => 'text', 'options' => [], 'required' => false],
+            ],
+        ],
     ];
 
     /** Thai public holidays 2026 (demo data: check against the official announcement). */
@@ -331,7 +346,8 @@ class DemoSeeder extends Seeder
     }
 
     /**
-     * Tickets of the last ten days in every status. Each one is opened "back then" (so SLA due
+     * Tickets of the last ten days in every status, and finished ones spread over the last two
+     * years. Each one is opened "back then" (so SLA due
      * times and breaches look real) and moved along the workflow by the people who would do it.
      *
      * @param  Collection<int, User>  $technicians
@@ -349,6 +365,8 @@ class DemoSeeder extends Seeder
             [['assign', 'start', 'resolve', 'approve'], 5], [['assign', 'start', 'resolve', 'approve'], 8],
             [['assign', 'start', 'resolve', 'approve'], 9],
             [['cancel'], 6],
+            // Older, finished work, so the home page charts have months and years to show.
+            ...array_map(fn (int $daysAgo) => [['assign', 'start', 'resolve', 'approve'], $daysAgo], [24, 41, 58, 77, 103, 131, 165, 198, 240, 290, 350, 420, 510, 640]),
         ];
 
         // Demo tickets must not e-mail anyone when the queue worker starts.
@@ -535,6 +553,8 @@ class DemoSeeder extends Seeder
             'ports' => fake()->randomElement([8, 24, 48]),
             'ip' => fake()->localIpv4(),
             'rack' => 'R'.fake()->numberBetween(1, 4).'-U'.fake()->numberBetween(1, 42),
+            'seats' => fake()->randomElement([5, 10, 25, 50, 100]),
+            'license_key' => strtoupper(fake()->bothify('?????-?????-?????-?????')),
         ];
 
         $specs = [];

@@ -15,7 +15,8 @@ class PermissionCatalog
         'user' => ['view', 'create', 'update'],
         'role' => ['view', 'create', 'update'],
         'branch' => ['view', 'create', 'update', 'delete', 'all'],
-        'asset' => ['view', 'create', 'update', 'delete', 'import', 'export'],
+        // checkout = ask to issue/lend an asset and take it back; approve = decide on those requests.
+        'asset' => ['view', 'create', 'update', 'delete', 'import', 'export', 'checkout', 'approve'],
         'asset_category' => ['view', 'create', 'update', 'delete'],
         'customer' => ['view', 'create', 'update', 'delete'],
         'contract' => ['view', 'create', 'update', 'delete'],
@@ -27,6 +28,11 @@ class PermissionCatalog
         'stock' => ['view', 'receive', 'issue', 'adjust'],
         'survey' => ['view', 'answer'],
         'report' => ['view'],
+        // Ask to buy something the company does not have. Approved with asset.approve; marked
+        // ordered and received with stock.receive (Inventory module).
+        'purchase' => ['request'],
+        // The company's own profile: logo, service phone and e-mail (labels, documents).
+        'company' => ['update'],
         // impersonate = enter a customer tenant; full_access = pass every check while inside.
         'platform' => ['impersonate', 'tenants', 'full_access'],
     ];
@@ -60,7 +66,7 @@ class PermissionCatalog
             'permissions' => [
                 'platform.impersonate',
                 'branch.view', 'branch.all',
-                'asset.view', 'asset_category.view', 'customer.view', 'contract.view',
+                'asset.view', 'asset.checkout', 'purchase.request', 'asset_category.view', 'customer.view', 'contract.view',
                 'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
                 'holiday.view',
                 'pm.view', 'pm.update',
@@ -73,7 +79,7 @@ class PermissionCatalog
             'permissions' => [
                 'platform.impersonate',
                 'branch.view', 'branch.all',
-                'asset.view', 'asset.update',
+                'asset.view', 'asset.update', 'asset.checkout', 'purchase.request',
                 'customer.view', 'contract.view',
                 'ticket.view', 'ticket.update', 'ticket.close',
                 'pm.view', 'pm.perform',
@@ -101,7 +107,7 @@ class PermissionCatalog
             // No branch.all: like every company role but the admin, helpdesk works in its own branch.
             'permissions' => [
                 'branch.view',
-                'asset.view', 'asset_category.view', 'customer.view', 'contract.view',
+                'asset.view', 'asset.checkout', 'purchase.request', 'asset_category.view', 'customer.view', 'contract.view',
                 'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
                 'holiday.view',
                 'pm.view', 'pm.create', 'pm.update',
@@ -114,7 +120,7 @@ class PermissionCatalog
             'label' => 'ช่างเทคนิค',
             'permissions' => [
                 'branch.view',
-                'asset.view', 'asset.update',
+                'asset.view', 'asset.update', 'asset.checkout', 'purchase.request',
                 'customer.view', 'contract.view',
                 'ticket.view', 'ticket.update', 'ticket.close',
                 'pm.view', 'pm.perform',
@@ -125,7 +131,7 @@ class PermissionCatalog
         ],
         'user' => [
             'label' => 'ผู้ใช้งานทั่วไป',
-            'permissions' => ['asset.view', 'ticket.view', 'ticket.create'],
+            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'purchase.request'],
         ],
         // Staff of a customer: only ever see records of their own customer (TenantPolicy).
         'customer' => [

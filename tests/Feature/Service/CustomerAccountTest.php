@@ -90,7 +90,7 @@ it('lets a customer account open a ticket for its own asset, and tells the dispa
 });
 
 it('hides internal notes from a customer account and keeps its comments public', function () {
-    $ticket = openTicket($this->helpdesk, ['customer_id' => $this->acme->id, 'asset_id' => $this->acmeAsset->id]);
+    $ticket = openTicket($this->helpdesk, ['customer_id' => $this->acme->id, 'asset_id' => $this->acmeAsset->id], warrantyChecked: false);
     $this->actingAs($this->helpdesk)->post("/tickets/{$ticket->ulid}/comments", ['body' => 'ลูกค้าค้างชำระ', 'is_internal' => true]);
     $this->actingAs($this->helpdesk)->post("/tickets/{$ticket->ulid}/comments", ['body' => 'ช่างจะเข้าวันนี้']);
     $this->actingAs($this->client)->post("/tickets/{$ticket->ulid}/comments", ['body' => 'รับทราบ', 'is_internal' => true]);

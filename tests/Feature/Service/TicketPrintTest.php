@@ -65,3 +65,19 @@ it('only prints tickets the user may see', function () {
     $theirs = asTenant($other, fn () => openTicket(userWithRole('helpdesk')));
     $this->actingAs($this->helpdesk)->get("/tickets/{$theirs->ulid}/print")->assertNotFound();
 });
+
+it('fills the device part of the sheet from the asset when the ticket left it out', function () {
+    $asset = createAsset(createAssetCategory(), [
+        'name' => 'Notebook', 'brand' => 'Dell', 'model' => 'Latitude 5440', 'serial_number' => 'BC1373595',
+        'property_no' => 'ครภ.69-001', 'location' => 'ห้องประชุม',
+    ]);
+    $ticket = openTicket($this->helpdesk, ['title' => 'Disk noise', 'asset_id' => $asset->id]);
+    // a ticket opened before tickets kept the device details
+    $ticket->forceFill(['device_name' => null, 'device_brand' => null, 'device_model' => null, 'device_serial' => null, 'device_location' => null])->save();
+
+    $this->actingAs($this->helpdesk)->get("/tickets/{$ticket->ulid}/print")->assertInertia(fn (Assert $page) => $page
+        ->where('ticket.device', [
+            'registered' => true, 'name' => 'Notebook', 'brand' => 'Dell', 'model' => 'Latitude 5440', 'serial' => 'BC1373595',
+            'serial_unknown' => false, 'location' => 'ห้องประชุม', 'ip' => null, 'property_no' => 'ครภ.69-001',
+        ]));
+});

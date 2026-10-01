@@ -48,6 +48,15 @@ docker compose up -d gotenberg  # สำหรับปุ่ม PDF (ถ้า�
 PostgreSQL 16, Redis, Gotenberg 8, Node 20+ (เฉพาะตอน build), SMTP สำหรับอีเมล
 และ DNS แบบ wildcard `*.autoservice.example.com` ชี้มาที่เซิร์ฟเวอร์ (แต่ละบริษัทเข้าทาง subdomain ของตัวเอง)
 
+php.ini (และ `client_max_body_size` ของ nginx) ต้องรับไฟล์แนบได้ครบ: ไฟล์ละไม่เกิน 2 MB ครั้งละไม่เกิน 10 ไฟล์
+และรูปถ่ายไม่เกิน 10 MB
+
+```ini
+upload_max_filesize = 10M
+post_max_size = 32M
+max_file_uploads = 20
+```
+
 ### ครั้งแรก
 
 ```bash

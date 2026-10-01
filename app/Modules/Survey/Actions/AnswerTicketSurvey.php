@@ -14,7 +14,8 @@ use Illuminate\Validation\ValidationException;
 class AnswerTicketSurvey
 {
     /**
-     * @param  array{score: int, comment?: string|null, name?: string|null}  $answer
+     * @param  array{score: int, comment?: string|null, name?: string|null, on_paper?: bool}  $answer
+     *                                                                                                 on_paper = the customer ticked the printed job sheet and $user keyed it in; name = who rated
      * @param  User|null  $user  null = answered through the public link
      */
     public function handle(TicketSurvey $survey, array $answer, ?User $user = null): TicketSurvey
@@ -26,12 +27,16 @@ class AnswerTicketSurvey
                 throw ValidationException::withMessages(['score' => __('survey.already_answered')]);
             }
 
+            $onPaper = (bool) ($answer['on_paper'] ?? false);
+            $typedName = filled($answer['name'] ?? null) ? trim($answer['name']) : null;
+
             $locked->update([
                 'score' => (int) $answer['score'],
                 'comment' => filled($answer['comment'] ?? null) ? trim($answer['comment']) : null,
                 'answered_at' => now(),
                 'answered_by' => $user?->id,
-                'answered_name' => $user?->name ?? (filled($answer['name'] ?? null) ? trim($answer['name']) : null),
+                'answered_name' => $onPaper ? $typedName : ($user?->name ?? $typedName),
+                'on_paper' => $onPaper,
             ]);
 
             return $locked;
