@@ -16,6 +16,11 @@ const props = defineProps<{
     borrowers: { id: number; name: string }[];
     title: string;
     fromSearch?: boolean;
+    // How many can still be asked for; above 1 the form asks how many (an asset bought by the lot).
+    maxQuantity?: number;
+    unit?: string | null;
+    // Projects (MA contracts) the form can be for; none = the field is hidden.
+    contracts?: { id: number; label: string }[];
 }>();
 
 const emit = defineEmits<{ done: []; cancel: [] }>();
@@ -23,6 +28,8 @@ const emit = defineEmits<{ done: []; cancel: [] }>();
 const borrowerKind = ref<'staff' | 'other'>('staff');
 const form = useForm({
     type: 'loan' as 'issue' | 'loan',
+    quantity: 1,
+    contract_id: null as number | null,
     borrower_user_id: null as number | null,
     borrower_name: '',
     borrower_department: '',
@@ -74,6 +81,30 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
         </fieldset>
 
         <div class="grid gap-4 sm:grid-cols-2">
+            <div v-if="(maxQuantity ?? 1) > 1" class="grid content-start gap-2 sm:col-span-2">
+                <Label :for="`quantity-${assetUlid}`">{{ t('checkouts.quantity') }}</Label>
+                <div class="flex items-center gap-2">
+                    <Input
+                        :id="`quantity-${assetUlid}`"
+                        v-model.number="form.quantity"
+                        type="number"
+                        min="1"
+                        :max="maxQuantity"
+                        required
+                        class="w-32"
+                    />
+                    <span class="text-sm text-muted-foreground">{{ unit }} · {{ t('checkouts.max_quantity', { max: maxQuantity ?? 1 }) }}</span>
+                </div>
+                <InputError :message="form.errors.quantity" />
+            </div>
+            <div v-if="contracts?.length" class="grid content-start gap-2 sm:col-span-2">
+                <Label :for="`contract_id-${assetUlid}`">{{ t('checkouts.contract') }}</Label>
+                <select :id="`contract_id-${assetUlid}`" v-model="form.contract_id" :class="selectClass">
+                    <option :value="null">{{ t('checkouts.no_contract') }}</option>
+                    <option v-for="contract in contracts" :key="contract.id" :value="contract.id">{{ contract.label }}</option>
+                </select>
+                <InputError :message="form.errors.contract_id" />
+            </div>
             <div class="grid content-start gap-2 sm:col-span-2">
                 <Label>{{ t('checkouts.borrower') }}</Label>
                 <div class="flex flex-wrap gap-4 text-sm">

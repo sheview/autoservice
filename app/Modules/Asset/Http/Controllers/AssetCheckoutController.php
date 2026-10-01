@@ -14,6 +14,7 @@ use App\Modules\Asset\Http\Requests\CheckoutRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Asset\Support\CheckoutRow;
+use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Identity\Actions\UsersWithPermission;
@@ -60,6 +61,7 @@ class AssetCheckoutController extends Controller
             'search' => $search,
             'groups' => fn () => $search === '' ? [] : $available->handle($request->user(), $search),
             'borrowers' => $usersWithPermission->handle('asset.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values(),
+            'contracts' => fn () => $modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
             'canPurchase' => $modules->enabled('inventory') && $request->user()->can('purchase.request'),
         ]);
     }

@@ -2,6 +2,8 @@
 export interface PurchaseRequestRow {
     ulid: string;
     pr_no: string;
+    // The project (MA contract) it is for, if any.
+    contract_id: number | null;
     status: 'pending' | 'approved' | 'ordered' | 'received' | 'rejected' | 'cancelled';
     item_name: string;
     description: string | null;

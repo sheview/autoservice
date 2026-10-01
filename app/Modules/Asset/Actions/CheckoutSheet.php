@@ -30,7 +30,7 @@ class CheckoutSheet
             'logo' => $logo ? 'data:'.$logo->mime_type.';base64,'.base64_encode(stream_get_contents($logo->stream())) : null,
             'checkout' => $checkout,
             'asset' => [
-                ...$asset->only(['asset_code', 'name', 'brand', 'model', 'serial_number', 'property_no', 'location']),
+                ...$asset->only(['asset_code', 'name', 'brand', 'model', 'serial_number', 'property_no', 'location', 'unit']),
                 'category' => $asset->category?->name,
             ],
         ];

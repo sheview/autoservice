@@ -3,9 +3,9 @@ import { reactive, watch } from 'vue';
 
 /**
  * Reactive filters for a server-side list page. Any change reloads the page with the filters in the query string
- * (search is debounced); pagination resets to page 1.
+ * (search is debounced); pagination resets to page 1. "params" = the route's own parameters (a page of one record).
  */
-export function useListFilters<T extends Record<string, unknown>>(routeName: string, initial: T) {
+export function useListFilters<T extends Record<string, unknown>>(routeName: string, initial: T, params?: Record<string, string | number>) {
     const filters = reactive({ ...initial }) as T;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -13,7 +13,7 @@ export function useListFilters<T extends Record<string, unknown>>(routeName: str
         const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== null && value !== '')) as Parameters<
             typeof router.get
         >[1];
-        router.get(route(routeName), query, { preserveState: true, preserveScroll: true, replace: true });
+        router.get(route(routeName, params), query, { preserveState: true, preserveScroll: true, replace: true });
     };
 
     watch(

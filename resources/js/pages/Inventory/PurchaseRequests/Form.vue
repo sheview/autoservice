@@ -20,6 +20,8 @@ const props = defineProps<{
     // From the issue/loan search: what was looked for.
     item: string;
     maxLinks: number;
+    // Projects (MA contracts) the purchase can be for; none = the field is hidden.
+    contracts: { id: number; label: string }[];
 }>();
 
 const title = props.request ? t('purchase_requests.edit') : t('purchase_requests.create');
@@ -31,6 +33,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const form = useForm({
     item_name: props.request?.item_name ?? props.item,
+    contract_id: props.request?.contract_id ?? (null as number | null),
     description: props.request?.description ?? '',
     quantity: props.request?.quantity ?? 1,
     unit: props.request?.unit ?? t('purchase_requests.unit_default'),
@@ -120,6 +123,18 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <Label for="needed_by">{{ t('purchase_requests.needed_by') }}<span class="text-red-600"> *</span></Label>
                         <Input id="needed_by" v-model="form.needed_by" type="date" required :min="request ? undefined : today" />
                         <InputError :message="form.errors.needed_by" />
+                    </div>
+                    <div v-if="contracts.length" class="grid content-start gap-2 sm:col-span-2">
+                        <Label for="contract_id">{{ t('purchase_requests.contract') }}</Label>
+                        <select
+                            id="contract_id"
+                            v-model="form.contract_id"
+                            class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                        >
+                            <option :value="null">{{ t('purchase_requests.no_contract') }}</option>
+                            <option v-for="contract in contracts" :key="contract.id" :value="contract.id">{{ contract.label }}</option>
+                        </select>
+                        <InputError :message="form.errors.contract_id" />
                     </div>
                 </div>
 

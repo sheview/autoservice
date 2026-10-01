@@ -2,12 +2,14 @@
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
+import StepDots from '@/components/StepDots.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { purchaseSteps } from '@/lib/purchaseSteps';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import type { PurchaseRequestRow } from '@/types/purchase';
 import { Head, Link, usePage } from '@inertiajs/vue3';
@@ -131,7 +133,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <div class="text-xs text-muted-foreground">{{ row.requested_by_name }}</div>
                             </td>
                             <td class="whitespace-nowrap px-4 py-2">{{ row.needed_by ?? '-' }}</td>
-                            <td class="px-4 py-2"><PurchaseStatusBadge :status="row.status" /></td>
+                            <td class="px-4 py-2">
+                                <StepDots v-bind="purchaseSteps(row)" />
+                                <div class="mt-1"><PurchaseStatusBadge :status="row.status" /></div>
+                            </td>
                         </tr>
                         <tr v-if="requests.data.length === 0">
                             <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">{{ t('purchase_requests.no_requests') }}</td>

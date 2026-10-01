@@ -56,6 +56,10 @@ class SearchCheckouts
                 ->whereNotNull('due_on')->where('due_on', '<', today()->toDateString()))
             ->when(in_array($status, AssetCheckout::STATUSES, true), fn (Builder $q) => $q->where('status', $status))
             ->when($filters['type'] ?? null, fn (Builder $q, $type) => $q->where('type', $type))
+            // Set by the summaries (Reporting module): one person (a user, or a name from outside) or one project.
+            ->when($filters['borrower_user_id'] ?? null, fn (Builder $q, $id) => $q->where('borrower_user_id', $id))
+            ->when($filters['borrower_name'] ?? null, fn (Builder $q, $name) => $q->whereNull('borrower_user_id')->where('borrower_name', $name))
+            ->when($filters['contract_id'] ?? null, fn (Builder $q, $id) => $q->where('contract_id', $id))
             ->when(($filters['sort'] ?? 'created_at') === 'due_on',
                 fn (Builder $q) => $q->orderByRaw('due_on '.($filters['direction'] === 'asc' ? 'asc' : 'desc').' nulls last'),
                 fn (Builder $q) => $q->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc'))

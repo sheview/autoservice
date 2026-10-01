@@ -25,6 +25,9 @@ class CheckoutRequest extends FormRequest
     {
         return [
             'type' => ['required', Rule::in(AssetCheckout::TYPES)],
+            // Enough of it is checked by RequestCheckout, under a lock.
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
             'borrower_user_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail) {
                 // Staff of this company only (the list the form offers).
                 if (! app(UsersWithPermission::class)->handle('asset.view')->contains('id', (int) $value)) {

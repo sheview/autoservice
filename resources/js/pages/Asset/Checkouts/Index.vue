@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CheckoutActions from '@/components/CheckoutActions.vue';
 import CheckoutStatusBadge from '@/components/CheckoutStatusBadge.vue';
+import CheckoutSteps from '@/components/CheckoutSteps.vue';
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import { Button } from '@/components/ui/button';
@@ -108,7 +109,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <tr v-for="row in checkouts.data" :key="row.ulid" class="border-t align-top">
                             <td class="whitespace-nowrap px-4 py-2">
                                 <div class="font-mono text-xs">{{ row.checkout_no }}</div>
-                                <div class="text-xs text-muted-foreground">{{ t(`checkouts.types.${row.type}`) }}</div>
+                                <div class="text-xs text-muted-foreground">
+                                    {{ t(`checkouts.types.${row.type}`)
+                                    }}<template v-if="row.quantity > 1"> · {{ row.quantity }} {{ row.asset?.unit ?? '' }}</template>
+                                </div>
                             </td>
                             <td class="px-4 py-2">
                                 <Link
@@ -132,7 +136,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="whitespace-nowrap px-4 py-2" :class="{ 'text-red-700 dark:text-red-400': row.overdue }">
                                 {{ row.due_on ?? '-' }}
                             </td>
-                            <td class="px-4 py-2"><CheckoutStatusBadge :status="row.status" :overdue="row.overdue" /></td>
+                            <td class="px-4 py-2">
+                                <CheckoutSteps :checkout="row" compact />
+                                <div class="mt-1"><CheckoutStatusBadge :status="row.status" :overdue="row.overdue" /></div>
+                            </td>
                             <td class="min-w-64 px-4 py-2"><CheckoutActions :checkout="row" :can="actionCan" /></td>
                         </tr>
                         <tr v-if="checkouts.data.length === 0">

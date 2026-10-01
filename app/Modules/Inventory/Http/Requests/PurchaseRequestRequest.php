@@ -7,6 +7,7 @@ use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Platform\Support\Money;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Validation\Rule;
 
 /**
  * What to buy: the item, how many, an estimated price (baht), the product pages (web links only)
@@ -44,6 +45,7 @@ class PurchaseRequestRequest extends FormRequest
 
         return [
             'item_name' => ['required', 'string', 'max:255'],
+            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
             'description' => ['nullable', 'string', 'max:5000'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
             'unit' => ['required', 'string', 'max:30'],

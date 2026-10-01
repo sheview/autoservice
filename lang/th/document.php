@@ -5,6 +5,7 @@ return [
     'unavailable' => 'ระบบสร้างไฟล์ PDF ยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง หรือใช้ปุ่ม "พิมพ์" แทน',
 
     'checkout' => [
+        'quantity' => 'จำนวน :quantity :unit',
         'title_issue' => 'ใบเบิกทรัพย์สิน',
         'title_loan' => 'ใบยืมทรัพย์สิน',
         'date' => 'วันที่ :date',

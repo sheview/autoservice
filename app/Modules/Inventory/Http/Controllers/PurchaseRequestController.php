@@ -3,6 +3,8 @@
 namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Contract\Actions\ContractLabels;
+use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Document\Http\Concerns\ServesAttachments;
@@ -53,7 +55,7 @@ class PurchaseRequestController extends Controller
     }
 
     /** ?item= starts the request from what was searched for on the issue/loan page. */
-    public function create(Request $request): Response
+    public function create(Request $request, Modules $modules): Response
     {
         Gate::authorize('create', PurchaseRequest::class);
 
@@ -62,6 +64,7 @@ class PurchaseRequestController extends Controller
             'attachments' => [],
             'item' => $request->string('item')->trim()->limit(255, '')->value(),
             'maxLinks' => PurchaseRequest::MAX_LINKS,
+            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
         ]);
     }
 
@@ -79,6 +82,10 @@ class PurchaseRequestController extends Controller
 
         return Inertia::render('Inventory/PurchaseRequests/Show', [
             'request' => PurchaseRequestRow::of($purchaseRequest),
+            // The project it is for: number and title.
+            'contract' => $purchaseRequest->contract_id && $modules->enabled('contract')
+                ? app(ContractLabels::class)->handle([$purchaseRequest->contract_id])[$purchaseRequest->contract_id] ?? null
+                : null,
             'attachments' => $this->attachmentList($purchaseRequest),
             // Moves the user may make now.
             'actions' => collect(array_keys(PurchaseWorkflow::ACTIONS))->filter(fn (string $action) => $user->can('move', [$purchaseRequest, $action]))->values(),
@@ -92,7 +99,7 @@ class PurchaseRequestController extends Controller
         ]);
     }
 
-    public function edit(PurchaseRequest $purchaseRequest): Response
+    public function edit(PurchaseRequest $purchaseRequest, Modules $modules): Response
     {
         Gate::authorize('update', $purchaseRequest);
 
@@ -101,6 +108,7 @@ class PurchaseRequestController extends Controller
             'attachments' => $this->attachmentList($purchaseRequest),
             'item' => '',
             'maxLinks' => PurchaseRequest::MAX_LINKS,
+            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($purchaseRequest->contract_id) : [],
         ]);
     }
 

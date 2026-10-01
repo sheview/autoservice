@@ -32,7 +32,7 @@
         <table>
             <thead>
                 <tr>
-                    <th class="center" style="width: 36px">{{ __('document.no') }}</th>
+                    <th class="center" style="width: 50px">{{ __('document.no') }}</th>
                     <th style="width: 30%">{{ __('document.pm.asset') }}</th>
                     <th style="width: 70px">{{ __('document.pm.result') }}</th>
                     <th>{{ __('document.pm.checks') }}</th>

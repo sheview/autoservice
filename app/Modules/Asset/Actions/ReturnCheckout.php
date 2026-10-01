@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Takes an issued or lent asset back: the form is closed and the asset is spare again.
+ * Takes an issued or lent asset back: the form is closed, its quantity is available again, and the
+ * asset is spare once nothing of it is out.
  */
 class ReturnCheckout
 {
@@ -27,7 +28,12 @@ class ReturnCheckout
                 'returned_at' => now(),
                 'return_note' => filled($note) ? $note : null,
             ]);
-            $checkout->asset->update(['status' => Asset::STATUS_SPARE]);
+            // Spare again once nothing of it is out any more.
+            $stillOut = AssetCheckout::query()->where('asset_id', $checkout->asset_id)
+                ->where('status', AssetCheckout::STATUS_APPROVED)->exists();
+            if (! $stillOut) {
+                $checkout->asset->update(['status' => Asset::STATUS_SPARE]);
+            }
 
             activity()->performedOn($checkout->asset)->causedBy($actor)->event('checkout_returned')
                 ->withProperties(['checkout_no' => $checkout->checkout_no, 'note' => $note])

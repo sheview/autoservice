@@ -4,6 +4,7 @@ namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetSuggestions;
+use App\Modules\Asset\Actions\CheckedOutQuantities;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
 use App\Modules\Asset\Actions\RequestCheckout;
@@ -16,6 +17,7 @@ use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Asset\Support\CheckoutRow;
+use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\AddAttachments;
@@ -46,7 +48,7 @@ class AssetController extends Controller
         private AssetSuggestions $suggestions,
     ) {}
 
-    public function index(Request $request, SearchAssets $search): Response
+    public function index(Request $request, SearchAssets $search, CheckedOutQuantities $checkedOut): Response
     {
         Gate::authorize('viewAny', Asset::class);
 
@@ -57,8 +59,15 @@ class AssetController extends Controller
         $assets = $search->handle($user, $filters)
             ->with(['category:id,name', 'branch:id,name'])
             ->paginate(20)
-            ->withQueryString()
+            ->withQueryString();
+        // Held by issue/loan forms that are asked for or out; the rest of each asset is available.
+        $held = $checkedOut->handle($assets->getCollection()->modelKeys());
+
+        $assets = $assets
             ->through(fn (Asset $asset) => [
+                'quantity' => $asset->quantity,
+                'available' => max(0, $asset->quantity - ($held[$asset->id] ?? 0)),
+                'unit' => $asset->unit,
                 'ulid' => $asset->ulid,
                 'asset_code' => $asset->asset_code,
                 'name' => $asset->name,
@@ -164,6 +173,7 @@ class AssetController extends Controller
                     'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes',
                 ]),
                 'serials' => $asset->serials->pluck('serial_number'),
+                'available' => RequestCheckout::availableQuantity($asset),
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
                 'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $asset->customer_id)['name'] ?? null,
@@ -295,17 +305,25 @@ class AssetController extends Controller
             return null;
         }
 
-        $recent = AssetCheckout::query()->where('asset_id', $asset->id)->latest('id')->limit(10)->get();
-        $current = $recent->first(fn (AssetCheckout $checkout) => in_array($checkout->status, AssetCheckout::OPEN_STATUSES, true));
-        $available = $current === null && RequestCheckout::available($asset);
+        // Every form still holding some of the asset (several at once for an asset bought by the
+        // lot), then the last closed ones.
+        $open = AssetCheckout::query()->where('asset_id', $asset->id)->whereIn('status', AssetCheckout::OPEN_STATUSES)->oldest('id')->get();
+        $recent = AssetCheckout::query()->where('asset_id', $asset->id)->whereNotIn('status', AssetCheckout::OPEN_STATUSES)->latest('id')->limit(10)->get();
+        $available = RequestCheckout::available($asset);
 
         return [
-            'current' => $current ? CheckoutRow::of($current) : null,
-            'history' => $recent->reject(fn (AssetCheckout $checkout) => $checkout->is($current))->map(fn (AssetCheckout $checkout) => CheckoutRow::of($checkout))->values(),
+            // The first open form (kept for pages that show one), and all of them.
+            'current' => $open->isNotEmpty() ? CheckoutRow::of($open->first()) : null,
+            'open' => $open->map(fn (AssetCheckout $checkout) => CheckoutRow::of($checkout))->values(),
+            'history' => $recent->map(fn (AssetCheckout $checkout) => CheckoutRow::of($checkout))->values(),
             'available' => $available,
+            'available_quantity' => RequestCheckout::availableQuantity($asset),
+            'quantity' => $asset->quantity,
+            'unit' => $asset->unit,
             'borrowers' => $available && $can['request']
                 ? $usersWithPermission->handle('asset.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
                 : [],
+            'contracts' => $available && $can['request'] && $this->modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
             'can' => [...$can, 'userId' => $request->user()->id],
         ];
     }

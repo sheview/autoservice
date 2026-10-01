@@ -81,7 +81,8 @@ class Modules
             if ($customerAccount && ($item['staff'] ?? false)) {
                 continue;
             }
-            if (isset($item['module']) && ! $this->enabled($item['module'])) {
+            // "module": one key, or several that must all be on.
+            if (isset($item['module']) && collect((array) $item['module'])->contains(fn (string $key) => ! $this->enabled($key))) {
                 continue;
             }
             // Pages about the company itself: not in the platform tenant (it is no company).

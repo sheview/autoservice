@@ -34,7 +34,7 @@
         <table>
             <thead>
                 <tr>
-                    <th class="center" style="width: 40px">{{ __('document.no') }}</th>
+                    <th class="center" style="width: 50px">{{ __('document.no') }}</th>
                     <th>{{ __('document.purchase.item') }}</th>
                     <th class="num" style="width: 90px">{{ __('document.purchase.quantity') }}</th>
                     <th class="num" style="width: 120px">{{ __('document.purchase.unit_price') }}</th>
@@ -79,22 +79,22 @@
         </section>
     @endif
 
-    <div class="signatures" style="grid-template-columns: repeat(3, 1fr); gap: 24px">
+    <div class="signatures" style="grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
         <div>
             <div class="sign-line" style="margin: 0 8px"></div>
-            <div>( {{ $request->requested_by_name ?? str_repeat('.', 36) }} )</div>
+            <div>( {{ $request->requested_by_name ?? str_repeat('.', 30) }} )</div>
             <div style="font-weight: 600">{{ __('document.purchase.sign_requester') }}</div>
             <div class="muted">{{ __('document.sign_date') }}</div>
         </div>
         <div>
             <div class="sign-line" style="margin: 0 8px"></div>
-            <div>( {{ $request->decided_by_name ?? str_repeat('.', 36) }} )</div>
+            <div>( {{ $request->decided_by_name ?? str_repeat('.', 30) }} )</div>
             <div style="font-weight: 600">{{ __('document.purchase.sign_approver') }}</div>
             <div class="muted">{{ __('document.sign_date') }}</div>
         </div>
         <div>
             <div class="sign-line" style="margin: 0 8px"></div>
-            <div>( {{ $request->ordered_by_name ?? str_repeat('.', 36) }} )</div>
+            <div>( {{ $request->ordered_by_name ?? str_repeat('.', 30) }} )</div>
             <div style="font-weight: 600">{{ __('document.purchase.sign_buyer') }}</div>
             <div class="muted">{{ __('document.sign_date') }}</div>
         </div>

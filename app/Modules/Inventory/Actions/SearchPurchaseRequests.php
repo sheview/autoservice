@@ -44,6 +44,9 @@ class SearchPurchaseRequests
 
         return PurchaseRequest::query()
             ->when($onlyMine, fn (Builder $q) => $q->where('requested_by', $user->id))
+            // Set by the summaries (Reporting module): one person or one project.
+            ->when($filters['requested_by'] ?? null, fn (Builder $q, $id) => $q->where('requested_by', $id))
+            ->when($filters['contract_id'] ?? null, fn (Builder $q, $id) => $q->where('contract_id', $id))
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->where('pr_no', 'ilike', "%{$search}%")
                 ->orWhere('item_name', 'ilike', "%{$search}%")

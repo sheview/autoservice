@@ -40,19 +40,21 @@ class AssetCheckout extends Model
     public const OPEN_STATUSES = [self::STATUS_PENDING, self::STATUS_APPROVED];
 
     protected $fillable = [
-        'asset_id', 'checkout_no', 'type', 'status',
+        'asset_id', 'contract_id', 'checkout_no', 'type', 'quantity', 'status',
         'borrower_user_id', 'borrower_name', 'borrower_department', 'borrower_phone', 'purpose', 'due_on',
         'requested_by', 'requested_by_name', 'decided_by', 'decided_by_name', 'decided_at', 'decision_note',
         'returned_by', 'returned_by_name', 'returned_at', 'return_note',
     ];
 
     protected $attributes = [
+        'quantity' => 1,
         'status' => self::STATUS_PENDING,
     ];
 
     protected function casts(): array
     {
         return [
+            'quantity' => 'integer',
             'due_on' => 'date',
             'decided_at' => 'datetime',
             'returned_at' => 'datetime',

@@ -6,6 +6,7 @@ use App\Modules\Asset\Http\Controllers\AssetCheckoutController;
 use App\Modules\Asset\Http\Controllers\AssetController;
 use App\Modules\Asset\Http\Controllers\AssetImportController;
 use App\Modules\Asset\Http\Controllers\AssetPhotoController;
+use App\Modules\Asset\Http\Controllers\IpCheckController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(function () {
@@ -14,6 +15,8 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::get('assets/imports', [AssetImportController::class, 'index'])->name('imports.index');
     Route::post('assets/imports', [AssetImportController::class, 'store'])->name('imports.store');
     Route::get('assets/imports/template', [AssetController::class, 'template'])->name('imports.template');
+
+    Route::get('ip-check', IpCheckController::class)->name('ip-check');
 
     Route::resource('assets', AssetController::class);
 

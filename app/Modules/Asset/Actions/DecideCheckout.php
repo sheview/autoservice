@@ -33,7 +33,11 @@ class DecideCheckout
             ]);
 
             $asset = $checkout->asset;
-            if ($approve) {
+            // In use once nothing of it is left to hand out (an asset bought by the lot stays spare
+            // while some of it is still on the shelf).
+            $handedOut = $approve ? (int) AssetCheckout::query()->where('asset_id', $asset->id)
+                ->where('status', AssetCheckout::STATUS_APPROVED)->sum('quantity') : 0;
+            if ($approve && $handedOut >= $asset->quantity) {
                 $asset->update(['status' => Asset::STATUS_IN_USE]);
             }
 

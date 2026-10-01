@@ -1,0 +1,69 @@
+<?php
+
+namespace App\Modules\Reporting\Actions;
+
+use App\Modules\Identity\Actions\UserNames;
+use App\Modules\Identity\Models\User;
+use App\Modules\Reporting\Support\SummaryTotals;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * The summary by person: everyone who borrowed, was issued or asked to buy something — users of
+ * the company (by id, under their current name) and people from outside (by the name typed in) —
+ * with how many of each, still open or not. Search, filters, sort and pages on the server.
+ */
+class SummarizePeople
+{
+    public const SORTABLE = ['name', 'last_at', 'open_count', 'total'];
+
+    public const KINDS = ['issue', 'loan', 'purchase'];
+
+    public function __construct(
+        private SummaryRows $rows,
+        private UserNames $userNames,
+    ) {}
+
+    /**
+     * @return array{search: string, show: string, kind: string|null, sort: string, direction: string}
+     */
+    public static function filtersFrom(Request $request): array
+    {
+        return [
+            'search' => $request->string('search')->trim()->value(),
+            'show' => $request->input('show') === 'open' ? 'open' : 'all',
+            'kind' => in_array($request->input('kind'), self::KINDS, true) ? $request->input('kind') : null,
+            'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'last_at',
+            'direction' => $request->input('direction') === 'asc' ? 'asc' : 'desc',
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters  from filtersFrom()
+     */
+    public function handle(User $viewer, array $filters): LengthAwarePaginator
+    {
+        $search = $filters['search'] ?? '';
+
+        $people = DB::query()->fromSub($this->rows->handle($viewer), 'rows')
+            ->selectRaw('user_id, case when user_id is null then name end as outside_name, max(name) as name, '.SummaryTotals::SELECT)
+            ->when($search !== '', fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->when($filters['kind'] ?? null, fn ($q, $kind) => $q->where('kind', $kind))
+            ->groupByRaw('user_id, case when user_id is null then name end')
+            ->when(($filters['show'] ?? 'all') === 'open', fn ($q) => $q->havingRaw('count(*) filter (where is_open = 1) > 0'))
+            ->orderBy($filters['sort'] ?? 'last_at', $filters['direction'] ?? 'desc')
+            ->orderBy('name')
+            ->paginate(20)
+            ->withQueryString();
+
+        $names = $this->userNames->handle($people->getCollection()->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->all());
+
+        return $people->through(fn (object $row) => [
+            'user_id' => $row->user_id === null ? null : (int) $row->user_id,
+            'outside_name' => $row->outside_name,
+            'name' => $row->user_id === null ? $row->name : ($names[$row->user_id] ?? $row->name),
+            ...SummaryTotals::of($row),
+        ]);
+    }
+}

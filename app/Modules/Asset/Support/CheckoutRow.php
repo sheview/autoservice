@@ -16,7 +16,7 @@ class CheckoutRow
     {
         return [
             ...$checkout->only([
-                'ulid', 'checkout_no', 'type', 'status', 'borrower_name', 'borrower_department', 'borrower_phone', 'purpose',
+                'ulid', 'checkout_no', 'contract_id', 'type', 'quantity', 'status', 'borrower_user_id', 'borrower_name', 'borrower_department', 'borrower_phone', 'purpose',
                 'requested_by', 'requested_by_name', 'decided_by_name', 'decision_note', 'returned_by_name', 'return_note',
             ]),
             'due_on' => $checkout->due_on?->toDateString(),
@@ -25,7 +25,7 @@ class CheckoutRow
             'decided_at' => $checkout->decided_at?->toIso8601String(),
             'returned_at' => $checkout->returned_at?->toIso8601String(),
             'asset' => $checkout->relationLoaded('asset') && $checkout->asset
-                ? $checkout->asset->only(['ulid', 'asset_code', 'name', 'serial_number'])
+                ? $checkout->asset->only(['ulid', 'asset_code', 'name', 'serial_number', 'unit'])
                 : null,
         ];
     }

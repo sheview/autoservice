@@ -53,8 +53,8 @@ it('lets central staff enter any company and see every branch, with the menu of 
         ->where('auth.permissions', fn ($permissions) => collect($permissions)->contains('ticket.assign')
             && ! collect($permissions)->contains('user.view') && ! collect($permissions)->contains('platform.impersonate'))
         ->where('navigation', fn ($items) => collect($items)->pluck('title')->all() === [
-            'หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน',
-            'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'รายงาน', 'ผลประเมินความพึงพอใจ', 'วันหยุด',
+            'หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน',
+            'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'รายงาน', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ', 'วันหยุด',
         ]));
 
     // every branch, though the central user has none

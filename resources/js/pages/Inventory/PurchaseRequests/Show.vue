@@ -3,11 +3,12 @@ import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
-import StepProgress, { type Step } from '@/components/StepProgress.vue';
+import StepProgress from '@/components/StepProgress.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { purchaseSteps } from '@/lib/purchaseSteps';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import type { PurchaseRequestRow } from '@/types/purchase';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
@@ -16,6 +17,7 @@ import { computed, ref } from 'vue';
 
 const props = defineProps<{
     request: PurchaseRequestRow;
+    contract: { id: number; contract_no: string; title: string } | null;
     attachments: Attachment[];
     actions: string[];
     needsNote: string[];
@@ -53,18 +55,7 @@ const host = (url: string) => {
 };
 
 // --- progress ------------------------------------------------------------------
-const stepBar = computed(() => {
-    const r = props.request;
-    const steps: Step[] = [
-        { key: 'requested', label: t('purchase_requests.step_requested'), at: r.requested_at ? dateTime(r.requested_at) : null },
-        { key: 'decided', label: t('purchase_requests.step_decided'), at: r.decided_at ? dateTime(r.decided_at) : null },
-        { key: 'ordered', label: t('purchase_requests.step_ordered'), at: r.ordered_at ? dateTime(r.ordered_at) : null },
-        { key: 'received', label: t('purchase_requests.step_received'), at: r.received_at ? dateTime(r.received_at) : null },
-    ];
-    const current = { pending: 1, approved: 2, ordered: 3, received: 3, rejected: 1, cancelled: r.decided_at ? 2 : 1 }[r.status];
-    const state = r.status === 'received' ? 'done' : r.status === 'rejected' || r.status === 'cancelled' ? 'cancelled' : 'active';
-    return { steps, current, state: state as 'done' | 'cancelled' | 'active' };
-});
+const stepBar = computed(() => purchaseSteps(props.request));
 
 const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
 </script>
@@ -173,6 +164,10 @@ const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLoc
                 <div>
                     <dt class="text-xs text-muted-foreground">{{ t('purchase_requests.total') }}</dt>
                     <dd class="font-semibold tabular-nums">{{ money(request.total) }}</dd>
+                </div>
+                <div v-if="contract" class="sm:col-span-2 lg:col-span-4">
+                    <dt class="text-xs text-muted-foreground">{{ t('purchase_requests.contract') }}</dt>
+                    <dd>{{ contract.contract_no }} · {{ contract.title }}</dd>
                 </div>
                 <div v-if="request.description" class="sm:col-span-2 lg:col-span-4">
                     <dt class="text-xs text-muted-foreground">{{ t('purchase_requests.description_field') }}</dt>

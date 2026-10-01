@@ -2,8 +2,13 @@
 export interface CheckoutRow {
     ulid: string;
     checkout_no: string;
+    // The project (MA contract) it is for, if any.
+    contract_id: number | null;
     type: 'issue' | 'loan';
+    // How many of the asset the form takes (1 for a single device).
+    quantity: number;
     status: 'pending' | 'approved' | 'rejected' | 'returned' | 'cancelled';
+    borrower_user_id: number | null;
     borrower_name: string;
     borrower_department: string | null;
     borrower_phone: string | null;
@@ -19,5 +24,5 @@ export interface CheckoutRow {
     requested_at: string | null;
     decided_at: string | null;
     returned_at: string | null;
-    asset: { ulid: string; asset_code: string; name: string; serial_number: string | null } | null;
+    asset: { ulid: string; asset_code: string; name: string; serial_number: string | null; unit: string | null } | null;
 }

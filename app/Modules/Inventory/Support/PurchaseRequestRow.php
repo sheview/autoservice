@@ -17,7 +17,7 @@ class PurchaseRequestRow
     {
         return [
             ...$request->only([
-                'ulid', 'pr_no', 'status', 'item_name', 'description', 'quantity', 'unit', 'links', 'reason', 'requested_by', 'requested_by_name',
+                'ulid', 'pr_no', 'contract_id', 'status', 'item_name', 'description', 'quantity', 'unit', 'links', 'reason', 'requested_by', 'requested_by_name',
                 'decided_by_name', 'decision_note', 'ordered_by_name', 'order_note', 'received_by_name', 'receive_note',
             ]),
             'unit_price' => Money::toBaht($request->unit_price),

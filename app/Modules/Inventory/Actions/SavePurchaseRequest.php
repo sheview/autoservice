@@ -20,7 +20,7 @@ class SavePurchaseRequest
     ) {}
 
     /**
-     * @param  array{item_name: string, description?: string|null, quantity: int, unit: string, unit_price?: int|null,
+     * @param  array{item_name: string, contract_id?: int|null, description?: string|null, quantity: int, unit: string, unit_price?: int|null,
      *     links?: list<string>, reason?: string|null, needed_by?: string|null}  $data  validated; unit_price in satang
      * @param  list<UploadedFile>  $files
      */
@@ -28,7 +28,7 @@ class SavePurchaseRequest
     {
         return DB::transaction(function () use ($request, $data, $actor, $files) {
             $fields = [
-                ...collect($data)->only(['item_name', 'description', 'quantity', 'unit', 'unit_price', 'reason', 'needed_by'])->all(),
+                ...collect($data)->only(['contract_id', 'item_name', 'description', 'quantity', 'unit', 'unit_price', 'reason', 'needed_by'])->all(),
                 'links' => array_values(array_filter(array_map('trim', $data['links'] ?? []))),
             ];
 

@@ -24,6 +24,10 @@ interface AssetRow {
     customer: string | null;
     status: string;
     warranty_expires_at: string | null;
+    // Available = not held by an issue/loan form that is asked for or out.
+    quantity: number;
+    available: number;
+    unit: string | null;
 }
 
 interface Filters {
@@ -72,6 +76,7 @@ const columns = [
     { key: 'branch', sortable: false },
     // Customers exist only when the contract module is on.
     ...(props.customers.length ? [{ key: 'customer', sortable: false }] : []),
+    { key: 'quantity', sortable: false },
     { key: 'status', sortable: true },
     { key: 'warranty_expires_at', sortable: true },
 ];
@@ -167,6 +172,13 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="px-4 py-2">{{ asset.category ?? t('common.none') }}</td>
                             <td class="px-4 py-2">{{ asset.branch ?? t('assets.no_branch') }}</td>
                             <td v-if="customers.length" class="px-4 py-2">{{ asset.customer ?? t('common.none') }}</td>
+                            <td class="whitespace-nowrap px-4 py-2" :title="t('assets.quantity_hint')">
+                                <span class="font-medium" :class="{ 'text-red-700 dark:text-red-400': asset.available === 0 }">{{
+                                    asset.available
+                                }}</span>
+                                <span class="text-muted-foreground">/{{ asset.quantity }}</span>
+                                <span v-if="asset.unit" class="text-xs text-muted-foreground"> {{ asset.unit }}</span>
+                            </td>
                             <td class="px-4 py-2">
                                 <AssetStatusBadge :status="asset.status" />
                             </td>

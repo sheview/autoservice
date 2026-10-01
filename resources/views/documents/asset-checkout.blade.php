@@ -6,8 +6,8 @@
 @section('title', $title.' '.$checkout->checkout_no)
 
 @section('content')
-    <div class="header">
-        <div style="display: flex; gap: 12px; align-items: center">
+    <div class="header" style="gap: 16px">
+        <div style="display: flex; gap: 12px; align-items: center; min-width: 0">
             @if ($logo)
                 <img src="{{ $logo }}" alt="" style="height: 16mm; max-width: 45mm; object-fit: contain">
             @endif
@@ -47,7 +47,7 @@
         <table>
             <thead>
                 <tr>
-                    <th class="center" style="width: 40px">{{ __('document.no') }}</th>
+                    <th class="center" style="width: 50px">{{ __('document.no') }}</th>
                     <th style="width: 110px">{{ __('document.checkout.asset_code') }}</th>
                     <th>{{ __('document.checkout.asset_name') }}</th>
                     <th style="width: 150px">{{ __('document.checkout.serial') }}</th>
@@ -63,6 +63,9 @@
                         @if ($asset['brand'] || $asset['model'])
                             <div class="muted">{{ collect([$asset['brand'], $asset['model']])->filter()->implode(' ') }}</div>
                         @endif
+                        @if ($checkout->quantity > 1)
+                            <div>{{ __('document.checkout.quantity', ['quantity' => $checkout->quantity, 'unit' => $asset['unit'] ?? '']) }}</div>
+                        @endif
                     </td>
                     <td style="font-family: monospace">{{ $asset['serial_number'] ?? '-' }}</td>
                     <td>{{ $asset['property_no'] ?? '-' }}</td>
@@ -75,7 +78,7 @@
         <p style="margin: 6px 0 0">{{ __('document.checkout.terms_'.$checkout->type, ['date' => $isLoan ? $long($checkout->due_on) : '']) }}</p>
     </section>
 
-    <div class="signatures" style="grid-template-columns: repeat(3, 1fr); gap: 24px">
+    <div class="signatures" style="grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px">
         <div>
             <div class="sign-line" style="margin: 0 8px"></div>
             <div>( {{ $checkout->borrower_name }} )</div>
@@ -84,13 +87,13 @@
         </div>
         <div>
             <div class="sign-line" style="margin: 0 8px"></div>
-            <div>( {{ str_repeat('.', 36) }} )</div>
+            <div>( {{ str_repeat('.', 30) }} )</div>
             <div style="font-weight: 600">{{ __('document.checkout.sign_handover') }}</div>
             <div class="muted">{{ __('document.sign_date') }}</div>
         </div>
         <div>
             <div class="sign-line" style="margin: 0 8px"></div>
-            <div>( {{ $checkout->decided_by_name ?? str_repeat('.', 36) }} )</div>
+            <div>( {{ $checkout->decided_by_name ?? str_repeat('.', 30) }} )</div>
             <div style="font-weight: 600">{{ __('document.checkout.sign_approver') }}</div>
             <div class="muted">{{ __('document.sign_date') }}</div>
         </div>

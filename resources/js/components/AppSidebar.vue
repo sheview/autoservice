@@ -15,10 +15,12 @@ import {
     Circle,
     ClipboardList,
     FileText,
+    FolderKanban,
     HandHelping,
     HardDrive,
     LayoutGrid,
     ListChecks,
+    Network,
     Package,
     QrCode,
     Settings,
@@ -26,6 +28,7 @@ import {
     ShoppingCart,
     Star,
     Tags,
+    UserSearch,
     Users,
     Wrench,
     type LucideIcon,
@@ -45,6 +48,7 @@ const icons: Record<string, LucideIcon> = {
     'list-checks': ListChecks,
     'qr-code': QrCode,
     package: Package,
+    network: Network,
     'arrow-left-right': ArrowLeftRight,
     star: Star,
     'bar-chart-3': BarChart3,
@@ -59,6 +63,8 @@ const icons: Record<string, LucideIcon> = {
     'building-2': Building2,
     settings: Settings,
     'shopping-cart': ShoppingCart,
+    'user-search': UserSearch,
+    'folder-kanban': FolderKanban,
 };
 
 // Built on the server from config/modules.php (permission + enabled modules).

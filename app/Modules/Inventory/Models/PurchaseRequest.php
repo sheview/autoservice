@@ -45,7 +45,7 @@ class PurchaseRequest extends Model implements HasMedia
     public const MAX_LINKS = 5;
 
     protected $fillable = [
-        'pr_no', 'status', 'item_name', 'description', 'quantity', 'unit', 'unit_price', 'links', 'reason', 'needed_by',
+        'pr_no', 'contract_id', 'status', 'item_name', 'description', 'quantity', 'unit', 'unit_price', 'links', 'reason', 'needed_by',
         'requested_by', 'requested_by_name', 'decided_by', 'decided_by_name', 'decided_at', 'decision_note',
         'ordered_by_name', 'ordered_at', 'order_note', 'received_by_name', 'received_at', 'receive_note',
     ];

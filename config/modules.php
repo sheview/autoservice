@@ -12,7 +12,7 @@
 | always on and are not listed here. The platform tenant never gets business modules.
 |
 | "navigation": the sidebar, in order. An item is shown when the user has "permission" (if set)
-| and the tenant has "module" switched on (if set); "staff" items are hidden from customer
+| and the tenant has "module" switched on (if set; a list = all of them); "staff" items are hidden from customer
 | accounts; "company" items are only shown inside a customer company (not the platform). "icon" is a lucide icon name that
 | resources/js/components/AppSidebar.vue knows. "title" is a key of lang/{locale}/ui.php.
 |
@@ -39,6 +39,7 @@ return [
         ['group' => 'service', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'calendar-check', 'permission' => 'pm.view', 'module' => 'maintenance'],
         ['group' => 'service', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'clipboard-list', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'service', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'service', 'title' => 'nav.ip_check', 'route' => 'asset.ip-check', 'icon' => 'network', 'permission' => 'asset.view', 'module' => 'asset', 'staff' => true],
 
         ['group' => 'assets', 'title' => 'nav.assets', 'route' => 'asset.assets.index', 'icon' => 'hard-drive', 'permission' => 'asset.view', 'module' => 'asset'],
         ['group' => 'assets', 'title' => 'nav.checkouts', 'route' => 'asset.checkouts.index', 'icon' => 'hand-helping', 'permission' => 'asset.checkout', 'module' => 'asset', 'staff' => true],
@@ -53,6 +54,8 @@ return [
         ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock.view', 'module' => 'inventory', 'staff' => true],
 
         ['group' => 'reports', 'title' => 'nav.reports', 'route' => 'reporting.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'report.view', 'module' => 'reporting', 'staff' => true],
+        ['group' => 'reports', 'title' => 'nav.people_summary', 'route' => 'reporting.people.index', 'icon' => 'user-search', 'permission' => 'report.view', 'module' => 'reporting', 'staff' => true],
+        ['group' => 'reports', 'title' => 'nav.project_summary', 'route' => 'reporting.projects.index', 'icon' => 'folder-kanban', 'permission' => 'report.view', 'module' => ['reporting', 'contract'], 'staff' => true],
         ['group' => 'reports', 'title' => 'nav.surveys', 'route' => 'survey.surveys.index', 'icon' => 'star', 'permission' => 'survey.view', 'module' => 'survey', 'staff' => true],
 
         ['group' => 'settings', 'title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'user.view'],

@@ -17,6 +17,9 @@ interface Unit {
     property_no: string | null;
     location: string | null;
     branch: string | null;
+    quantity: number;
+    available: number;
+    unit: string | null;
 }
 
 interface Group {
@@ -36,6 +39,7 @@ const props = defineProps<{
     search: string;
     groups: Group[];
     borrowers: { id: number; name: string }[];
+    contracts: { id: number; label: string }[];
     canPurchase: boolean;
 }>();
 
@@ -94,6 +98,9 @@ const label = (group: Group) => [group.brand, group.model].filter(Boolean).join(
                         <li v-for="unit in group.units" :key="unit.ulid" class="flex flex-wrap items-center gap-2 px-3 py-2">
                             <span class="font-mono text-xs">{{ unit.asset_code }}</span>
                             <span v-if="unit.serial_number" class="text-xs text-muted-foreground">S/N {{ unit.serial_number }}</span>
+                            <span v-if="unit.quantity > 1" class="text-xs text-muted-foreground">
+                                · {{ t('assets.available_of', { available: unit.available, total: unit.quantity }) }} {{ unit.unit ?? '' }}
+                            </span>
                             <span v-if="unit.branch || unit.location" class="text-xs text-muted-foreground">
                                 · {{ [unit.branch, unit.location].filter(Boolean).join(' · ') }}
                             </span>
@@ -112,6 +119,9 @@ const label = (group: Group) => [group.brand, group.model].filter(Boolean).join(
                         :key="picked.unit.ulid"
                         :asset-ulid="picked.unit.ulid"
                         :borrowers="borrowers"
+                        :contracts="contracts"
+                        :max-quantity="picked.unit.available"
+                        :unit="picked.unit.unit"
                         :title="t('checkouts.request_for', { code: picked.unit.asset_code })"
                         from-search
                         @cancel="picked = null"

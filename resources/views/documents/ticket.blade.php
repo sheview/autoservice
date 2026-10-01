@@ -23,7 +23,7 @@
         .sign-row .sign-line { flex: 1; height: auto; margin: 0; border-bottom: 1px dotted #000; }
         .caption { font-weight: 600; margin-bottom: 2px; }
         .checkbox { display: inline-block; width: 11px; height: 11px; border: 1px solid #000; text-align: center; line-height: 10px; font-size: 8.5pt; vertical-align: -1px; }
-        .rating-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 20px; font-size: 9.5pt; }
+        .rating-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px 20px; font-size: 9.5pt; }
         .footer { margin-top: 10px; }
     </style>
 
@@ -134,7 +134,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th class="center" style="width: 40px">{{ __('document.no') }}</th>
+                        <th class="center" style="width: 50px">{{ __('document.no') }}</th>
                         <th style="width: 100px">{{ __('ui.ticket_print.part_code') }}</th>
                         <th>{{ __('ui.ticket_print.part_name') }}</th>
                         <th style="width: 150px">{{ __('ui.ticket_print.part_serial') }}</th>

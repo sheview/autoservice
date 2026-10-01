@@ -27,6 +27,8 @@ interface AssetDetail {
     serial_number: string | null;
     serials: string[];
     quantity: number;
+    // Not held by an issue/loan form that is asked for or out.
+    available: number;
     unit: string | null;
     property_no: string | null;
     status: string;
@@ -126,7 +128,7 @@ const details: [string, (a: AssetDetail) => string | null][] = [
     ['model', (a) => a.model],
     ['subtype', (a) => a.subtype],
     ['serial_number', (a) => (a.serials.length ? a.serials.join(', ') : null)],
-    ['quantity', (a) => [a.quantity.toLocaleString('th-TH'), a.unit].filter(Boolean).join(' ')],
+    ['quantity', (a) => [`/`, a.unit].filter(Boolean).join(' ')],
     ['property_no', (a) => a.property_no],
     ['purchased_at', (a) => a.purchased_at],
     ['purchase_price', (a) => money(a.purchase_price)],
