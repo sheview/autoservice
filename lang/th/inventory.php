@@ -1,6 +1,31 @@
 <?php
 
 return [
+    'part_checkouts' => [
+        'requested' => 'ส่งคำขอ :no แล้ว รอผู้อนุมัติ',
+        'approved' => 'อนุมัติ :no แล้ว ตัดสต็อกแล้ว พิมพ์ใบให้ผู้รับเซ็นได้เลย',
+        'rejected' => 'ไม่อนุมัติ :no แล้ว',
+        'returned' => 'รับคืนตาม :no แล้ว คืนเข้าสต็อกแล้ว',
+        'cancelled' => 'ยกเลิกคำขอ :no แล้ว',
+        'not_available' => 'อะไหล่นี้เบิก/ยืมไม่ได้ตอนนี้ (ไม่มีของในสต็อก มีคำขอค้างอยู่ครบจำนวน หรือเลิกใช้แล้ว)',
+        'not_enough' => 'เบิก/ยืมได้อีกไม่เกิน :available :unit',
+        'not_pending' => 'คำขอนี้ไม่ได้รออนุมัติแล้ว',
+        'not_out' => 'รายการนี้ไม่ได้ถูกยืมอยู่ (อะไหล่ที่เบิกใช้แล้วไม่ต้องคืน)',
+        'reason_required' => 'กรุณาระบุเหตุผลที่ไม่อนุมัติ',
+        'fields' => [
+            'type' => 'ประเภท',
+            'quantity' => 'จำนวน',
+            'contract_id' => 'โครงการ (สัญญา MA)',
+            'borrower_user_id' => 'พนักงาน',
+            'borrower_name' => 'ชื่อผู้เบิก/ผู้ยืม',
+            'borrower_department' => 'หน่วยงาน',
+            'borrower_phone' => 'เบอร์โทร',
+            'purpose' => 'วัตถุประสงค์',
+            'due_on' => 'กำหนดคืน',
+            'note' => 'หมายเหตุ',
+        ],
+    ],
+
     'purchase_requests' => [
         'created' => 'ส่งใบขอซื้อ :no แล้ว รอผู้อนุมัติ',
         'updated' => 'บันทึกใบขอซื้อเรียบร้อยแล้ว',
@@ -108,6 +133,7 @@ return [
     // Field names for validation messages.
     'fields' => [
         'code' => 'รหัสอะไหล่',
+        'contract_id' => 'โครงการ (สัญญา MA)',
         'name' => 'ชื่ออะไหล่',
         'part_number' => 'Part number',
         'brand' => 'ยี่ห้อ',

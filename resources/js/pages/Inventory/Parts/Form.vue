@@ -13,6 +13,7 @@ interface PartForm {
     id: number;
     code: string;
     name: string;
+    contract_id: number | null;
     part_number: string | null;
     brand: string | null;
     unit: string;
@@ -22,7 +23,8 @@ interface PartForm {
     notes: string | null;
 }
 
-const props = defineProps<{ part: PartForm | null }>();
+// contracts: the MA contracts (projects) a part can be kept for; none = the field is hidden.
+const props = defineProps<{ part: PartForm | null; contracts: { id: number; label: string }[] }>();
 
 const title = props.part ? t('parts.edit') : t('parts.create');
 const breadcrumbs: BreadcrumbItem[] = [
@@ -33,6 +35,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const form = useForm({
     code: props.part?.code ?? '',
     name: props.part?.name ?? '',
+    contract_id: props.part?.contract_id ?? (null as number | null),
     part_number: props.part?.part_number ?? '',
     brand: props.part?.brand ?? '',
     unit: props.part?.unit ?? '',
@@ -72,6 +75,20 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                         <Label for="name">{{ t('parts.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
+                    </div>
+
+                    <div v-if="contracts.length" class="grid content-start gap-2 sm:col-span-3">
+                        <Label for="contract_id">{{ t('parts.contract') }}</Label>
+                        <select
+                            id="contract_id"
+                            v-model="form.contract_id"
+                            class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                        >
+                            <option :value="null">{{ t('parts.no_contract') }}</option>
+                            <option v-for="contract in contracts" :key="contract.id" :value="contract.id">{{ contract.label }}</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">{{ t('parts.contract_hint') }}</p>
+                        <InputError :message="form.errors.contract_id" />
                     </div>
 
                     <div class="grid content-start gap-2">

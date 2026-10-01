@@ -21,6 +21,10 @@ const props = defineProps<{
     unit?: string | null;
     // Projects (MA contracts) the form can be for; none = the field is hidden.
     contracts?: { id: number; label: string }[];
+    // Where the form goes; default the asset's. Parts post to their own (Inventory module).
+    storeUrl?: string;
+    // The project chosen at first (a part's own MA contract).
+    defaultContractId?: number | null;
 }>();
 
 const emit = defineEmits<{ done: []; cancel: [] }>();
@@ -29,7 +33,7 @@ const borrowerKind = ref<'staff' | 'other'>('staff');
 const form = useForm({
     type: 'loan' as 'issue' | 'loan',
     quantity: 1,
-    contract_id: null as number | null,
+    contract_id: (props.defaultContractId ?? null) as number | null,
     borrower_user_id: null as number | null,
     borrower_name: '',
     borrower_department: '',
@@ -48,7 +52,7 @@ const submit = () =>
             due_on: data.type === 'loan' ? data.due_on : null,
             from_search: props.fromSearch ?? false,
         }))
-        .post(route('asset.checkouts.store', props.assetUlid), {
+        .post(props.storeUrl ?? route('asset.checkouts.store', props.assetUlid), {
             preserveScroll: true,
             onSuccess: () => {
                 form.reset();

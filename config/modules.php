@@ -50,6 +50,7 @@ return [
         ['group' => 'customers', 'title' => 'nav.contracts', 'route' => 'contract.contracts.index', 'icon' => 'file-text', 'permission' => 'contract.view', 'module' => 'contract'],
 
         ['group' => 'stock', 'title' => 'nav.parts', 'route' => 'inventory.parts.index', 'icon' => 'package', 'permission' => 'part.view', 'module' => 'inventory', 'staff' => true],
+        ['group' => 'stock', 'title' => 'nav.part_checkouts', 'route' => 'inventory.part-checkouts.index', 'icon' => 'hand-helping', 'permission' => 'asset.checkout', 'module' => 'inventory', 'staff' => true],
         ['group' => 'stock', 'title' => 'nav.purchase_requests', 'route' => 'inventory.purchase-requests.index', 'icon' => 'shopping-cart', 'permission' => 'purchase.request', 'module' => 'inventory', 'staff' => true],
         ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock.view', 'module' => 'inventory', 'staff' => true],
 

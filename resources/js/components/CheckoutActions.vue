@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
+import { checkoutRoute } from '@/lib/checkoutRoutes';
 import { t } from '@/lib/i18n';
 import type { CheckoutRow } from '@/types/checkout';
 import { useForm } from '@inertiajs/vue3';
@@ -23,11 +24,13 @@ const form = useForm({ note: '' });
 
 const pending = computed(() => props.checkout.status === 'pending');
 const out = computed(() => props.checkout.status === 'approved');
+// Issued parts are used up: only lent ones come back.
+const returnable = computed(() => out.value && !(props.checkout.kind === 'part' && props.checkout.type === 'issue'));
 const canCancel = computed(() => pending.value && (props.can.approve || props.checkout.requested_by === props.can.userId));
 const printable = computed(() => out.value || props.checkout.status === 'returned');
 
 const send = (action: 'approve' | 'reject' | 'return' | 'cancel') =>
-    form.post(route(`asset.checkouts.${action}`, props.checkout.ulid), {
+    form.post(route(checkoutRoute(props.checkout, action), props.checkout.ulid), {
         preserveScroll: true,
         onSuccess: () => {
             open.value = null;
@@ -60,16 +63,18 @@ const toggle = (box: 'reject' | 'return') => {
             }}</Button>
             <template v-if="printable">
                 <Button :size="size ?? 'sm'" variant="outline" as-child>
-                    <a :href="route('asset.checkouts.print', checkout.ulid)" target="_blank" rel="noopener">
+                    <a :href="route(checkoutRoute(checkout, 'print'), checkout.ulid)" target="_blank" rel="noopener">
                         <Printer class="h-4 w-4" />
                         {{ t('checkouts.print') }}
                     </a>
                 </Button>
                 <Button :size="size ?? 'sm'" variant="ghost" as-child>
-                    <a :href="route('asset.checkouts.pdf', checkout.ulid)" target="_blank" rel="noopener">{{ t('checkouts.pdf') }}</a>
+                    <a :href="route(checkoutRoute(checkout, 'pdf'), checkout.ulid)" target="_blank" rel="noopener">{{ t('checkouts.pdf') }}</a>
                 </Button>
             </template>
-            <Button v-if="out && can.request" :size="size ?? 'sm'" variant="outline" @click="toggle('return')">{{ t('checkouts.give_back') }}</Button>
+            <Button v-if="returnable && can.request" :size="size ?? 'sm'" variant="outline" @click="toggle('return')">{{
+                t('checkouts.give_back')
+            }}</Button>
         </div>
 
         <form v-if="open" class="space-y-2" @submit.prevent="send(open)">

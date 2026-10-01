@@ -6,6 +6,7 @@ use App\Modules\Inventory\Models\Part;
 use App\Modules\Platform\Support\Money;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class PartRequest extends FormRequest
 {
@@ -34,6 +35,8 @@ class PartRequest extends FormRequest
                 }
             }],
             'name' => ['required', 'string', 'max:255'],
+            // The MA contract (project) the part is kept for.
+            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
             'part_number' => ['nullable', 'string', 'max:100'],
             'brand' => ['nullable', 'string', 'max:100'],
             'unit' => ['required', 'string', 'max:30'],

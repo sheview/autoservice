@@ -4,6 +4,18 @@
 return [
     'unavailable' => 'ระบบสร้างไฟล์ PDF ยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง หรือใช้ปุ่ม "พิมพ์" แทน',
 
+    // A part issue/loan form: the same page as an asset's, with these in place of the asset's words.
+    'part_checkout' => [
+        'title_issue' => 'ใบเบิกอะไหล่',
+        'title_loan' => 'ใบยืมอะไหล่',
+        'asset' => 'รายการอะไหล่',
+        'asset_code' => 'รหัสอะไหล่',
+        'serial' => 'Part Number',
+        'property_no' => 'หมายเหตุ',
+        'terms_issue' => 'ข้าพเจ้าได้รับอะไหล่ตามรายการข้างต้นไปใช้งานตามวัตถุประสงค์ที่ระบุ',
+        'terms_loan' => 'ข้าพเจ้าได้ยืมอะไหล่ตามรายการข้างต้น จะดูแลรักษาเป็นอย่างดี และจะส่งคืนภายในวันที่ :date หากชำรุดหรือสูญหายจะรับผิดชอบตามระเบียบของบริษัท',
+    ],
+
     'checkout' => [
         'quantity' => 'จำนวน :quantity :unit',
         'title_issue' => 'ใบเบิกทรัพย์สิน',

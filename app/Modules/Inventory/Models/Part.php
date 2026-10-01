@@ -23,7 +23,7 @@ class Part extends Model implements HasMedia
 {
     use BelongsToTenant, HasPhotoSlots, LogsActivity, SoftDeletes;
 
-    protected $fillable = ['code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'unit_cost', 'is_active', 'notes'];
+    protected $fillable = ['code', 'name', 'contract_id', 'part_number', 'brand', 'unit', 'min_qty', 'unit_cost', 'is_active', 'notes'];
 
     protected $attributes = [
         'min_qty' => 0,

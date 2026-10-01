@@ -16,6 +16,7 @@ const props = defineProps<{
     totals: SummaryTotals;
     filters: { search: string; status: 'all' | 'open'; direction: 'asc' | 'desc' };
     checkouts: Paginated<SummaryCheckout> | null;
+    partCheckouts: Paginated<SummaryCheckout> | null;
     purchases: Paginated<SummaryPurchase> | null;
 }>();
 
@@ -52,6 +53,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <SummaryItems
                 by="person"
                 :checkouts="checkouts"
+                :part-checkouts="partCheckouts"
                 :purchases="purchases"
                 :purchases-note="person.user_id ? undefined : t('summary.outside_purchase_note')"
             />

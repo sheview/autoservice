@@ -1,5 +1,7 @@
 // An issue/loan form as the server sends it (App\Modules\Asset\Support\CheckoutRow).
 export interface CheckoutRow {
+    // "part" = a part form (Inventory module; the part is under "asset"); absent = an asset form.
+    kind?: 'part';
     ulid: string;
     checkout_no: string;
     // The project (MA contract) it is for, if any.

@@ -19,10 +19,15 @@ const bar = computed(() => {
             label: c.status === 'rejected' ? t('checkouts.steps.rejected') : t('checkouts.steps.approved'),
             at: c.decided_at ? dateTime(c.decided_at) : null,
         },
-        { key: 'returned', label: t('checkouts.steps.returned'), at: c.returned_at ? dateTime(c.returned_at) : null },
     ];
-    const current = { pending: 1, approved: 2, returned: 2, rejected: 1, cancelled: 1 }[c.status];
-    const state = c.status === 'returned' ? 'done' : c.status === 'rejected' || c.status === 'cancelled' ? 'cancelled' : 'active';
+    // Issued parts are used up: their form ends at the hand-over.
+    const consumed = c.kind === 'part' && c.type === 'issue';
+    if (!consumed) {
+        steps.push({ key: 'returned', label: t('checkouts.steps.returned'), at: c.returned_at ? dateTime(c.returned_at) : null });
+    }
+    const current = { pending: 1, approved: consumed ? 1 : 2, returned: 2, rejected: 1, cancelled: 1 }[c.status];
+    const done = c.status === 'returned' || (consumed && c.status === 'approved');
+    const state = done ? 'done' : c.status === 'rejected' || c.status === 'cancelled' ? 'cancelled' : 'active';
 
     return { steps, current, state: state as 'done' | 'cancelled' | 'active' };
 });

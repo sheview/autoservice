@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Inventory\Http\Controllers\PartCheckoutController;
 use App\Modules\Inventory\Http\Controllers\PartController;
 use App\Modules\Inventory\Http\Controllers\PartImportController;
 use App\Modules\Inventory\Http\Controllers\PartPhotoController;
@@ -24,6 +25,16 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     Route::post('parts/{part}/movements', [StockMovementController::class, 'store'])->name('parts.movements.store');
 
     Route::get('stock-movements', [StockMovementController::class, 'index'])->name('movements.index');
+
+    // Issuing and lending parts (like assets)
+    Route::get('part-checkouts', [PartCheckoutController::class, 'index'])->name('part-checkouts.index');
+    Route::post('parts/{part}/checkouts', [PartCheckoutController::class, 'store'])->name('part-checkouts.store');
+    Route::post('part-checkouts/{checkout}/approve', [PartCheckoutController::class, 'approve'])->name('part-checkouts.approve');
+    Route::post('part-checkouts/{checkout}/reject', [PartCheckoutController::class, 'reject'])->name('part-checkouts.reject');
+    Route::post('part-checkouts/{checkout}/return', [PartCheckoutController::class, 'giveBack'])->name('part-checkouts.return');
+    Route::post('part-checkouts/{checkout}/cancel', [PartCheckoutController::class, 'cancel'])->name('part-checkouts.cancel');
+    Route::get('part-checkouts/{checkout}/print', [PartCheckoutController::class, 'print'])->name('part-checkouts.print');
+    Route::get('part-checkouts/{checkout}/pdf', [PartCheckoutController::class, 'pdf'])->name('part-checkouts.pdf');
 
     // Purchase requests
     Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);

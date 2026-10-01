@@ -12,8 +12,11 @@ use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Contract\Support\ContractPhase;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Actions\SearchPartCheckouts;
 use App\Modules\Inventory\Actions\SearchPurchaseRequests;
+use App\Modules\Inventory\Models\PartCheckout;
 use App\Modules\Inventory\Models\PurchaseRequest;
+use App\Modules\Inventory\Support\PartCheckoutRow;
 use App\Modules\Inventory\Support\PurchaseRequestRow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Reporting\Actions\CountSummaryRows;
@@ -36,6 +39,7 @@ class SummaryController extends Controller
         private ContractLabels $contractLabels,
         private SearchCheckouts $searchCheckouts,
         private SearchPurchaseRequests $searchPurchases,
+        private SearchPartCheckouts $searchPartCheckouts,
     ) {}
 
     public function people(Request $request, SummarizePeople $summarize): Response
@@ -72,6 +76,9 @@ class SummaryController extends Controller
             'checkouts' => $this->modules->enabled('asset')
                 ? $this->checkouts($viewer, [...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
                 : null,
+            'partCheckouts' => $this->modules->enabled('inventory')
+                ? $this->partCheckouts([...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
+                : null,
             // People from outside cannot ask to buy.
             'purchases' => $userId && $this->modules->enabled('inventory')
                 ? $this->purchases($viewer, [...$filters, 'requested_by' => $userId])
@@ -107,6 +114,7 @@ class SummaryController extends Controller
             'totals' => $this->countRows->handle($viewer, ['contract_id' => $contract]),
             'filters' => $filters,
             'checkouts' => $this->modules->enabled('asset') ? $this->checkouts($viewer, [...$filters, 'contract_id' => $contract]) : null,
+            'partCheckouts' => $this->modules->enabled('inventory') ? $this->partCheckouts([...$filters, 'contract_id' => $contract]) : null,
             'purchases' => $this->modules->enabled('inventory') ? $this->purchases($viewer, [...$filters, 'contract_id' => $contract]) : null,
         ]);
     }
@@ -135,6 +143,18 @@ class SummaryController extends Controller
         $labels = $this->contractLabels->handle($page->getCollection()->pluck('contract_id')->all());
 
         return $page->through(fn (AssetCheckout $checkout) => [...CheckoutRow::of($checkout), 'contract' => $labels[$checkout->contract_id] ?? null]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function partCheckouts(array $filters): LengthAwarePaginator
+    {
+        $page = $this->searchPartCheckouts->handle([...$filters, 'type' => null, 'sort' => 'created_at'])
+            ->paginate(10, pageName: 'parts_page')->withQueryString();
+        $labels = $this->contractLabels->handle($page->getCollection()->pluck('contract_id')->all());
+
+        return $page->through(fn (PartCheckout $checkout) => [...PartCheckoutRow::of($checkout), 'contract' => $labels[$checkout->contract_id] ?? null]);
     }
 
     /**

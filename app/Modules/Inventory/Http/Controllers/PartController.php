@@ -3,14 +3,20 @@
 namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Contract\Actions\ContractLabels;
+use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Document\Support\PhotoSlots;
+use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Inventory\Actions\DeletePart;
+use App\Modules\Inventory\Actions\RequestPartCheckout;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Actions\SearchParts;
 use App\Modules\Inventory\Exports\PartsExport;
 use App\Modules\Inventory\Http\Requests\PartRequest;
 use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\PartCheckout;
 use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Inventory\Support\PartCheckoutRow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\TicketLabels;
@@ -62,11 +68,14 @@ class PartController extends Controller
         return Excel::download(new PartsExport($search->handle(SearchParts::filtersFrom($request))), 'parts-'.now()->format('Ymd-His').'.xlsx');
     }
 
-    public function create(): Response
+    public function create(Modules $modules): Response
     {
         Gate::authorize('create', Part::class);
 
-        return Inertia::render('Inventory/Parts/Form', ['part' => null]);
+        return Inertia::render('Inventory/Parts/Form', [
+            'part' => null,
+            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
+        ]);
     }
 
     public function store(PartRequest $request, SavePart $savePart): RedirectResponse
@@ -76,7 +85,7 @@ class PartController extends Controller
         return redirect()->route('inventory.parts.show', $part)->with('success', __('inventory.parts.created'));
     }
 
-    public function show(Request $request, Part $part, Modules $modules, TicketLabels $ticketLabels): Response
+    public function show(Request $request, Part $part, Modules $modules, TicketLabels $ticketLabels, UsersWithPermission $usersWithPermission): Response
     {
         Gate::authorize('view', $part);
 
@@ -99,7 +108,12 @@ class PartController extends Controller
                 ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active', 'notes']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
+                // The MA contract (project) it is kept for.
+                'contract' => $part->contract_id && $modules->enabled('contract')
+                    ? app(ContractLabels::class)->handle([$part->contract_id])[$part->contract_id] ?? null
+                    : null,
             ],
+            'checkouts' => $this->checkouts($request, $part, $modules, $usersWithPermission),
             'photos' => PhotoSlots::list($part, fn (int $slot) => route('inventory.parts.photos.show', [$part, $slot])),
             'movements' => $movements,
             // Stock changes the user may enter here.
@@ -112,16 +126,53 @@ class PartController extends Controller
         ]);
     }
 
-    public function edit(Part $part): Response
+    public function edit(Part $part, Modules $modules): Response
     {
         Gate::authorize('update', $part);
 
         return Inertia::render('Inventory/Parts/Form', [
             'part' => [
-                ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'is_active', 'notes']),
+                ...$part->only(['id', 'code', 'name', 'contract_id', 'part_number', 'brand', 'unit', 'min_qty', 'is_active', 'notes']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
             ],
+            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($part->contract_id) : [],
         ]);
+    }
+
+    /**
+     * Issue/loan on the part page: the forms still to act on (waiting, or lent and not back), the
+     * last closed ones, and whether more can be asked for. Null for users who do not handle them.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function checkouts(Request $request, Part $part, Modules $modules, UsersWithPermission $usersWithPermission): ?array
+    {
+        $can = PartCheckoutController::abilities($request);
+        if (! $can['request'] && ! $can['approve']) {
+            return null;
+        }
+
+        $isOpen = fn ($q) => $q->where('status', PartCheckout::STATUS_PENDING)
+            ->orWhere(fn ($q) => $q->where('status', PartCheckout::STATUS_APPROVED)->where('type', PartCheckout::TYPE_LOAN));
+        $open = PartCheckout::query()->where('part_id', $part->id)->where($isOpen)->with('part')->oldest('id')->get();
+        $recent = PartCheckout::query()->where('part_id', $part->id)->whereNot($isOpen)->with('part')->latest('id')->limit(10)->get();
+        $left = RequestPartCheckout::availableQuantity($part);
+        $available = $part->is_active && $left > 0;
+
+        return [
+            'open' => $open->map(fn (PartCheckout $checkout) => PartCheckoutRow::of($checkout))->values(),
+            'history' => $recent->map(fn (PartCheckout $checkout) => PartCheckoutRow::of($checkout))->values(),
+            'available' => $available,
+            'available_quantity' => $left,
+            'quantity' => (int) $part->qty_on_hand,
+            'unit' => $part->unit,
+            'borrowers' => $available && $can['request']
+                ? $usersWithPermission->handle('part.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
+                : [],
+            'contracts' => $available && $can['request'] && $modules->enabled('contract') ? app(ContractOptions::class)->handle($part->contract_id) : [],
+            'default_contract_id' => $part->contract_id,
+            'can' => [...$can, 'userId' => $request->user()->id],
+        ];
     }
 
     public function update(PartRequest $request, Part $part, SavePart $savePart): RedirectResponse

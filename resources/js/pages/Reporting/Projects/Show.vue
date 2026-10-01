@@ -16,6 +16,7 @@ const props = defineProps<{
     totals: SummaryTotals;
     filters: { search: string; status: 'all' | 'open'; direction: 'asc' | 'desc' };
     checkouts: Paginated<SummaryCheckout> | null;
+    partCheckouts: Paginated<SummaryCheckout> | null;
     purchases: Paginated<SummaryPurchase> | null;
 }>();
 
@@ -56,7 +57,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 </select>
             </div>
 
-            <SummaryItems by="project" :checkouts="checkouts" :purchases="purchases" />
+            <SummaryItems by="project" :checkouts="checkouts" :part-checkouts="partCheckouts" :purchases="purchases" />
 
             <Button variant="outline" as-child>
                 <Link :href="route('reporting.projects.index')">{{ t('common.back') }}</Link>

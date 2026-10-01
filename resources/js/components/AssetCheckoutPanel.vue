@@ -4,6 +4,7 @@ import CheckoutRequestForm from '@/components/CheckoutRequestForm.vue';
 import CheckoutStatusBadge from '@/components/CheckoutStatusBadge.vue';
 import CheckoutSteps from '@/components/CheckoutSteps.vue';
 import { Button } from '@/components/ui/button';
+import { checkoutRoute } from '@/lib/checkoutRoutes';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { CheckoutRow } from '@/types/checkout';
@@ -16,6 +17,9 @@ import { reactive, ref } from 'vue';
  */
 defineProps<{
     assetUlid: string;
+    // A part's page: where its request form goes (Inventory module).
+    storeUrl?: string;
+    requestTitle?: string;
     checkouts: {
         open: CheckoutRow[];
         history: CheckoutRow[];
@@ -25,6 +29,7 @@ defineProps<{
         unit: string | null;
         borrowers: { id: number; name: string }[];
         contracts: { id: number; label: string }[];
+        default_contract_id?: number | null;
         can: { request: boolean; approve: boolean; userId: number };
     };
 }>();
@@ -69,7 +74,9 @@ const toggle = (ulid: string) => (expanded.has(ulid) ? expanded.delete(ulid) : e
             :asset-ulid="assetUlid"
             :borrowers="checkouts.borrowers"
             :contracts="checkouts.contracts"
-            :title="t('checkouts.request_title')"
+            :default-contract-id="checkouts.default_contract_id"
+            :store-url="storeUrl"
+            :title="requestTitle ?? t('checkouts.request_title')"
             :max-quantity="checkouts.available_quantity"
             :unit="checkouts.unit"
             @done="asking = false"
@@ -177,7 +184,7 @@ const toggle = (ulid: string) => (expanded.has(ulid) ? expanded.delete(ulid) : e
                         <td class="px-4 py-2">
                             <a
                                 v-if="row.status === 'returned'"
-                                :href="route('asset.checkouts.print', row.ulid)"
+                                :href="route(checkoutRoute(row, 'print'), row.ulid)"
                                 target="_blank"
                                 rel="noopener"
                                 class="text-primary underline-offset-4 hover:underline"

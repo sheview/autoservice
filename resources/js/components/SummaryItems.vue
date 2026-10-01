@@ -10,32 +10,43 @@ import { purchaseSteps } from '@/lib/purchaseSteps';
 import type { Paginated } from '@/types';
 import { personParams, type ContractLabel, type SummaryCheckout, type SummaryPurchase } from '@/types/summary';
 import { Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 /**
  * The issue/loan forms and the purchase requests of a person or a project, each list with its own
  * pages. "by" = which page shows them: on a person's page the project is the useful column, on a
  * project's page the person. Null list = that module is off (or, for purchases, a person from outside).
  */
-defineProps<{
+const props = defineProps<{
     checkouts: Paginated<SummaryCheckout> | null;
+    // Parts issued or lent (same rows as the assets', kind "part").
+    partCheckouts?: Paginated<SummaryCheckout> | null;
     purchases: Paginated<SummaryPurchase> | null;
     by: 'person' | 'project';
     purchasesNote?: string;
 }>();
+
+// The asset forms, then the part forms: the same table for both.
+const checkoutLists = computed(() =>
+    [
+        { key: 'assets', title: t('summary.checkouts'), rows: props.checkouts },
+        { key: 'parts', title: t('summary.part_checkouts'), rows: props.partCheckouts ?? null },
+    ].filter((list): list is { key: string; title: string; rows: Paginated<SummaryCheckout> } => list.rows !== null),
+);
 
 const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
 const project = (contract: ContractLabel) => (contract ? `${contract.contract_no} · ${contract.title}` : t('summary.no_project'));
 </script>
 
 <template>
-    <section v-if="checkouts" class="space-y-2">
-        <h3 class="text-sm font-semibold">{{ t('summary.checkouts') }}</h3>
+    <section v-for="list in checkoutLists" :key="list.key" class="space-y-2">
+        <h3 class="text-sm font-semibold">{{ list.title }}</h3>
         <div class="overflow-x-auto rounded-md border">
             <table class="w-full text-sm">
                 <thead class="bg-muted/50 text-left">
                     <tr>
                         <th class="px-4 py-2 font-medium">{{ t('checkouts.checkout_no') }}</th>
-                        <th class="px-4 py-2 font-medium">{{ t('summary.asset') }}</th>
+                        <th class="px-4 py-2 font-medium">{{ list.key === 'parts' ? t('part_checkouts.part') : t('summary.asset') }}</th>
                         <th class="px-4 py-2 font-medium">{{ by === 'person' ? t('summary.project') : t('summary.borrower') }}</th>
                         <th class="px-4 py-2 font-medium">{{ t('summary.date') }}</th>
                         <th class="px-4 py-2 font-medium">{{ t('checkouts.due_on') }}</th>
@@ -43,18 +54,20 @@ const project = (contract: ContractLabel) => (contract ? `${contract.contract_no
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in checkouts.data" :key="row.ulid" class="border-t align-top">
+                    <tr v-for="row in list.rows.data" :key="row.ulid" class="border-t align-top">
                         <td class="whitespace-nowrap px-4 py-2">
                             <div class="font-mono text-xs">{{ row.checkout_no }}</div>
                             <div class="text-xs text-muted-foreground">
-                                {{ t(`checkouts.types.${row.type}`)
+                                {{ t(`${row.kind === 'part' ? 'part_checkouts' : 'checkouts'}.types.${row.type}`)
                                 }}<template v-if="row.quantity > 1"> · {{ row.quantity }} {{ row.asset?.unit ?? '' }}</template>
                             </div>
                         </td>
                         <td class="px-4 py-2">
                             <Link
                                 v-if="row.asset"
-                                :href="route('asset.assets.show', row.asset.ulid)"
+                                :href="
+                                    row.kind === 'part' ? route('inventory.parts.show', row.asset.ulid) : route('asset.assets.show', row.asset.ulid)
+                                "
                                 class="font-mono text-xs text-primary underline-offset-4 hover:underline"
                             >
                                 {{ row.asset.asset_code }}
@@ -96,13 +109,13 @@ const project = (contract: ContractLabel) => (contract ? `${contract.contract_no
                             <div class="mt-1"><CheckoutStatusBadge :status="row.status" :overdue="row.overdue" /></div>
                         </td>
                     </tr>
-                    <tr v-if="checkouts.data.length === 0">
+                    <tr v-if="list.rows.data.length === 0">
                         <td colspan="6" class="px-4 py-6 text-center text-muted-foreground">{{ t('summary.no_checkouts') }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <Pagination :paginator="checkouts" />
+        <Pagination :paginator="list.rows" />
     </section>
 
     <section v-if="purchases" class="space-y-2">

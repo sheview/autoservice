@@ -28,19 +28,19 @@ return [
     'events' => [
         'checkout_requested' => [
             'title' => 'มีคำขอ:typeใหม่ :no',
-            'body' => "ทรัพย์สิน: :asset\nจำนวน: :quantity\nผู้:type: :borrower\nขอโดย: :actor",
+            'body' => "รายการ: :asset\nจำนวน: :quantity\nผู้:type: :borrower\nขอโดย: :actor",
         ],
         'checkout_approved' => [
             'title' => 'อนุมัติ:type :no',
-            'body' => "ทรัพย์สิน: :asset\nผู้:type: :borrower\nอนุมัติโดย: :actor",
+            'body' => "รายการ: :asset\nผู้:type: :borrower\nอนุมัติโดย: :actor",
         ],
         'checkout_rejected' => [
             'title' => 'ไม่อนุมัติ:type :no',
-            'body' => "ทรัพย์สิน: :asset\nผู้:type: :borrower\nโดย: :actor\nเหตุผล: :note",
+            'body' => "รายการ: :asset\nผู้:type: :borrower\nโดย: :actor\nเหตุผล: :note",
         ],
         'checkout_returned' => [
             'title' => 'คืนทรัพย์สินแล้ว :no',
-            'body' => "ทรัพย์สิน: :asset\nผู้คืน: :borrower\nรับคืนโดย: :actor",
+            'body' => "รายการ: :asset\nผู้คืน: :borrower\nรับคืนโดย: :actor",
         ],
         'ticket_opened' => [
             'title' => 'แจ้งซ่อมใหม่ :no',

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AssetCheckoutPanel from '@/components/AssetCheckoutPanel.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
@@ -26,6 +27,7 @@ interface PartDetail {
     is_active: boolean;
     notes: string | null;
     low: boolean;
+    contract: { id: number; contract_no: string; title: string } | null;
 }
 
 interface MovementRow {
@@ -44,6 +46,8 @@ interface MovementRow {
 const props = defineProps<{
     part: PartDetail;
     movements: Paginated<MovementRow> | null;
+    // Issue/loan of this part (same panel as an asset's); null when the user does not handle them.
+    checkouts: InstanceType<typeof AssetCheckoutPanel>['$props']['checkouts'] | null;
     photos: { slot: number; action: string; url: string | null }[];
     movementTypes: string[];
     can: { update: boolean; delete: boolean; viewTickets: boolean };
@@ -106,6 +110,14 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
             <PhotoSlots :photos="photos" :editable="can.update" />
 
+            <AssetCheckoutPanel
+                v-if="checkouts"
+                :asset-ulid="String(part.id)"
+                :checkouts="checkouts"
+                :store-url="route('inventory.part-checkouts.store', part.id)"
+                :request-title="t('part_checkouts.request_title')"
+            />
+
             <div class="grid gap-6 lg:grid-cols-3">
                 <dl class="space-y-3 rounded-md border p-4 text-sm">
                     <div>
@@ -138,6 +150,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <div>
                         <dt class="text-xs text-muted-foreground">{{ t('common.status') }}</dt>
                         <dd>{{ t(`parts.statuses.${part.is_active ? 'active' : 'inactive'}`) }}</dd>
+                    </div>
+                    <div v-if="part.contract">
+                        <dt class="text-xs text-muted-foreground">{{ t('parts.contract') }}</dt>
+                        <dd>{{ part.contract.contract_no }} · {{ part.contract.title }}</dd>
                     </div>
                     <div v-if="part.notes">
                         <dt class="text-xs text-muted-foreground">{{ t('parts.notes') }}</dt>
