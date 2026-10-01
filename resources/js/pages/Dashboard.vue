@@ -1,40 +1,187 @@
 <script setup lang="ts">
+import StarRating from '@/components/StarRating.vue';
+import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
+import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
+import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/vue3';
-import PlaceholderPattern from '../components/PlaceholderPattern.vue';
+import { dateTime } from '@/lib/format';
+import { t } from '@/lib/i18n';
+import type { BreadcrumbItem, SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
-];
-
-defineProps<{
-    name?: string;
+// The home page: what needs attention now. Each card is null when the user may not see it.
+const props = defineProps<{
+    tickets: {
+        open: number;
+        mine: number;
+        unassigned: number;
+        breached: number;
+        due_soon: number;
+        recent: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[];
+    } | null;
+    pm: { overdue: number; this_month: number; mine: number } | null;
+    contracts: { expiring: number } | null;
+    parts: { low: number; out: number } | null;
+    surveys: { average: number | null; answered: number; sent: number } | null;
+    can: { createTicket: boolean; reports: boolean };
 }>();
+
+const page = usePage<SharedData>();
+const breadcrumbs: BreadcrumbItem[] = [{ title: t('nav.dashboard'), href: route('dashboard') }];
+
+interface Tile {
+    key: string;
+    label: string;
+    value: string;
+    href: string;
+    alert?: boolean;
+}
+
+// One tile per figure; a figure that needs action now is highlighted when above zero.
+const tiles = computed<Tile[]>(() => {
+    const list: Tile[] = [];
+    const tickets = props.tickets;
+    if (tickets) {
+        list.push(
+            { key: 'open', label: t('dashboard.tickets_open'), value: String(tickets.open), href: route('service.tickets.index') },
+            {
+                key: 'mine',
+                label: t('dashboard.tickets_mine'),
+                value: String(tickets.mine),
+                href: route('service.tickets.index', { assignee: 'me' }),
+            },
+            {
+                key: 'breached',
+                label: t('dashboard.tickets_breached'),
+                value: String(tickets.breached),
+                href: route('service.tickets.index', { sla: 'breached' }),
+                alert: tickets.breached > 0,
+            },
+            {
+                key: 'unassigned',
+                label: t('dashboard.tickets_unassigned'),
+                value: String(tickets.unassigned),
+                href: route('service.tickets.index', { assignee: 'none' }),
+                alert: tickets.unassigned > 0,
+            },
+        );
+    }
+    if (props.pm) {
+        list.push(
+            {
+                key: 'pm_overdue',
+                label: t('dashboard.pm_overdue'),
+                value: String(props.pm.overdue),
+                href: route('maintenance.visits.index', { status: 'overdue' }),
+                alert: props.pm.overdue > 0,
+            },
+            { key: 'pm_month', label: t('dashboard.pm_this_month'), value: String(props.pm.this_month), href: route('maintenance.visits.index') },
+        );
+    }
+    if (props.contracts) {
+        list.push({
+            key: 'contracts',
+            label: t('dashboard.contracts_expiring'),
+            value: String(props.contracts.expiring),
+            href: route('contract.contracts.index', { phase: 'expiring' }),
+            alert: props.contracts.expiring > 0,
+        });
+    }
+    if (props.parts) {
+        list.push({
+            key: 'parts',
+            label: t('dashboard.parts_low'),
+            value: String(props.parts.low + props.parts.out),
+            href: route('inventory.parts.index', { sort: 'qty_on_hand' }),
+            alert: props.parts.out > 0,
+        });
+    }
+    return list;
+});
 </script>
 
 <template>
-    <Head title="Dashboard" />
+    <Head :title="t('nav.dashboard')" />
 
     <AppLayout :breadcrumbs="breadcrumbs">
-        <div class="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-            <div class="grid auto-rows-min gap-4 md:grid-cols-3">
-                <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                    <PlaceholderPattern />
+        <div class="space-y-6 p-4">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h1 class="text-xl font-semibold">{{ t('dashboard.hello', { name: page.props.auth.user.name }) }}</h1>
+                    <p class="text-sm text-muted-foreground">{{ page.props.tenant?.name }}</p>
                 </div>
-                <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                    <PlaceholderPattern />
-                </div>
-                <div class="relative aspect-video overflow-hidden rounded-xl border border-sidebar-border/70 dark:border-sidebar-border">
-                    <PlaceholderPattern />
+                <div class="flex flex-wrap gap-2">
+                    <Button v-if="can.reports" variant="outline" as-child>
+                        <Link :href="route('reporting.reports.index')">{{ t('nav.reports') }}</Link>
+                    </Button>
+                    <Button v-if="can.createTicket" as-child>
+                        <Link :href="route('service.tickets.create')">{{ t('tickets.create') }}</Link>
+                    </Button>
                 </div>
             </div>
-            <div class="relative min-h-[100vh] flex-1 rounded-xl border border-sidebar-border/70 dark:border-sidebar-border md:min-h-min">
-                <PlaceholderPattern />
+
+            <div v-if="tiles.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Link
+                    v-for="tile in tiles"
+                    :key="tile.key"
+                    :href="tile.href"
+                    class="rounded-md border p-4 transition-colors hover:bg-muted/40"
+                    :class="{ 'border-red-300 dark:border-red-900': tile.alert }"
+                >
+                    <p class="text-xs text-muted-foreground">{{ tile.label }}</p>
+                    <p class="text-2xl font-semibold" :class="{ 'text-red-700 dark:text-red-400': tile.alert }">{{ tile.value }}</p>
+                </Link>
             </div>
+
+            <div class="grid gap-6 lg:grid-cols-3">
+                <section v-if="tickets" class="space-y-2 lg:col-span-2">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-sm font-semibold">{{ t('dashboard.recent_tickets') }}</h2>
+                        <Link :href="route('service.tickets.index')" class="text-sm text-primary underline-offset-4 hover:underline">
+                            {{ t('dashboard.view_all') }}
+                        </Link>
+                    </div>
+                    <ul v-if="tickets.recent.length" class="divide-y rounded-md border text-sm">
+                        <li v-for="ticket in tickets.recent" :key="ticket.ulid">
+                            <Link
+                                :href="route('service.tickets.show', ticket.ulid)"
+                                class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 hover:bg-muted/40"
+                            >
+                                <span class="min-w-0">
+                                    <span class="font-mono text-xs text-muted-foreground">{{ ticket.ticket_no }}</span>
+                                    <span class="ml-2">{{ ticket.title }}</span>
+                                    <span class="ml-2 text-xs text-muted-foreground">{{ dateTime(ticket.created_at) }}</span>
+                                </span>
+                                <span class="flex items-center gap-2">
+                                    <TicketPriorityBadge :priority="ticket.priority" />
+                                    <TicketStatusBadge :status="ticket.status" />
+                                </span>
+                            </Link>
+                        </li>
+                    </ul>
+                    <p v-else class="rounded-md border px-4 py-6 text-center text-sm text-muted-foreground">{{ t('dashboard.no_open_tickets') }}</p>
+                </section>
+
+                <section v-if="surveys" class="space-y-2">
+                    <h2 class="text-sm font-semibold">{{ t('dashboard.satisfaction') }}</h2>
+                    <div class="rounded-md border p-4">
+                        <p class="text-2xl font-semibold">
+                            {{ surveys.average === null ? t('common.none') : surveys.average.toFixed(2) }}
+                            <span class="text-sm font-normal text-muted-foreground">{{ t('surveys.summary.out_of', { max: 5 }) }}</span>
+                        </p>
+                        <StarRating :model-value="surveys.average === null ? null : Math.round(surveys.average)" />
+                        <p class="mt-1 text-xs text-muted-foreground">
+                            {{ t('surveys.summary.answered_of', { answered: surveys.answered, sent: surveys.sent }) }} ·
+                            {{ t('dashboard.this_month') }}
+                        </p>
+                    </div>
+                </section>
+            </div>
+
+            <p v-if="!tiles.length && !tickets" class="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
+                {{ page.props.tenant?.is_platform ? t('dashboard.platform_hint') : t('dashboard.nothing') }}
+            </p>
         </div>
     </AppLayout>
 </template>

@@ -5,6 +5,7 @@ use App\Modules\Maintenance\Http\Controllers\PmChecklistController;
 use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitController;
+use App\Modules\Maintenance\Http\Controllers\PmVisitPdfController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance.')->group(function () {
@@ -18,6 +19,7 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
 
     Route::resource('pm-visits', PmVisitController::class)->only(['index', 'show', 'update'])
         ->names('visits')->parameters(['pm-visits' => 'visit']);
+    Route::get('pm-visits/{visit}/pdf', PmVisitPdfController::class)->name('visits.pdf');
     Route::post('pm-visits/{visit}/start', [PmVisitController::class, 'start'])->name('visits.start');
     Route::post('pm-visits/{visit}/complete', [PmVisitController::class, 'complete'])->name('visits.complete');
     Route::post('pm-visits/{visit}/cancel', [PmVisitController::class, 'cancel'])->name('visits.cancel');

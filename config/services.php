@@ -28,6 +28,12 @@ return [
         'key' => env('RESEND_KEY'),
     ],
 
+    // Every PDF is made by Gotenberg (HTML -> PDF with Chromium). See App\Modules\Document.
+    'gotenberg' => [
+        'url' => env('GOTENBERG_URL', 'http://127.0.0.1:3000'),
+        'timeout' => (int) env('GOTENBERG_TIMEOUT', 30),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

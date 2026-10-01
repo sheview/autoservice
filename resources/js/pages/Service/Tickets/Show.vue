@@ -215,6 +215,9 @@ const showBody = (event: TicketEvent) => event.body && ['comment', 'status'].inc
                             {{ t('ticket_print.button') }}
                         </Link>
                     </Button>
+                    <Button variant="outline" as-child>
+                        <a :href="route('service.tickets.pdf', ticket.ulid)" target="_blank" rel="noopener">{{ t('ticket_print.pdf') }}</a>
+                    </Button>
                     <Button v-if="can.update" variant="outline" as-child>
                         <Link :href="route('service.tickets.edit', ticket.ulid)">{{ t('common.edit') }}</Link>
                     </Button>

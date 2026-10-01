@@ -9,10 +9,10 @@ class ExampleTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_returns_a_successful_response()
+    // There is no public landing page: the root sends visitors to the sign-in page.
+    public function test_sends_visitors_to_the_sign_in_page()
     {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
+        $this->get('/')->assertRedirect('/login');
+        $this->get('/login')->assertOk();
     }
 }

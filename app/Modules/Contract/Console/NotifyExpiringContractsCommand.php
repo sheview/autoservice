@@ -5,6 +5,7 @@ namespace App\Modules\Contract\Console;
 use App\Modules\Contract\Jobs\NotifyExpiringContractsJob;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Tenant;
+use App\Modules\Tenancy\Support\Subscription;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Bus;
@@ -28,7 +29,8 @@ class NotifyExpiringContractsCommand extends Command
             ->where('is_platform', false)
             ->where('status', Tenant::STATUS_ACTIVE)
             ->each(function (Tenant $tenant) use ($context, $modules, &$count) {
-                if (! $modules->enabled('contract', $tenant)) {
+                // A company locked out (subscription over) gets no e-mails either.
+                if (! $modules->enabled('contract', $tenant) || Subscription::of($tenant)['locked']) {
                     return;
                 }
 

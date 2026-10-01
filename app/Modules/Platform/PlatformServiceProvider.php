@@ -2,6 +2,8 @@
 
 namespace App\Modules\Platform;
 
+use App\Modules\Platform\Console\InstallPlatformCommand;
+use App\Modules\Platform\Console\SyncPermissionsCommand;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Tenant;
@@ -23,6 +25,10 @@ class PlatformServiceProvider extends ServiceProvider
 
         foreach (config('modules.toggleable', []) as $key => $module) {
             Feature::define(Modules::feature($key), fn (Tenant $tenant) => ! $tenant->is_platform && (bool) $module['default']);
+        }
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([InstallPlatformCommand::class, SyncPermissionsCommand::class]);
         }
     }
 }

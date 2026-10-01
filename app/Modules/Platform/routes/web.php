@@ -1,9 +1,13 @@
 <?php
 
+use App\Modules\Platform\Http\Controllers\DashboardController;
 use App\Modules\Platform\Http\Controllers\ImpersonationController;
 use App\Modules\Platform\Http\Controllers\TenantController;
 use App\Modules\Platform\Http\Controllers\TenantModuleController;
 use Illuminate\Support\Facades\Route;
+
+// The home page of every signed-in user.
+Route::get('dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(function () {
     Route::get('impersonation', [ImpersonationController::class, 'index'])->name('impersonation.index');

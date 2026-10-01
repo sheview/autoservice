@@ -84,6 +84,9 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     />
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <a :href="route('maintenance.visits.pdf', visit.ulid)" target="_blank" rel="noopener">{{ t('pm_visits.pdf') }}</a>
+                    </Button>
                     <Button v-if="can.start" @click="start">{{ t('pm_visits.start') }}</Button>
                     <Button v-if="can.cancel && !cancelling" variant="outline" @click="cancelling = true">{{ t('pm_visits.cancel') }}</Button>
                 </div>

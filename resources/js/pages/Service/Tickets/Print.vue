@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { documentDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft, Printer } from 'lucide-vue-next';
+import { ArrowLeft, FileDown, Printer } from 'lucide-vue-next';
 import { onBeforeUnmount, onMounted } from 'vue';
 
 // The job sheet of a ticket: one A4 page printed with the browser. No app layout or navigation.
@@ -81,6 +81,12 @@ const blankRows = 3;
             <Button @click="print">
                 <Printer class="h-4 w-4" />
                 {{ t('ticket_print.print_now') }}
+            </Button>
+            <Button variant="outline" as-child>
+                <a :href="route('service.tickets.pdf', ticket.ulid)" target="_blank" rel="noopener">
+                    <FileDown class="h-4 w-4" />
+                    {{ t('ticket_print.pdf') }}
+                </a>
             </Button>
             <span class="text-xs text-muted-foreground">{{ t('ticket_print.hint') }}</span>
         </div>
