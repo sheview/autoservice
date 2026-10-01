@@ -7,6 +7,7 @@ use App\Modules\Platform\Actions\StartImpersonation;
 use App\Modules\Platform\Actions\StopImpersonation;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Models\Tenant;
+use App\Modules\Tenancy\Support\Subscription;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,7 +29,10 @@ class ImpersonationController extends Controller
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString()
-            ->through(fn (Tenant $tenant) => $tenant->only(['id', 'ulid', 'name', 'subdomain', 'status']));
+            ->through(fn (Tenant $tenant) => [
+                ...$tenant->only(['id', 'ulid', 'name', 'subdomain', 'status']),
+                'subscription' => Subscription::of($tenant),
+            ]);
 
         return Inertia::render('Platform/Impersonation/Index', [
             'tenants' => $tenants,

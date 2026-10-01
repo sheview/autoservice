@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Tenancy\Support\Subscription;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -61,7 +62,13 @@ class HandleInertiaRequests extends Middleware
             'impersonation' => $impersonation->active() ? ['tenant' => ['name' => $impersonation->tenant()->name]] : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
             ],
+            // The company's subscription, for the warning popup and banner. Customer accounts are
+            // not told about their MA company's contract with the platform.
+            'subscription' => fn () => $tenant && ! $tenant->is_platform && $user && $user->customer_id === null
+                ? Subscription::of($tenant)
+                : null,
             'locale' => app()->getLocale(),
             'translations' => fn () => trans('ui'),
         ];

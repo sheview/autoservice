@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Modules\Platform\Http\Middleware\EnsureModuleEnabled;
 use App\Modules\Platform\Http\Middleware\LogImpersonatedRequests;
+use App\Modules\Tenancy\Http\Middleware\EnforceSubscription;
 use App\Modules\Tenancy\Http\Middleware\ResolveTenant;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -19,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             ResolveTenant::class,
+            EnforceSubscription::class,
             LogImpersonatedRequests::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,

@@ -4,6 +4,7 @@ import AppShell from '@/components/AppShell.vue';
 import AppSidebar from '@/components/AppSidebar.vue';
 import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue';
+import SubscriptionNotice from '@/components/SubscriptionNotice.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
@@ -20,6 +21,7 @@ withDefaults(defineProps<Props>(), {
         <AppSidebar />
         <AppContent variant="sidebar">
             <ImpersonationBanner />
+            <SubscriptionNotice />
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
             <slot />
         </AppContent>

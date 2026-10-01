@@ -16,6 +16,7 @@ interface TenantRow {
     name: string;
     subdomain: string;
     status: string;
+    subscription: NonNullable<SharedData['subscription']>;
 }
 
 const props = defineProps<{
@@ -37,7 +38,16 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
         <Head :title="t('impersonation.title')" />
 
         <div class="space-y-6 p-4">
-            <Heading :title="t('impersonation.title')" :description="t('impersonation.description')" />
+            <div class="flex flex-wrap items-start justify-between gap-4">
+                <Heading :title="t('impersonation.title')" :description="t('impersonation.description')" />
+                <Button v-if="can('platform.tenants') && !page.props.impersonation" as-child>
+                    <Link :href="route('platform.tenants.create')">{{ t('tenants.create') }}</Link>
+                </Button>
+            </div>
+
+            <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
+                {{ page.props.flash.success }}
+            </p>
 
             <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('impersonation.search_placeholder')" />
 
@@ -48,6 +58,7 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                             <th class="px-4 py-2 font-medium">{{ t('impersonation.name') }}</th>
                             <th class="px-4 py-2 font-medium">{{ t('impersonation.subdomain') }}</th>
                             <th class="px-4 py-2 font-medium">{{ t('common.status') }}</th>
+                            <th class="px-4 py-2 font-medium">{{ t('tenants.subscription') }}</th>
                             <th class="px-4 py-2 text-right font-medium">{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
@@ -56,8 +67,28 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                             <td class="px-4 py-2 font-medium">{{ tenant.name }}</td>
                             <td class="px-4 py-2 font-mono text-xs">{{ tenant.subdomain }}</td>
                             <td class="px-4 py-2">{{ t(`impersonation.status.${tenant.status}`) }}</td>
+                            <td class="px-4 py-2">
+                                <span
+                                    class="rounded px-1.5 py-0.5 text-xs"
+                                    :class="{
+                                        'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200': tenant.subscription.state === 'expiring',
+                                        'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200': ['grace', 'locked', 'not_started'].includes(
+                                            tenant.subscription.state,
+                                        ),
+                                        'bg-muted': ['active', 'unlimited'].includes(tenant.subscription.state),
+                                    }"
+                                >
+                                    {{ t(`subscription.states.${tenant.subscription.state}`) }}
+                                </span>
+                                <span v-if="tenant.subscription.ends_on" class="ml-2 text-xs text-muted-foreground">
+                                    {{ t('tenants.ends') }} {{ tenant.subscription.ends_on }}
+                                </span>
+                            </td>
                             <td class="px-4 py-2 text-right">
                                 <div class="flex justify-end gap-2">
+                                    <Button v-if="can('platform.tenants') && !page.props.impersonation" size="sm" variant="ghost" as-child>
+                                        <Link :href="route('platform.tenants.edit', tenant.ulid)">{{ t('tenants.manage') }}</Link>
+                                    </Button>
                                     <Button v-if="can('platform.tenants') && !page.props.impersonation" size="sm" variant="ghost" as-child>
                                         <Link :href="route('platform.tenants.modules.edit', tenant.ulid)">{{ t('tenant_modules.link') }}</Link>
                                     </Button>
@@ -68,7 +99,7 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                             </td>
                         </tr>
                         <tr v-if="tenants.data.length === 0">
-                            <td colspan="4" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
+                            <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
                         </tr>
                     </tbody>
                 </table>

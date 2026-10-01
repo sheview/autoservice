@@ -25,7 +25,17 @@ export interface SharedData {
     impersonation: { tenant: { name: string } } | null;
     /** Sidebar items built on the server from config/modules.php; icon is a lucide icon name. */
     navigation: { title: string; href: string; icon: string }[];
-    flash: { success: string | null };
+    flash: { success: string | null; error: string | null };
+    /** The company's paid period; null for the platform tenant and customer accounts. */
+    subscription: {
+        state: 'unlimited' | 'not_started' | 'active' | 'expiring' | 'grace' | 'locked';
+        starts_on: string | null;
+        ends_on: string | null;
+        days_left: number | null;
+        read_only_until: string | null;
+        read_only: boolean;
+        locked: boolean;
+    } | null;
     locale: string;
     translations: Record<string, unknown>;
     ziggy: {

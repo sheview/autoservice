@@ -15,7 +15,7 @@ class Tenant extends Model
 
     public const STATUS_SUSPENDED = 'suspended';
 
-    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings'];
+    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings', 'subscription_starts_on', 'subscription_ends_on'];
 
     protected $attributes = [
         'status' => self::STATUS_ACTIVE,
@@ -33,6 +33,8 @@ class Tenant extends Model
         return [
             'settings' => 'array',
             'is_platform' => 'boolean',
+            'subscription_starts_on' => 'date',
+            'subscription_ends_on' => 'date',
         ];
     }
 
