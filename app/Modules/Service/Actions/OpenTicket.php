@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\AssetDevices;
 use App\Modules\Contract\Actions\CoveringContracts;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Actions\SendAlert;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
 use App\Modules\Service\Support\TicketSla;
@@ -73,6 +74,15 @@ class OpenTicket
             if ($ticket->assignee_id !== null) {
                 $this->notify->handle($ticket, 'assigned', $actor);
             }
+
+            // LINE / Telegram / e-mail of the company, if it wants them.
+            app(SendAlert::class)->handle('ticket_opened', [
+                'no' => $ticket->ticket_no,
+                'title' => $ticket->title,
+                'priority' => __("ui.tickets.priorities.{$ticket->priority}"),
+                'contact' => $ticket->contact_name,
+                'actor' => $actor->name,
+            ], route('service.tickets.show', $ticket));
 
             return $ticket;
         });

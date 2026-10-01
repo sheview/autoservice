@@ -4,7 +4,9 @@ namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Support\CheckoutAlert;
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Actions\SendAlert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -38,6 +40,8 @@ class ReturnCheckout
             activity()->performedOn($checkout->asset)->causedBy($actor)->event('checkout_returned')
                 ->withProperties(['checkout_no' => $checkout->checkout_no, 'note' => $note])
                 ->log('รับคืน');
+
+            app(SendAlert::class)->handle('checkout_returned', CheckoutAlert::replace($checkout, $checkout->asset, $actor), route('asset.assets.show', $checkout->asset));
 
             return $checkout;
         });

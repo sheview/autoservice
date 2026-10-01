@@ -3,6 +3,7 @@
 namespace App\Modules\Service\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Actions\SendAlert;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
@@ -76,6 +77,11 @@ class MoveTicket
             // Ask whoever confirms the fix to check it.
             if ($action === 'resolve') {
                 $this->notify->handle($ticket, 'resolved', $actor);
+                app(SendAlert::class)->handle('ticket_resolved', [
+                    'no' => $ticket->ticket_no,
+                    'title' => $ticket->title,
+                    'actor' => $actor->name,
+                ], route('service.tickets.show', $ticket));
             }
 
             // The job is closed: ask the customer how it went (Survey module).

@@ -4,8 +4,10 @@ namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Support\CheckoutAlert;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Actions\SendAlert;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -65,6 +67,8 @@ class RequestCheckout
             activity()->performedOn($asset)->causedBy($actor)->event('checkout_requested')
                 ->withProperties(['checkout_no' => $checkout->checkout_no, 'type' => $checkout->type, 'borrower' => $checkout->borrower_name])
                 ->log('ขอเบิก/ยืม');
+
+            app(SendAlert::class)->handle('checkout_requested', CheckoutAlert::replace($checkout, $asset, $actor), route('asset.assets.show', $asset));
 
             return $checkout;
         });

@@ -62,6 +62,8 @@ return [
         ['group' => 'settings', 'title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'role.view'],
         ['group' => 'settings', 'title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holiday.view', 'module' => 'service'],
         ['group' => 'settings', 'title' => 'nav.company', 'route' => 'tenancy.company.edit', 'icon' => 'building', 'permission' => 'company.update', 'company' => true],
+        ['group' => 'settings', 'title' => 'nav.alerts', 'route' => 'platform.alerts.edit', 'icon' => 'bell', 'permission' => 'company.update', 'company' => true],
+        ['group' => 'settings', 'title' => 'nav.activity_log', 'route' => 'platform.activity-log', 'icon' => 'scroll-text', 'permission' => 'log.view'],
 
         ['group' => 'platform', 'title' => 'nav.tenants', 'route' => 'platform.impersonation.index', 'icon' => 'building-2', 'permission' => 'platform.impersonate'],
         ['group' => 'platform', 'title' => 'nav.platform_settings', 'route' => 'platform.settings.edit', 'icon' => 'settings', 'permission' => 'platform.tenants'],

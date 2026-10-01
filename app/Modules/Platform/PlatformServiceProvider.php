@@ -3,11 +3,13 @@
 namespace App\Modules\Platform;
 
 use App\Modules\Platform\Console\InstallPlatformCommand;
+use App\Modules\Platform\Console\PruneActivityLogCommand;
 use App\Modules\Platform\Console\SyncPermissionsCommand;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 
@@ -28,7 +30,12 @@ class PlatformServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([InstallPlatformCommand::class, SyncPermissionsCommand::class]);
+            $this->commands([InstallPlatformCommand::class, SyncPermissionsCommand::class, PruneActivityLogCommand::class]);
         }
+
+        // The activity log keeps SearchActivityLog::KEEP_DAYS days.
+        $this->callAfterResolving(Schedule::class, function (Schedule $schedule) {
+            $schedule->command('activitylog:prune')->dailyAt('03:00')->timezone('Asia/Bangkok');
+        });
     }
 }

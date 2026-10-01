@@ -33,6 +33,8 @@ class PermissionCatalog
         'purchase' => ['request'],
         // The company's own profile: logo, service phone and e-mail (labels, documents).
         'company' => ['update'],
+        // The activity log of the company (kept 90 days).
+        'log' => ['view'],
         // impersonate = enter a customer tenant; full_access = pass every check while inside.
         'platform' => ['impersonate', 'tenants', 'full_access'],
     ];

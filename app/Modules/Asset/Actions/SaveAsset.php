@@ -6,6 +6,7 @@ use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetSerial;
 use App\Modules\Asset\Support\SpecFields;
+use App\Modules\Platform\Actions\SendAlert;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -48,7 +49,17 @@ class SaveAsset
                 }
             }
 
+            $isNew = ! $asset->exists;
             $asset->fill($data)->save();
+
+            // Sent for repair (a change of an existing asset; not a new one or an import of new ones).
+            if (! $isNew && $asset->wasChanged('status') && $asset->status === Asset::STATUS_IN_REPAIR) {
+                app(SendAlert::class)->handle('asset_in_repair', [
+                    'code' => $asset->asset_code,
+                    'name' => $asset->name,
+                    'location' => $asset->location,
+                ], route('asset.assets.show', $asset));
+            }
 
             if ($serials !== null) {
                 $this->syncSerials($asset, $serials);
