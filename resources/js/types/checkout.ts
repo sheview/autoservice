@@ -26,5 +26,7 @@ export interface CheckoutRow {
     requested_at: string | null;
     decided_at: string | null;
     returned_at: string | null;
+    // What the user may do with this form now (asset forms); absent = the page's "can" decides.
+    actions?: { approve: boolean; return: boolean; cancel: boolean };
     asset: { ulid: string; asset_code: string; name: string; serial_number: string | null; unit: string | null } | null;
 }

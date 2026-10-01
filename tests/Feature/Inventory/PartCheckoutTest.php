@@ -66,7 +66,7 @@ it('issues parts: asked for, the stock goes out when approved, and they do not c
 });
 
 it('lends parts and takes them back into stock', function () {
-    ($this->ask)(['type' => 'loan', 'quantity' => 3, 'due_on' => '2026-10-10', 'contract_id' => null, 'borrower_user_id' => null, 'borrower_name' => 'Contractor Lek'])
+    ($this->ask)(['type' => 'loan', 'quantity' => 3, 'due_on' => '2026-10-10', 'contract_id' => null])
         ->assertSessionHasNoErrors();
     $form = PartCheckout::sole();
     expect($form->contract_id)->toBeNull();
@@ -134,4 +134,38 @@ it('counts parts in the summaries by person and by project', function () {
     $this->actingAs($this->admin)->get("/summary/people/view?user={$this->tech->id}")->assertInertia(fn (Assert $page) => $page
         ->where('totals.issues', 1)
         ->has('partCheckouts.data', 1));
+});
+
+it('keeps a technician (parts.issue scope own) to forms for themself and to their own forms', function () {
+    // whatever the form says, a technician asks only for themself
+    ($this->ask)(['borrower_user_id' => null, 'borrower_name' => 'Contractor Lek'])->assertSessionHasNoErrors();
+    $mine = PartCheckout::sole();
+    expect($mine->only(['borrower_user_id', 'borrower_name']))->toBe(['borrower_user_id' => $this->tech->id, 'borrower_name' => 'Somsak Tech']);
+    $this->actingAs($this->tech)->get("/parts/{$this->ram->id}")->assertInertia(fn (Assert $page) => $page
+        ->where('checkouts.can.forOthers', false)
+        ->where('checkouts.borrowers', [['id' => $this->tech->id, 'name' => 'Somsak Tech']]));
+
+    // helpdesk (scope all) asks for anyone, also someone from outside
+    $helpdesk = userWithRole('helpdesk');
+    ($this->ask)(['type' => 'loan', 'due_on' => '2026-10-10', 'borrower_user_id' => null, 'borrower_name' => 'Contractor Lek'], $helpdesk)->assertSessionHasNoErrors();
+    $theirs = PartCheckout::latest('id')->first();
+    expect($theirs->borrower_name)->toBe('Contractor Lek');
+
+    // the technician sees only their own form, on the list and on the part page
+    $this->actingAs($this->tech)->get('/part-checkouts')->assertInertia(fn (Assert $page) => $page
+        ->has('checkouts.data', 1)->where('checkouts.data.0.checkout_no', $mine->checkout_no));
+    $this->actingAs($this->tech)->get("/parts/{$this->ram->id}")->assertInertia(fn (Assert $page) => $page->has('checkouts.open', 1));
+    $this->actingAs($helpdesk)->get('/part-checkouts')->assertInertia(fn (Assert $page) => $page->has('checkouts.data', 2));
+
+    // and cannot take back or print someone else's form
+    $this->actingAs($this->admin)->post("/part-checkouts/{$theirs->ulid}/approve")->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->post("/part-checkouts/{$theirs->ulid}/return")->assertForbidden();
+    $this->actingAs($this->tech)->get("/part-checkouts/{$theirs->ulid}/print")->assertForbidden();
+    // the approver takes it back
+    $this->actingAs($helpdesk)->post("/part-checkouts/{$theirs->ulid}/return")->assertSessionHasNoErrors();
+    expect($theirs->fresh()->status)->toBe('returned');
+
+    // a form made out to the technician by someone else is theirs too
+    ($this->ask)(['borrower_user_id' => $this->tech->id], $helpdesk)->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->get('/part-checkouts')->assertInertia(fn (Assert $page) => $page->has('checkouts.data', 2));
 });

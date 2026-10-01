@@ -11,12 +11,12 @@ use App\Modules\Asset\Actions\RequestCheckout;
 use App\Modules\Asset\Actions\SameModelAssets;
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Actions\SearchAssets;
+use App\Modules\Asset\Actions\SearchCheckouts;
 use App\Modules\Asset\Exports\AssetsExport;
 use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetCheckout;
-use App\Modules\Asset\Support\CheckoutRow;
 use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
@@ -25,6 +25,7 @@ use App\Modules\Document\Support\Attachments;
 use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\PurchaseRequestDetails;
 use App\Modules\Maintenance\Actions\PmHistoryForAsset;
@@ -84,7 +85,7 @@ class AssetController extends Controller
         return Inertia::render('Asset/Assets/Index', [
             'assets' => $assets,
             'filters' => $filters,
-            'branches' => $this->branchOptions($user),
+            'branches' => $this->branchOptions($user, 'assets.view'),
             'customers' => $this->customers(),
             'categories' => AssetCategory::orderBy('name')->get(['id', 'name']),
             'statuses' => Asset::STATUSES,
@@ -163,7 +164,7 @@ class AssetController extends Controller
 
         $asset->load(['category', 'branch:id,name', 'serials']);
         $user = $request->user();
-        $showContracts = $this->modules->enabled('contract') && $user->can('contract.view');
+        $showContracts = $this->modules->enabled('contract') && $user->can('contracts.view');
         $serviceOn = $this->modules->enabled('service');
 
         return Inertia::render('Asset/Assets/Show', [
@@ -189,12 +190,12 @@ class AssetController extends Controller
             'checkouts' => $this->checkouts($request, $asset, $usersWithPermission),
             'photos' => PhotoSlots::list($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
             'attachments' => Attachments::list($asset, $asset->attachmentCollection(), fn (int $id) => route('asset.assets.attachments.show', [$asset, $id])),
-            // null = the user cannot see contracts here (module off or no contract.view)
+            // null = the user cannot see contracts here (module off or no contracts.view)
             'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
-            // null = the user cannot see tickets here (module off or no ticket.view)
-            'tickets' => $serviceOn && $user->can('ticket.view') ? $ticketsForAsset->handle($asset->id) : null,
-            // null = the user cannot see PM rounds here (module off or no pm.view)
-            'pmHistory' => $this->modules->enabled('maintenance') && $user->can('pm.view') ? $pmHistoryForAsset->handle($asset->id) : null,
+            // null = the user cannot see tickets here (module off or no tickets.view)
+            'tickets' => $serviceOn && $user->can('tickets.view') ? $ticketsForAsset->handle($asset->id) : null,
+            // null = the user cannot see PM rounds here (module off or no pm-visits.view)
+            'pmHistory' => $this->modules->enabled('maintenance') && $user->can('pm-visits.view') ? $pmHistoryForAsset->handle($asset->id) : null,
             'history' => $asset->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,
                 'event' => $log->event,
@@ -206,8 +207,8 @@ class AssetController extends Controller
                 'create' => $user->can('create', Asset::class),
                 'update' => $user->can('update', $asset),
                 'delete' => $user->can('delete', $asset),
-                'openTicket' => $serviceOn && $user->can('ticket.create'),
-                'printLabel' => $this->modules->enabled('labeling') && $user->can('sticker.print'),
+                'openTicket' => $serviceOn && $user->can('tickets.create'),
+                'printLabel' => $this->modules->enabled('labeling') && $user->can('labels.print'),
             ],
         ]);
     }
@@ -283,7 +284,7 @@ class AssetController extends Controller
             'purchase' => null,
             'maxSerials' => AssetRequest::MAX_SERIALS,
             'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'code_prefix', 'requires_serial', 'spec_fields']),
-            'branches' => $this->branchOptions($user),
+            'branches' => $this->branchOptions($user, $asset ? 'assets.update' : 'assets.create'),
             'customers' => $this->customers(),
             'statuses' => Asset::STATUSES,
             // Creating only: the asset is already out with someone.
@@ -300,31 +301,35 @@ class AssetController extends Controller
      */
     private function checkouts(Request $request, Asset $asset, UsersWithPermission $usersWithPermission): ?array
     {
+        $user = $request->user();
         $can = AssetCheckoutController::abilities($request);
-        if (! $can['request'] && ! $can['approve']) {
+        if (! $can['view'] && ! $can['request'] && ! $can['approve'] && ! $can['return']) {
             return null;
         }
 
         // Every form still holding some of the asset (several at once for an asset bought by the
-        // lot), then the last closed ones.
-        $open = AssetCheckout::query()->where('asset_id', $asset->id)->whereIn('status', AssetCheckout::OPEN_STATUSES)->oldest('id')->get();
-        $recent = AssetCheckout::query()->where('asset_id', $asset->id)->whereNotIn('status', AssetCheckout::OPEN_STATUSES)->latest('id')->limit(10)->get();
+        // lot), then the last closed ones: those the user reaches (SearchCheckouts).
+        $forms = fn () => SearchCheckouts::visibleTo(AssetCheckout::query(), $user)->where('asset_id', $asset->id)->with('asset:id,branch_id');
+        $open = $forms()->whereIn('status', AssetCheckout::OPEN_STATUSES)->oldest('id')->get();
+        $recent = $forms()->whereNotIn('status', AssetCheckout::OPEN_STATUSES)->latest('id')->limit(10)->get();
         $available = RequestCheckout::available($asset);
+        $row = fn (AssetCheckout $checkout) => AssetCheckoutController::row($checkout, $user);
 
         return [
             // The first open form (kept for pages that show one), and all of them.
-            'current' => $open->isNotEmpty() ? CheckoutRow::of($open->first()) : null,
-            'open' => $open->map(fn (AssetCheckout $checkout) => CheckoutRow::of($checkout))->values(),
-            'history' => $recent->map(fn (AssetCheckout $checkout) => CheckoutRow::of($checkout))->values(),
+            'current' => $open->isNotEmpty() ? $row($open->first()) : null,
+            'open' => $open->map($row)->values(),
+            'history' => $recent->map($row)->values(),
             'available' => $available,
             'available_quantity' => RequestCheckout::availableQuantity($asset),
             'quantity' => $asset->quantity,
             'unit' => $asset->unit,
-            'borrowers' => $available && $can['request']
-                ? $usersWithPermission->handle('asset.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
+            // Asking only for oneself (forSelf): nobody to choose.
+            'borrowers' => $available && $can['request'] && ! $can['forSelf']
+                ? $usersWithPermission->handle('assets.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
                 : [],
             'contracts' => $available && $can['request'] && $this->modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
-            'can' => [...$can, 'userId' => $request->user()->id],
+            'can' => [...$can, 'userId' => $user->id],
         ];
     }
 
@@ -364,12 +369,13 @@ class AssetController extends Controller
     }
 
     /**
-     * Branches the user may pick: all of them with branch.all, otherwise only their own.
+     * Branches the user may pick: all of them when $permission reaches the whole company (scope
+     * all), otherwise only their own.
      */
-    private function branchOptions(User $user): array
+    private function branchOptions(User $user, string $permission): array
     {
         return Branch::query()
-            ->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn ($q) => $q->whereKey($user->branch_id))
+            ->unless(DataScope::of($user, $permission) === PermissionCatalog::SCOPE_ALL, fn ($q) => $q->whereKey($user->branch_id))
             ->orderBy('name')
             ->get(['id', 'name'])
             ->toArray();

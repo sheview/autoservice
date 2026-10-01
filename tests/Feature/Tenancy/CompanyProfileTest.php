@@ -51,6 +51,13 @@ it('validates the profile', function () {
 it('lets only the company admin change it, and keeps each company to its own', function () {
     $this->actingAs(userWithRole('technician'))->get('/company')->assertForbidden();
     $this->actingAs(userWithRole('helpdesk'))->put('/company', ['service_phone' => '1'])->assertForbidden();
+    $this->actingAs($this->admin)->get('/company')->assertInertia(fn (Assert $page) => $page->where('can.manage', true));
+
+    // company.view opens the page read only; company.manage is needed to change it
+    grantTo('helpdesk', ['company.view']);
+    $helpdesk = userWithRole('helpdesk');
+    $this->actingAs($helpdesk)->get('/company')->assertOk()->assertInertia(fn (Assert $page) => $page->where('can.manage', false));
+    $this->actingAs($helpdesk)->put('/company', ['service_phone' => '1'])->assertForbidden();
 
     $this->actingAs($this->admin)->put('/company', ['service_phone' => '02-1111111']);
 

@@ -2,6 +2,20 @@
 
 // Texts of the PDF documents (resources/views/documents) and of the Document module.
 return [
+    'manuals' => [
+        'created' => 'เพิ่มคู่มือเรียบร้อยแล้ว',
+        'updated' => 'บันทึกคู่มือเรียบร้อยแล้ว',
+        'deleted' => 'ลบคู่มือแล้ว',
+        'fields' => [
+            'title' => 'ชื่อคู่มือ',
+            'category' => 'หมวด',
+            'description' => 'รายละเอียด',
+            'links' => 'ลิงก์',
+            'links.*.label' => 'ชื่อลิงก์',
+            'links.*.url' => 'ลิงก์',
+        ],
+    ],
+
     'unavailable' => 'ระบบสร้างไฟล์ PDF ยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง หรือใช้ปุ่ม "พิมพ์" แทน',
 
     // A part issue/loan form: the same page as an asset's, with these in place of the asset's words.

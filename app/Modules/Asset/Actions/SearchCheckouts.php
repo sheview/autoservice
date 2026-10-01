@@ -4,11 +4,13 @@ namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * The issue/loan list: forms of assets the user may see (SearchAssets), with search, filters and sort.
+ * The issue/loan list: the forms the user reaches with asset-checkouts.view (visibleTo), with
+ * search, filters and sort.
  */
 class SearchCheckouts
 {
@@ -41,8 +43,9 @@ class SearchCheckouts
         $status = $filters['status'] ?? 'open';
 
         return AssetCheckout::query()
-            ->with('asset:id,ulid,asset_code,name,serial_number')
-            ->whereHas('asset', fn (Builder $q) => SearchAssets::visibleTo($q, $user))
+            ->with('asset:id,ulid,asset_code,name,serial_number,branch_id')
+            ->has('asset')
+            ->tap(fn (Builder $q) => self::visibleTo($q, $user))
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->where('checkout_no', 'ilike', "%{$search}%")
                 ->orWhere('borrower_name', 'ilike', "%{$search}%")
@@ -64,5 +67,32 @@ class SearchCheckouts
                 fn (Builder $q) => $q->orderByRaw('due_on '.($filters['direction'] === 'asc' ? 'asc' : 'desc').' nulls last'),
                 fn (Builder $q) => $q->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc'))
             ->orderByDesc('id');
+    }
+
+    /**
+     * Limit a form query to what the user reaches with $permission (DataScope): every form (all),
+     * forms of assets of the user's branch or of no branch (branch), or the user's own forms:
+     * asked for by them or for them (own). Forms have no customer.
+     *
+     * @param  Builder<AssetCheckout>  $query
+     * @return Builder<AssetCheckout>
+     */
+    public static function visibleTo(Builder $query, User $user, string $permission = 'asset-checkouts.view'): Builder
+    {
+        return DataScope::constrain($query, $user, $permission,
+            branch: fn (Builder $q, ?int $branchId) => $q->whereHas('asset', fn (Builder $q) => $q
+                ->where(fn ($q) => $q->whereNull('branch_id')->when($branchId, fn ($q, $id) => $q->orWhere('branch_id', $id)))),
+            customer: null,
+            own: fn (Builder $q) => $q->where(fn ($q) => $q->where('requested_by', $user->id)->orWhere('borrower_user_id', $user->id)));
+    }
+
+    /** Whether the user reaches the form with $permission (the check of visibleTo on one form). */
+    public static function covers(AssetCheckout $checkout, User $user, string $permission): bool
+    {
+        return DataScope::covers($checkout, $user, $permission,
+            branch: fn (AssetCheckout $c, ?int $branchId) => $c->asset !== null
+                && ($c->asset->branch_id === null || (int) $c->asset->branch_id === (int) $branchId),
+            customer: null,
+            own: fn (AssetCheckout $c) => (int) $c->requested_by === $user->id || (int) $c->borrower_user_id === $user->id);
     }
 }

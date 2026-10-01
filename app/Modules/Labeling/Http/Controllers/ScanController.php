@@ -31,7 +31,7 @@ class ScanController extends Controller
         Modules $modules,
     ): Response {
         $user = $request->user();
-        abort_unless($user->can('asset.view'), 403);
+        abort_unless($user->can('assets.view'), 403);
 
         $found = array_values($assetDetails->handle([$asset], byUlid: true))[0] ?? null;
         $row = $found ? ($assetSummaries->handle($user, ['ids' => [$found['id']]])[0] ?? null) : null;
@@ -44,10 +44,10 @@ class ScanController extends Controller
 
         return Inertia::render('Labeling/Scan', [
             'asset' => [...collect($row)->only(['ulid', 'asset_code', 'name', 'category', 'branch', 'status', 'serial_number', 'property_no'])->all(), 'customer' => $customer],
-            'tickets' => $serviceOn && $user->can('ticket.view') ? array_slice($ticketsForAsset->handle($row['id']), 0, 3) : null,
-            'lastPm' => $modules->enabled('maintenance') && $user->can('pm.view') ? ($pmHistory->handle($row['id'], 1)[0] ?? null) : null,
+            'tickets' => $serviceOn && $user->can('tickets.view') ? array_slice($ticketsForAsset->handle($row['id']), 0, 3) : null,
+            'lastPm' => $modules->enabled('maintenance') && $user->can('pm-visits.view') ? ($pmHistory->handle($row['id'], 1)[0] ?? null) : null,
             'can' => [
-                'openTicket' => $serviceOn && $user->can('ticket.create'),
+                'openTicket' => $serviceOn && $user->can('tickets.create'),
             ],
         ]);
     }

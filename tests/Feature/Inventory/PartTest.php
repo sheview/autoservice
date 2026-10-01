@@ -80,22 +80,25 @@ it('deletes only a part without stock', function () {
         ->and(Part::withTrashed()->count())->toBe(2);
 });
 
-it('lets technicians and helpdesk view parts but not change them, and hides them from others', function () {
+it('lets technicians view parts but not change them, helpdesk add and edit but not delete, and hides them from others', function () {
     $part = createPart();
     $payload = ['code' => 'X', 'name' => 'X', 'unit' => 'pcs'];
 
-    foreach (['technician', 'helpdesk'] as $role) {
-        $user = userWithRole($role);
-        $this->actingAs($user)->get('/parts')->assertOk();
-        $this->actingAs($user)->get("/parts/{$part->id}")->assertOk();
-        $this->actingAs($user)->post('/parts', $payload)->assertForbidden();
-        $this->actingAs($user)->put("/parts/{$part->id}", $payload)->assertForbidden();
-        $this->actingAs($user)->delete("/parts/{$part->id}")->assertForbidden();
-    }
+    $technician = userWithRole('technician');
+    $this->actingAs($technician)->get('/parts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('can.create', false)->where('can.update', false));
+    $this->actingAs($technician)->get("/parts/{$part->id}")->assertOk();
+    $this->actingAs($technician)->post('/parts', $payload)->assertForbidden();
+    $this->actingAs($technician)->put("/parts/{$part->id}", $payload)->assertForbidden();
+    $this->actingAs($technician)->delete("/parts/{$part->id}")->assertForbidden();
+
+    $helpdesk = userWithRole('helpdesk');
+    $this->actingAs($helpdesk)->get('/parts')->assertOk()->assertInertia(fn (Assert $page) => $page->where('can.create', true)->where('can.delete', false));
+    $this->actingAs($helpdesk)->put("/parts/{$part->id}", [...$payload, 'code' => $part->code])->assertSessionHasNoErrors();
+    $this->actingAs($helpdesk)->delete("/parts/{$part->id}")->assertForbidden();
 
     $this->actingAs(userWithRole('user'))->get('/parts')->assertForbidden();
 
-    $client = userWithRole('customer', ['customer_id' => createCustomer()->id]);
+    $client = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($client)->get('/parts')->assertForbidden();
     $this->actingAs($client)->get("/parts/{$part->id}")->assertForbidden();
 });

@@ -54,8 +54,9 @@ it('deletes only a customer without contracts or assets', function () {
 it('lets a technician view but not change customers', function () {
     $technician = userWithRole('technician');
     $customer = createCustomer();
+    openTicket($this->admin, ['customer_id' => $customer->id, 'assignee_id' => $technician->id]);
 
-    $this->actingAs($technician)->get('/customers')->assertOk();
+    $this->actingAs($technician)->get('/customers')->assertOk()->assertInertia(fn (Assert $page) => $page->where('customers.total', 1));
     $this->actingAs($technician)->post('/customers', ['code' => 'X', 'name' => 'X'])->assertForbidden();
     $this->actingAs($technician)->put("/customers/{$customer->id}", ['code' => 'X', 'name' => 'X'])->assertForbidden();
     $this->actingAs($technician)->delete("/customers/{$customer->id}")->assertForbidden();

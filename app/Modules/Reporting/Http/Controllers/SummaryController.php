@@ -28,8 +28,10 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * What each person, and each project (MA contract), has been issued, lent or bought. Office staff
- * with report.view; each list shows only the forms the user may see in their own module.
+ * What each person (summary-people.view), and each project (MA contract, summary-projects.view),
+ * has been issued, lent or bought; each list shows only the forms the user may see in their own
+ * module. With scope own a person sees only their own summary; a customer account only the
+ * projects of its customer, without purchases or amounts (SummarizePeople, SummarizeProjects).
  */
 class SummaryController extends Controller
 {
@@ -44,7 +46,7 @@ class SummaryController extends Controller
 
     public function people(Request $request, SummarizePeople $summarize): Response
     {
-        abort_unless($request->user()->can(ReportController::PERMISSION), 403);
+        abort_unless($request->user()->can(SummarizePeople::PERMISSION), 403);
         $filters = SummarizePeople::filtersFrom($request);
 
         return Inertia::render('Reporting/People/Index', [
@@ -60,9 +62,10 @@ class SummaryController extends Controller
     public function person(Request $request, UserNames $userNames): Response
     {
         $viewer = $request->user();
-        abort_unless($viewer->can(ReportController::PERMISSION), 403);
+        abort_unless($viewer->can(SummarizePeople::PERMISSION), 403);
 
         $userId = $request->integer('user') ?: null;
+        abort_unless(SummarizePeople::reaches($viewer, $userId), 403);
         $outsideName = $userId ? null : $request->string('name')->trim()->limit(255, '')->value();
         $name = $userId ? ($userNames->handle([$userId])[$userId] ?? null) : $outsideName;
         abort_if(blank($name), 404);
@@ -77,7 +80,7 @@ class SummaryController extends Controller
                 ? $this->checkouts($viewer, [...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
                 : null,
             'partCheckouts' => $this->modules->enabled('inventory')
-                ? $this->partCheckouts([...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
+                ? $this->partCheckouts($viewer, [...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
                 : null,
             // People from outside cannot ask to buy.
             'purchases' => $userId && $this->modules->enabled('inventory')
@@ -88,34 +91,46 @@ class SummaryController extends Controller
 
     public function projects(Request $request, SummarizeProjects $summarize, ListCustomers $listCustomers): Response
     {
-        abort_unless($request->user()->can(ReportController::PERMISSION), 403);
+        $viewer = $request->user();
+        abort_unless($viewer->can(SummarizeProjects::PERMISSION), 403);
         abort_unless($this->modules->enabled('contract'), 404);
         $filters = SummarizeProjects::filtersFrom($request);
+        $customerIds = $summarize->customerIds($viewer);
 
         return Inertia::render('Reporting/Projects/Index', [
-            'projects' => $summarize->handle($request->user(), $filters),
+            'projects' => $summarize->handle($viewer, $filters),
             'filters' => $filters,
-            'customers' => $listCustomers->handle(),
+            // Only the customers whose projects the user may see.
+            'customers' => collect($listCustomers->handle())
+                ->filter(fn (array $customer) => $customerIds === null || in_array($customer['id'], $customerIds, true))
+                ->values()->all(),
             'phases' => ContractPhase::PHASES,
+            'showsPurchases' => SummarizeProjects::showsPurchases($viewer),
         ]);
     }
 
-    public function project(Request $request, int $contract, ContractDetails $contractDetails): Response
+    public function project(Request $request, int $contract, ContractDetails $contractDetails, SummarizeProjects $summarize): Response
     {
         $viewer = $request->user();
-        abort_unless($viewer->can(ReportController::PERMISSION), 403);
+        abort_unless($viewer->can(SummarizeProjects::PERMISSION), 403);
         abort_unless($this->modules->enabled('contract'), 404);
 
         $details = $contractDetails->handle([$contract])[$contract] ?? abort(404);
+        $customerIds = $summarize->customerIds($viewer);
+        abort_unless($customerIds === null || in_array((int) $details['customer_id'], $customerIds, true), 403);
+
         $filters = $this->listFilters($request);
+        $purchases = SummarizeProjects::showsPurchases($viewer);
 
         return Inertia::render('Reporting/Projects/Show', [
             'project' => collect($details)->only(['id', 'contract_no', 'title', 'status', 'customer', 'starts_on', 'ends_on'])->all(),
-            'totals' => $this->countRows->handle($viewer, ['contract_id' => $contract]),
+            'totals' => $this->countRows->handle($viewer, ['contract_id' => $contract], $purchases),
             'filters' => $filters,
             'checkouts' => $this->modules->enabled('asset') ? $this->checkouts($viewer, [...$filters, 'contract_id' => $contract]) : null,
-            'partCheckouts' => $this->modules->enabled('inventory') ? $this->partCheckouts([...$filters, 'contract_id' => $contract]) : null,
-            'purchases' => $this->modules->enabled('inventory') ? $this->purchases($viewer, [...$filters, 'contract_id' => $contract]) : null,
+            'partCheckouts' => $this->modules->enabled('inventory') ? $this->partCheckouts($viewer, [...$filters, 'contract_id' => $contract]) : null,
+            // Customer accounts never see what was bought, or for how much.
+            'purchases' => $purchases && $this->modules->enabled('inventory') ? $this->purchases($viewer, [...$filters, 'contract_id' => $contract]) : null,
+            'showsPurchases' => $purchases,
         ]);
     }
 
@@ -148,9 +163,9 @@ class SummaryController extends Controller
     /**
      * @param  array<string, mixed>  $filters
      */
-    private function partCheckouts(array $filters): LengthAwarePaginator
+    private function partCheckouts(User $viewer, array $filters): LengthAwarePaginator
     {
-        $page = $this->searchPartCheckouts->handle([...$filters, 'type' => null, 'sort' => 'created_at'])
+        $page = $this->searchPartCheckouts->handle([...$filters, 'type' => null, 'sort' => 'created_at'], $viewer)
             ->paginate(10, pageName: 'parts_page')->withQueryString();
         $labels = $this->contractLabels->handle($page->getCollection()->pluck('contract_id')->all());
 

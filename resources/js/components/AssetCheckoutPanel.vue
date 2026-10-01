@@ -30,7 +30,8 @@ defineProps<{
         borrowers: { id: number; name: string }[];
         contracts: { id: number; label: string }[];
         default_contract_id?: number | null;
-        can: { request: boolean; approve: boolean; userId: number };
+        // forSelf: may ask only for themself; return: may take back. Part pages leave them out.
+        can: { request: boolean; approve: boolean; userId: number; forSelf?: boolean; return?: boolean };
     };
 }>();
 
@@ -79,6 +80,7 @@ const toggle = (ulid: string) => (expanded.has(ulid) ? expanded.delete(ulid) : e
             :title="requestTitle ?? t('checkouts.request_title')"
             :max-quantity="checkouts.available_quantity"
             :unit="checkouts.unit"
+            :for-self="checkouts.can.forSelf ?? false"
             @done="asking = false"
             @cancel="asking = false"
         />

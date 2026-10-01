@@ -26,6 +26,8 @@ const props = defineProps<{
     filters: Filters;
     customers: { id: number; code: string; name: string }[];
     phases: string[];
+    // False for customer accounts: no purchases or amounts.
+    showsPurchases: boolean;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('summary.projects_title'), href: route('reporting.projects.index') }];
@@ -37,7 +39,7 @@ const sortBy = (column: string) => {
     filters.sort = column;
 };
 
-const money = (baht: string) => (Number(baht) === 0 ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
+const money = (baht: string | undefined) => (Number(baht ?? 0) === 0 ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
 
@@ -86,8 +88,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             </th>
                             <th class="px-4 py-2 text-right font-medium">{{ t('summary.issues') }}</th>
                             <th class="px-4 py-2 text-right font-medium">{{ t('summary.loans') }}</th>
-                            <th class="px-4 py-2 text-right font-medium">{{ t('summary.purchases') }}</th>
-                            <th class="px-4 py-2 text-right font-medium">{{ t('summary.purchase_amount') }}</th>
+                            <template v-if="showsPurchases">
+                                <th class="px-4 py-2 text-right font-medium">{{ t('summary.purchases') }}</th>
+                                <th class="px-4 py-2 text-right font-medium">{{ t('summary.purchase_amount') }}</th>
+                            </template>
                             <th class="px-4 py-2 text-right font-medium">{{ t('summary.open') }}</th>
                         </tr>
                     </thead>
@@ -115,17 +119,21 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 {{ row.loans
                                 }}<span v-if="row.loans_open" class="text-xs text-amber-700 dark:text-amber-400"> ({{ row.loans_open }})</span>
                             </td>
-                            <td class="whitespace-nowrap px-4 py-2 text-right tabular-nums">
-                                {{ row.purchases
-                                }}<span v-if="row.purchases_open" class="text-xs text-amber-700 dark:text-amber-400">
-                                    ({{ row.purchases_open }})</span
-                                >
-                            </td>
-                            <td class="whitespace-nowrap px-4 py-2 text-right tabular-nums">{{ money(row.purchase_amount) }}</td>
+                            <template v-if="showsPurchases">
+                                <td class="whitespace-nowrap px-4 py-2 text-right tabular-nums">
+                                    {{ row.purchases
+                                    }}<span v-if="row.purchases_open" class="text-xs text-amber-700 dark:text-amber-400">
+                                        ({{ row.purchases_open }})</span
+                                    >
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-2 text-right tabular-nums">{{ money(row.purchase_amount) }}</td>
+                            </template>
                             <td class="whitespace-nowrap px-4 py-2 text-right font-semibold tabular-nums">{{ row.open_count }}</td>
                         </tr>
                         <tr v-if="projects.data.length === 0">
-                            <td colspan="8" class="px-4 py-8 text-center text-muted-foreground">{{ t('summary.no_projects') }}</td>
+                            <td :colspan="showsPurchases ? 8 : 6" class="px-4 py-8 text-center text-muted-foreground">
+                                {{ t('summary.no_projects') }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>

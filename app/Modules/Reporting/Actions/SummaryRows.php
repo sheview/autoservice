@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Every issue, loan (of assets and of parts) and purchase the user may see, one row each (user_id, name, contract_id, kind,
  * is_open, quantity, amount, at), from the modules switched on — for the summaries by person and
- * by project to add up.
+ * by project to add up. Without $purchases, no purchase rows (customer accounts never see them).
  */
 class SummaryRows
 {
@@ -24,11 +24,11 @@ class SummaryRows
         private PartCheckoutSummaryRows $partCheckouts,
     ) {}
 
-    public function handle(User $viewer): Builder
+    public function handle(User $viewer, bool $purchases = true): Builder
     {
         $parts = array_values(array_filter([
             $this->modules->enabled('asset') ? $this->checkouts->handle($viewer) : null,
-            $this->modules->enabled('inventory') ? $this->purchases->handle($viewer) : null,
+            $purchases && $this->modules->enabled('inventory') ? $this->purchases->handle($viewer) : null,
             // Parts issued or lent count as issues and loans too.
             $this->modules->enabled('inventory') ? $this->partCheckouts->handle() : null,
         ]));

@@ -14,6 +14,7 @@ import {
     ArrowLeftRight,
     BarChart3,
     Bell,
+    BookOpen,
     Briefcase,
     Building,
     Building2,
@@ -78,6 +79,7 @@ const icons: Record<string, LucideIcon> = {
     'user-search': UserSearch,
     'folder-kanban': FolderKanban,
     bell: Bell,
+    'book-open': BookOpen,
     'scroll-text': ScrollText,
 };
 

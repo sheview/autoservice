@@ -68,12 +68,13 @@ it('shows on the asset page which contracts cover it', function () {
             ->where('contracts.1.contract_no', 'MA-1')
             ->where('contracts.1.covering', true));
 
-    // no contract.view -> no contract section
+    // no contracts.view -> no contract section
+    grantTo('user', ['assets.view']);
     $this->actingAs(userWithRole('user'))->get("/assets/{$this->mine->ulid}")
         ->assertInertia(fn (Assert $page) => $page->where('contracts', null));
 });
 
-it('hides covered assets of other branches from a user without branch.all', function () {
+it('hides covered assets of other branches from a user with branch scope on assets', function () {
     $north = Branch::create(['code' => 'N', 'name' => 'North']);
     $south = Branch::create(['code' => 'S', 'name' => 'South']);
     $this->mine->update(['branch_id' => $north->id]);
@@ -81,7 +82,11 @@ it('hides covered assets of other branches from a user without branch.all', func
     $this->contract->contractAssets()->create(['asset_id' => $this->mine->id]);
     $this->contract->contractAssets()->create(['asset_id' => $this->alsoMine->id]);
 
-    $this->actingAs(userWithRole('technician', ['branch_id' => $north->id]))->get("/contracts/{$this->contract->id}")
+    // the technician works on a ticket of this customer, so its contracts are theirs to see (scope own)
+    $technician = userWithRole('technician', ['branch_id' => $north->id]);
+    openTicket($this->admin, ['customer_id' => $this->customer->id, 'assignee_id' => $technician->id]);
+
+    $this->actingAs($technician)->get("/contracts/{$this->contract->id}")
         ->assertInertia(fn (Assert $page) => $page
             ->where('assetCount', 2)
             ->where('assets', fn ($rows) => collect($rows)->pluck('name')->all() === ['Acme Switch'])

@@ -2,6 +2,7 @@
 
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -75,8 +76,10 @@ it('charts repairs within what the user may see', function () {
     $south = Branch::create(['code' => 'S', 'name' => 'South']);
     $tech = userWithRole('technician', ['branch_id' => $north->id]);
     $category = createAssetCategory();
+    // the technician's own ticket (tickets.view scope own), and one of somebody else
     ticketAt('2026-04-01 09:00', null, ['asset_id' => createAsset($category, ['branch_id' => $north->id])->id]);
     ticketAt('2026-04-02 09:00', null, ['asset_id' => createAsset($category, ['branch_id' => $south->id])->id]);
+    Ticket::query()->orderBy('id')->first()->forceFill(['assignee_id' => $tech->id])->save();
 
     $this->actingAs($this->admin)->get('/dashboard')
         ->assertInertia(fn (Assert $page) => $page->where('trends.tickets.monthly.opened', months([4 => 2])));

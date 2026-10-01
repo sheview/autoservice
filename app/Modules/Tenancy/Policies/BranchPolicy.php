@@ -3,14 +3,15 @@
 namespace App\Modules\Tenancy\Policies;
 
 use App\Modules\Identity\Policies\TenantPolicy;
-use Illuminate\Database\Eloquent\Model;
 
 class BranchPolicy extends TenantPolicy
 {
-    protected string $module = 'branch';
+    protected string $resource = 'branches';
 
-    protected function branchIdOf(Model $model): ?int
-    {
-        return $model->getKey();
-    }
+    protected array $actions = ['create' => 'manage', 'update' => 'manage', 'delete' => 'manage'];
+
+    // A branch is "in the user's branch" when it is that branch.
+    protected ?string $branchColumn = 'id';
+
+    protected ?string $customerColumn = null;
 }

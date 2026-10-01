@@ -39,8 +39,8 @@ class PmChecklistController extends Controller
             'categories' => $this->options($this->categories()),
             'can' => [
                 'create' => $user->can('create', PmChecklist::class),
-                'update' => $user->can('pm.update'),
-                'delete' => $user->can('pm.delete'),
+                'update' => $user->can('pm-checklists.manage'),
+                'delete' => $user->can('pm-checklists.manage'),
             ],
         ]);
     }

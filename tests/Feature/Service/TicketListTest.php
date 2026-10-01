@@ -60,12 +60,34 @@ it('finds tickets past or close to their SLA', function () {
         ->assertInertia(fn (Assert $page) => $page->where('tickets.data.0.sla', ['response' => 'breached', 'resolve' => 'pending']));
 });
 
-it('shows a technician the tickets of their branch and their own', function () {
+it('shows a technician (scope own) only the tickets reported by or assigned to them', function () {
+    $mine = openTicket($this->tech, ['title' => 'Reported by tech']);
+    $titles = fn () => collect($this->actingAs($this->tech)->get('/tickets?assignee=')
+        ->viewData('page')['props']['tickets']['data'])->pluck('title')->sort()->values()->all();
+
+    expect($titles())->toBe(['Calm north', 'Reported by tech']);
+
+    $this->actingAs($this->tech)->get('/tickets?assignee=me')
+        ->assertInertia(fn (Assert $page) => $page->where('tickets.total', 1)->where('tickets.data.0.title', 'Calm north'));
+    $this->actingAs($this->tech)->get("/tickets/{$this->urgent->ulid}")->assertForbidden();
+    $this->actingAs($this->tech)->get("/tickets/{$this->calm->ulid}")->assertOk();
+    $this->actingAs($this->tech)->get("/tickets/{$mine->ulid}")->assertOk();
+});
+
+it('shows a role with scope branch the tickets of its branch, without a branch and its own', function () {
+    setRoleScope('technician', 'branch', ['tickets.view']);
+
     $titles = collect($this->actingAs($this->tech)->get('/tickets?assignee=')
         ->viewData('page')['props']['tickets']['data'])->pluck('title')->sort()->values()->all();
 
     expect($titles)->toBe(['Calm north', 'Urgent north']);
+    $this->actingAs($this->tech)->get("/tickets/{$this->urgent->ulid}")->assertOk();
+    $this->actingAs($this->tech)->get("/tickets/{$this->south->ulid}")->assertForbidden();
+});
 
-    $this->actingAs($this->tech)->get('/tickets?assignee=me')
-        ->assertInertia(fn (Assert $page) => $page->where('tickets.total', 1)->where('tickets.data.0.title', 'Calm north'));
+it('shows helpdesk (default scope all) the tickets of every branch', function () {
+    $helpdesk = userWithRole('helpdesk', ['branch_id' => $this->north->id]);
+
+    $this->actingAs($helpdesk)->get('/tickets')->assertInertia(fn (Assert $page) => $page->where('tickets.total', 3));
+    $this->actingAs($helpdesk)->get("/tickets/{$this->south->ulid}")->assertOk();
 });

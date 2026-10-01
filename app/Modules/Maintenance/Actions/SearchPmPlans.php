@@ -2,6 +2,8 @@
 
 namespace App\Modules\Maintenance\Actions;
 
+use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Maintenance\Models\PmPlan;
 use App\Modules\Maintenance\Models\PmVisit;
 use Illuminate\Database\Eloquent\Builder;
@@ -31,11 +33,11 @@ class SearchPmPlans
      * @param  array<string, mixed>  $filters  from filtersFrom()
      * @return Builder<PmPlan>
      */
-    public function handle(array $filters): Builder
+    public function handle(User $user, array $filters): Builder
     {
         $search = $filters['search'] ?? '';
 
-        return PmPlan::query()
+        return self::visibleTo(PmPlan::query(), $user)
             ->withCount([
                 'visits',
                 'visits as completed_count' => fn ($q) => $q->where('status', PmVisit::STATUS_COMPLETED),
@@ -45,5 +47,19 @@ class SearchPmPlans
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->orderBy($filters['sort'] ?? 'ends_on', $filters['direction'] ?? 'asc')
             ->orderBy('id');
+    }
+
+    /**
+     * The plans the user may see with pm-plans.view (DataScope): plans have no branch, so scope
+     * branch reaches every plan; customer = plans of the account's customer; own = plans the user
+     * is the technician of.
+     *
+     * @param  Builder<PmPlan>  $query
+     * @return Builder<PmPlan>
+     */
+    public static function visibleTo(Builder $query, User $user): Builder
+    {
+        return DataScope::constrain($query, $user, 'pm-plans.view', branch: null,
+            own: fn (Builder $q) => $q->where('assignee_id', $user->id));
     }
 }

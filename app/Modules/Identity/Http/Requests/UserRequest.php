@@ -3,6 +3,7 @@
 namespace App\Modules\Identity\Http\Requests;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\CrossTenant\UniqueUserEmail;
 use Illuminate\Foundation\Http\FormRequest;
@@ -33,7 +34,10 @@ class UserRequest extends FormRequest
             // One e-mail = one login across the whole platform.
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', new UniqueUserEmail($user?->id)],
             'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::defaults()],
-            'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at')],
+            'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at'),
+                // users.manage scope branch: only into the manager's own branch (or none).
+                ...(DataScope::of($this->user(), 'users.manage') === PermissionCatalog::SCOPE_BRANCH
+                    ? [Rule::in(array_filter([$this->user()->branch_id]))] : [])],
             // Set = a customer account (Contract module customer), which must have the customer role.
             'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
             'employee_code' => ['nullable', 'string', 'max:50'],

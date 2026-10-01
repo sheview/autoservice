@@ -35,7 +35,7 @@ it('creates a customer company with its roles and first admin', function () {
     asTenant($tenant, function () {
         $admin = User::where('email', 'admin@itservice.test')->sole();
         expect($admin->hasRole('admin_company'))->toBeTrue()
-            ->and($admin->can('user.create'))->toBeTrue()
+            ->and($admin->can('users.manage'))->toBeTrue()
             ->and(Role::count())->toBe(5);
     });
 

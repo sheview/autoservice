@@ -86,7 +86,8 @@ it('lets whoever may see an asset open its files, and only editors add or delete
         ->assertSessionHasNoErrors();
     [$pdf, $excel] = $asset->fresh()->getMedia('attachments')->all();
 
-    $viewer = userWithRole('user');
+    // anyone who sees the asset but may not edit it (a technician: assets.view branch, no update)
+    $viewer = userWithRole('technician');
     $this->actingAs($viewer)->get("/assets/{$asset->ulid}/attachments/{$pdf->id}")->assertOk()->assertHeader('content-disposition', 'inline; filename=report.pdf');
     // Word and Excel are downloaded, not opened in the browser
     expect($this->actingAs($viewer)->get("/assets/{$asset->ulid}/attachments/{$excel->id}")->headers->get('content-disposition'))->toStartWith('attachment');
@@ -104,7 +105,7 @@ it('lets whoever may see an asset open its files, and only editors add or delete
 
 it('attaches files to a ticket when it is opened, and lets the customer add more', function () {
     $customer = createCustomer();
-    $client = userWithRole('customer', ['customer_id' => $customer->id]);
+    $client = userWithRole('customer_it', ['customer_id' => $customer->id]);
 
     $device = ['device_name' => 'Printer', 'device_brand' => 'HP', 'device_model' => 'M404', 'device_serial_unknown' => true];
     $this->actingAs($client)->post('/tickets', ['title' => 'Printer', 'priority' => 'low', 'source' => 'portal', ...$device, 'attachments' => [attachmentOffice('error-log.docx')]])

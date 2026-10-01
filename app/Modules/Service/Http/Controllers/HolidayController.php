@@ -33,7 +33,7 @@ class HolidayController extends Controller
                 ->map(fn (Holiday $holiday) => ['id' => $holiday->id, 'date' => $holiday->date->toDateString(), 'name' => $holiday->name]),
             'can' => [
                 'create' => $request->user()->can('create', Holiday::class),
-                'delete' => $request->user()->can('holiday.delete'),
+                'delete' => $request->user()->can('holidays.manage'),
             ],
         ]);
     }

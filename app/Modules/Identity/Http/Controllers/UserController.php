@@ -8,6 +8,7 @@ use App\Modules\Identity\Actions\SaveUser;
 use App\Modules\Identity\Http\Requests\UserRequest;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Branch;
@@ -40,8 +41,11 @@ class UserController extends Controller
         ];
 
         $customerNames = collect($this->customerOptions(withTrashed: true))->pluck('name', 'id');
+        $viewer = $request->user();
 
-        $users = User::query()
+        // Within the viewer's users.view: their branch (and users of none), or only themself.
+        $users = DataScope::constrain(User::query(), $viewer, 'users.view', customer: null,
+            own: fn ($q) => $q->whereKey($viewer->id))
             ->with(['branch:id,name', 'roles:id,name,label'])
             ->when($filters['search'] !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('name', 'ilike', "%{$filters['search']}%")
@@ -71,7 +75,7 @@ class UserController extends Controller
             'filters' => $filters,
             'branches' => $this->branchOptions(),
             'roles' => $this->roleOptions(),
-            'can' => ['create' => $request->user()->can('create', User::class)],
+            'can' => ['create' => $viewer->can('create', User::class)],
         ]);
     }
 
@@ -127,9 +131,17 @@ class UserController extends Controller
         ];
     }
 
+    /**
+     * The branches a user can be put in: with users.manage scope branch, only the manager's own.
+     */
     private function branchOptions(): array
     {
-        return Branch::orderBy('name')->get(['id', 'name'])->toArray();
+        $manager = request()->user();
+        $ownBranchOnly = $manager !== null && DataScope::of($manager, 'users.manage') === PermissionCatalog::SCOPE_BRANCH;
+
+        return Branch::orderBy('name')
+            ->when($ownBranchOnly, fn ($q) => $q->whereKey($manager->branch_id))
+            ->get(['id', 'name'])->toArray();
     }
 
     /**

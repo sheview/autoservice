@@ -3,7 +3,6 @@
 namespace App\Modules\Identity\Http\Requests;
 
 use App\Modules\Identity\Models\Role;
-use App\Modules\Identity\Support\PermissionCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -30,8 +29,6 @@ class RoleRequest extends FormRequest
                 Rule::unique('roles', 'name')->ignore($role?->id),
             ],
             'label' => ['required', 'string', 'max:255'],
-            'permissions' => ['array'],
-            'permissions.*' => ['string', Rule::in(PermissionCatalog::tenantPermissions())],
         ];
     }
 }

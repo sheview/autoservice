@@ -96,7 +96,7 @@ class TicketSheet
                     'at' => $event->created_at->toIso8601String(),
                 ])->all(),
             // Null = leave the parts table out (no stock module, or the user does not see stock).
-            'parts' => $this->modules->enabled('inventory') && $user->can('part.view') ? $this->ticketParts->handle($ticket->id) : null,
+            'parts' => $this->modules->enabled('inventory') && $user->can('parts.view') ? $this->ticketParts->handle($ticket->id) : null,
             // The score boxes for the customer to tick; already ticked when the survey was answered.
             'rating' => $this->modules->enabled('survey') ? [
                 'score' => $survey !== null && $survey['answered'] ? $survey['score'] : null,

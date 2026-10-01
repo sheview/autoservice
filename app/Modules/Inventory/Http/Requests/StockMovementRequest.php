@@ -9,7 +9,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * A stock change entered on the part page (not for a ticket): receive, issue, loan, spare,
- * return or adjust. The permission of each type is StockMovement::permissionFor().
+ * return or adjust: stock-movements.create (StockMovement::permissionFor()).
  */
 class StockMovementRequest extends FormRequest
 {

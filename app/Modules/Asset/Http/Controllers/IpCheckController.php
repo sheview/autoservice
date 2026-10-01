@@ -4,27 +4,28 @@ namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\IpUsage;
-use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Support\IpRange;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Platform\Support\Modules;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * "Free IP" check: type a range, see which addresses are taken by registered devices and which
- * can be given out. Read-only, for staff who may see assets.
+ * can be given out. Read-only: the page with ip-check.view, checking a range with ip-check.run.
  */
 class IpCheckController extends Controller
 {
     public function __invoke(Request $request, IpUsage $ipUsage, ListCustomers $listCustomers, Modules $modules): Response
     {
-        Gate::authorize('viewAny', Asset::class);
-        abort_if($request->user()->customer_id !== null, 403);
+        $user = $request->user();
+        abort_unless($user->can('ip-check.view'), 403);
+        abort_if($user->customer_id !== null, 403);
+        // Checking a range needs ip-check.run; without it the page only shows the form, disabled.
+        $canRun = $user->can('ip-check.run');
 
-        $range = $request->string('range')->trim()->value();
+        $range = $canRun ? $request->string('range')->trim()->value() : '';
         // "" = every device, "own" = the company's own devices, or a customer id
         $customer = (string) $request->input('customer', '');
         $customerId = $customer === 'own' ? 0 : ((int) $customer ?: null);
@@ -33,7 +34,7 @@ class IpCheckController extends Controller
         $customers = $modules->enabled('contract') ? $listCustomers->handle() : [];
         $names = collect($listCustomers->handle(withTrashed: true))->pluck('name', 'id');
 
-        $rows = is_array($addresses) ? $ipUsage->handle($request->user(), $addresses, $customerId) : [];
+        $rows = is_array($addresses) ? $ipUsage->handle($user, $addresses, $customerId) : [];
         $rows = array_map(fn (array $row) => [
             ...$row,
             'assets' => array_map(fn (array $asset) => [...$asset, 'customer' => $names[$asset['customer_id']] ?? null], $row['assets']),
@@ -50,6 +51,7 @@ class IpCheckController extends Controller
             ],
             'customers' => $customers,
             'max' => IpRange::MAX,
+            'can' => ['run' => $canRun],
         ]);
     }
 }

@@ -36,7 +36,7 @@ beforeEach(function () {
 it('seeds the platform tenant with the superadmin and the two central roles', function () {
     expect(asTenant($this->platform, fn () => Role::orderBy('name')->pluck('name')->all()))
         ->toBe(['central_helpdesk', 'central_technician', 'superadmin'])
-        ->and(PermissionCatalog::platformPermissionsFor(PermissionCatalog::CENTRAL_HELPDESK))->not->toContain('platform.full_access', 'platform.tenants', 'user.create', 'role.update')
+        ->and(PermissionCatalog::platformPermissionsFor(PermissionCatalog::CENTRAL_HELPDESK))->not->toContain('platform.full_access', 'platform.tenants', 'users.manage', 'roles.manage')
         ->and(PermissionCatalog::platformPermissionsFor(PermissionCatalog::SUPERADMIN))->toContain('platform.full_access');
 });
 
@@ -50,11 +50,11 @@ it('lets central staff enter any company and see every branch, with the menu of 
     $this->actingAs($this->centralHelpdesk)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
         ->where('tenant.name', 'Default')
         ->where('impersonation.tenant.name', 'Default')
-        ->where('auth.permissions', fn ($permissions) => collect($permissions)->contains('ticket.assign')
-            && ! collect($permissions)->contains('user.view') && ! collect($permissions)->contains('platform.impersonate'))
+        ->where('auth.permissions', fn ($permissions) => collect($permissions)->contains('tickets.assign')
+            && ! collect($permissions)->contains('users.view') && ! collect($permissions)->contains('platform.impersonate'))
         ->where('navigation', fn ($items) => collect($items)->pluck('title')->all() === [
-            'หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน',
-            'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'เบิก / ยืมอะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'รายงาน', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ', 'วันหยุด',
+            'หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
+            'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'รายงาน', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ', 'คู่มือ', 'วันหยุด',
         ]));
 
     // every branch, though the central user has none
@@ -99,9 +99,8 @@ it('lets a central technician work on tickets without being the assignee', funct
     $this->actingAs($this->centralTech)->post("{$url}/move", ['action' => 'resolve'])->assertSessionHasNoErrors();
     expect($this->ticket->fresh()->status)->toBe(Ticket::STATUS_RESOLVED);
 
-    // a technician, central or not, does not dispatch, approve or cancel
+    // a technician, central or not, does not dispatch
     $this->actingAs($this->centralTech)->post("{$url}/assign", ['assignee_id' => $this->localTech->id])->assertForbidden();
-    $this->actingAs($this->centralTech)->post("{$url}/move", ['action' => 'approve'])->assertForbidden();
     $this->actingAs($this->centralTech)->get('/reports')->assertForbidden();
     $this->actingAs($this->centralTech)->get('/users')->assertForbidden();
 
@@ -110,6 +109,10 @@ it('lets a central technician work on tickets without being the assignee', funct
     $this->actingAs($this->centralTech)->post("{$url}/parts", ['part_id' => $part->id, 'quantity' => 1])->assertSessionHasNoErrors();
     expect($part->fresh()->qty_on_hand)->toBe(1);
     $this->actingAs($this->centralTech)->post("/parts/{$part->id}/movements", ['type' => 'receive', 'quantity' => 5])->assertForbidden();
+
+    // and closes the resolved job (tickets.close)
+    $this->actingAs($this->centralTech)->post("{$url}/move", ['action' => 'approve'])->assertSessionHasNoErrors();
+    expect($this->ticket->fresh()->status)->toBe(Ticket::STATUS_CLOSED);
 });
 
 it('logs what central staff do in the company with their real name, and leaves when they stop', function () {
@@ -136,7 +139,9 @@ it('keeps the superadmin all-powerful inside a company and company staff out of 
     $helpdesk = userWithRole('helpdesk', ['branch_id' => $this->north->id]);
     $this->actingAs($helpdesk)->post("/platform/impersonation/{$other->ulid}")->assertForbidden();
     $this->actingAs($helpdesk)->get('/platform/impersonation')->assertForbidden();
-    // and sees its own branch only
+    // in its own company it sees every branch (helpdesk grants have scope all), but no further
+    $this->actingAs($helpdesk)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 2));
+    setRoleScope('helpdesk', 'branch', ['assets.view']);
     $this->actingAs($helpdesk)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 1));
     $this->actingAs($helpdesk)->get("/assets/{$this->southAsset->ulid}")->assertForbidden();
 });

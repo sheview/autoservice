@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Identity\Models\Role;
 use App\Modules\Labeling\Models\AssetLabelPrint;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Branch;
@@ -76,7 +77,11 @@ it('opens the scan page after sign-in, for whoever may see the asset', function 
             ->where('asset.asset_code', $this->a1->asset_code)
             ->where('asset.customer', 'Acme')
             ->where('tickets', [])
-            ->where('can.openTicket', false));
+            // technicians may open tickets (tickets.create)
+            ->where('can.openTicket', true));
+
+    // an office user (assets.view own) only reaches what they hold
+    $this->actingAs(userWithRole('user'))->get("/a/{$this->a1->ulid}")->assertNotFound();
 
     $helpdesk = userWithRole('helpdesk');
     $ticket = openTicket($helpdesk, ['asset_id' => $this->a1->id, 'customer_id' => $this->customer->id]);
@@ -84,7 +89,7 @@ it('opens the scan page after sign-in, for whoever may see the asset', function 
         ->assertInertia(fn (Assert $page) => $page->where('tickets.0.ticket_no', $ticket->ticket_no)->where('can.openTicket', true));
 
     // a customer account: its own assets only
-    $client = userWithRole('customer', ['customer_id' => $this->customer->id]);
+    $client = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
     $this->actingAs($client)->get("/a/{$this->a1->ulid}")->assertInertia(fn (Assert $page) => $page->where('can.openTicket', true));
     $this->actingAs($client)->get("/a/{$this->a2->ulid}")->assertNotFound();
     $this->actingAs($client)->get('/labels')->assertForbidden();
@@ -108,4 +113,16 @@ it('keeps labels and scans per tenant, and scanning works with labeling switched
     Feature::for($this->tech->tenant)->deactivate(Modules::feature('labeling'));
     $this->actingAs($this->tech)->get('/labels')->assertNotFound();
     $this->actingAs($this->tech)->get("/a/{$this->a1->ulid}")->assertOk();
+});
+
+it('lists assets with labels.view but prints only with labels.print', function () {
+    Role::create(['name' => 'viewer', 'label' => 'Viewer', 'guard_name' => 'web']);
+    grantTo('viewer', ['assets.view', 'labels.view']);
+    $viewer = userWithRole('viewer');
+
+    $this->actingAs($viewer)->get('/labels')->assertOk()->assertInertia(fn (Assert $page) => $page->where('can.print', false));
+    $this->actingAs($viewer)->get("/labels/print?assets={$this->a1->ulid}")->assertForbidden();
+    $this->actingAs($viewer)->post('/labels/print', ['assets' => [$this->a1->ulid], 'template' => 'roll_50x30'])->assertForbidden();
+
+    $this->actingAs($this->tech)->get('/labels')->assertInertia(fn (Assert $page) => $page->where('can.print', true));
 });

@@ -39,6 +39,8 @@ const props = defineProps<{
     search: string;
     groups: Group[];
     borrowers: { id: number; name: string }[];
+    // Asking only for oneself (asset-checkouts.request without .create).
+    forSelf: boolean;
     contracts: { id: number; label: string }[];
     canPurchase: boolean;
 }>();
@@ -119,6 +121,7 @@ const label = (group: Group) => [group.brand, group.model].filter(Boolean).join(
                         :key="picked.unit.ulid"
                         :asset-ulid="picked.unit.ulid"
                         :borrowers="borrowers"
+                        :for-self="forSelf"
                         :contracts="contracts"
                         :max-quantity="picked.unit.available"
                         :unit="picked.unit.unit"

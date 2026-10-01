@@ -15,18 +15,19 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * The company's own profile (CompanyProfile), edited by its admin (company.update). The logo is
+ * The company's own profile (CompanyProfile): company.view to open it, company.manage to change it. The logo is
  * served to every signed-in user of the company, as it is printed on labels.
  */
 class CompanyProfileController extends Controller
 {
-    public function edit(TenantContext $context): Response
+    public function edit(Request $request, TenantContext $context): Response
     {
-        Gate::authorize(CompanyProfile::PERMISSION);
+        Gate::authorize(CompanyProfile::VIEW_PERMISSION);
 
         return Inertia::render('Tenancy/Company', [
             'company' => CompanyProfile::of($this->company($context)),
             'logoMaxKb' => CompanyProfile::LOGO_MAX_KB,
+            'can' => ['manage' => $request->user()->can(CompanyProfile::PERMISSION)],
         ]);
     }
 

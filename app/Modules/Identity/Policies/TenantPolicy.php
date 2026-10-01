@@ -3,26 +3,35 @@
 namespace App\Modules\Identity\Policies;
 
 use App\Modules\Identity\Models\User;
-use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Platform\Support\Impersonation;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Base policy for tenant data. A module policy only sets $module:
+ * Base policy for tenant data. A resource policy sets $resource (the first part of its
+ * permissions, PermissionCatalog) and, where they differ, how abilities map to actions and
+ * which records are the user's own:
  *
- *   class AssetPolicy extends TenantPolicy { protected string $module = 'asset'; }
+ *   class AssetPolicy extends TenantPolicy { protected string $resource = 'assets'; }
  *
- * Each ability needs the permission "{module}.{ability}" and, for a record, that the record
- * is in the user's tenant and in the user's branch (unless the user has branch.all).
- * For a customer account (user with customer_id) the record must belong to that customer instead.
- * Override branchIdOf() when the branch is not the "branch_id" column.
+ * Each ability needs the permission "{resource}.{action}" and, for a record, that the record is
+ * in the user's tenant and within the scope the user's role grants for that permission
+ * (DataScope: all / branch / own / customer). Override owns() to say what "own" means, and set
+ * $branchColumn / $customerColumn to null for a resource without branches / customers.
  * A superadmin who is impersonating passes every check (Gate::before in IdentityServiceProvider).
  * Central staff who entered the tenant are checked here like anyone else, with the permissions
- * of their platform role and the tenant they entered.
+ * of their platform role over the whole company.
  */
 abstract class TenantPolicy
 {
-    protected string $module;
+    protected string $resource;
+
+    /** @var array<string, string> ability => action of the permission, where they differ */
+    protected array $actions = [];
+
+    protected ?string $branchColumn = 'branch_id';
+
+    protected ?string $customerColumn = 'customer_id';
 
     public function viewAny(User $user): bool
     {
@@ -31,7 +40,7 @@ abstract class TenantPolicy
 
     public function view(User $user, Model $model): bool
     {
-        return $this->permits($user, 'view') && $this->inScope($user, $model);
+        return $this->permits($user, 'view') && $this->inScope($user, $model, 'view');
     }
 
     public function create(User $user): bool
@@ -41,37 +50,42 @@ abstract class TenantPolicy
 
     public function update(User $user, Model $model): bool
     {
-        return $this->permits($user, 'update') && $this->inScope($user, $model);
+        return $this->permits($user, 'update') && $this->inScope($user, $model, 'update');
     }
 
     public function delete(User $user, Model $model): bool
     {
-        return $this->permits($user, 'delete') && $this->inScope($user, $model);
+        return $this->permits($user, 'delete') && $this->inScope($user, $model, 'delete');
     }
 
-    protected function permits(User $user, string $action): bool
+    /** The permission an ability needs. */
+    protected function permission(string $ability): string
     {
-        return $user->checkPermissionTo("{$this->module}.{$action}");
+        return "{$this->resource}.".($this->actions[$ability] ?? $ability);
     }
 
-    protected function inScope(User $user, Model $model): bool
+    protected function permits(User $user, string $ability): bool
+    {
+        return $user->checkPermissionTo($this->permission($ability));
+    }
+
+    /**
+     * The record is in the user's tenant and within the scope of the ability's permission.
+     */
+    protected function inScope(User $user, Model $model, string $ability = 'view'): bool
     {
         if ((int) $model->getAttribute('tenant_id') !== $this->tenantIdOf($user)) {
             return false;
         }
 
-        // A customer account only sees records of its own customer; anything without a
-        // customer (branches, users, categories, ...) is out of its reach.
-        if ($user->customer_id !== null) {
-            return $model->getAttribute('customer_id') !== null
-                && (int) $model->getAttribute('customer_id') === (int) $user->customer_id;
-        }
+        return DataScope::covers($model, $user, $this->permission($ability), $this->branchColumn, $this->customerColumn,
+            fn (Model $record) => $this->owns($user, $record));
+    }
 
-        $branchId = $this->branchIdOf($model);
-
-        return $branchId === null
-            || $user->checkPermissionTo(PermissionCatalog::ALL_BRANCHES)
-            || (int) $branchId === (int) $user->branch_id;
+    /** Whether the record is the user's own (for scope "own"). */
+    protected function owns(User $user, Model $model): bool
+    {
+        return false;
     }
 
     /**
@@ -91,10 +105,5 @@ abstract class TenantPolicy
     protected function actsFromPlatform(User $user): bool
     {
         return app(Impersonation::class)->actingAs($user);
-    }
-
-    protected function branchIdOf(Model $model): ?int
-    {
-        return $model->getAttribute('branch_id');
     }
 }

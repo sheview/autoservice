@@ -12,6 +12,8 @@ beforeEach(function () {
     $this->admin = userWithRole('admin_company', ['name' => 'Admin Boss']);
     $this->tech = userWithRole('technician', ['name' => 'Somsak Tech']);
     $this->staff = userWithRole('user', ['name' => 'Somchai Office']);
+    // Office staff here may ask to buy (their own requests).
+    grantTo('user', ['purchase-requests.view', 'purchase-requests.create'], 'own');
     $this->contract = createContract(createCustomer(['name' => 'Acme Hospital']), ['contract_no' => 'MA-2026-01', 'title' => 'Network MA']);
     $this->other = createContract(createCustomer(), ['contract_no' => 'MA-2026-02', 'title' => 'PC MA']);
 
@@ -19,7 +21,8 @@ beforeEach(function () {
     $this->switch = createAsset($category, ['name' => 'Switch 24 port', 'status' => Asset::STATUS_SPARE]);
     $this->cables = createAsset($category, ['name' => 'สาย LAN', 'quantity' => 24, 'unit' => 'เส้น', 'status' => Asset::STATUS_SPARE]);
 
-    $this->checkout = fn (Asset $asset, array $data) => $this->actingAs($this->tech)->post("/assets/{$asset->ulid}/checkouts", $data + [
+    // The office makes the forms (asset-checkouts.create: for anyone, or someone from outside).
+    $this->checkout = fn (Asset $asset, array $data) => $this->actingAs($this->admin)->post("/assets/{$asset->ulid}/checkouts", $data + [
         'type' => 'issue', 'quantity' => 1,
     ])->assertSessionHasNoErrors();
     $this->buy = fn ($user, array $data = []) => $this->actingAs($user)->post('/purchase-requests', $data + [
@@ -183,9 +186,11 @@ it('is for office staff, follows the modules and never shows another tenant', fu
     $this->actingAs($this->admin)->get("/summary/people/view?user={$foreign['user']->id}")->assertNotFound();
 
     foreach (['/summary/people', '/summary/projects', "/summary/projects/{$this->contract->id}", "/summary/people/view?user={$this->tech->id}"] as $url) {
-        $this->actingAs($this->tech)->get($url)->assertForbidden();
         $this->actingAs($this->staff)->get($url)->assertForbidden();
     }
+    // a technician has no project summary (their own person summary: below)
+    $this->actingAs($this->tech)->get('/summary/projects')->assertForbidden();
+    $this->actingAs($this->tech)->get("/summary/projects/{$this->contract->id}")->assertForbidden();
 
     // without the contract module there are no projects; without reporting, no summaries
     Feature::for($this->tenant)->deactivate(Modules::feature('contract'));
@@ -193,4 +198,49 @@ it('is for office staff, follows the modules and never shows another tenant', fu
     $this->actingAs($this->admin)->get('/summary/people')->assertOk();
     Feature::for($this->tenant)->deactivate(Modules::feature('reporting'));
     $this->actingAs($this->admin)->get('/summary/people')->assertNotFound();
+});
+
+it('shows a technician only their own person summary (scope own)', function () {
+    ($this->checkout)($this->switch, ['borrower_user_id' => $this->tech->id, 'contract_id' => $this->contract->id]);
+    ($this->checkout)($this->cables, ['quantity' => 2, 'borrower_name' => 'Contractor Lek']);
+    ($this->buy)($this->staff);
+
+    $this->actingAs($this->tech)->get('/summary/people')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('people.total', 1)
+        ->where('people.data.0.user_id', $this->tech->id));
+    $this->actingAs($this->tech)->get("/summary/people/view?user={$this->tech->id}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('totals.issues', 1));
+    $this->actingAs($this->tech)->get("/summary/people/view?user={$this->staff->id}")->assertForbidden();
+    $this->actingAs($this->tech)->get('/summary/people/view?name='.urlencode('Contractor Lek'))->assertForbidden();
+
+    // with scope all, everyone in the forms they may see (not the office's purchase: purchase-requests.view is own)
+    setRoleScope('technician', 'all', ['summary-people.view']);
+    $this->actingAs($this->tech)->get('/summary/people')->assertInertia(fn (Assert $page) => $page->where('people.total', 2));
+});
+
+it('shows a customer account only the projects of its customer, never purchases or amounts', function () {
+    ($this->checkout)($this->switch, ['borrower_user_id' => $this->tech->id, 'contract_id' => $this->contract->id]);
+    ($this->checkout)($this->cables, ['quantity' => 1, 'borrower_name' => 'Contractor Lek', 'contract_id' => $this->other->id]);
+    ($this->buy)($this->staff, ['contract_id' => $this->contract->id]);
+
+    // the switch is the customer's own (a customer account sees only its customer's assets)
+    $this->switch->update(['customer_id' => $this->contract->customer_id]);
+    $client = userWithRole('customer_it', ['customer_id' => $this->contract->customer_id]);
+
+    $this->actingAs($client)->get('/summary/projects?items=all')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('projects.total', 1)
+        ->where('projects.data.0.contract_no', 'MA-2026-01')
+        ->where('projects.data.0', fn ($row) => ! collect($row)->has(['purchases']) && ! collect($row)->has('purchase_amount')
+            && ! collect($row)->has('purchases_open'))
+        ->where('showsPurchases', false)
+        ->where('customers', fn ($customers) => collect($customers)->pluck('id')->all() === [$this->contract->customer_id]));
+
+    $this->actingAs($client)->get("/summary/projects/{$this->contract->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('purchases', null)
+        ->where('totals.total', 1)
+        ->where('totals', fn ($totals) => ! collect($totals)->has('purchase_amount') && ! collect($totals)->has('purchases')));
+    $this->actingAs($client)->get("/summary/projects/{$this->other->id}")->assertForbidden();
+
+    // and no person summary at all
+    $this->actingAs($client)->get('/summary/people')->assertForbidden();
 });

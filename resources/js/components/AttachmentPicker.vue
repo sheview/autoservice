@@ -10,8 +10,10 @@ import { computed, ref } from 'vue';
  * Picks files to attach when the form is saved. Files that are too big or of another type are
  * refused here already (the server checks again), so the user knows before saving.
  */
-const props = withDefaults(defineProps<{ images?: boolean; errors?: Record<string, string>; field?: string }>(), {
+// maxMb: the largest file (Attachments::MAX_KB, or a record's own, e.g. manuals).
+const props = withDefaults(defineProps<{ images?: boolean; errors?: Record<string, string>; field?: string; maxMb?: number }>(), {
     images: false,
+    maxMb: 2,
     errors: () => ({}),
     field: 'attachments',
 });
@@ -19,7 +21,7 @@ const props = withDefaults(defineProps<{ images?: boolean; errors?: Record<strin
 const files = defineModel<File[]>({ required: true });
 
 // Same limits as App\Modules\Document\Support\Attachments.
-const MAX_MB = 2;
+const MAX_MB = computed(() => props.maxMb);
 const MAX_FILES = 10;
 
 const extensions = computed(() => ['pdf', 'doc', 'docx', 'xls', 'xlsx', ...(props.images ? ['jpg', 'jpeg', 'png'] : [])]);
@@ -36,8 +38,8 @@ const pick = (event: Event) => {
             refused.value.push(t('attachments.wrong_type', { name: file.name }));
             return false;
         }
-        if (file.size > MAX_MB * 1024 * 1024) {
-            refused.value.push(t('attachments.too_big', { name: file.name, mb: MAX_MB }));
+        if (file.size > MAX_MB.value * 1024 * 1024) {
+            refused.value.push(t('attachments.too_big', { name: file.name, mb: MAX_MB.value }));
             return false;
         }
         return true;

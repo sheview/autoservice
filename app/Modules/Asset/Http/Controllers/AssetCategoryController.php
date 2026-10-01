@@ -59,8 +59,8 @@ class AssetCategoryController extends Controller
             'assetTypes' => AssetCategory::ASSET_TYPES,
             'can' => [
                 'create' => $user->can('create', AssetCategory::class),
-                'update' => $user->can('asset_category.update'),
-                'delete' => $user->can('asset_category.delete'),
+                'update' => $user->can('asset-categories.manage'),
+                'delete' => $user->can('asset-categories.manage'),
             ],
         ]);
     }

@@ -4,6 +4,7 @@ import SummaryItems from '@/components/SummaryItems.vue';
 import SummaryTotalsCards from '@/components/SummaryTotalsCards.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCan } from '@/composables/useCan';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
@@ -18,6 +19,8 @@ const props = defineProps<{
     checkouts: Paginated<SummaryCheckout> | null;
     partCheckouts: Paginated<SummaryCheckout> | null;
     purchases: Paginated<SummaryPurchase> | null;
+    // False for customer accounts: no purchases or amounts.
+    showsPurchases: boolean;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,6 +28,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: props.project.contract_no, href: route('reporting.projects.show', props.project.id) },
 ];
 
+const can = useCan();
 const filters = useListFilters('reporting.projects.show', { ...props.filters }, { contract: props.project.id });
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
@@ -39,12 +43,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <p class="font-mono text-sm text-muted-foreground">{{ project.contract_no }}</p>
                     <Heading :title="project.title" :description="`${project.customer ?? ''} · ${project.starts_on} – ${project.ends_on}`" />
                 </div>
-                <Button variant="outline" as-child>
+                <Button v-if="can('contracts.view')" variant="outline" as-child>
                     <Link :href="route('contract.contracts.show', project.id)">{{ t('nav.contracts') }}</Link>
                 </Button>
             </div>
 
-            <SummaryTotalsCards :totals="totals" />
+            <SummaryTotalsCards :totals="totals" :purchases="showsPurchases" />
 
             <div class="flex flex-wrap items-center gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('summary.search_items')" />

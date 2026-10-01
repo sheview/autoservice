@@ -24,16 +24,19 @@ class TicketReport
      *     trend: list<array{label: string, count: int}>, trend_unit: string,
      *     by_customer: array<int, int>, by_assignee: array<int, array{tickets: int, closed: int, resolve_breached: int}>}
      */
-    public function handle(CarbonInterface $from, CarbonInterface $to): array
+    public function handle(CarbonInterface $from, CarbonInterface $to, ?int $customerId = null): array
     {
-        $tickets = Ticket::query()
+        // $customerId: only that customer's tickets (a customer account's report).
+        $query = fn () => Ticket::query()->when($customerId, fn ($q, $id) => $q->where('customer_id', $id));
+
+        $tickets = $query()
             ->whereBetween('created_at', [$from, $to])
             ->get([
                 'id', 'status', 'priority', 'customer_id', 'assignee_id', 'created_at',
                 'response_due_at', 'resolve_due_at', 'responded_at', 'resolved_at', 'closed_at',
             ]);
 
-        $resolveSeconds = Ticket::query()
+        $resolveSeconds = $query()
             ->whereBetween('resolved_at', [$from, $to])
             ->selectRaw('avg(extract(epoch from (resolved_at - created_at))) as seconds')
             ->value('seconds');
@@ -42,10 +45,10 @@ class TicketReport
 
         return [
             'opened' => $tickets->count(),
-            'closed' => Ticket::query()->whereBetween('closed_at', [$from, $to])->count(),
-            'cancelled' => Ticket::query()->whereBetween('cancelled_at', [$from, $to])->count(),
+            'closed' => $query()->whereBetween('closed_at', [$from, $to])->count(),
+            'cancelled' => $query()->whereBetween('cancelled_at', [$from, $to])->count(),
             // Everything still to be finished today, whenever it was opened.
-            'backlog' => Ticket::query()->whereNotIn('status', [Ticket::STATUS_CLOSED, Ticket::STATUS_CANCELLED])->count(),
+            'backlog' => $query()->whereNotIn('status', [Ticket::STATUS_CLOSED, Ticket::STATUS_CANCELLED])->count(),
             'avg_resolve_hours' => $resolveSeconds === null ? null : round($resolveSeconds / 3600, 1),
             'by_status' => $this->countBy($tickets, 'status', Ticket::STATUSES),
             'by_priority' => $this->countBy($tickets, 'priority', Ticket::PRIORITIES),

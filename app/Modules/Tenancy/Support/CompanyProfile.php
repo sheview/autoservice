@@ -7,12 +7,15 @@ use App\Modules\Tenancy\Models\Tenant;
 /**
  * How a company presents itself on what it prints (QR labels, documents): its name, logo and
  * where to call for service. The logo is the tenant's "logo" media; phone and e-mail are in the
- * tenant's settings. Set by the company's admin (company.update).
+ * tenant's settings. Seen with company.view, changed with company.manage.
  */
 class CompanyProfile
 {
     /** Who may change the profile. */
-    public const PERMISSION = 'company.update';
+    public const PERMISSION = 'company.manage';
+
+    /** Who may open the profile page. */
+    public const VIEW_PERMISSION = 'company.view';
 
     public const LOGO = 'logo';
 

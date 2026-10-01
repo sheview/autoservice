@@ -3,46 +3,67 @@
 namespace App\Modules\Identity\Support;
 
 /**
- * Every permission in the system ({module}.{action}) and the default roles of a tenant.
+ * Every permission in the system ({resource}.{action}) and the default roles of a tenant, as
+ * agreed in permissions.json. Each grant of a role carries a scope (DataScope):
  *
- * Permissions are global; roles are created per tenant from DEFAULT_ROLES when the tenant
- * is created, after which each tenant may change its own roles.
- * Add permissions here when a module needs them; SyncPermissions adds missing rows.
+ *   all       every record of the company
+ *   branch    records of the user's own branch (and those of no branch)
+ *   own       records the user made, is assigned to or holds (each resource says which)
+ *   customer  records of the customer the account belongs to (customer accounts only)
+ *
+ * Nothing is allowed unless granted. Permissions are global; roles are created per tenant from
+ * DEFAULT_ROLES when the tenant is created, after which each tenant may change its own roles on
+ * the roles matrix (except the admin role, which always holds everything). SyncPermissions adds
+ * missing permission rows; `platform:sync-permissions --defaults` puts the default roles back.
  */
 class PermissionCatalog
 {
+    public const SCOPE_ALL = 'all';
+
+    public const SCOPE_BRANCH = 'branch';
+
+    public const SCOPE_OWN = 'own';
+
+    public const SCOPE_CUSTOMER = 'customer';
+
+    /** Widest first: with several roles a user gets the widest scope any of them grants. */
+    public const SCOPES = [self::SCOPE_ALL, self::SCOPE_BRANCH, self::SCOPE_CUSTOMER, self::SCOPE_OWN];
+
     public const PERMISSIONS = [
-        'user' => ['view', 'create', 'update'],
-        'role' => ['view', 'create', 'update'],
-        'branch' => ['view', 'create', 'update', 'delete', 'all'],
-        // checkout = ask to issue/lend an asset and take it back; approve = decide on those requests.
-        'asset' => ['view', 'create', 'update', 'delete', 'import', 'export', 'checkout', 'approve'],
-        'asset_category' => ['view', 'create', 'update', 'delete'],
-        'customer' => ['view', 'create', 'update', 'delete'],
-        'contract' => ['view', 'create', 'update', 'delete'],
-        'ticket' => ['view', 'create', 'update', 'assign', 'approve', 'close'],
-        'holiday' => ['view', 'create', 'delete'],
-        'pm' => ['view', 'create', 'update', 'delete', 'perform'],
-        'sticker' => ['print'],
-        'part' => ['view', 'create', 'update', 'delete', 'import', 'export'],
-        'stock' => ['view', 'receive', 'issue', 'adjust'],
-        'survey' => ['view', 'answer'],
-        'report' => ['view'],
-        // Ask to buy something the company does not have. Approved with asset.approve; marked
-        // ordered and received with stock.receive (Inventory module).
-        'purchase' => ['request'],
-        // The company's own profile: logo, service phone and e-mail (labels, documents).
-        'company' => ['update'],
-        // The activity log of the company (kept 90 days).
-        'log' => ['view'],
+        'dashboard' => ['view'],
+        'tickets' => ['view', 'create', 'update', 'assign', 'close', 'delete', 'export', 'approve'],
+        'pm-visits' => ['view', 'create', 'update', 'complete', 'delete'],
+        'pm-plans' => ['view', 'create', 'update', 'delete'],
+        'pm-checklists' => ['view', 'manage'],
+        'ip-check' => ['view', 'run'],
+        'assets' => ['view', 'create', 'update', 'delete', 'export', 'import'],
+        // request = ask for oneself; create = make a form for anyone; return = take back.
+        'asset-checkouts' => ['view', 'request', 'create', 'approve', 'return'],
+        'asset-categories' => ['view', 'manage'],
+        'labels' => ['view', 'print'],
+        'customers' => ['view', 'create', 'update', 'delete'],
+        'contracts' => ['view', 'create', 'update', 'delete'],
+        // issue = take parts (to a ticket, or on a part issue/loan form).
+        'parts' => ['view', 'create', 'update', 'delete', 'issue', 'import', 'export'],
+        // receive = mark an approved request ordered, then received.
+        'purchase-requests' => ['view', 'create', 'update', 'approve', 'delete', 'receive'],
+        'stock-movements' => ['view', 'create'],
+        'reports' => ['view', 'export'],
+        'summary-people' => ['view'],
+        'summary-projects' => ['view'],
+        'surveys' => ['view', 'respond', 'manage'],
+        'users' => ['view', 'manage'],
+        'roles' => ['manage'],
+        'branches' => ['view', 'manage'],
+        'holidays' => ['view', 'manage'],
+        'company' => ['view', 'manage'],
+        'alerts' => ['manage'],
+        'activity-log' => ['view'],
+        // Not in permissions.json: the company's manuals (links and files).
+        'manuals' => ['view', 'manage'],
         // impersonate = enter a customer tenant; full_access = pass every check while inside.
         'platform' => ['impersonate', 'tenants', 'full_access'],
     ];
-
-    /**
-     * branch.all = may see data of every branch; without it a user only sees their own branch.
-     */
-    public const ALL_BRANCHES = 'branch.all';
 
     public const SUPERADMIN = 'superadmin';
 
@@ -52,9 +73,8 @@ class PermissionCatalog
 
     /**
      * Roles of the platform tenant. '*' = every permission. Central staff enter any customer
-     * tenant (platform.impersonate) and work there with the tenant permissions listed here:
-     * they see every branch and do the daily work, but hold nothing that configures the
-     * company (users, roles, branches, categories, checklists, holidays, imports, modules).
+     * tenant (platform.impersonate) and work there with the tenant permissions listed here,
+     * always over the whole company (scope all): the daily work, nothing that configures it.
      *
      * @var array<string, array{label: string, permissions: list<string>|string}>
      */
@@ -67,78 +87,124 @@ class PermissionCatalog
             'label' => 'Helpdesk ส่วนกลาง',
             'permissions' => [
                 'platform.impersonate',
-                'branch.view', 'branch.all',
-                'asset.view', 'asset.checkout', 'purchase.request', 'asset_category.view', 'customer.view', 'contract.view',
-                'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
-                'holiday.view',
-                'pm.view', 'pm.update',
-                'part.view', 'stock.view',
-                'survey.view', 'report.view',
+                'dashboard.view', 'branches.view',
+                'tickets.view', 'tickets.create', 'tickets.update', 'tickets.assign',
+                'pm-visits.view', 'pm-visits.update', 'pm-plans.view', 'pm-plans.update', 'pm-checklists.view',
+                'ip-check.view', 'ip-check.run',
+                'assets.view', 'asset-checkouts.view', 'asset-checkouts.create', 'asset-categories.view', 'labels.view',
+                'customers.view', 'contracts.view',
+                'parts.view', 'stock-movements.view', 'purchase-requests.view', 'purchase-requests.create',
+                'reports.view', 'summary-people.view', 'summary-projects.view', 'surveys.view', 'holidays.view', 'manuals.view',
             ],
         ],
         self::CENTRAL_TECHNICIAN => [
             'label' => 'ช่างส่วนกลาง',
             'permissions' => [
                 'platform.impersonate',
-                'branch.view', 'branch.all',
-                'asset.view', 'asset.update', 'asset.checkout', 'purchase.request',
-                'customer.view', 'contract.view',
-                'ticket.view', 'ticket.update', 'ticket.close',
-                'pm.view', 'pm.perform',
-                'sticker.print',
-                'part.view', 'stock.view', 'stock.issue',
+                'dashboard.view', 'branches.view',
+                'tickets.view', 'tickets.update', 'tickets.close',
+                'pm-visits.view', 'pm-visits.update', 'pm-visits.complete', 'pm-plans.view', 'pm-checklists.view',
+                'ip-check.view', 'ip-check.run',
+                'assets.view', 'assets.update', 'asset-checkouts.view', 'asset-checkouts.request', 'asset-checkouts.return',
+                'labels.view', 'labels.print',
+                'customers.view', 'contracts.view',
+                'parts.view', 'parts.issue', 'stock-movements.view', 'purchase-requests.view', 'purchase-requests.create',
+                'manuals.view',
             ],
         ],
     ];
 
     /** The role of customer accounts (users with customer_id); the only role they may have. */
-    public const CUSTOMER_ROLE = 'customer';
+    public const CUSTOMER_ROLE = 'customer_it';
+
+    /** The company's admin role: always every permission over the whole company. */
+    public const ADMIN_ROLE = 'admin_company';
 
     /**
-     * Roles seeded into every customer tenant. '*' = every permission except platform.*.
+     * Roles seeded into every customer tenant (permissions.json). '*' = every permission except
+     * platform.*, scope all. Otherwise permission => scope.
      *
-     * @var array<string, array{label: string, permissions: list<string>|string}>
+     * @var array<string, array{label: string, grants: array<string, string>|string, external?: bool}>
      */
     public const DEFAULT_ROLES = [
-        'admin_company' => [
+        self::ADMIN_ROLE => [
             'label' => 'ผู้ดูแลระบบบริษัท',
-            'permissions' => '*',
+            'grants' => '*',
         ],
         'helpdesk' => [
             'label' => 'เจ้าหน้าที่ Helpdesk',
-            // No branch.all: like every company role but the admin, helpdesk works in its own branch.
-            'permissions' => [
-                'branch.view',
-                'asset.view', 'asset.checkout', 'purchase.request', 'asset_category.view', 'customer.view', 'contract.view',
-                'ticket.view', 'ticket.create', 'ticket.update', 'ticket.assign',
-                'holiday.view',
-                'pm.view', 'pm.create', 'pm.update',
-                'part.view', 'stock.view',
-                'survey.view',
-                'user.view', 'report.view',
+            'grants' => [
+                'dashboard.view' => 'all',
+                'tickets.view' => 'all', 'tickets.create' => 'all', 'tickets.update' => 'all', 'tickets.assign' => 'all',
+                'tickets.close' => 'all', 'tickets.export' => 'all',
+                'pm-visits.view' => 'all', 'pm-visits.create' => 'all', 'pm-visits.update' => 'all',
+                'pm-plans.view' => 'all', 'pm-plans.create' => 'all', 'pm-plans.update' => 'all',
+                'pm-checklists.view' => 'all',
+                'ip-check.view' => 'all',
+                'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.export' => 'all',
+                'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.approve' => 'all', 'asset-checkouts.return' => 'all',
+                'asset-categories.view' => 'all',
+                'labels.view' => 'all', 'labels.print' => 'all',
+                'customers.view' => 'all', 'customers.create' => 'all', 'customers.update' => 'all',
+                'contracts.view' => 'all',
+                'parts.view' => 'all', 'parts.create' => 'all', 'parts.update' => 'all', 'parts.issue' => 'all',
+                'purchase-requests.view' => 'all', 'purchase-requests.create' => 'all', 'purchase-requests.update' => 'all',
+                'stock-movements.view' => 'all', 'stock-movements.create' => 'all',
+                'reports.view' => 'all',
+                'summary-projects.view' => 'all',
+                'surveys.view' => 'all',
+                'holidays.view' => 'all',
+                'manuals.view' => 'all',
             ],
         ],
         'technician' => [
             'label' => 'ช่างเทคนิค',
-            'permissions' => [
-                'branch.view',
-                'asset.view', 'asset.update', 'asset.checkout', 'purchase.request',
-                'customer.view', 'contract.view',
-                'ticket.view', 'ticket.update', 'ticket.close',
-                'pm.view', 'pm.perform',
-                'sticker.print',
-                // A technician takes parts for the jobs they work on; receiving and counting is office work.
-                'part.view', 'stock.view', 'stock.issue',
+            'grants' => [
+                'dashboard.view' => 'own',
+                'tickets.view' => 'own', 'tickets.create' => 'own', 'tickets.update' => 'own',
+                'pm-visits.view' => 'own', 'pm-visits.update' => 'own', 'pm-visits.complete' => 'own',
+                'pm-plans.view' => 'branch',
+                'pm-checklists.view' => 'all',
+                'ip-check.view' => 'all', 'ip-check.run' => 'all',
+                'assets.view' => 'branch',
+                'asset-checkouts.view' => 'own', 'asset-checkouts.request' => 'own', 'asset-checkouts.return' => 'own',
+                'labels.view' => 'all', 'labels.print' => 'all',
+                'customers.view' => 'own',
+                'contracts.view' => 'own',
+                'parts.view' => 'all', 'parts.issue' => 'own',
+                'purchase-requests.view' => 'own', 'purchase-requests.create' => 'own',
+                'stock-movements.view' => 'own',
+                'summary-people.view' => 'own',
+                'surveys.view' => 'own',
+                'manuals.view' => 'all',
             ],
         ],
         'user' => [
             'label' => 'ผู้ใช้งานทั่วไป',
-            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'purchase.request'],
+            'grants' => [
+                'dashboard.view' => 'own',
+                'tickets.view' => 'own', 'tickets.create' => 'own',
+                'assets.view' => 'own',
+                'asset-checkouts.view' => 'own', 'asset-checkouts.request' => 'own',
+                'manuals.view' => 'all',
+            ],
         ],
-        // Staff of a customer: only ever see records of their own customer (TenantPolicy).
-        'customer' => [
-            'label' => 'บัญชีลูกค้า',
-            'permissions' => ['asset.view', 'ticket.view', 'ticket.create', 'ticket.approve', 'pm.view', 'survey.answer'],
+        // Staff of a customer: only ever see records of their own customer.
+        self::CUSTOMER_ROLE => [
+            'label' => 'เจ้าหน้าที่ไอทีของลูกค้า',
+            'external' => true,
+            'grants' => [
+                'dashboard.view' => 'customer',
+                'tickets.view' => 'customer', 'tickets.create' => 'customer',
+                // Not in permissions.json: confirming a repair is done, kept from before.
+                'tickets.approve' => 'customer',
+                'pm-visits.view' => 'customer', 'pm-plans.view' => 'customer',
+                'assets.view' => 'customer',
+                'contracts.view' => 'customer',
+                'reports.view' => 'customer',
+                'summary-projects.view' => 'customer',
+                'surveys.view' => 'customer', 'surveys.respond' => 'customer',
+            ],
         ],
     ];
 
@@ -148,9 +214,9 @@ class PermissionCatalog
     public static function all(): array
     {
         $names = [];
-        foreach (self::PERMISSIONS as $module => $actions) {
+        foreach (self::PERMISSIONS as $resource => $actions) {
             foreach ($actions as $action) {
-                $names[] = "{$module}.{$action}";
+                $names[] = "{$resource}.{$action}";
             }
         }
 
@@ -168,13 +234,23 @@ class PermissionCatalog
     }
 
     /**
+     * The default grants of a company role: permission => scope.
+     *
+     * @return array<string, string>
+     */
+    public static function grantsFor(string $role): array
+    {
+        $grants = self::DEFAULT_ROLES[$role]['grants'];
+
+        return $grants === '*' ? array_fill_keys(self::tenantPermissions(), self::SCOPE_ALL) : $grants;
+    }
+
+    /**
      * @return list<string>
      */
     public static function permissionsFor(string $role): array
     {
-        $permissions = self::DEFAULT_ROLES[$role]['permissions'];
-
-        return $permissions === '*' ? self::tenantPermissions() : $permissions;
+        return array_keys(self::grantsFor($role));
     }
 
     /**

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 /**
  * Spare devices that can be asked for now (not asked for or out already), matching a search,
  * grouped by model so the person asking picks "a Lenovo E14" rather than hunting for serials.
- * Within what the user may see (SearchAssets).
+ * Among the assets the user may ask for (SearchAssets::askableBy).
  */
 class AvailableForCheckout
 {
@@ -26,7 +26,7 @@ class AvailableForCheckout
     {
         $search = trim($search);
 
-        $assets = SearchAssets::visibleTo(Asset::query(), $user)
+        $assets = SearchAssets::askableBy(Asset::query(), $user)
             ->with(['category:id,name', 'branch:id,name'])
             ->where('status', Asset::STATUS_SPARE)
             // Some of its quantity is not asked for or out already.

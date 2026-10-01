@@ -38,16 +38,13 @@ class StockMovement extends Model
     public const MANUAL_TYPES = self::TYPES;
 
     /**
-     * The permission a movement type needs: receiving and counting have their own; taking stock
-     * out in any way, and bringing it back, is stock.issue.
+     * The permission entering a movement of this type on the part page needs: writing the
+     * ledger directly is stock-movements.create for every type. Taking parts out for a ticket or
+     * on an issue/loan form is parts.issue instead (Service module, PartCheckoutController).
      */
     public static function permissionFor(string $type): string
     {
-        return match ($type) {
-            self::TYPE_RECEIVE => 'stock.receive',
-            self::TYPE_ADJUST => 'stock.adjust',
-            default => 'stock.issue',
-        };
+        return 'stock-movements.create';
     }
 
     protected $fillable = ['type', 'quantity', 'balance_after', 'unit_cost', 'ticket_id', 'reference', 'note', 'user_id', 'user_name'];

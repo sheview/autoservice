@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 class PmPlanRequest extends FormRequest
 {
     /** Who can be given PM rounds. */
-    public const ASSIGNABLE_PERMISSION = 'pm.perform';
+    public const ASSIGNABLE_PERMISSION = 'pm-visits.complete';
 
     public function authorize(): bool
     {

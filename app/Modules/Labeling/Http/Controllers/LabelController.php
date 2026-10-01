@@ -30,7 +30,11 @@ use Inertia\Response;
  */
 class LabelController extends Controller
 {
-    public const PERMISSION = 'sticker.print';
+    /** The page to choose assets. */
+    public const PERMISSION = 'labels.view';
+
+    /** Printing (the print page and its log). */
+    public const PRINT_PERMISSION = 'labels.print';
 
     /** Most labels on one print page. */
     public const MAX_LABELS = 300;
@@ -73,6 +77,7 @@ class LabelController extends Controller
             'categories' => collect($categoryNames->handle())->map(fn (string $name, int $id) => ['id' => $id, 'name' => $name])->values(),
             'templates' => LabelTemplates::all(),
             'maxLabels' => self::MAX_LABELS,
+            'can' => ['print' => $user->can(self::PRINT_PERMISSION)],
         ]);
     }
 
@@ -82,7 +87,7 @@ class LabelController extends Controller
      */
     public function print(Request $request, BuildLabels $buildLabels, TenantContext $context): Response
     {
-        Gate::authorize(self::PERMISSION);
+        Gate::authorize(self::PRINT_PERMISSION);
 
         $data = [
             'assets' => array_values(array_filter(explode(',', (string) $request->input('assets')))),
@@ -114,7 +119,7 @@ class LabelController extends Controller
      */
     public function record(Request $request, RecordLabelPrint $recordPrint): RedirectResponse
     {
-        Gate::authorize(self::PERMISSION);
+        Gate::authorize(self::PRINT_PERMISSION);
 
         $data = $request->validate([
             'assets' => ['required', 'array', 'min:1', 'max:'.self::MAX_LABELS],

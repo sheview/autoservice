@@ -10,11 +10,11 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Who did what in the company, for the last SearchActivityLog::KEEP_DAYS days (log.view).
+ * Who did what in the company, for the last SearchActivityLog::KEEP_DAYS days (activity-log.view).
  */
 class ActivityLogController extends Controller
 {
-    public const PERMISSION = 'log.view';
+    public const PERMISSION = 'activity-log.view';
 
     public function __invoke(Request $request, SearchActivityLog $search): Response
     {

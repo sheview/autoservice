@@ -9,13 +9,13 @@ use Illuminate\Support\Facades\Notification;
 
 /**
  * For the current tenant: one e-mail listing the active parts that are at or below their
- * reorder point and have not been e-mailed yet, to the staff who restock (stock.receive).
+ * reorder point and have not been e-mailed yet, to the staff who restock (stock-movements.create).
  * Each shortage is e-mailed once; restocking or a new reorder point re-arms it
  * (RecordStockMovement, SavePart).
  */
 class NotifyLowStock
 {
-    public const RECIPIENT_PERMISSION = 'stock.receive';
+    public const RECIPIENT_PERMISSION = 'stock-movements.create';
 
     public function __construct(private UsersWithPermission $usersWithPermission) {}
 

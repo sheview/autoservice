@@ -19,15 +19,15 @@ use Illuminate\Validation\ValidationException;
  */
 class TicketPartController extends Controller
 {
-    public const PERMISSION = 'stock.issue';
+    public const PERMISSION = 'parts.issue';
 
     /** Parts can still be taken right after the job is resolved, but not once it is closed or cancelled. */
     public const STATUSES = [...Ticket::OPEN_STATUSES, Ticket::STATUS_RESOLVED];
 
-    /** Whoever may work on the ticket and may take parts out of stock. */
+    /** Whoever may work on the ticket and may take parts out of stock for it (TicketPolicy::issueParts). */
     public static function allows(User $user, Ticket $ticket): bool
     {
-        return $user->can(self::PERMISSION) && $user->can('update', $ticket);
+        return $user->can('issueParts', $ticket);
     }
 
     public function store(Request $request, Ticket $ticket, IssuePartToTicket $issuePart): RedirectResponse

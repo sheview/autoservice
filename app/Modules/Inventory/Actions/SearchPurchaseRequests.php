@@ -3,13 +3,14 @@
 namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Inventory\Models\PurchaseRequest;
-use App\Modules\Inventory\Policies\PurchaseRequestPolicy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * The purchase request list: the user's own, or all for approvers and buyers; search, filter, sort.
+ * The purchase request list within the reach of the user's purchase-requests.view (scope own =
+ * the requests they asked for, wider = everyone's; "mine" narrows to their own); search, filter, sort.
  */
 class SearchPurchaseRequests
 {
@@ -40,10 +41,9 @@ class SearchPurchaseRequests
     {
         $search = $filters['search'] ?? '';
         $status = $filters['status'] ?? 'open';
-        $onlyMine = ! PurchaseRequestPolicy::seesAll($user) || ($filters['mine'] ?? false);
 
-        return PurchaseRequest::query()
-            ->when($onlyMine, fn (Builder $q) => $q->where('requested_by', $user->id))
+        return self::visibleTo(PurchaseRequest::query(), $user)
+            ->when($filters['mine'] ?? false, fn (Builder $q) => $q->where('requested_by', $user->id))
             // Set by the summaries (Reporting module): one person or one project.
             ->when($filters['requested_by'] ?? null, fn (Builder $q, $id) => $q->where('requested_by', $id))
             ->when($filters['contract_id'] ?? null, fn (Builder $q, $id) => $q->where('contract_id', $id))
@@ -58,5 +58,24 @@ class SearchPurchaseRequests
                 fn (Builder $q) => $q->orderByRaw('needed_by '.($filters['direction'] === 'asc' ? 'asc' : 'desc').' nulls last'),
                 fn (Builder $q) => $q->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc'))
             ->orderByDesc('id');
+    }
+
+    /**
+     * Narrows a purchase requests query to those the user may see (PurchaseRequestPolicy):
+     * no branch or customer; own = asked for by the user.
+     *
+     * @template T of Builder
+     *
+     * @param  T  $query
+     * @return T
+     */
+    public static function visibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->customer_id !== null) {
+            return $query->whereRaw('false');
+        }
+
+        return DataScope::constrain($query, $user, 'purchase-requests.view', branch: null, customer: null,
+            own: fn ($q) => $q->where($query->qualifyColumn('requested_by'), $user->id));
     }
 }

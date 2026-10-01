@@ -130,8 +130,10 @@ it('opens a repair ticket for an asset found with an issue', function () {
 it('lets only the assignee or a PM manager work on a round', function () {
     $otherTech = userWithRole('technician');
 
-    $this->actingAs($otherTech)->get("/pm-visits/{$this->visit->ulid}")
-        ->assertInertia(fn (Assert $page) => $page->where('can.start', false)->where('can.update', false));
+    // a technician sees and works on only the rounds given to them (scope own)
+    $this->actingAs($otherTech)->get("/pm-visits/{$this->visit->ulid}")->assertForbidden();
+    $this->actingAs($this->tech)->get("/pm-visits/{$this->visit->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('can.start', true)->where('can.update', true));
     $this->actingAs($otherTech)->post("/pm-visits/{$this->visit->ulid}/start")->assertForbidden();
     $this->actingAs($otherTech)->post("/pm-visits/{$this->visit->ulid}/cancel", ['reason' => 'x'])->assertForbidden();
 
@@ -161,7 +163,7 @@ it('lists rounds with search, filters and sort', function () {
     $visits = $this->plan->visits()->orderBy('round')->get();
     $visits[3]->update(['assignee_id' => null]);
 
-    $list = fn (string $query) => $this->actingAs($this->tech)->get("/pm-visits{$query}");
+    $list = fn (string $query) => $this->actingAs($this->helpdesk)->get("/pm-visits{$query}");
 
     // open by default, soonest due first; round 1 (due 2026-03-31) is overdue
     $list('')->assertInertia(fn (Assert $page) => $page->component('Maintenance/Visits/Index')
@@ -170,11 +172,21 @@ it('lists rounds with search, filters and sort', function () {
         ->where('visits.data.0.overdue', true)
         ->where('visits.data.1.overdue', false));
     $list('?status=overdue')->assertInertia(fn (Assert $page) => $page->where('visits.total', 1));
-    $list('?assignee=me')->assertInertia(fn (Assert $page) => $page->where('visits.total', 3));
+    $list('?assignee='.$this->tech->id)->assertInertia(fn (Assert $page) => $page->where('visits.total', 3));
+    $list('?assignee=me')->assertInertia(fn (Assert $page) => $page->where('visits.total', 0));
     $list('?assignee=none')->assertInertia(fn (Assert $page) => $page->where('visits.total', 1));
     $list('?month=2026-06')->assertInertia(fn (Assert $page) => $page->where('visits.total', 1)->where('visits.data.0.visit_no', $visits[1]->visit_no));
     $list('?search='.$visits[2]->visit_no)->assertInertia(fn (Assert $page) => $page->where('visits.total', 1));
     $list('?search=acme')->assertInertia(fn (Assert $page) => $page->where('visits.total', 4));
     $list('?sort=due_on&direction=desc')->assertInertia(fn (Assert $page) => $page->where('visits.data.0.visit_no', $visits[3]->visit_no));
     $list('?customer_id='.createCustomer()->id)->assertInertia(fn (Assert $page) => $page->where('visits.total', 0));
+
+    // the technician (scope own) sees only the rounds given to them
+    $this->actingAs($this->tech)->get('/pm-visits')->assertInertia(fn (Assert $page) => $page->where('visits.total', 3));
+    $this->actingAs($this->tech)->get('/pm-visits?assignee=none')->assertInertia(fn (Assert $page) => $page->where('visits.total', 0));
+    $this->actingAs($this->tech)->get("/pm-visits/{$visits[3]->ulid}")->assertForbidden();
+
+    // with scope all, every round
+    setRoleScope('technician', 'all', ['pm-visits.view']);
+    $this->actingAs($this->tech)->get('/pm-visits')->assertInertia(fn (Assert $page) => $page->where('visits.total', 4));
 });

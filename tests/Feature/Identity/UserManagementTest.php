@@ -34,11 +34,35 @@ it('searches and filters users on the server', function () {
         ->assertInertia(fn (Assert $page) => $page->where('users.total', 1)->where('users.data.0.name', 'Somsri'));
 });
 
-it('forbids user management without user.view', function () {
+it('forbids user management without users.view', function () {
     $technician = userWithRole('technician');
 
     $this->actingAs($technician)->get('/users')->assertForbidden();
     $this->actingAs($technician)->get('/roles')->assertForbidden();
+});
+
+it('lists only the users within the scope of users.view', function () {
+    $north = Branch::create(['code' => 'N', 'name' => 'North']);
+    $south = Branch::create(['code' => 'S', 'name' => 'South']);
+    $manager = userWithRole('helpdesk', ['name' => 'Manager North', 'branch_id' => $north->id]);
+    userWithRole('technician', ['name' => 'Tech North', 'branch_id' => $north->id]);
+    userWithRole('technician', ['name' => 'Tech South', 'branch_id' => $south->id]);
+
+    // scope branch: their branch, and users of no branch (the admin here)
+    grantTo('helpdesk', ['users.view', 'users.manage'], 'branch');
+    $this->actingAs($manager)->get('/users')->assertInertia(fn (Assert $page) => $page
+        ->where('users.data', fn ($users) => collect($users)->pluck('name')->sort()->values()->all() === ['Admin Here', 'Manager North', 'Tech North'])
+        ->where('branches', fn ($branches) => collect($branches)->pluck('id')->all() === [$north->id]));
+    // and only into their own branch
+    $this->actingAs($manager)->post('/users', [
+        'name' => 'X', 'email' => 'x.south@example.com', 'password' => 'password-123', 'password_confirmation' => 'password-123',
+        'branch_id' => $south->id, 'role' => 'user',
+    ])->assertSessionHasErrors('branch_id');
+
+    // scope own: only themself
+    setRoleScope('helpdesk', 'own', ['users.view']);
+    $this->actingAs($manager)->get('/users')->assertInertia(fn (Assert $page) => $page
+        ->where('users.total', 1)->where('users.data.0.name', 'Manager North'));
 });
 
 it('lets the admin create a user with a role and logs who did it', function () {
@@ -98,21 +122,7 @@ it('does not let an admin deactivate themselves', function () {
     ])->assertSessionHasErrors('is_active');
 });
 
-it('lets the admin create a role and change its permissions', function () {
-    $this->actingAs($this->admin)->post('/roles', [
-        'name' => 'auditor', 'label' => 'ผู้ตรวจสอบ', 'permissions' => ['asset.view', 'report.view'],
-    ])->assertRedirect('/roles')->assertSessionHasNoErrors();
-
-    $role = Role::findByName('auditor');
-    expect($role->permissions->pluck('name')->sort()->values()->all())->toBe(['asset.view', 'report.view'])
-        ->and(asTenant($this->other, fn () => Role::where('name', 'auditor')->exists()))->toBeFalse();
-});
-
-it('does not allow platform permissions in a tenant role', function () {
-    $this->actingAs($this->admin)->post('/roles', [
-        'name' => 'sneaky', 'label' => 'Sneaky', 'permissions' => ['platform.impersonate'],
-    ])->assertSessionHasErrors('permissions.0');
-});
+// Role permissions are given on the roles matrix: see RoleMatrixTest.
 
 it('keeps the name of a system role', function () {
     $role = Role::findByName('technician');
@@ -123,4 +133,16 @@ it('keeps the name of a system role', function () {
 
     expect($role->fresh()->name)->toBe('technician')
         ->and($role->fresh()->label)->toBe('ช่าง');
+});
+
+it('gives a customer account the customer role only', function () {
+    $customer = createCustomer();
+    $payload = ['name' => 'Client', 'email' => 'client@example.com', 'password' => 'password-123', 'password_confirmation' => 'password-123'];
+
+    $this->actingAs($this->admin)->post('/users', $payload + ['customer_id' => $customer->id, 'role' => 'user'])->assertSessionHasErrors('role');
+    $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer_it'])->assertSessionHasErrors('customer_id');
+    $this->actingAs($this->admin)->post('/users', $payload + ['customer_id' => $customer->id, 'role' => 'customer_it'])->assertSessionHasNoErrors();
+
+    expect(User::where('email', 'client@example.com')->first()->hasRole('customer_it'))->toBeTrue();
+    $this->actingAs($this->admin)->get('/users/create')->assertInertia(fn (Assert $page) => $page->where('customerRole', 'customer_it'));
 });

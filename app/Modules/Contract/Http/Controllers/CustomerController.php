@@ -7,6 +7,7 @@ use App\Modules\Contract\Actions\DeleteCustomer;
 use App\Modules\Contract\Actions\SaveCustomer;
 use App\Modules\Contract\Http\Requests\CustomerRequest;
 use App\Modules\Contract\Models\Customer;
+use App\Modules\Contract\Support\ContractScope;
 use App\Modules\Document\Actions\AddAttachments;
 use App\Modules\Document\Support\Attachments;
 use Illuminate\Http\RedirectResponse;
@@ -29,7 +30,9 @@ class CustomerController extends Controller
             'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
 
-        $customers = Customer::query()
+        $user = $request->user();
+        // A customer's contracts all fall within the same reach as the customer (ContractScope).
+        $customers = ContractScope::customers(Customer::query(), $user)
             ->withCount('contracts')
             ->when($filters['search'] !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('code', 'ilike', "%{$filters['search']}%")
@@ -44,18 +47,17 @@ class CustomerController extends Controller
             ->through(fn (Customer $customer) => [
                 ...$customer->only(['id', 'code', 'name', 'short_name', 'contact_name', 'phone', 'email']),
                 'contracts_count' => $customer->contracts_count,
+                'can' => ['update' => $user->can('update', $customer), 'delete' => $user->can('delete', $customer)],
             ]);
-
-        $user = $request->user();
 
         return Inertia::render('Contract/Customers/Index', [
             'customers' => $customers,
             'filters' => $filters,
             'can' => [
                 'create' => $user->can('create', Customer::class),
-                'update' => $user->can('customer.update'),
-                'delete' => $user->can('customer.delete'),
-                'viewContracts' => $user->can('contract.view'),
+                'update' => $user->can('customers.update'),
+                'delete' => $user->can('customers.delete'),
+                'viewContracts' => $user->can('contracts.view'),
             ],
         ]);
     }

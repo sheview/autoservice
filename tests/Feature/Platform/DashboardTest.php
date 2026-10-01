@@ -1,5 +1,7 @@
 <?php
 
+use App\Modules\Identity\Models\Role;
+use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Tenancy\Models\Branch;
@@ -51,11 +53,11 @@ it('shows what needs attention, within what the user may see', function () {
         ->where('surveys', null)
         ->where('can.reports', false));
 
-    // a customer account: its own tickets only, nothing about the company
-    $client = userWithRole('customer', ['customer_id' => $this->customer->id]);
+    // a customer account: its own tickets and contracts only, nothing about the company's stock
+    $client = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
     $this->actingAs($client)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
         ->where('tickets.open', 1)
-        ->where('contracts', null)->where('parts', null)->where('surveys', null));
+        ->where('contracts.expiring', 0)->where('parts', null)->where('surveys.sent', 0));
 });
 
 it('leaves out the cards of modules that are switched off', function () {
@@ -91,4 +93,31 @@ it('gives the platform its customer companies, and the ones to renew first', fun
     $this->actingAs($this->admin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('platform', null));
     $this->actingAs($superadmin)->post("/platform/impersonation/{$this->tenant->ulid}");
     $this->actingAs($superadmin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('platform', null));
+});
+
+it('needs dashboard.view, and sends those without it to the first page of their menu', function () {
+    $role = Role::create(['name' => 'stock_clerk', 'label' => 'Stock', 'guard_name' => 'web']);
+    $role->givePermissionTo('parts.view');
+    $clerk = User::factory()->create();
+    $clerk->assignRole('stock_clerk');
+
+    $this->actingAs($clerk)->get('/dashboard')->assertRedirect('/parts');
+
+    $role->revokePermissionTo('parts.view');
+    $this->actingAs($clerk->fresh())->get('/dashboard')->assertForbidden();
+});
+
+it('counts only the own work of a technician (scope own)', function () {
+    $other = userWithRole('technician', ['branch_id' => $this->north->id]);
+    $mine = openTicket($this->admin, ['title' => 'Mine', 'customer_id' => $this->customer->id]);
+    app(AssignTicket::class)->handle($mine, $this->tech->id, $this->admin);
+    $theirs = openTicket($this->admin, ['title' => 'Theirs']);
+    app(AssignTicket::class)->handle($theirs, $other->id, $this->admin);
+
+    $this->actingAs($this->tech)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('tickets.mine', 1)
+        ->where('tickets.recent', fn ($recent) => collect($recent)->pluck('title')->all() === ['Mine'])
+        ->where('pm', ['overdue' => 0, 'this_month' => 0, 'mine' => 0])
+        // surveys of their own tickets only cannot be added up: no card
+        ->where('surveys', null));
 });

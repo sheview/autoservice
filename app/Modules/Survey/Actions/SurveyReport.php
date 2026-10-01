@@ -17,9 +17,11 @@ class SurveyReport
      * @return array{sent: int, answered: int, response_rate: int|null, average: float|null, scores: array<int, int>,
      *     by_assignee: array<int, array{answers: int, average: float}>}
      */
-    public function handle(CarbonInterface $from, CarbonInterface $to): array
+    public function handle(CarbonInterface $from, CarbonInterface $to, ?int $customerId = null): array
     {
-        $sent = fn () => TicketSurvey::query()->whereBetween('created_at', [$from, $to]);
+        // $customerId: only that customer's surveys (a customer account's report).
+        $sent = fn () => TicketSurvey::query()->whereBetween('created_at', [$from, $to])
+            ->when($customerId, fn ($q, $id) => $q->where('customer_id', $id));
 
         return [
             ...$this->summarise->handle($sent()),

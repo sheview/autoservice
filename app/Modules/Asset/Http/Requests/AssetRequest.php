@@ -8,6 +8,7 @@ use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Asset\Models\AssetSerial;
 use App\Modules\Asset\Support\SpecFields;
 use App\Modules\Document\Support\Attachments;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Money;
 use Illuminate\Foundation\Http\FormRequest;
@@ -184,11 +185,12 @@ class AssetRequest extends FormRequest
             fn (Validator $validator) => $this->checkSerialsTaken($validator),
             function (Validator $validator) {
                 $user = $this->user();
-                if ($user->can(PermissionCatalog::ALL_BRANCHES)) {
+                $permission = $this->route('asset') instanceof Asset ? 'assets.update' : 'assets.create';
+                if (DataScope::of($user, $permission) === PermissionCatalog::SCOPE_ALL) {
                     return;
                 }
 
-                // Without branch.all an asset can only be put in the user's own branch (or none).
+                // Without reach over the whole company an asset can only be put in the user's own branch (or none).
                 $branchId = $this->input('branch_id') === null ? null : (int) $this->input('branch_id');
                 if (! in_array($branchId, [null, $user->branch_id], true)) {
                     $validator->errors()->add('branch_id', __('asset.assets.branch_not_allowed'));

@@ -18,10 +18,11 @@ class DashboardTest extends TestCase
 
     public function test_authenticated_users_can_visit_the_dashboard()
     {
-        $user = User::factory()->create();
-        $this->actingAs($user);
+        // dashboard.view comes with a role (permissions.json); without any, the page is refused
+        $this->actingAs(User::factory()->withRole('user')->create());
+        $this->get('/dashboard')->assertStatus(200);
 
-        $response = $this->get('/dashboard');
-        $response->assertStatus(200);
+        $this->actingAs(User::factory()->create());
+        $this->get('/dashboard')->assertForbidden();
     }
 }

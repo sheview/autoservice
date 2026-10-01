@@ -21,7 +21,8 @@ trait ServesAttachments
     protected function storeAttachments(Request $request, HasMedia $model): RedirectResponse
     {
         $request->validate(
-            Attachments::rules(images: $model->attachmentsTakeImages(), required: true),
+            Attachments::rules(images: $model->attachmentsTakeImages(), required: true,
+                maxKb: method_exists($model, 'attachmentMaxKb') ? $model->attachmentMaxKb() : Attachments::MAX_KB),
             attributes: Attachments::attributes(),
         );
 

@@ -17,7 +17,7 @@ beforeEach(function () {
     $this->helpdesk = userWithRole('helpdesk');
     $this->tech = userWithRole('technician', ['name' => 'Tech One']);
     $this->acme = createCustomer(['code' => 'ACME', 'name' => 'Acme']);
-    $this->client = userWithRole('customer', ['name' => 'Acme IT', 'customer_id' => $this->acme->id]);
+    $this->client = userWithRole('customer_it', ['name' => 'Acme IT', 'customer_id' => $this->acme->id]);
 
     // Opens a ticket for Acme and takes it to "resolved"; $closer then approves (closes) it.
     $this->closedTicket = function ($reporter = null, $closer = null, array $attributes = []): Ticket {
@@ -100,7 +100,7 @@ it('lets the customer account rate its ticket on the ticket page, once', functio
         ->where('survey.answered', true)->where('survey.score', 4)->where('survey.canAnswer', false));
 
     // an account of another customer cannot see or rate the ticket
-    $other = userWithRole('customer', ['customer_id' => createCustomer()->id]);
+    $other = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $another = ($this->closedTicket)();
     $this->actingAs($other)->post("/tickets/{$another->ulid}/survey", ['score' => 1])->assertForbidden();
     expect(TicketSurvey::where('ticket_id', $another->id)->value('score'))->toBeNull();
@@ -189,8 +189,19 @@ it('lists the surveys with search, filters, sort and a summary', function () {
     $get('sort=score&direction=desc')->assertInertia(fn (Assert $page) => $page
         ->where('surveys.data.0.score', 5)->where('surveys.data.2.score', null));
 
-    // technicians, office users and customer accounts do not see the results
-    $this->actingAs($this->tech)->get('/surveys')->assertForbidden();
+    // office users do not see the results
     $this->actingAs(userWithRole('user'))->get('/surveys')->assertForbidden();
-    $this->actingAs($this->client)->get('/surveys')->assertForbidden();
+
+    // scope own: a technician sees the surveys of the jobs assigned to them
+    $this->actingAs($this->tech)->get('/surveys')->assertInertia(fn (Assert $page) => $page
+        ->where('surveys.total', 2)
+        ->where('technicians', fn ($technicians) => collect($technicians)->pluck('name')->all() === ['Tech One']));
+    $this->actingAs($tech2)->get('/surveys')->assertInertia(fn (Assert $page) => $page
+        ->where('surveys.total', 1)->where('surveys.data.0.ticket_title', 'Slow laptop'));
+
+    // scope customer: a customer account sees its own customer's surveys only
+    $this->actingAs($this->client)->get('/surveys')->assertInertia(fn (Assert $page) => $page
+        ->where('surveys.total', 2)
+        ->where('customers', fn ($customers) => collect($customers)->pluck('name')->all() === ['Acme']));
+    $this->actingAs($this->client)->get("/surveys?customer_id={$beta->id}")->assertInertia(fn (Assert $page) => $page->where('surveys.total', 0));
 });

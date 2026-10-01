@@ -22,15 +22,15 @@ beforeEach(function () {
     $contract = createContract($this->acme, ['service_window' => '24x7', 'slas' => ['medium' => ['response_minutes' => 60, 'resolve_minutes' => 240]]]);
     $contract->contractAssets()->create(['asset_id' => $this->acmeAsset->id]);
 
-    $this->client = userWithRole('customer', ['name' => 'Acme IT', 'customer_id' => $this->acme->id]);
+    $this->client = userWithRole('customer_it', ['name' => 'Acme IT', 'customer_id' => $this->acme->id]);
 });
 
 it('lets an admin create a customer account, and only with the customer role', function () {
     $payload = ['name' => 'Beta IT', 'email' => 'it@beta.test', 'password' => 'password-123', 'password_confirmation' => 'password-123'];
 
-    $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer'])->assertSessionHasErrors('customer_id');
+    $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer_it'])->assertSessionHasErrors('customer_id');
     $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'technician', 'customer_id' => $this->beta->id])->assertSessionHasErrors('role');
-    $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer', 'customer_id' => $this->beta->id])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer_it', 'customer_id' => $this->beta->id])->assertSessionHasNoErrors();
 
     expect(User::where('email', 'it@beta.test')->value('customer_id'))->toBe($this->beta->id);
 
@@ -56,13 +56,14 @@ it('shows a customer account only its own assets and tickets', function () {
 });
 
 it('keeps a customer account out of the staff pages', function () {
-    foreach (['/users', '/roles', '/customers', '/contracts', '/asset-categories', '/holidays', '/assets/export'] as $url) {
+    // contracts: customer_it sees its own customer's contracts (scope customer).
+    foreach (['/users', '/roles', '/customers', '/asset-categories', '/holidays', '/assets/export'] as $url) {
         $this->actingAs($this->client)->get($url)->assertForbidden();
     }
 
     $this->actingAs($this->client)->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(collect($page->toArray()['props']['navigation'])->pluck('title')->all())
-            ->toBe(['หน้าหลัก', 'ใบงาน', 'รอบ PM', 'ทรัพย์สิน']));
+            ->toBe(['หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'ทรัพย์สิน', 'สัญญา MA', 'รายงาน', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ']));
 });
 
 it('lets a customer account open a ticket for its own asset, and tells the dispatchers', function () {
@@ -123,6 +124,6 @@ it('lets the customer confirm or reject the fix of its own ticket only', functio
     expect($ticket->fresh()->status)->toBe(Ticket::STATUS_CLOSED);
 
     // another customer's account cannot touch it
-    $betaClient = userWithRole('customer', ['customer_id' => $this->beta->id]);
+    $betaClient = userWithRole('customer_it', ['customer_id' => $this->beta->id]);
     $this->actingAs($betaClient)->get("/tickets/{$ticket->ulid}")->assertForbidden();
 });

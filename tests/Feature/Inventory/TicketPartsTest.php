@@ -81,13 +81,11 @@ it('returns parts to stock, at most what the ticket still holds', function () {
 it('only lets staff who work on the ticket and may issue stock book parts', function () {
     $payload = ['part_id' => $this->ram->id, 'quantity' => 1];
 
-    // helpdesk sees the parts but has no stock.issue
-    $this->actingAs($this->helpdesk)->post("{$this->url}/parts", $payload)->assertForbidden();
-    $this->actingAs($this->helpdesk)->get($this->url)
-        ->assertInertia(fn (Assert $page) => $page->where('parts.canIssue', false)->where('parts.options', []));
+    // a technician who is not on the ticket (parts.issue scope own) may not
+    $this->actingAs(userWithRole('technician'))->post("{$this->url}/parts", $payload)->assertForbidden();
 
     // a customer account sees its ticket but nothing about stock
-    $client = userWithRole('customer', ['customer_id' => $this->customer->id]);
+    $client = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
     $this->actingAs($client)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts', null));
     $this->actingAs($client)->post("{$this->url}/parts", $payload)->assertForbidden();
 

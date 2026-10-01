@@ -136,12 +136,12 @@ it('does not find an asset by its numeric id', function () {
     $this->actingAs($this->admin)->get("/assets/{$asset->id}")->assertNotFound();
 });
 
-it('lets a user without asset.create only view', function () {
+it('lets a user without assets.create only view, and only what they hold', function () {
     $user = userWithRole('user');
     $asset = createAsset($this->pc, ['specs' => ['cpu' => 'x']]);
 
-    $this->actingAs($user)->get('/assets')->assertOk();
-    $this->actingAs($user)->get("/assets/{$asset->ulid}")->assertOk();
+    $this->actingAs($user)->get('/assets')->assertOk()->assertInertia(fn (Assert $page) => $page->where('assets.total', 0)->where('can.create', false));
+    $this->actingAs($user)->get("/assets/{$asset->ulid}")->assertForbidden();
     $this->actingAs($user)->post('/assets', assetPayload())->assertForbidden();
     $this->actingAs($user)->put("/assets/{$asset->ulid}", assetPayload())->assertForbidden();
     $this->actingAs($user)->delete("/assets/{$asset->ulid}")->assertForbidden();
@@ -151,7 +151,8 @@ describe('branch scope', function () {
     beforeEach(function () {
         $this->north = Branch::create(['code' => 'N', 'name' => 'North']);
         $this->south = Branch::create(['code' => 'S', 'name' => 'South']);
-        // technician: asset.view + asset.update, no branch.all
+        // technician: assets.view scope branch; here also assets.update scope branch
+        grantTo('technician', ['assets.update'], 'branch');
         $this->tech = userWithRole('technician', ['branch_id' => $this->north->id]);
 
         $this->northAsset = createAsset($this->pc, ['name' => 'North PC', 'branch_id' => $this->north->id, 'specs' => ['cpu' => 'x']]);
@@ -166,7 +167,7 @@ describe('branch scope', function () {
                 ->where('assets.data', fn ($rows) => collect($rows)->pluck('name')->sort()->values()->all() === ['North PC', 'Shared PC'])
                 ->where('branches', [['id' => $this->north->id, 'name' => 'North']]));
 
-        // branch.all sees every branch
+        // scope all sees every branch
         $this->actingAs($this->admin)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 3));
     });
 
@@ -174,6 +175,20 @@ describe('branch scope', function () {
         $this->actingAs($this->tech)->get("/assets/{$this->southAsset->ulid}")->assertForbidden();
         $this->actingAs($this->tech)->put("/assets/{$this->southAsset->ulid}", assetPayload())->assertForbidden();
         $this->actingAs($this->tech)->get("/assets/{$this->northAsset->ulid}")->assertOk();
+    });
+
+    it('lists the assets of the account customer only (scope customer)', function () {
+        $acme = createCustomer();
+        $this->northAsset->update(['customer_id' => $acme->id]);
+        $client = userWithRole('customer_it', ['customer_id' => $acme->id]);
+
+        $this->actingAs($client)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 1)->where('assets.data.0.name', 'North PC'));
+        $this->actingAs($client)->get("/assets/{$this->southAsset->ulid}")->assertForbidden();
+    });
+
+    it('lets a role with assets.view scope all see every branch', function () {
+        setRoleScope('technician', 'all', ['assets.view']);
+        $this->actingAs($this->tech)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 3));
     });
 
     it('does not let the user move an asset to another branch', function () {

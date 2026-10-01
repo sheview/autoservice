@@ -53,7 +53,7 @@ class Attachments
      *
      * @return array<string, list<string>>
      */
-    public static function rules(string $key = 'attachments', bool $images = false, bool $required = false): array
+    public static function rules(string $key = 'attachments', bool $images = false, bool $required = false, int $maxKb = self::MAX_KB): array
     {
         $extensions = $images ? [...self::EXTENSIONS, ...self::IMAGE_EXTENSIONS] : self::EXTENSIONS;
 
@@ -63,7 +63,7 @@ class Attachments
                 'file',
                 'extensions:'.implode(',', $extensions),
                 'mimetypes:'.implode(',', self::mimeTypes($images)),
-                'max:'.self::MAX_KB,
+                'max:'.$maxKb,
             ],
         ];
     }

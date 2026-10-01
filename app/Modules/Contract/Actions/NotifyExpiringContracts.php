@@ -9,13 +9,13 @@ use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Support\Facades\Notification;
 
 /**
- * For the current tenant: e-mails the users with contract.update about active contracts that
+ * For the current tenant: e-mails the users with contracts.update about active contracts that
  * reached their notice window (ends_on - notify_days_before) and were not e-mailed yet.
  * Each contract is e-mailed once; changing its end date re-arms it (SaveContract).
  */
 class NotifyExpiringContracts
 {
-    public const PERMISSION = 'contract.update';
+    public const PERMISSION = 'contracts.update';
 
     public function __construct(
         private UsersWithPermission $usersWithPermission,

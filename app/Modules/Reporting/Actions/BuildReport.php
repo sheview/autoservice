@@ -5,6 +5,9 @@ namespace App\Modules\Reporting\Actions;
 use App\Modules\Asset\Actions\AssetReport;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
+use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\PartUsageReport;
 use App\Modules\Maintenance\Actions\PmReport;
 use App\Modules\Platform\Support\Modules;
@@ -16,6 +19,10 @@ use App\Modules\Survey\Actions\SurveyReport;
  * The management report of the current tenant for a period: one section per business module,
  * each built by that module's own report action. A section is null when its module is switched
  * off. Ids are turned into names here, so the page and the Excel export get the same thing.
+ *
+ * A viewer whose permission has scope customer gets only that customer's figures (tickets, PM,
+ * surveys). What cannot be narrowed to one customer (assets) or is internal (technicians, the
+ * customer ranking, stock, parts and costs) is left out for them.
  */
 class BuildReport
 {
@@ -39,9 +46,13 @@ class BuildReport
      *     pm: array<string, mixed>|null, assets: array<string, mixed>|null, parts: array<string, mixed>|null,
      *     surveys: array<string, mixed>|null}
      */
-    public function handle(ReportPeriod $period): array
+    public function handle(ReportPeriod $period, ?User $viewer = null, string $permission = 'reports.view'): array
     {
         $on = fn (string $module) => $this->modules->enabled($module);
+
+        if ($viewer !== null && DataScope::of($viewer, $permission) === PermissionCatalog::SCOPE_CUSTOMER) {
+            return $this->forCustomer($period, (int) $viewer->customer_id);
+        }
 
         $tickets = $on('service') ? $this->ticketReport->handle($period->from, $period->to) : null;
         // Surveys are about tickets: without the Service module there is nothing to show them against.
@@ -55,6 +66,30 @@ class BuildReport
             'pm' => $on('maintenance') ? $this->pmReport->handle($period->from, $period->to) : null,
             'assets' => $on('asset') ? $this->assetReport->handle() : null,
             'parts' => $on('inventory') ? $this->partUsageReport->handle($period->from, $period->to) : null,
+            'surveys' => $surveys ? collect($surveys)->except('by_assignee')->all() : null,
+        ];
+    }
+
+    /**
+     * The report of one customer: only what can be counted for that customer alone.
+     *
+     * @return array<string, mixed> the same keys as handle()
+     */
+    private function forCustomer(ReportPeriod $period, int $customerId): array
+    {
+        $on = fn (string $module) => $this->modules->enabled($module);
+        $tickets = $on('service') ? $this->ticketReport->handle($period->from, $period->to, $customerId) : null;
+        $surveys = $on('survey') && $on('service') ? $this->surveyReport->handle($period->from, $period->to, $customerId) : null;
+
+        return [
+            'period' => $period->toArray(),
+            'tickets' => $tickets ? collect($tickets)->except(['by_customer', 'by_assignee'])->all() : null,
+            'customers' => [],
+            'technicians' => [],
+            'pm' => $on('maintenance') ? $this->pmReport->handle($period->from, $period->to, $customerId) : null,
+            // AssetReport counts the whole company: not for one customer.
+            'assets' => null,
+            'parts' => null,
             'surveys' => $surveys ? collect($surveys)->except('by_assignee')->all() : null,
         ];
     }

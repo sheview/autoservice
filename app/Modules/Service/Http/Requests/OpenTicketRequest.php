@@ -106,7 +106,7 @@ class OpenTicketRequest extends FormRequest
 
     /**
      * The asset must be one the user can see and belong to the chosen customer; the contract must
-     * cover that customer/asset today; only users with ticket.assign pick an assignee.
+     * cover that customer/asset today; only users with tickets.assign pick an assignee.
      */
     public function after(): array
     {
@@ -114,6 +114,10 @@ class OpenTicketRequest extends FormRequest
             function ($validator) {
                 if ($validator->errors()->isNotEmpty()) {
                     return;
+                }
+
+                if ($this->filled('assignee_id') && ! $this->user()->can('tickets.assign')) {
+                    $validator->errors()->add('assignee_id', __('service.tickets.cannot_assign'));
                 }
 
                 $assetId = $this->integer('asset_id') ?: null;
@@ -137,10 +141,6 @@ class OpenTicketRequest extends FormRequest
                     if (! $covering->contains($this->integer('contract_id'))) {
                         $validator->errors()->add('contract_id', __('service.tickets.contract_not_covering'));
                     }
-                }
-
-                if ($this->filled('assignee_id') && ! $this->user()->can('ticket.assign')) {
-                    $validator->errors()->add('assignee_id', __('service.tickets.cannot_assign'));
                 }
             },
         ];

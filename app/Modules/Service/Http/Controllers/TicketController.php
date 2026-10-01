@@ -14,6 +14,8 @@ use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\TicketParts;
 use App\Modules\Labeling\Actions\QrSvg;
@@ -21,6 +23,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SearchTickets;
+use App\Modules\Service\Actions\TicketCustomerIds;
 use App\Modules\Service\Actions\UpdateTicket;
 use App\Modules\Service\Http\Requests\OpenTicketRequest;
 use App\Modules\Service\Http\Requests\UpdateTicketRequest;
@@ -38,7 +41,7 @@ use Inertia\Response;
 class TicketController extends Controller
 {
     /** Users who can be given tickets: whoever may work on them. */
-    public const ASSIGNABLE_PERMISSION = 'ticket.update';
+    public const ASSIGNABLE_PERMISSION = 'tickets.update';
 
     public function __construct(
         private Modules $modules,
@@ -46,7 +49,7 @@ class TicketController extends Controller
         private UserNames $userNames,
     ) {}
 
-    public function index(Request $request, SearchTickets $search): Response
+    public function index(Request $request, SearchTickets $search, TicketCustomerIds $ticketCustomerIds): Response
     {
         Gate::authorize('viewAny', Ticket::class);
 
@@ -70,7 +73,10 @@ class TicketController extends Controller
             'filters' => $filters,
             'statuses' => Ticket::STATUSES,
             'priorities' => Ticket::PRIORITIES,
-            'customers' => $this->customers(),
+            // Scope "own": only the customers of the user's own tickets in the filter.
+            'customers' => DataScope::of($user, 'tickets.view') === PermissionCatalog::SCOPE_OWN
+                ? array_values(array_filter($this->customers(), fn (array $c) => in_array($c['id'], $ticketCustomerIds->handle($user), true)))
+                : $this->customers(),
             'dueSoonHours' => SearchTickets::DUE_SOON_HOURS,
             'can' => ['create' => $user->can('create', Ticket::class)],
         ]);
@@ -115,7 +121,7 @@ class TicketController extends Controller
             'contracts' => fn () => $this->modules->enabled('contract') && $user->customer_id === null
                 ? $coveringContracts->handle($customerId, $assetId)
                 : [],
-            'assignees' => $user->can('ticket.assign')
+            'assignees' => $user->can('tickets.assign')
                 ? $usersWithPermission->handle(self::ASSIGNABLE_PERMISSION)->map(fn (User $u) => $u->only(['id', 'name']))->values()
                 : [],
             'priorities' => Ticket::PRIORITIES,
@@ -160,7 +166,7 @@ class TicketController extends Controller
                     'contact_name', 'contact_phone', 'service_window', 'response_minutes', 'resolve_minutes', 'hold_minutes',
                 ]),
                 'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $ticket->customer_id)['name'] ?? null,
-                'asset' => $asset ? [...$asset, 'can_view' => $user->can('asset.view')] : null,
+                'asset' => $asset ? [...$asset, 'can_view' => $user->can('assets.view')] : null,
                 'device' => [
                     ...$ticket->only(['device_name', 'device_brand', 'device_model', 'device_serial', 'device_serial_unknown', 'device_location', 'device_ip']),
                     'property_no' => $device['property_no'] ?? null,
@@ -179,7 +185,7 @@ class TicketController extends Controller
                     // A registered asset: what its warranty date says today, for staff to confirm.
                     'asset_expires_on' => $device['warranty_expires_at'] ?? null,
                 ],
-                'contract' => $contract ? [...$contract, 'can_view' => $user->can('contract.view')] : null,
+                'contract' => $contract ? [...$contract, 'can_view' => $user->can('contracts.view')] : null,
                 'branch' => $ticket->branch?->name,
                 'assignee_id' => $ticket->assignee_id,
                 'assignee' => $names[$ticket->assignee_id] ?? null,
@@ -205,7 +211,7 @@ class TicketController extends Controller
                 ? $usersWithPermission->handle(self::ASSIGNABLE_PERMISSION)->map(fn (User $u) => $u->only(['id', 'name']))->values()
                 : null,
             // Spare parts used on the job (Inventory module); null = the user does not see stock.
-            'parts' => $this->modules->enabled('inventory') && $user->can('part.view') ? [
+            'parts' => $this->modules->enabled('inventory') && $user->can('parts.view') ? [
                 'items' => $ticketParts->handle($ticket->id),
                 'options' => $canIssueParts ? $issuableParts->handle() : [],
                 'types' => IssuableParts::TYPES,
@@ -227,7 +233,7 @@ class TicketController extends Controller
     }
 
     /**
-     * The satisfaction survey of a closed ticket (Survey module). Staff with survey.view see the
+     * The satisfaction survey of a closed ticket (Survey module). Staff with surveys.view see the
      * answer, and while there is none the public link (with its QR code) to send to the customer;
      * whoever may answer gets the form. Null = nothing to show to this user.
      *
@@ -235,7 +241,7 @@ class TicketController extends Controller
      */
     private function survey(Ticket $ticket, User $user, SurveyOfTicket $surveyOfTicket, QrSvg $qrSvg): ?array
     {
-        $canView = $user->can('survey.view');
+        $canView = TicketSurveyController::allowsView($user, $ticket);
         $canAnswer = TicketSurveyController::allows($user, $ticket);
         $canPaper = TicketSurveyController::allowsPaper($user, $ticket);
 
@@ -248,7 +254,10 @@ class TicketController extends Controller
             return null;
         }
 
-        $shareLink = $canView && ! $survey['answered'];
+        // Staff send the link; a customer account answers on the page instead, and the technician
+        // who did the job never gets the link to rate their own work.
+        $shareLink = $canView && ! $survey['answered'] && $user->customer_id === null
+            && (int) $ticket->assignee_id !== (int) $user->id;
 
         return [
             ...collect($survey)->except('url')->all(),

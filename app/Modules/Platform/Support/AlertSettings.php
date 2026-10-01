@@ -9,11 +9,11 @@ use Illuminate\Support\Facades\Crypt;
  * Where a company wants to hear about things that happen (issue/loan forms, repairs): LINE
  * (Messaging API: channel access token + user/group id), Telegram (bot token + chat id) and
  * e-mail (a list of addresses), and for which events. Kept in tenants.settings "alerts"; the
- * tokens are encrypted and never sent back to the browser. Set by the company's admin.
+ * tokens are encrypted and never sent back to the browser. Set by whoever holds alerts.manage.
  */
 class AlertSettings
 {
-    public const PERMISSION = 'company.update';
+    public const PERMISSION = 'alerts.manage';
 
     public const CHANNELS = ['line', 'telegram', 'mail'];
 

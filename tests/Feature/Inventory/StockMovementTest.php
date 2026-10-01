@@ -94,19 +94,20 @@ it('checks the permission of each movement type', function () {
     $technician = userWithRole('technician');
     $helpdesk = userWithRole('helpdesk');
 
-    // a technician may take parts, but receiving and counting is office work
-    ($this->move)(['type' => 'issue', 'quantity' => 1], $technician)->assertSessionHasNoErrors();
-    ($this->move)(['type' => 'receive', 'quantity' => 1], $technician)->assertForbidden();
+    // writing the ledger directly is stock-movements.create (helpdesk); technicians take parts
+    // on a ticket or an issue/loan form instead
+    foreach (['issue', 'receive', 'loan', 'return'] as $type) {
+        ($this->move)(['type' => $type, 'quantity' => 1], $technician)->assertForbidden();
+    }
     ($this->move)(['type' => 'adjust', 'quantity' => 1, 'note' => 'x'], $technician)->assertForbidden();
-    ($this->move)(['type' => 'issue', 'quantity' => 1], $helpdesk)->assertForbidden();
-    ($this->move)(['type' => 'loan', 'quantity' => 1], $helpdesk)->assertForbidden();
-    ($this->move)(['type' => 'return', 'quantity' => 1], $helpdesk)->assertForbidden();
+    ($this->move)(['type' => 'issue', 'quantity' => 1], $helpdesk)->assertSessionHasNoErrors();
+    ($this->move)(['type' => 'receive', 'quantity' => 2], $helpdesk)->assertSessionHasNoErrors();
     ($this->move)(['type' => 'issue', 'quantity' => 1], userWithRole('user'))->assertForbidden();
 
     $this->actingAs($technician)->get("/parts/{$this->part->id}")
-        ->assertInertia(fn (Assert $page) => $page->where('movementTypes', ['issue', 'loan', 'spare', 'return'])->where('part.qty_on_hand', 4));
+        ->assertInertia(fn (Assert $page) => $page->where('movementTypes', [])->where('part.qty_on_hand', 6));
     $this->actingAs($helpdesk)->get("/parts/{$this->part->id}")
-        ->assertInertia(fn (Assert $page) => $page->where('movementTypes', [])->where('movements.total', 2));
+        ->assertInertia(fn (Assert $page) => $page->where('movementTypes', ['receive', 'issue', 'loan', 'spare', 'return', 'adjust'])->where('movements.total', 3));
 });
 
 it('lists the ledger with search, filters and sort', function () {
@@ -130,4 +131,18 @@ it('lists the ledger with search, filters and sort', function () {
     $get('sort=quantity&direction=asc')->assertInertia(fn (Assert $page) => $page->where('movements.data.0.quantity', -4));
 
     $this->actingAs(userWithRole('user'))->get('/stock-movements')->assertForbidden();
+});
+
+it('shows a technician (scope own) only the ledger rows they entered', function () {
+    ($this->move)(['type' => 'receive', 'quantity' => 10]);
+    $technician = userWithRole('technician');
+    grantTo('technician', ['stock-movements.create']);
+    ($this->move)(['type' => 'issue', 'quantity' => 1, 'reference' => 'mine'], $technician)->assertSessionHasNoErrors();
+
+    $this->actingAs($technician)->get('/stock-movements')->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('movements.total', 1)->where('movements.data.0.reference', 'mine'));
+    $this->actingAs($technician)->get("/parts/{$this->part->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('movements.total', 1));
+    $this->actingAs(userWithRole('helpdesk'))->get('/stock-movements')
+        ->assertInertia(fn (Assert $page) => $page->where('movements.total', 2));
 });

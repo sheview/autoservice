@@ -3,15 +3,13 @@
 namespace App\Modules\Service\Actions;
 
 use App\Modules\Identity\Models\User;
-use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Service\Models\Ticket;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * The ticket list query: the user's scope + filters + sort.
- * Users without branch.all see tickets of their branch, without a branch, or assigned to them;
- * a customer account sees the tickets of its customer.
+ * The ticket list query: the user's scope (visibleTo) + filters + sort.
  */
 class SearchTickets
 {
@@ -88,19 +86,22 @@ class SearchTickets
     }
 
     /**
+     * The tickets the user reaches with tickets.view (DataScope): all; their branch, tickets
+     * without a branch and those assigned to them; their customer; or their own (reported by
+     * them or assigned to them). Nothing without the permission.
+     *
      * @param  Builder<Ticket>  $query
      * @return Builder<Ticket>
      */
-    public static function visibleTo(Builder $query, User $user): Builder
+    public static function visibleTo(Builder $query, User $user, string $permission = 'tickets.view'): Builder
     {
-        // A customer account sees the tickets of its customer only (see TenantPolicy).
-        if ($user->customer_id !== null) {
-            return $query->where('customer_id', $user->customer_id);
-        }
-
-        return $query->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn (Builder $q) => $q->where(fn ($q) => $q
-            ->whereNull('branch_id')
-            ->orWhere('assignee_id', $user->id)
-            ->when($user->branch_id, fn ($q, $branchId) => $q->orWhere('branch_id', $branchId))));
+        return DataScope::constrain($query, $user, $permission,
+            branch: fn (Builder $q, ?int $branchId) => $q->where(fn ($q) => $q
+                ->whereNull('branch_id')
+                ->orWhere('assignee_id', $user->id)
+                ->when($branchId, fn ($q, $id) => $q->orWhere('branch_id', $id))),
+            customer: 'customer_id',
+            own: fn (Builder $q) => $q->where('reported_by', $user->id)->orWhere('assignee_id', $user->id),
+        );
     }
 }

@@ -28,7 +28,7 @@ const props = defineProps<{
     requests: Paginated<PurchaseRequestRow>;
     filters: Filters;
     statuses: string[];
-    can: { create: boolean; seesAll: boolean };
+    can: { create: boolean; viewAll: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -69,7 +69,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <option v-for="key in ['open', 'all']" :key="key" :value="key">{{ t(`purchase_requests.status_filters.${key}`) }}</option>
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`purchase_requests.statuses.${status}`) }}</option>
                 </select>
-                <label v-if="can.seesAll" class="flex items-center gap-2 text-sm">
+                <label v-if="can.viewAll" class="flex items-center gap-2 text-sm">
                     <input v-model="filters.mine" type="checkbox" :true-value="true" :false-value="null" class="size-4 rounded border-input" />
                     {{ t('purchase_requests.mine') }}
                 </label>

@@ -3,15 +3,16 @@
 namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
+use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * The asset query of the list page and the Excel export: the user's branch scope + filters + sort.
- * Users without branch.all see only assets of their own branch and assets without a branch
- * (the same rule as TenantPolicy::inScope).
+ * The asset query of the list page and the Excel export: the user's scope of assets.view
+ * (visibleTo, the same rule as AssetPolicy) + filters + sort.
  */
 class SearchAssets
 {
@@ -75,21 +76,56 @@ class SearchAssets
     }
 
     /**
-     * Limit an asset query to what the user may see: the user's branch (and assets without a branch)
-     * unless the user has branch.all; a customer account: the assets of its customer.
+     * Limit an asset query to what the user may see with $permission (DataScope): every asset
+     * (all), those of the user's branch and of no branch (branch), those of the account's
+     * customer (customer), or those the user holds now (own).
      *
      * @param  Builder<Asset>  $query
      * @return Builder<Asset>
      */
-    public static function visibleTo(Builder $query, User $user): Builder
+    public static function visibleTo(Builder $query, User $user, string $permission = 'assets.view'): Builder
     {
-        // A customer account sees the assets of its customer only (see TenantPolicy).
-        if ($user->customer_id !== null) {
-            return $query->where('customer_id', $user->customer_id);
+        return DataScope::constrain($query, $user, $permission,
+            branch: $query->qualifyColumn('branch_id'),
+            customer: $query->qualifyColumn('customer_id'),
+            own: fn (Builder $q) => $q->whereIn($q->qualifyColumn('id'), self::heldIds($user)));
+    }
+
+    /**
+     * Spare assets the user may ask for on an issue/loan form: what they may see, except that
+     * someone who only sees what they hold (scope own) may still ask for the assets of their
+     * branch (and those of no branch).
+     *
+     * @param  Builder<Asset>  $query
+     * @return Builder<Asset>
+     */
+    public static function askableBy(Builder $query, User $user): Builder
+    {
+        if (DataScope::of($user, 'assets.view') !== PermissionCatalog::SCOPE_OWN) {
+            return self::visibleTo($query, $user);
         }
 
-        return $query->unless($user->can(PermissionCatalog::ALL_BRANCHES), fn (Builder $q) => $q->where(fn ($q) => $q
-            ->whereNull('branch_id')
-            ->when($user->branch_id, fn ($q, $branchId) => $q->orWhere('branch_id', $branchId))));
+        $branch = $query->qualifyColumn('branch_id');
+
+        return $query->where(fn ($q) => $q->whereNull($branch)->when($user->branch_id, fn ($q, $id) => $q->orWhere($branch, $id)));
+    }
+
+    /** Whether the user holds the asset now (asked for or handed over to them, not back yet). */
+    public static function holds(User $user, int $assetId): bool
+    {
+        return self::heldIds($user)->where('asset_id', $assetId)->exists();
+    }
+
+    /**
+     * Ids of the assets the user holds now.
+     *
+     * @return Builder<AssetCheckout>
+     */
+    private static function heldIds(User $user): Builder
+    {
+        return AssetCheckout::query()
+            ->select('asset_id')
+            ->where('borrower_user_id', $user->id)
+            ->whereIn('status', AssetCheckout::OPEN_STATUSES);
     }
 }

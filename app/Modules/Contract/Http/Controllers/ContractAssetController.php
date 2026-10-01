@@ -15,7 +15,7 @@ class ContractAssetController extends Controller
     public function store(Request $request, Contract $contract, AddContractAssets $addAssets): RedirectResponse
     {
         Gate::authorize('update', $contract);
-        Gate::authorize('asset.view');
+        Gate::authorize('assets.view');
 
         $validated = $request->validate([
             'asset_ids' => ['required', 'array', 'max:200'],

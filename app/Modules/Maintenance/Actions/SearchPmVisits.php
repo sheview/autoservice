@@ -3,6 +3,7 @@
 namespace App\Modules\Maintenance\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use Illuminate\Database\Eloquent\Builder;
@@ -76,14 +77,16 @@ class SearchPmVisits
     }
 
     /**
-     * Staff see every round (rounds have no branch: a contract's assets may be in many branches);
-     * a customer account sees the rounds of its customer only (see TenantPolicy).
+     * The rounds the user may see with pm-visits.view (DataScope): rounds have no branch (a
+     * contract's assets may be in many branches), so scope branch reaches every round; customer =
+     * rounds of the account's customer; own = rounds the user is the technician of.
      *
      * @param  Builder<PmVisit>  $query
      * @return Builder<PmVisit>
      */
-    public static function visibleTo(Builder $query, User $user): Builder
+    public static function visibleTo(Builder $query, User $user, string $permission = 'pm-visits.view'): Builder
     {
-        return $query->when($user->customer_id !== null, fn (Builder $q) => $q->where('customer_id', $user->customer_id));
+        return DataScope::constrain($query, $user, $permission, branch: null,
+            own: fn (Builder $q) => $q->where('assignee_id', $user->id));
     }
 }

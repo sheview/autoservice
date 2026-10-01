@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PartImportController extends Controller
 {
-    public const PERMISSION = 'part.import';
+    public const PERMISSION = 'parts.import';
 
     public function create(Request $request): Response
     {

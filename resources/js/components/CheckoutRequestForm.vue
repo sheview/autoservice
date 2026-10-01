@@ -25,6 +25,8 @@ const props = defineProps<{
     storeUrl?: string;
     // The project chosen at first (a part's own MA contract).
     defaultContractId?: number | null;
+    // Asking only for oneself (asset-checkouts.request): no borrower to choose, the server sets it.
+    forSelf?: boolean;
 }>();
 
 const emit = defineEmits<{ done: []; cancel: [] }>();
@@ -109,7 +111,8 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 </select>
                 <InputError :message="form.errors.contract_id" />
             </div>
-            <div class="grid content-start gap-2 sm:col-span-2">
+            <p v-if="forSelf" class="text-sm text-muted-foreground sm:col-span-2">{{ t('checkouts.for_self') }}</p>
+            <div v-if="!forSelf" class="grid content-start gap-2 sm:col-span-2">
                 <Label>{{ t('checkouts.borrower') }}</Label>
                 <div class="flex flex-wrap gap-4 text-sm">
                     <label class="flex items-center gap-2">
@@ -122,7 +125,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </label>
                 </div>
             </div>
-            <div v-if="borrowerKind === 'staff'" class="grid content-start gap-2">
+            <div v-if="!forSelf && borrowerKind === 'staff'" class="grid content-start gap-2">
                 <Label :for="`borrower_user_id-${assetUlid}`">{{ t('checkouts.borrower_name') }}</Label>
                 <select :id="`borrower_user_id-${assetUlid}`" v-model="form.borrower_user_id" required :class="selectClass">
                     <option :value="null" disabled>{{ t('checkouts.choose_staff') }}</option>
@@ -130,7 +133,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 </select>
                 <InputError :message="form.errors.borrower_user_id" />
             </div>
-            <div v-else class="grid content-start gap-2">
+            <div v-else-if="!forSelf" class="grid content-start gap-2">
                 <Label :for="`borrower_name-${assetUlid}`">{{ t('checkouts.borrower_name') }}</Label>
                 <Input :id="`borrower_name-${assetUlid}`" v-model="form.borrower_name" required />
                 <InputError :message="form.errors.borrower_name" />

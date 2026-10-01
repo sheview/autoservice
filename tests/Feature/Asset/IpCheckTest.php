@@ -85,7 +85,25 @@ it('is for staff who see assets, inside their own company only', function () {
 
     $this->actingAs($this->admin)->get('/ip-check?range=192.168.1.5')->assertInertia(fn (Assert $page) => $page->where('summary.used', 0));
 
-    $this->actingAs(userWithRole('customer', ['customer_id' => $this->acme->id]))->get('/ip-check')->assertForbidden();
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => $this->acme->id]))->get('/ip-check')->assertForbidden();
     $this->actingAs(userWithRole('admin_company'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(collect($page->toArray()['props']['navigation'])->pluck('title'))->toContain('เช็ค IP ว่าง'));
+});
+
+it('needs ip-check.view for the page and ip-check.run to check a range', function () {
+    ($this->ip)('192.168.1.5', ['name' => 'Switch']);
+
+    // helpdesk: the page, not the check
+    $this->actingAs(userWithRole('helpdesk'))->get('/ip-check?range=192.168.1.5')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('can.run', false)
+        ->where('rows', [])
+        ->where('filters.range', ''));
+
+    // technician: both
+    $this->actingAs(userWithRole('technician'))->get('/ip-check?range=192.168.1.5')->assertInertia(fn (Assert $page) => $page
+        ->where('can.run', true)
+        ->where('summary.used', 1));
+
+    // an office user: neither
+    $this->actingAs(userWithRole('user'))->get('/ip-check')->assertForbidden();
 });

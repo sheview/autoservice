@@ -4,6 +4,8 @@ namespace App\Modules\Reporting\Actions;
 
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Reporting\Support\SummaryTotals;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
@@ -13,12 +15,15 @@ use Illuminate\Support\Facades\DB;
  * The summary by person: everyone who borrowed, was issued or asked to buy something — users of
  * the company (by id, under their current name) and people from outside (by the name typed in) —
  * with how many of each, still open or not. Search, filters, sort and pages on the server.
+ * With summary-people.view scope own, only the user themself; scope customer reaches nobody.
  */
 class SummarizePeople
 {
     public const SORTABLE = ['name', 'last_at', 'open_count', 'total'];
 
     public const KINDS = ['issue', 'loan', 'purchase'];
+
+    public const PERMISSION = 'summary-people.view';
 
     public function __construct(
         private SummaryRows $rows,
@@ -40,14 +45,31 @@ class SummarizePeople
     }
 
     /**
+     * Whether the user may open the summary of one person: a user of the company ($userId) or
+     * someone from outside (null). With scope own, only of themself.
+     */
+    public static function reaches(User $viewer, ?int $userId): bool
+    {
+        return match (DataScope::of($viewer, self::PERMISSION)) {
+            PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH => true,
+            PermissionCatalog::SCOPE_OWN => $userId !== null && $userId === (int) $viewer->id,
+            default => false,
+        };
+    }
+
+    /**
      * @param  array<string, mixed>  $filters  from filtersFrom()
      */
     public function handle(User $viewer, array $filters): LengthAwarePaginator
     {
         $search = $filters['search'] ?? '';
+        $scope = DataScope::of($viewer, self::PERMISSION);
 
         $people = DB::query()->fromSub($this->rows->handle($viewer), 'rows')
             ->selectRaw('user_id, case when user_id is null then name end as outside_name, max(name) as name, '.SummaryTotals::SELECT)
+            ->when($scope === PermissionCatalog::SCOPE_OWN, fn ($q) => $q->where('user_id', $viewer->id))
+            ->unless(in_array($scope, [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH, PermissionCatalog::SCOPE_OWN], true),
+                fn ($q) => $q->whereRaw('false'))
             ->when($search !== '', fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
             ->when($filters['kind'] ?? null, fn ($q, $kind) => $q->where('kind', $kind))
             ->groupByRaw('user_id, case when user_id is null then name end')

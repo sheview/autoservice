@@ -58,9 +58,8 @@ it('runs a ticket from assignment to approval and keeps the SLA clock right', fu
     moveTicket($this->ticket, 'resolve')->assertSessionHasNoErrors();
     moveTicket($this->ticket, 'approve')->assertForbidden();
 
-    // Approving is for ticket.approve (the company admin), not the dispatcher.
-    $this->actingAs($this->helpdesk);
-    moveTicket($this->ticket, 'approve')->assertForbidden();
+    // Closing is for tickets.approve (the customer) or tickets.close (helpdesk, admin), not the technician.
+    expect($this->helpdesk->can('approve', $this->ticket->fresh()))->toBeTrue();
 
     $admin = userWithRole('admin_company');
     $this->actingAs($admin);
@@ -94,9 +93,15 @@ it('refuses moves that the status does not allow', function () {
 it('lets only the assignee or a dispatcher work on a ticket', function () {
     $this->actingAs($this->helpdesk)->post("/tickets/{$this->ticket->ulid}/assign", ['assignee_id' => $this->tech->id]);
 
-    // same branch, not the assignee
+    // same branch, not the assignee (scope own): cannot even see it
     $colleague = userWithRole('technician', ['branch_id' => $this->north->id]);
-    $this->actingAs($colleague)->get("/tickets/{$this->ticket->ulid}")->assertOk();
+    $this->actingAs($colleague)->get("/tickets/{$this->ticket->ulid}")->assertForbidden();
+    moveTicket($this->ticket, 'start')->assertForbidden();
+
+    // with scope branch the colleague sees it but still cannot work on it
+    setRoleScope('technician', 'branch', ['tickets.view', 'tickets.update']);
+    $this->actingAs($colleague)->get("/tickets/{$this->ticket->ulid}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('actions', [])->where('can.update', true));
     moveTicket($this->ticket, 'start')->assertForbidden();
 
     // other branch: cannot even see it

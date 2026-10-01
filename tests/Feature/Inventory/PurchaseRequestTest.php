@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Inventory\Actions\PurchaseSummaryRows;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -9,7 +10,9 @@ beforeEach(function () {
     Storage::fake('local');
     $this->travelTo('2026-10-01 10:00');
     $this->admin = userWithRole('admin_company', ['name' => 'Admin Boss']);
-    $this->staff = userWithRole('user', ['name' => 'Somchai Office']);
+    // Technicians ask (scope own); here they may also change their own pending requests.
+    $this->staff = userWithRole('technician', ['name' => 'Somchai Office']);
+    grantTo('technician', ['purchase-requests.update'], 'own');
     $this->payload = [
         'item_name' => 'Notebook for accounting', 'description' => 'RAM 16GB', 'quantity' => 2, 'unit' => 'เครื่อง',
         'unit_price' => '25900.50', 'links' => ['https://shop.example.com/lenovo-e14', ''], 'reason' => 'New staff', 'needed_by' => '2026-11-01',
@@ -64,18 +67,19 @@ it('accepts web links only, and not too many', function () {
 it('shows staff their own requests, and approvers all of them', function () {
     $this->actingAs($this->staff)->post('/purchase-requests', $this->payload);
     $mine = PurchaseRequest::sole();
-    $colleague = userWithRole('user');
+    $colleague = userWithRole('technician');
 
     $this->actingAs($colleague)->get('/purchase-requests')->assertInertia(fn (Assert $page) => $page->where('requests.total', 0));
     $this->actingAs($colleague)->get("/purchase-requests/{$mine->ulid}")->assertForbidden();
     $this->actingAs($this->admin)->get('/purchase-requests')->assertInertia(fn (Assert $page) => $page
         ->where('requests.total', 1)
-        ->where('can.seesAll', true));
+        ->where('can.viewAll', true));
     $this->actingAs($this->admin)->get('/purchase-requests?search=accounting&status=pending')->assertInertia(fn (Assert $page) => $page->where('requests.total', 1));
     $this->actingAs($this->admin)->get('/purchase-requests?mine=1')->assertInertia(fn (Assert $page) => $page->where('requests.total', 0));
 
-    // customer accounts never
-    $client = userWithRole('customer', ['customer_id' => createCustomer()->id]);
+    // without purchase-requests.view, and customer accounts, never
+    $this->actingAs(userWithRole('user'))->get('/purchase-requests')->assertForbidden();
+    $client = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($client)->get('/purchase-requests')->assertForbidden();
 });
 
@@ -85,6 +89,7 @@ it('goes from approval to order to delivery, each by the right people', function
     $move = fn ($user, string $action, ?string $note = null) => $this->actingAs($user)->post("/purchase-requests/{$pr->ulid}/move", ['action' => $action, 'note' => $note]);
 
     $move(userWithRole('technician'), 'approve')->assertForbidden();
+    $move(userWithRole('helpdesk'), 'approve')->assertForbidden(); // sees all, but does not approve
     $move($this->staff, 'approve')->assertForbidden();
     $move($this->admin, 'order')->assertForbidden(); // not approved yet
     $move($this->admin, 'reject')->assertSessionHasErrors('note');
@@ -139,4 +144,38 @@ it('keeps each company to its own requests', function () {
     $this->actingAs($otherAdmin)->get("/purchase-requests/{$pr->ulid}")->assertNotFound();
     $this->actingAs($otherAdmin)->post("/purchase-requests/{$pr->ulid}/move", ['action' => 'approve'])->assertNotFound();
     $this->actingAs($otherAdmin)->get('/purchase-requests')->assertInertia(fn (Assert $page) => $page->where('requests.total', 0));
+});
+
+it('follows the scope of purchase-requests.view, also in the summary rows', function () {
+    $this->actingAs($this->staff)->post('/purchase-requests', $this->payload);
+    $other = userWithRole('technician');
+    $this->actingAs($other)->post('/purchase-requests', [...$this->payload, 'item_name' => 'Other']);
+
+    // scope own: only the own request, no "mine" switch
+    $this->actingAs($this->staff)->get('/purchase-requests')->assertInertia(fn (Assert $page) => $page
+        ->where('requests.total', 1)->where('requests.data.0.item_name', 'Notebook for accounting')->where('can.viewAll', false));
+    expect(app(PurchaseSummaryRows::class)->handle($this->staff)->count())->toBe(1);
+
+    // scope all (helpdesk): everyone's, but changing stays with the requester
+    $helpdesk = userWithRole('helpdesk');
+    $this->actingAs($helpdesk)->get('/purchase-requests')->assertInertia(fn (Assert $page) => $page->where('requests.total', 2)->where('can.viewAll', true));
+    expect(app(PurchaseSummaryRows::class)->handle($helpdesk)->count())->toBe(2);
+    $pr = PurchaseRequest::where('item_name', 'Other')->sole();
+    $this->actingAs($helpdesk)->get("/purchase-requests/{$pr->ulid}/edit")->assertForbidden();
+
+    // a technician given scope all sees everyone's too
+    setRoleScope('technician', 'all', ['purchase-requests.view']);
+    $this->actingAs($this->staff)->get('/purchase-requests')->assertInertia(fn (Assert $page) => $page->where('requests.total', 2));
+});
+
+it('lets buyers with purchase-requests.receive order and receive an approved request', function () {
+    $this->actingAs($this->staff)->post('/purchase-requests', $this->payload);
+    $pr = PurchaseRequest::sole();
+    $this->actingAs($this->admin)->post("/purchase-requests/{$pr->ulid}/move", ['action' => 'approve'])->assertSessionHasNoErrors();
+
+    $helpdesk = userWithRole('helpdesk');
+    $this->actingAs($helpdesk)->post("/purchase-requests/{$pr->ulid}/move", ['action' => 'order'])->assertForbidden();
+    grantTo('helpdesk', ['purchase-requests.receive']);
+    $this->actingAs($helpdesk)->post("/purchase-requests/{$pr->ulid}/move", ['action' => 'order'])->assertSessionHasNoErrors();
+    expect($pr->fresh()->status)->toBe('ordered');
 });

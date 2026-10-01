@@ -103,7 +103,7 @@ it('only makes documents the user may see', function () {
     $ticket = openTicket($this->helpdesk, ['customer_id' => $this->customer->id]);
 
     $this->get("/tickets/{$ticket->ulid}/pdf")->assertRedirect('/login');
-    $this->actingAs(userWithRole('customer', ['customer_id' => createCustomer()->id]))->get("/tickets/{$ticket->ulid}/pdf")->assertForbidden();
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => createCustomer()->id]))->get("/tickets/{$ticket->ulid}/pdf")->assertForbidden();
 
     $other = createTenant('other');
     $theirs = asTenant($other, fn () => openTicket(userWithRole('helpdesk')));

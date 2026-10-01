@@ -22,12 +22,14 @@ const props = defineProps<{
     summary: { total: number; used: number; duplicates: number };
     customers: { id: number; code: string; name: string }[];
     max: number;
+    // ip-check.run: without it the form is shown disabled.
+    can: { run: boolean };
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('ip_check.title'), href: route('asset.ip-check') }];
 
 const form = reactive({ ...props.filters });
-const check = () => router.get(route('asset.ip-check'), { ...form }, { preserveState: true, preserveScroll: true });
+const check = () => props.can.run && router.get(route('asset.ip-check'), { ...form }, { preserveState: true, preserveScroll: true });
 
 // Shown rows only: the range is at most a few hundred addresses, so this is filtered here.
 const show = ref<'all' | 'free' | 'used'>('all');
@@ -57,21 +59,25 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <Heading :title="t('ip_check.title')" :description="t('ip_check.description')" />
 
             <form class="flex flex-wrap items-end gap-3" @submit.prevent="check">
-                <div class="grid gap-1">
-                    <Label for="range">{{ t('ip_check.range') }}</Label>
-                    <Input id="range" v-model="form.range" required class="w-72 font-mono" :placeholder="t('ip_check.range_placeholder')" />
-                </div>
-                <div v-if="customers.length" class="grid gap-1">
-                    <Label for="customer">{{ t('ip_check.customer') }}</Label>
-                    <select id="customer" v-model="form.customer" :class="selectClass">
-                        <option value="">{{ t('ip_check.all') }}</option>
-                        <option value="own">{{ t('ip_check.own') }}</option>
-                        <option v-for="customer in customers" :key="customer.id" :value="String(customer.id)">{{ customer.name }}</option>
-                    </select>
-                </div>
-                <Button>{{ t('ip_check.check') }}</Button>
+                <fieldset :disabled="!can.run" class="contents">
+                    <div class="grid gap-1">
+                        <Label for="range">{{ t('ip_check.range') }}</Label>
+                        <Input id="range" v-model="form.range" required class="w-72 font-mono" :placeholder="t('ip_check.range_placeholder')" />
+                    </div>
+                    <div v-if="customers.length" class="grid gap-1">
+                        <Label for="customer">{{ t('ip_check.customer') }}</Label>
+                        <select id="customer" v-model="form.customer" :class="selectClass">
+                            <option value="">{{ t('ip_check.all') }}</option>
+                            <option value="own">{{ t('ip_check.own') }}</option>
+                            <option v-for="customer in customers" :key="customer.id" :value="String(customer.id)">{{ customer.name }}</option>
+                        </select>
+                    </div>
+                    <Button>{{ t('ip_check.check') }}</Button>
+                </fieldset>
             </form>
-            <p class="-mt-3 text-xs text-muted-foreground">{{ t('ip_check.range_hint', { max }) }}</p>
+            <p class="-mt-3 text-xs text-muted-foreground">
+                {{ can.run ? t('ip_check.range_hint', { max }) : t('ip_check.cannot_run') }}
+            </p>
 
             <p v-if="error" role="alert" class="rounded-md bg-red-50 px-4 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
                 {{ t(`ip_check.${error}`, { max }) }}

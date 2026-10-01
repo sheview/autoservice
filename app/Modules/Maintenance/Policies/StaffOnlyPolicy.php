@@ -7,12 +7,14 @@ use App\Modules\Identity\Policies\TenantPolicy;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * pm.* for records that are internal to the MA company (plans, checklists): a customer account
- * may see its PM rounds (pm.view) but never these.
+ * For records that are internal to the MA company (checklists): a customer account never sees
+ * them, whatever its role says. They have no branch, customer or owner.
  */
 abstract class StaffOnlyPolicy extends TenantPolicy
 {
-    protected string $module = 'pm';
+    protected ?string $branchColumn = null;
+
+    protected ?string $customerColumn = null;
 
     public function viewAny(User $user): bool
     {

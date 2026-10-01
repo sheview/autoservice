@@ -115,23 +115,25 @@ it('shows a customer account the PM rounds of its own customer only, read only',
     ]);
     $theirs = $otherPlan->visits()->first();
 
-    $customerUser = userWithRole('customer', ['customer_id' => $this->customer->id]);
+    $customerUser = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
 
     $this->actingAs($customerUser)->get('/dashboard')
         ->assertInertia(fn (Assert $page) => $page->where('navigation', fn ($items) => collect($items)->pluck('href')
-            ->filter(fn ($href) => str_contains($href, '/pm-'))->values()->all() === ['/pm-visits']));
+            ->filter(fn ($href) => str_contains($href, '/pm-'))->values()->all() === ['/pm-visits', '/pm-plans']));
 
     $this->actingAs($customerUser)->get('/pm-visits?status=all')
         ->assertInertia(fn (Assert $page) => $page->where('visits.total', 4)->where('customers', [])->where('assignees', []));
     $this->actingAs($customerUser)->get("/pm-visits/{$mine->ulid}")
         ->assertInertia(fn (Assert $page) => $page
-            ->where('visit.plan.can_view', false)
+            ->where('visit.plan.can_view', true)
             ->where('can', ['update' => false, 'start' => false, 'perform' => false, 'cancel' => false, 'openTicket' => false]));
     $this->actingAs($customerUser)->get("/pm-visits/{$theirs->ulid}")->assertForbidden();
     $this->actingAs($customerUser)->get('/pm-calendar?month=2026-06')
         ->assertInertia(fn (Assert $page) => $page->has('visits', 1));
 
-    $this->actingAs($customerUser)->get("/pm-plans/{$this->plan->id}")->assertForbidden();
+    // its own plans read only (pm-plans.view, scope customer); never the checklists
+    $this->actingAs($customerUser)->get("/pm-plans/{$this->plan->id}")->assertOk();
+    $this->actingAs($customerUser)->get("/pm-plans/{$otherPlan->id}")->assertForbidden();
     $this->actingAs($customerUser)->get('/pm-checklists')->assertForbidden();
     $this->actingAs($customerUser)->post("/pm-visits/{$mine->ulid}/complete")->assertForbidden();
 });

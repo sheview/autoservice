@@ -10,7 +10,9 @@ use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Inventory\Actions\DeletePart;
 use App\Modules\Inventory\Actions\RequestPartCheckout;
 use App\Modules\Inventory\Actions\SavePart;
+use App\Modules\Inventory\Actions\SearchPartCheckouts;
 use App\Modules\Inventory\Actions\SearchParts;
+use App\Modules\Inventory\Actions\SearchStockMovements;
 use App\Modules\Inventory\Exports\PartsExport;
 use App\Modules\Inventory\Http\Requests\PartRequest;
 use App\Modules\Inventory\Models\Part;
@@ -30,7 +32,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class PartController extends Controller
 {
-    public const EXPORT_PERMISSION = 'part.export';
+    public const EXPORT_PERMISSION = 'parts.export';
 
     public function index(Request $request, SearchParts $search): Response
     {
@@ -50,8 +52,8 @@ class PartController extends Controller
             'stockLevels' => SearchParts::STOCK_LEVELS,
             'can' => [
                 'create' => $user->can('create', Part::class),
-                'update' => $user->can('part.update'),
-                'delete' => $user->can('part.delete'),
+                'update' => $user->can('parts.update'),
+                'delete' => $user->can('parts.delete'),
                 'import' => $user->can(PartImportController::PERMISSION),
                 'export' => $user->can(self::EXPORT_PERMISSION),
             ],
@@ -91,9 +93,9 @@ class PartController extends Controller
 
         $user = $request->user();
         $movements = null;
-        if ($user->can('stock.view')) {
-            // Newest first, like the ledger page (id breaks ties within the same second).
-            $movements = $part->movements()->orderByDesc('created_at')->orderByDesc('id')->paginate(20)->withQueryString();
+        if ($user->can(StockMovementController::VIEW_PERMISSION)) {
+            // Newest first, like the ledger page (id breaks ties within the same second); scope own = own entries.
+            $movements = SearchStockMovements::visibleTo($part->movements()->getQuery(), $user)->orderByDesc('created_at')->orderByDesc('id')->paginate(20)->withQueryString();
             $tickets = $modules->enabled('service') ? $ticketLabels->handle($movements->pluck('ticket_id')->all()) : [];
             $movements = $movements->through(fn (StockMovement $movement) => [
                 ...$movement->only(['id', 'type', 'quantity', 'balance_after', 'reference', 'note', 'user_name']),
@@ -121,7 +123,7 @@ class PartController extends Controller
             'can' => [
                 'update' => $user->can('update', $part),
                 'delete' => $user->can('delete', $part),
-                'viewTickets' => $user->can('ticket.view'),
+                'viewTickets' => $user->can('tickets.view'),
             ],
         ]);
     }
@@ -154,8 +156,10 @@ class PartController extends Controller
 
         $isOpen = fn ($q) => $q->where('status', PartCheckout::STATUS_PENDING)
             ->orWhere(fn ($q) => $q->where('status', PartCheckout::STATUS_APPROVED)->where('type', PartCheckout::TYPE_LOAN));
-        $open = PartCheckout::query()->where('part_id', $part->id)->where($isOpen)->with('part')->oldest('id')->get();
-        $recent = PartCheckout::query()->where('part_id', $part->id)->whereNot($isOpen)->with('part')->latest('id')->limit(10)->get();
+        // Only the forms the user may see (with scope own: their own).
+        $user = $request->user();
+        $open = SearchPartCheckouts::visibleTo(PartCheckout::query(), $user)->where('part_id', $part->id)->where($isOpen)->with('part')->oldest('id')->get();
+        $recent = SearchPartCheckouts::visibleTo(PartCheckout::query(), $user)->where('part_id', $part->id)->whereNot($isOpen)->with('part')->latest('id')->limit(10)->get();
         $left = RequestPartCheckout::availableQuantity($part);
         $available = $part->is_active && $left > 0;
 
@@ -166,12 +170,15 @@ class PartController extends Controller
             'available_quantity' => $left,
             'quantity' => (int) $part->qty_on_hand,
             'unit' => $part->unit,
-            'borrowers' => $available && $can['request']
-                ? $usersWithPermission->handle('part.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
-                : [],
+            // With scope own the form is only ever for the user themself.
+            'borrowers' => match (true) {
+                ! $available || ! $can['request'] => [],
+                ! $can['forOthers'] => [$user->only(['id', 'name'])],
+                default => $usersWithPermission->handle('parts.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values(),
+            },
             'contracts' => $available && $can['request'] && $modules->enabled('contract') ? app(ContractOptions::class)->handle($part->contract_id) : [],
             'default_contract_id' => $part->contract_id,
-            'can' => [...$can, 'userId' => $request->user()->id],
+            'can' => [...$can, 'userId' => $user->id],
         ];
     }
 

@@ -127,7 +127,7 @@ it('deletes a plan only while none of its rounds has started', function () {
     $plan = PmPlan::first();
     $admin = userWithRole('admin_company');
 
-    // helpdesk has no pm.delete
+    // helpdesk has no pm-plans.delete
     $this->actingAs($this->helpdesk)->delete("/pm-plans/{$plan->id}")->assertForbidden();
 
     $plan->visits()->first()->update(['status' => PmVisit::STATUS_IN_PROGRESS]);
@@ -149,8 +149,32 @@ it('lets technicians look at plans but not change them', function () {
     $this->actingAs($this->tech)->get('/pm-plans/create')->assertForbidden();
     $this->actingAs($this->tech)->put("/pm-plans/{$plan->id}", planPayload())->assertForbidden();
 
-    // a customer account never sees plans (its rounds: PmExtrasTest)
-    $customerUser = userWithRole('customer', ['customer_id' => $this->customer->id]);
-    $this->actingAs($customerUser)->get('/pm-plans')->assertForbidden();
-    $this->actingAs($customerUser)->get("/pm-plans/{$plan->id}")->assertForbidden();
+    // a customer account sees only the plans of its own customer, read only (pm-plans.view, scope customer)
+    $other = createContract(createCustomer());
+    $this->actingAs($this->helpdesk)->post('/pm-plans', planPayload(['contract_id' => $other->id]));
+    $theirs = PmPlan::where('contract_id', $other->id)->first();
+    $customerUser = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
+    $this->actingAs($customerUser)->get('/pm-plans')
+        ->assertInertia(fn (Assert $page) => $page->where('plans.total', 1)->where('plans.data.0.id', $plan->id)->where('customers', []));
+    $this->actingAs($customerUser)->get("/pm-plans/{$plan->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('can', ['update' => false, 'delete' => false]));
+    $this->actingAs($customerUser)->get("/pm-plans/{$theirs->id}")->assertForbidden();
+    $this->actingAs($customerUser)->put("/pm-plans/{$plan->id}", planPayload())->assertForbidden();
+});
+
+it('limits plans to those of the technician with scope own', function () {
+    $this->actingAs($this->helpdesk)->post('/pm-plans', planPayload());
+    $other = createContract($this->customer);
+    $this->actingAs($this->helpdesk)->post('/pm-plans', planPayload(['contract_id' => $other->id, 'assignee_id' => null]));
+    $mine = PmPlan::where('contract_id', $this->contract->id)->first();
+    $theirs = PmPlan::where('contract_id', $other->id)->first();
+
+    // default: scope branch, and plans have no branch: every plan
+    $this->actingAs($this->tech)->get('/pm-plans')->assertInertia(fn (Assert $page) => $page->where('plans.total', 2));
+
+    setRoleScope('technician', 'own', ['pm-plans.view']);
+    $this->actingAs($this->tech)->get('/pm-plans')
+        ->assertInertia(fn (Assert $page) => $page->where('plans.total', 1)->where('plans.data.0.id', $mine->id));
+    $this->actingAs($this->tech)->get("/pm-plans/{$mine->id}")->assertOk();
+    $this->actingAs($this->tech)->get("/pm-plans/{$theirs->id}")->assertForbidden();
 });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Identity\Models\User;
 use App\Modules\Service\Models\Holiday;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
@@ -91,7 +92,7 @@ it('rejects a contract that does not cover the asset and an asset of another cus
     expect(Ticket::count())->toBe(0);
 });
 
-it('lets helpdesk assign on opening but not a user without ticket.assign', function () {
+it('lets helpdesk assign on opening but not a user without tickets.assign', function () {
     $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['assignee_id' => $this->tech->id]))->assertSessionHasNoErrors();
 
     $ticket = Ticket::first();
@@ -126,7 +127,9 @@ it('shows the tickets of an asset on the asset page', function () {
             ->where('can.openTicket', true));
 });
 
-it('forbids opening tickets without ticket.create', function () {
-    $this->actingAs($this->tech)->get('/tickets/create')->assertForbidden();
-    $this->actingAs($this->tech)->post('/tickets', ticketPayload())->assertForbidden();
+it('forbids opening tickets without tickets.create', function () {
+    $nobody = User::factory()->create(['branch_id' => $this->branch->id]);
+
+    $this->actingAs($nobody)->get('/tickets/create')->assertForbidden();
+    $this->actingAs($nobody)->post('/tickets', ticketPayload())->assertForbidden();
 });

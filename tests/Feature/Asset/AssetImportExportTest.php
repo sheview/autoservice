@@ -104,10 +104,10 @@ it('rejects a file that is not a spreadsheet', function () {
         ->assertSessionHasErrors('file');
 });
 
-it('keeps an importer without branch.all inside their branch', function () {
+it('keeps an importer whose assets.import reaches only their branch inside it', function () {
     $north = Branch::create(['code' => 'N', 'name' => 'North']);
-    $role = Role::create(['name' => 'importer', 'label' => 'Importer', 'guard_name' => 'web']);
-    $role->syncPermissions(['asset.view', 'asset.import']);
+    Role::create(['name' => 'importer', 'label' => 'Importer', 'guard_name' => 'web']);
+    grantTo('importer', ['assets.view', 'assets.import'], 'branch');
     $importer = userWithRole('importer', ['branch_id' => $north->id]);
 
     $this->actingAs($importer)->post('/assets/imports', ['file' => xlsxUpload([
@@ -175,7 +175,7 @@ it('downloads an empty template with the spec columns', function () {
         ->and($rows[0])->toContain('CPU [spec.cpu]', 'RAM [spec.ram_gb]');
 });
 
-it('requires asset.import and asset.export', function () {
+it('requires assets.import and assets.export', function () {
     $technician = userWithRole('technician');
 
     $this->actingAs($technician)->get('/assets/imports')->assertForbidden();

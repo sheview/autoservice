@@ -181,8 +181,34 @@ it('is for office staff only and never counts another tenant', function () {
     foreach (['/reports', '/reports/export'] as $url) {
         $this->actingAs($this->tech)->get($url)->assertForbidden();
         $this->actingAs(userWithRole('user'))->get($url)->assertForbidden();
-        $this->actingAs(userWithRole('customer', ['customer_id' => $this->acme->id]))->get($url)->assertForbidden();
     }
+    // helpdesk sees the report but may not export it (no reports.export)
+    $this->actingAs($this->helpdesk)->get('/reports')->assertInertia(fn (Assert $page) => $page->where('can.export', false));
+    $this->actingAs($this->helpdesk)->get('/reports/export')->assertForbidden();
+    $this->actingAs($this->admin)->get('/reports')->assertInertia(fn (Assert $page) => $page->where('can.export', true));
+});
+
+it('shows a customer account only the figures of its own customer, without stock or costs', function () {
+    ($this->ticket)('2026-06-05 09:00');
+    ($this->ticket)('2026-06-06 09:00', [], ['customer_id' => $this->beta->id]);
+    createPart(stock: 5);
+    createAsset(createAssetCategory(), ['customer_id' => $this->acme->id]);
+
+    $client = userWithRole('customer_it', ['customer_id' => $this->acme->id]);
+
+    $this->actingAs($client)->get('/reports?from=2026-06-01&to=2026-06-30')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('report.tickets.opened', 1)
+        ->where('report.customers', [])
+        ->where('report.technicians', [])
+        ->where('report.parts', null)
+        ->where('report.assets', null)
+        ->where('report.pm.due', 0)
+        ->where('can.export', false));
+    $this->actingAs($client)->get('/reports/export')->assertForbidden();
+
+    // helpdesk (scope all) sees both customers
+    $this->actingAs($this->helpdesk)->get('/reports?from=2026-06-01&to=2026-06-30')
+        ->assertInertia(fn (Assert $page) => $page->where('report.tickets.opened', 2));
 });
 
 it('exports the report of the period as an Excel workbook', function () {
@@ -192,7 +218,7 @@ it('exports the report of the period as an Excel workbook', function () {
     app(MoveTicket::class)->handle($closed, 'resolve', $this->tech);
     app(MoveTicket::class)->handle($closed, 'approve', $this->admin);
 
-    $response = $this->actingAs($this->helpdesk)->get('/reports/export?from=2026-06-01&to=2026-06-30')->assertOk();
+    $response = $this->actingAs($this->admin)->get('/reports/export?from=2026-06-01&to=2026-06-30')->assertOk();
     expect($response->headers->get('content-disposition'))->toContain('report-2026-06-01-2026-06-30.xlsx');
 
     $sheets = Excel::toCollection(null, $response->getFile()->getPathname())->map->toArray();

@@ -4,6 +4,7 @@ namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Survey\Actions\AnswerSurveyOfTicket;
 use Illuminate\Http\RedirectResponse;
@@ -15,12 +16,31 @@ use Illuminate\Http\Request;
  */
 class TicketSurveyController extends Controller
 {
-    public const PERMISSION = 'survey.answer';
+    public const PERMISSION = 'surveys.respond';
 
-    /** Whoever may see the ticket and may answer surveys: a customer account, or staff on its behalf. */
+    /**
+     * Whoever may see the ticket and may answer surveys within their scope: a customer account,
+     * or staff on its behalf.
+     */
     public static function allows(User $user, Ticket $ticket): bool
     {
-        return $user->can(self::PERMISSION) && $user->can('view', $ticket);
+        return $user->can('view', $ticket) && self::reaches($user, $ticket, self::PERMISSION);
+    }
+
+    /** Whoever sees surveys (surveys.view) of this ticket's survey, within their scope. */
+    public static function allowsView(User $user, Ticket $ticket): bool
+    {
+        return self::reaches($user, $ticket, 'surveys.view');
+    }
+
+    /**
+     * The survey of the ticket is within the user's scope of a surveys.* permission: surveys have
+     * no branch; customer = the ticket's customer; own = the job was assigned to the user.
+     */
+    private static function reaches(User $user, Ticket $ticket, string $permission): bool
+    {
+        return $user->checkPermissionTo($permission) && DataScope::covers($ticket, $user, $permission, branch: null,
+            own: fn (Ticket $t) => $t->assignee_id !== null && (int) $t->assignee_id === (int) $user->id);
     }
 
     public function store(Request $request, Ticket $ticket, AnswerSurveyOfTicket $answerSurvey): RedirectResponse

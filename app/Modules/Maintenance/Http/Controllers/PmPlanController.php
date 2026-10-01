@@ -34,7 +34,7 @@ class PmPlanController extends Controller
         Gate::authorize('viewAny', PmPlan::class);
 
         $filters = SearchPmPlans::filtersFrom($request);
-        $plans = $search->handle($filters)->paginate(20)->withQueryString();
+        $plans = $search->handle($request->user(), $filters)->paginate(20)->withQueryString();
         $customers = collect($this->listCustomers->handle(withTrashed: true))->pluck('name', 'id');
         $contracts = $this->contractDetails->handle($plans->pluck('contract_id')->all());
         $assignees = $this->userNames->handle($plans->pluck('assignee_id')->all());
@@ -49,7 +49,8 @@ class PmPlanController extends Controller
                 'ends_on' => $plan->ends_on->toDateString(),
             ]),
             'filters' => $filters,
-            'customers' => $this->listCustomers->handle(),
+            // A customer account does not filter by customer.
+            'customers' => $request->user()->customer_id === null ? $this->listCustomers->handle() : [],
             'can' => ['create' => $request->user()->can('create', PmPlan::class)],
         ]);
     }
@@ -99,7 +100,7 @@ class PmPlanController extends Controller
                 'contract' => $contract ? [
                     ...collect($contract)->only(['id', 'contract_no', 'title'])->all(),
                     'assets_count' => count($contract['asset_ids']),
-                    'can_view' => $user->can('contract.view'),
+                    'can_view' => $user->can('contracts.view'),
                 ] : null,
                 'assignee' => $names[$plan->assignee_id] ?? null,
                 'starts_on' => $plan->starts_on->toDateString(),

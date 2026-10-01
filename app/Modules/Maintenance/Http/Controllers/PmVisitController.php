@@ -86,7 +86,7 @@ class PmVisitController extends Controller
                 ...$visit->only(['ulid', 'visit_no', 'round', 'status', 'summary', 'assignee_id']),
                 'plan' => $visit->plan ? ['id' => $visit->plan->id, 'title' => $visit->plan->title, 'can_view' => $user->can('view', $visit->plan)] : null,
                 'customer' => collect($this->listCustomers->handle(withTrashed: true))->firstWhere('id', $visit->customer_id)['name'] ?? null,
-                'contract' => $contract ? [...collect($contract)->only(['id', 'contract_no', 'title'])->all(), 'can_view' => $user->can('contract.view')] : null,
+                'contract' => $contract ? [...collect($contract)->only(['id', 'contract_no', 'title'])->all(), 'can_view' => $user->can('contracts.view')] : null,
                 // Before the round starts: how many assets it will cover.
                 'contract_assets_count' => $contract ? count($contract['asset_ids']) : 0,
                 'assignee' => $names[$visit->assignee_id] ?? null,
@@ -99,7 +99,7 @@ class PmVisitController extends Controller
             'items' => $items->map(fn (PmVisitItem $item) => [
                 ...$item->only(['id', 'result', 'answers', 'note', 'checklist']),
                 'asset' => isset($assets[$item->asset_id])
-                    ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name'])->all(), 'can_view' => $user->can('asset.view')]
+                    ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name'])->all(), 'can_view' => $user->can('assets.view')]
                     : null,
                 'ticket' => $tickets[$item->ticket_id] ?? null,
                 'photos' => $item->getMedia(PmVisitItem::PHOTOS)->map(fn ($media) => [

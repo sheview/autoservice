@@ -63,7 +63,7 @@ interface Report {
     surveys: { sent: number; answered: number; response_rate: number | null; average: number | null; scores: Record<string, number> } | null;
 }
 
-const props = defineProps<{ report: Report }>();
+const props = defineProps<{ report: Report; can: { export: boolean } }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('reports.title'), href: route('reporting.reports.index') }];
 
@@ -118,7 +118,7 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('reports.title')" :description="t('reports.description')" />
-                <Button variant="outline" as-child>
+                <Button v-if="can.export" variant="outline" as-child>
                     <a :href="exportUrl">{{ t('reports.export') }}</a>
                 </Button>
             </div>

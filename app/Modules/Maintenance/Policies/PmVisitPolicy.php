@@ -7,19 +7,23 @@ use App\Modules\Identity\Policies\TenantPolicy;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * pm.* permissions for PM rounds.
+ * pm-visits.* for PM rounds. Rounds have no branch; customer = rounds of the account's customer;
+ * own = rounds the user is the technician of.
  *
- *   update (schedule, assign), cancel   pm.update
- *   perform (start, record, complete)   pm.perform, and be the assignee or hold pm.update
+ *   update (schedule, assign), cancel   pm-visits.update
+ *   perform (start, record, complete)   pm-visits.complete
  */
 class PmVisitPolicy extends TenantPolicy
 {
-    protected string $module = 'pm';
+    protected string $resource = 'pm-visits';
+
+    protected array $actions = ['perform' => 'complete', 'cancel' => 'update'];
+
+    protected ?string $branchColumn = null;
 
     public function perform(User $user, Model $visit): bool
     {
-        return $this->permits($user, 'perform') && $this->inScope($user, $visit)
-            && ($this->isAssignee($user, $visit) || $this->permits($user, 'update') || $this->actsFromPlatform($user));
+        return $this->permits($user, 'perform') && $this->inScope($user, $visit, 'perform');
     }
 
     public function cancel(User $user, Model $visit): bool
@@ -27,9 +31,8 @@ class PmVisitPolicy extends TenantPolicy
         return $this->update($user, $visit);
     }
 
-    private function isAssignee(User $user, Model $visit): bool
+    protected function owns(User $user, Model $model): bool
     {
-        return $visit->getAttribute('assignee_id') !== null
-            && (int) $visit->getAttribute('assignee_id') === (int) $user->id;
+        return $model->getAttribute('assignee_id') !== null && (int) $model->getAttribute('assignee_id') === (int) $user->id;
     }
 }

@@ -29,7 +29,8 @@ const props = defineProps<{
     filters: Filters;
     statuses: string[];
     types: string[];
-    can: { request: boolean; approve: boolean };
+    // Each row also says what may be done with it (row.actions, within the user's scope).
+    can: { view: boolean; request: boolean; forSelf: boolean; approve: boolean; return: boolean };
 }>();
 
 const page = usePage<SharedData>();

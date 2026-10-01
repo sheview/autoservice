@@ -14,6 +14,8 @@ import { computed, onBeforeUnmount, ref } from 'vue';
 const props = defineProps<{
     company: { name: string; service_phone: string | null; service_email: string | null; logo_url: string | null };
     logoMaxKb: number;
+    // company.manage: without it the page is read only.
+    can: { manage: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -75,51 +77,60 @@ const submit = () =>
 
             <div class="grid gap-6 lg:grid-cols-2">
                 <form class="space-y-6" @submit.prevent="submit">
-                    <div class="grid content-start gap-2">
-                        <Label>{{ t('company.name') }}</Label>
-                        <p class="text-sm font-medium">{{ company.name }}</p>
-                        <p class="text-xs text-muted-foreground">{{ t('company.name_hint') }}</p>
-                    </div>
+                    <fieldset :disabled="!can.manage" class="space-y-6">
+                        <div class="grid content-start gap-2">
+                            <Label>{{ t('company.name') }}</Label>
+                            <p class="text-sm font-medium">{{ company.name }}</p>
+                            <p class="text-xs text-muted-foreground">{{ t('company.name_hint') }}</p>
+                        </div>
 
-                    <div class="grid content-start gap-2">
-                        <Label>{{ t('company.logo') }}</Label>
-                        <div class="flex flex-wrap items-center gap-3">
-                            <div class="flex h-20 w-40 items-center justify-center rounded-md border bg-white p-1">
-                                <img v-if="logoUrl" :src="logoUrl" :alt="t('company.logo')" class="max-h-full max-w-full object-contain" />
-                                <span v-else class="text-xs text-muted-foreground">{{ t('company.no_logo') }}</span>
+                        <div class="grid content-start gap-2">
+                            <Label>{{ t('company.logo') }}</Label>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <div class="flex h-20 w-40 items-center justify-center rounded-md border bg-white p-1">
+                                    <img v-if="logoUrl" :src="logoUrl" :alt="t('company.logo')" class="max-h-full max-w-full object-contain" />
+                                    <span v-else class="text-xs text-muted-foreground">{{ t('company.no_logo') }}</span>
+                                </div>
+                                <Button v-if="can.manage" type="button" variant="outline" size="sm" @click="input?.click()">
+                                    <ImageUp class="h-4 w-4" />
+                                    {{ t('company.choose_logo') }}
+                                </Button>
+                                <Button v-if="can.manage && logoUrl" type="button" variant="ghost" size="sm" @click="removeLogo">{{
+                                    t('company.remove_logo')
+                                }}</Button>
+                                <input
+                                    ref="input"
+                                    type="file"
+                                    accept=".jpg,.jpeg,.png,.webp"
+                                    class="hidden"
+                                    :aria-label="t('company.choose_logo')"
+                                    @change="pickLogo"
+                                />
                             </div>
-                            <Button type="button" variant="outline" size="sm" @click="input?.click()">
-                                <ImageUp class="h-4 w-4" />
-                                {{ t('company.choose_logo') }}
-                            </Button>
-                            <Button v-if="logoUrl" type="button" variant="ghost" size="sm" @click="removeLogo">{{ t('company.remove_logo') }}</Button>
-                            <input
-                                ref="input"
-                                type="file"
-                                accept=".jpg,.jpeg,.png,.webp"
-                                class="hidden"
-                                :aria-label="t('company.choose_logo')"
-                                @change="pickLogo"
-                            />
+                            <p class="text-xs text-muted-foreground">{{ t('company.logo_hint', { mb: logoMaxKb / 1024 }) }}</p>
+                            <InputError :message="form.errors.logo" />
                         </div>
-                        <p class="text-xs text-muted-foreground">{{ t('company.logo_hint', { mb: logoMaxKb / 1024 }) }}</p>
-                        <InputError :message="form.errors.logo" />
-                    </div>
 
-                    <div class="grid gap-6 sm:grid-cols-2">
-                        <div class="grid content-start gap-2">
-                            <Label for="service_phone">{{ t('company.service_phone') }}</Label>
-                            <Input id="service_phone" v-model="form.service_phone" type="tel" :placeholder="t('company.service_phone_placeholder')" />
-                            <InputError :message="form.errors.service_phone" />
+                        <div class="grid gap-6 sm:grid-cols-2">
+                            <div class="grid content-start gap-2">
+                                <Label for="service_phone">{{ t('company.service_phone') }}</Label>
+                                <Input
+                                    id="service_phone"
+                                    v-model="form.service_phone"
+                                    type="tel"
+                                    :placeholder="t('company.service_phone_placeholder')"
+                                />
+                                <InputError :message="form.errors.service_phone" />
+                            </div>
+                            <div class="grid content-start gap-2">
+                                <Label for="service_email">{{ t('company.service_email') }}</Label>
+                                <Input id="service_email" v-model="form.service_email" type="email" />
+                                <InputError :message="form.errors.service_email" />
+                            </div>
                         </div>
-                        <div class="grid content-start gap-2">
-                            <Label for="service_email">{{ t('company.service_email') }}</Label>
-                            <Input id="service_email" v-model="form.service_email" type="email" />
-                            <InputError :message="form.errors.service_email" />
-                        </div>
-                    </div>
 
-                    <Button :disabled="form.processing">{{ t('common.save') }}</Button>
+                        <Button v-if="can.manage" :disabled="form.processing">{{ t('common.save') }}</Button>
+                    </fieldset>
                 </form>
 
                 <!-- How the top of a QR label will look -->

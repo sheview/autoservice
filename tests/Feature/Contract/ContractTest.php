@@ -139,6 +139,7 @@ it('soft-deletes a contract', function () {
 it('lets a technician view but not change contracts', function () {
     $technician = userWithRole('technician');
     $contract = createContract($this->customer);
+    openTicket($this->admin, ['customer_id' => $this->customer->id, 'assignee_id' => $technician->id]);
 
     $this->actingAs($technician)->get('/contracts')->assertOk();
     $this->actingAs($technician)->get("/contracts/{$contract->id}")->assertOk();

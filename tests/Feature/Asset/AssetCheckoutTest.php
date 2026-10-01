@@ -11,10 +11,12 @@ beforeEach(function () {
     $this->admin = userWithRole('admin_company', ['name' => 'Admin Boss']);
     $this->tech = userWithRole('technician', ['name' => 'Tech One']);
     $this->staff = userWithRole('user', ['name' => 'Somchai Office']);
+    // helpdesk: asset-checkouts.create (a form for anyone), approve and return
+    $this->desk = userWithRole('helpdesk', ['name' => 'Desk One']);
     $this->asset = createAsset(createAssetCategory(), [
         'name' => 'Notebook Lenovo', 'brand' => 'Lenovo', 'model' => 'E14', 'serial_number' => 'SN-1', 'status' => Asset::STATUS_SPARE,
     ]);
-    $this->loan = fn (array $data = []) => $this->actingAs($this->tech)->post("/assets/{$this->asset->ulid}/checkouts", $data + [
+    $this->loan = fn (array $data = []) => $this->actingAs($this->desk)->post("/assets/{$this->asset->ulid}/checkouts", $data + [
         'type' => 'loan', 'borrower_user_id' => $this->staff->id, 'borrower_department' => 'Accounting', 'due_on' => '2026-10-15', 'purpose' => 'Work from home',
     ]);
 });
@@ -25,7 +27,7 @@ it('asks to lend an asset to a staff member, numbered per Buddhist year, waiting
     $checkout = AssetCheckout::sole();
     expect($checkout->only(['checkout_no', 'type', 'status', 'borrower_name', 'borrower_user_id', 'requested_by_name']))->toBe([
         'checkout_no' => 'AC-2569-00001', 'type' => 'loan', 'status' => 'pending',
-        'borrower_name' => 'Somchai Office', 'borrower_user_id' => $this->staff->id, 'requested_by_name' => 'Tech One',
+        'borrower_name' => 'Somchai Office', 'borrower_user_id' => $this->staff->id, 'requested_by_name' => 'Desk One',
     ])
         ->and($checkout->due_on->toDateString())->toBe('2026-10-15')
         // nothing is handed over before approval
@@ -36,7 +38,7 @@ it('asks to lend an asset to a staff member, numbered per Buddhist year, waiting
 });
 
 it('issues to someone from outside without a due date', function () {
-    $this->actingAs($this->tech)->post("/assets/{$this->asset->ulid}/checkouts", [
+    $this->actingAs($this->desk)->post("/assets/{$this->asset->ulid}/checkouts", [
         'type' => 'issue', 'borrower_name' => 'Customer staff', 'borrower_department' => 'Acme', 'due_on' => '2026-12-01',
     ])->assertSessionHasNoErrors();
 
@@ -51,7 +53,7 @@ it('validates the request', function () {
 
     // a user of another company, or a customer account, is not a borrower to choose
     $outsider = userWithRole('admin_company', [], createTenant('other'));
-    $client = userWithRole('customer', ['customer_id' => createCustomer()->id]);
+    $client = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     ($this->loan)(['borrower_user_id' => $outsider->id])->assertSessionHasErrors('borrower_user_id');
     ($this->loan)(['borrower_user_id' => $client->id])->assertSessionHasErrors('borrower_user_id');
 
@@ -63,10 +65,14 @@ it('validates the request', function () {
 });
 
 it('hands the asset over on approval, and takes it back', function () {
-    ($this->loan)();
+    // a technician asks only for themself, whoever the form names
+    $this->actingAs($this->tech)->post("/assets/{$this->asset->ulid}/checkouts", [
+        'type' => 'loan', 'borrower_user_id' => $this->staff->id, 'borrower_name' => 'Someone else', 'due_on' => '2026-10-15',
+    ])->assertSessionHasNoErrors();
     $checkout = AssetCheckout::sole();
+    expect($checkout->only(['borrower_user_id', 'borrower_name']))->toBe(['borrower_user_id' => $this->tech->id, 'borrower_name' => 'Tech One']);
 
-    // a technician may ask but not approve
+    // and may not approve
     $this->actingAs($this->tech)->post("/asset-checkouts/{$checkout->ulid}/approve")->assertForbidden();
 
     $this->actingAs($this->admin)->post("/asset-checkouts/{$checkout->ulid}/approve")->assertSessionHasNoErrors();
@@ -77,7 +83,8 @@ it('hands the asset over on approval, and takes it back', function () {
     $this->actingAs($this->tech)->get("/assets/{$this->asset->ulid}")->assertInertia(fn (Assert $page) => $page
         ->where('checkouts.current.checkout_no', 'AC-2569-00001')
         ->where('checkouts.available', false)
-        ->where('sameModel.0.holder', 'Somchai Office'));
+        ->where('checkouts.current.actions', ['approve' => false, 'return' => true, 'cancel' => true])
+        ->where('sameModel.0.holder', 'Tech One'));
 
     $this->actingAs($this->tech)->post("/asset-checkouts/{$checkout->ulid}/return", ['note' => 'OK, no scratches'])->assertSessionHasNoErrors();
     expect($checkout->fresh()->only(['status', 'returned_by_name', 'return_note']))->toBe(['status' => 'returned', 'returned_by_name' => 'Tech One', 'return_note' => 'OK, no scratches'])
@@ -98,8 +105,9 @@ it('rejects with a reason, and lets the requester cancel', function () {
 
     ($this->loan)();
     $second = AssetCheckout::where('status', 'pending')->sole();
-    $this->actingAs(userWithRole('technician'))->post("/asset-checkouts/{$second->ulid}/cancel")->assertForbidden();
-    $this->actingAs($this->tech)->post("/asset-checkouts/{$second->ulid}/cancel")->assertSessionHasNoErrors();
+    // another technician does not reach the form; the requester withdraws it
+    $this->actingAs($this->tech)->post("/asset-checkouts/{$second->ulid}/cancel")->assertNotFound();
+    $this->actingAs($this->desk)->post("/asset-checkouts/{$second->ulid}/cancel")->assertSessionHasNoErrors();
     expect($second->fresh()->status)->toBe('cancelled');
 });
 
@@ -110,11 +118,13 @@ it('prints the hand-over form once approved, as a page or a PDF', function () {
     $checkout = AssetCheckout::sole();
 
     // not before approval
-    $this->actingAs($this->tech)->get("/asset-checkouts/{$checkout->ulid}/print")->assertNotFound();
+    $this->actingAs($this->desk)->get("/asset-checkouts/{$checkout->ulid}/print")->assertNotFound();
 
     $this->actingAs($this->admin)->post("/asset-checkouts/{$checkout->ulid}/approve");
 
-    $this->actingAs($this->tech)->get("/asset-checkouts/{$checkout->ulid}/print")->assertOk()
+    // by whoever handles it, and by the borrower (their own form)
+    $this->actingAs($this->staff)->get("/asset-checkouts/{$checkout->ulid}/print")->assertOk();
+    $this->actingAs($this->desk)->get("/asset-checkouts/{$checkout->ulid}/print")->assertOk()
         ->assertSee('ใบยืมทรัพย์สิน')
         ->assertSee('AC-2569-00001')
         ->assertSee('Somchai Office')
@@ -122,10 +132,10 @@ it('prints the hand-over form once approved, as a page or a PDF', function () {
         ->assertSee('15 ตุลาคม 2569')
         ->assertSee('window.print', false);
 
-    $this->actingAs($this->tech)->get("/asset-checkouts/{$checkout->ulid}/pdf")->assertOk()->assertHeader('content-type', 'application/pdf');
+    $this->actingAs($this->desk)->get("/asset-checkouts/{$checkout->ulid}/pdf")->assertOk()->assertHeader('content-type', 'application/pdf');
 
-    // someone who neither asks nor approves cannot print it
-    $this->actingAs($this->staff)->get("/asset-checkouts/{$checkout->ulid}/print")->assertForbidden();
+    // a technician who neither asked nor borrows it does not reach it
+    $this->actingAs($this->tech)->get("/asset-checkouts/{$checkout->ulid}/print")->assertNotFound();
 });
 
 it('lists the forms with search, filters and sort, within what the user may see', function () {
@@ -150,10 +160,21 @@ it('lists the forms with search, filters and sort, within what the user may see'
         ->where('checkouts.total', 1)
         ->where('checkouts.data.0.overdue', true));
 
-    // a technician of the north branch does not see the south asset's form
-    $this->actingAs($northTech)->get('/asset-checkouts')->assertInertia(fn (Assert $page) => $page->where('checkouts.total', 1));
-    // and someone without the permissions does not get the page
-    $this->actingAs($this->staff)->get('/asset-checkouts')->assertForbidden();
+    // scope own (technician by default): only forms asked by or for the user
+    $this->actingAs($northTech)->get('/asset-checkouts')->assertInertia(fn (Assert $page) => $page->where('checkouts.total', 0));
+    $this->actingAs($this->staff)->get('/asset-checkouts?status=all')->assertInertia(fn (Assert $page) => $page
+        ->where('checkouts.total', 1)
+        ->where('checkouts.data.0.borrower_name', 'Somchai Office')
+        ->where('can.request', true)
+        ->where('can.forSelf', true)
+        ->where('can.approve', false));
+
+    // scope branch: forms of the branch's assets (and of assets without a branch), not the south ones
+    setRoleScope('technician', 'branch', ['asset-checkouts.view']);
+    $this->actingAs($northTech)->get('/asset-checkouts?status=all')->assertInertia(fn (Assert $page) => $page->where('checkouts.total', 1));
+
+    // and someone without the permission does not get the page
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => createCustomer()->id]))->get('/asset-checkouts')->assertForbidden();
 });
 
 it('starts a request from a search of the spare devices, grouped by model', function () {
@@ -179,7 +200,7 @@ it('starts a request from a search of the spare devices, grouped by model', func
     $this->actingAs($this->tech)->post("/assets/{$unit->ulid}/checkouts", ['type' => 'issue', 'borrower_name' => 'Y', 'from_search' => true])
         ->assertRedirect(route('asset.checkouts.index'));
 
-    $this->actingAs($this->staff)->get('/asset-checkouts/create')->assertForbidden();
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => createCustomer()->id]))->get('/asset-checkouts/create')->assertForbidden();
 });
 
 it('keeps each company to its own forms', function () {
@@ -191,4 +212,68 @@ it('keeps each company to its own forms', function () {
     $this->actingAs($otherAdmin)->get("/asset-checkouts/{$checkout->ulid}/print")->assertNotFound();
     $this->actingAs($otherAdmin)->get('/asset-checkouts')->assertInertia(fn (Assert $page) => $page->where('checkouts.total', 0));
     expect($checkout->fresh()->status)->toBe('pending');
+});
+
+it('lets a user ask only for themself, and then see the asset they hold', function () {
+    // the asset list of a user (scope own) holds only what they have; spares can still be asked for
+    $this->actingAs($this->staff)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 0));
+    $this->actingAs($this->staff)->get("/assets/{$this->asset->ulid}")->assertForbidden();
+    $this->actingAs($this->staff)->get('/asset-checkouts/create?search=lenovo')->assertInertia(fn (Assert $page) => $page
+        ->where('forSelf', true)
+        ->where('borrowers', [])
+        ->has('groups.0.units', 1));
+
+    $this->actingAs($this->staff)->post("/assets/{$this->asset->ulid}/checkouts", [
+        'type' => 'issue', 'borrower_user_id' => $this->tech->id, 'borrower_name' => 'Not me',
+    ])->assertSessionHasNoErrors();
+    expect(AssetCheckout::sole()->only(['borrower_user_id', 'borrower_name']))->toBe(['borrower_user_id' => $this->staff->id, 'borrower_name' => 'Somchai Office']);
+
+    // now held: listed and shown
+    $this->actingAs($this->staff)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 1));
+    $this->actingAs($this->staff)->get("/assets/{$this->asset->ulid}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('checkouts.can.forSelf', true)
+        ->where('checkouts.current.actions', ['approve' => false, 'return' => false, 'cancel' => true]));
+
+    // the user may not approve nor take it back, but may withdraw their own request
+    $checkout = AssetCheckout::sole();
+    $this->actingAs($this->staff)->post("/asset-checkouts/{$checkout->ulid}/approve")->assertForbidden();
+    $this->actingAs($this->staff)->post("/asset-checkouts/{$checkout->ulid}/cancel")->assertSessionHasNoErrors();
+    expect($checkout->fresh()->status)->toBe('cancelled');
+    $this->actingAs($this->staff)->get('/assets')->assertInertia(fn (Assert $page) => $page->where('assets.total', 0));
+});
+
+it('lets helpdesk make a form for anyone, with staff to choose from', function () {
+    $this->actingAs($this->desk)->get('/asset-checkouts/create')->assertInertia(fn (Assert $page) => $page
+        ->where('forSelf', false)
+        ->has('borrowers', 4));
+});
+
+it('takes a form back only within the scope of asset-checkouts.return', function () {
+    ($this->loan)();
+    $checkout = AssetCheckout::sole();
+    $this->actingAs($this->admin)->post("/asset-checkouts/{$checkout->ulid}/approve");
+
+    // a technician (return: own) does not reach a form neither asked by nor for them
+    $this->actingAs($this->tech)->post("/asset-checkouts/{$checkout->ulid}/return")->assertNotFound();
+    // the borrower sees it but has no asset-checkouts.return
+    $this->actingAs($this->staff)->post("/asset-checkouts/{$checkout->ulid}/return")->assertForbidden();
+    // a technician whose role returns forms of the whole company
+    setRoleScope('technician', 'all', ['asset-checkouts.return']);
+    $this->actingAs($this->tech)->post("/asset-checkouts/{$checkout->ulid}/return")->assertSessionHasNoErrors();
+    expect($checkout->fresh()->status)->toBe('returned');
+});
+
+it('approves only forms of the branch with asset-checkouts.approve scope branch', function () {
+    $north = Branch::create(['code' => 'N', 'name' => 'North']);
+    $south = Branch::create(['code' => 'S', 'name' => 'South']);
+    $northDesk = userWithRole('helpdesk', ['branch_id' => $north->id]);
+    setRoleScope('helpdesk', 'branch', ['asset-checkouts.view', 'asset-checkouts.approve']);
+    $southAsset = createAsset(createAssetCategory(), ['branch_id' => $south->id, 'status' => Asset::STATUS_SPARE]);
+    $this->actingAs($this->admin)->post("/assets/{$southAsset->ulid}/checkouts", ['type' => 'issue', 'borrower_name' => 'Somsri']);
+    $checkout = AssetCheckout::sole();
+
+    $this->actingAs($northDesk)->post("/asset-checkouts/{$checkout->ulid}/approve")->assertNotFound();
+    $southAsset->update(['branch_id' => $north->id]);
+    $this->actingAs($northDesk)->post("/asset-checkouts/{$checkout->ulid}/approve")->assertSessionHasNoErrors();
+    expect($checkout->fresh()->status)->toBe('approved');
 });

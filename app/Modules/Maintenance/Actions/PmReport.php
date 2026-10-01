@@ -8,7 +8,8 @@ use Carbon\CarbonInterface;
 
 /**
  * PM figures of the current tenant for the rounds that fall due in a period, as plain arrays,
- * for the Reporting module (which must not use the PM models directly).
+ * for the Reporting module (which must not use the PM models directly). With $customerId, only
+ * the rounds of that customer.
  */
 class PmReport
 {
@@ -16,10 +17,11 @@ class PmReport
      * @return array{due: int, completed: int, on_time: int, in_progress: int, overdue: int, scheduled: int,
      *     cancelled: int, compliance: int|null, items: array<string, int>}
      */
-    public function handle(CarbonInterface $from, CarbonInterface $to): array
+    public function handle(CarbonInterface $from, CarbonInterface $to, ?int $customerId = null): array
     {
         $visits = PmVisit::query()
             ->whereBetween('due_on', [$from->toDateString(), $to->toDateString()])
+            ->when($customerId !== null, fn ($q) => $q->where('customer_id', $customerId))
             ->get(['id', 'status', 'due_on', 'completed_at']);
 
         $completed = $visits->where('status', PmVisit::STATUS_COMPLETED);

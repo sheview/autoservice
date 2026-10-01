@@ -54,7 +54,7 @@ it('warns the staff in the last 30 days, and not the customer accounts', functio
         ->where('subscription.ends_on', '2026-06-30'));
     ($this->createCustomer)()->assertSessionMissing('error');
 
-    $client = userWithRole('customer', ['customer_id' => $this->customer->id]);
+    $client = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
     $this->actingAs($client)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('subscription', null));
 });
 

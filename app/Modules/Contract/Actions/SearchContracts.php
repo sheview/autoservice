@@ -4,11 +4,14 @@ namespace App\Modules\Contract\Actions;
 
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Support\ContractPhase;
+use App\Modules\Contract\Support\ContractScope;
+use App\Modules\Identity\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
  * The contract list query: search + filters (including the phase, see ContractPhase) + sort.
+ * Given the user, only the contracts within reach of their contracts.view (ContractScope).
  */
 class SearchContracts
 {
@@ -32,15 +35,17 @@ class SearchContracts
 
     /**
      * @param  array<string, mixed>  $filters  from filtersFrom()
+     * @param  User|null  $user  the viewer, to keep to their scope; null = every contract of the tenant
      * @return Builder<Contract>
      */
-    public function handle(array $filters): Builder
+    public function handle(array $filters, ?User $user = null): Builder
     {
         $today = now()->toDateString();
         $search = $filters['search'] ?? '';
         $active = fn (Builder $q) => $q->where('status', Contract::STATUS_ACTIVE);
 
         return Contract::query()
+            ->when($user, fn (Builder $q, User $user) => ContractScope::contracts($q, $user))
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->where('contract_no', 'ilike', "%{$search}%")
                 ->orWhere('title', 'ilike', "%{$search}%")

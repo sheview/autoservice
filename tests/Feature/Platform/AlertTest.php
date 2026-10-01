@@ -81,8 +81,9 @@ it('alerts on LINE, Telegram and e-mail when an asset is asked for and approved'
     Notification::fake();
     app(SaveAlertSettings::class)->handle($this->tenant, $this->settings);
 
+    // a technician asks for themself (asset-checkouts.request)
     $this->actingAs($this->tech)->post("/assets/{$this->asset->ulid}/checkouts", [
-        'type' => 'loan', 'borrower_name' => 'Contractor Lek', 'due_on' => '2026-10-10',
+        'type' => 'loan', 'due_on' => '2026-10-10',
     ])->assertSessionHasNoErrors();
 
     Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.line.me/v2/bot/message/push'
@@ -90,7 +91,7 @@ it('alerts on LINE, Telegram and e-mail when an asset is asked for and approved'
         && $request['to'] === 'Cgroup123'
         && str_contains($request['messages'][0]['text'], 'มีคำขอยืมใหม่')
         && str_contains($request['messages'][0]['text'], 'SW-001 Core switch')
-        && str_contains($request['messages'][0]['text'], 'Contractor Lek'));
+        && str_contains($request['messages'][0]['text'], 'Somsak Tech'));
     Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.telegram.org/bot123:telegram-secret/sendMessage'
         && $request['chat_id'] === '-100555');
     Notification::assertSentTo(new AnonymousNotifiable, AlertMail::class, fn (AlertMail $mail, array $channels, AnonymousNotifiable $notifiable) => $notifiable->routes['mail'] === ['boss@example.com', 'ops@example.com']

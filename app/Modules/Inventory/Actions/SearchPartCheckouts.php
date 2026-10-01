@@ -2,13 +2,16 @@
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Models\PartCheckout;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * The part issue/loan list: search, filters and sort. Parts have no branch or customer, so every
- * staff member who handles these forms sees all of them.
+ * The part issue/loan list: search, filters and sort, within what the user may see (scopeOf):
+ * approvers and askers with scope all see every form; with scope own only their own.
  */
 class SearchPartCheckouts
 {
@@ -33,14 +36,15 @@ class SearchPartCheckouts
 
     /**
      * @param  array<string, mixed>  $filters  from filtersFrom(), plus borrower_user_id / borrower_name / contract_id (summaries)
+     * @param  User|null  $user  the viewer: only the forms they may see (visibleTo); null = all
      * @return Builder<PartCheckout>
      */
-    public function handle(array $filters): Builder
+    public function handle(array $filters, ?User $user = null): Builder
     {
         $search = $filters['search'] ?? '';
         $status = $filters['status'] ?? 'open';
 
-        return PartCheckout::query()
+        return self::visibleTo(PartCheckout::query(), $user)
             ->with('part:id,code,name,part_number,unit')
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->where('checkout_no', 'ilike', "%{$search}%")
@@ -65,5 +69,58 @@ class SearchPartCheckouts
                 fn (Builder $q) => $q->orderByRaw('due_on '.(($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc').' nulls last'),
                 fn (Builder $q) => $q->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc'))
             ->orderByDesc('id');
+    }
+
+    /**
+     * How far the user reaches part issue/loan forms: the wider of asset-checkouts.approve
+     * (approvers) and parts.issue (askers). Parts have no branch, so branch = all; customer
+     * accounts reach none; own = forms the user asked for or that are made out to them.
+     */
+    public static function scopeOf(User $user): ?string
+    {
+        if ($user->customer_id !== null) {
+            return null;
+        }
+        $scopes = array_filter([DataScope::of($user, 'asset-checkouts.approve'), DataScope::of($user, 'parts.issue')]);
+        foreach ([PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH] as $wide) {
+            if (in_array($wide, $scopes, true)) {
+                return PermissionCatalog::SCOPE_ALL;
+            }
+        }
+
+        return in_array(PermissionCatalog::SCOPE_OWN, $scopes, true) ? PermissionCatalog::SCOPE_OWN : null;
+    }
+
+    /**
+     * Narrows a forms query to the ones the user may see (scopeOf).
+     *
+     * @template T of Builder
+     *
+     * @param  T  $query
+     * @return T
+     */
+    public static function visibleTo(Builder $query, ?User $user): Builder
+    {
+        return match ($user === null ? PermissionCatalog::SCOPE_ALL : self::scopeOf($user)) {
+            PermissionCatalog::SCOPE_ALL => $query,
+            PermissionCatalog::SCOPE_OWN => $query->where(fn ($q) => $q->where('requested_by', $user->id)->orWhere('borrower_user_id', $user->id)),
+            default => $query->whereRaw('false'),
+        };
+    }
+
+    /** Whether the user may see this form (scopeOf). */
+    public static function covers(PartCheckout $checkout, User $user): bool
+    {
+        return match (self::scopeOf($user)) {
+            PermissionCatalog::SCOPE_ALL => true,
+            PermissionCatalog::SCOPE_OWN => self::isOwn($checkout, $user),
+            default => false,
+        };
+    }
+
+    /** Asked for by the user, or made out to them. */
+    public static function isOwn(PartCheckout $checkout, User $user): bool
+    {
+        return (int) $checkout->requested_by === $user->id || (int) $checkout->borrower_user_id === $user->id;
     }
 }

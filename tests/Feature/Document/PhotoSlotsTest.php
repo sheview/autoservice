@@ -78,21 +78,22 @@ it('lets whoever may edit the record change its photos, and whoever may see it l
     $this->actingAs($this->admin)->post($assetUrl, ($this->photo)());
     $this->actingAs($this->admin)->post($partUrl, ($this->photo)());
 
-    // a technician edits assets, but only looks at parts
+    // the helpdesk edits assets (assets.update); a technician only looks (permissions.json)
+    $this->actingAs(userWithRole('helpdesk'))->post("/assets/{$this->asset->ulid}/photos/1", ($this->photo)())->assertSessionHasNoErrors();
     $tech = userWithRole('technician');
-    $this->actingAs($tech)->post("/assets/{$this->asset->ulid}/photos/1", ($this->photo)())->assertSessionHasNoErrors();
+    $this->actingAs($tech)->post("/assets/{$this->asset->ulid}/photos/2", ($this->photo)())->assertForbidden();
     $this->actingAs($tech)->get($partUrl)->assertOk();
     $this->actingAs($tech)->post($partUrl, ($this->photo)())->assertForbidden();
     $this->actingAs($tech)->delete($partUrl)->assertForbidden();
     $this->actingAs($tech)->get("/parts/{$this->part->id}")->assertInertia(fn (Assert $page) => $page->where('can.update', false));
 
     // a customer account sees the photos of its own assets only, and changes nothing
-    $client = userWithRole('customer', ['customer_id' => $this->customer->id]);
+    $client = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
     $this->actingAs($client)->get($assetUrl)->assertOk();
     $this->actingAs($client)->post($assetUrl, ($this->photo)())->assertForbidden();
     $this->actingAs($client)->delete($assetUrl)->assertForbidden();
     $this->actingAs($client)->get($partUrl)->assertForbidden();
-    $otherClient = userWithRole('customer', ['customer_id' => createCustomer()->id]);
+    $otherClient = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($otherClient)->get($assetUrl)->assertForbidden();
 
     expect(Media::count())->toBe(3);

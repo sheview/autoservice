@@ -31,21 +31,21 @@ it('installs the platform tenant and its first superadmin', function () {
 
 it('brings permissions up to date after a deploy without undoing company changes', function () {
     // a company that changed its technician role, and lost a new admin permission
-    Role::findByName('technician')->revokePermissionTo('sticker.print');
-    Role::findByName('admin_company')->revokePermissionTo('survey.view');
-    Permission::where('name', 'report.view')->delete();
+    Role::findByName('technician')->revokePermissionTo('labels.print');
+    Role::findByName('admin_company')->revokePermissionTo('surveys.view');
+    Permission::where('name', 'reports.view')->delete();
 
     $this->artisan('platform:sync-permissions')->assertSuccessful();
 
-    expect(Permission::where('name', 'report.view')->exists())->toBeTrue()
-        ->and(Role::findByName('admin_company')->hasPermissionTo('survey.view'))->toBeTrue()
-        ->and(Role::findByName('technician')->hasPermissionTo('sticker.print'))->toBeFalse();
+    expect(Permission::where('name', 'reports.view')->exists())->toBeTrue()
+        ->and(Role::findByName('admin_company')->hasPermissionTo('surveys.view'))->toBeTrue()
+        ->and(Role::findByName('technician')->hasPermissionTo('labels.print'))->toBeFalse();
 
-    // --defaults adds what the default roles have, never takes anything away
-    Role::findByName('technician')->givePermissionTo('report.view');
+    // --defaults puts the default roles back exactly as the catalog says
+    Role::findByName('technician')->givePermissionTo('reports.view');
     $this->artisan('platform:sync-permissions', ['--defaults' => true])->assertSuccessful();
-    expect(Role::findByName('technician')->hasPermissionTo('sticker.print'))->toBeTrue()
-        ->and(Role::findByName('technician')->hasPermissionTo('report.view'))->toBeTrue();
+    expect(Role::findByName('technician')->fresh()->hasPermissionTo('labels.print'))->toBeTrue()
+        ->and(Role::findByName('technician')->fresh()->hasPermissionTo('reports.view'))->toBeFalse();
 });
 
 it('sends no scheduled e-mails for a company that is locked out', function () {

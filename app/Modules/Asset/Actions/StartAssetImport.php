@@ -5,6 +5,7 @@ namespace App\Modules\Asset\Actions;
 use App\Modules\Asset\Jobs\ImportAssetsJob;
 use App\Modules\Asset\Models\AssetImport;
 use App\Modules\Identity\Models\User;
+use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\UploadedFile;
@@ -31,7 +32,7 @@ class StartAssetImport
             'file_path' => $path,
         ]);
 
-        ImportAssetsJob::dispatch($import->id, $user->can(PermissionCatalog::ALL_BRANCHES), $user->branch_id);
+        ImportAssetsJob::dispatch($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id);
 
         return $import;
     }

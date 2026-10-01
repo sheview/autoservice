@@ -24,7 +24,7 @@ class TicketDashboard
     {
         $count = fn (array $filters) => $this->search->handle($user, $filters + ['status' => 'open'])->count();
         // Assigned to me while that is the user's job; otherwise everything open that they can see.
-        $works = $user->customer_id === null && ! $user->can('ticket.assign');
+        $works = $user->customer_id === null && ! $user->can('tickets.assign');
 
         return [
             'open' => $count([]),

@@ -11,7 +11,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * A request to issue or lend some of a part: to a user of the company (borrower_user_id) or to
- * someone from outside (borrower_name). A loan needs its due date.
+ * someone from outside (borrower_name); with scope own only to oneself. A loan needs its due date.
  */
 class PartCheckoutRequest extends FormRequest
 {
@@ -20,6 +20,14 @@ class PartCheckoutRequest extends FormRequest
         $part = $this->route('part');
 
         return $part instanceof Part && PartCheckoutController::abilities($this)['request'] && $this->user()->can('view', $part);
+    }
+
+    /** With parts.issue scope own a user asks only for themselves, whatever the form sent. */
+    protected function prepareForValidation(): void
+    {
+        if ($this->user() && ! PartCheckoutController::abilities($this)['forOthers']) {
+            $this->merge(['borrower_user_id' => $this->user()->id, 'borrower_name' => null]);
+        }
     }
 
     public function rules(): array
@@ -31,7 +39,7 @@ class PartCheckoutRequest extends FormRequest
             'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
             'borrower_user_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail) {
                 // Staff of this company only (the list the form offers).
-                if (! app(UsersWithPermission::class)->handle('part.view')->contains('id', (int) $value)) {
+                if (! app(UsersWithPermission::class)->handle('parts.view')->contains('id', (int) $value)) {
                     $fail(__('validation.exists', ['attribute' => __('inventory.part_checkouts.fields.borrower_user_id')]));
                 }
             }],

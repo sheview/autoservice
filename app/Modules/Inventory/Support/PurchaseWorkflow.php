@@ -6,17 +6,17 @@ use App\Modules\Inventory\Models\PurchaseRequest as PR;
 
 /**
  * The moves of a purchase request, from which statuses each is allowed, and who may make it:
- *   approve, reject  asset.approve (the same approvers as issue/loan); a rejection says why
- *   order, receive   stock.receive (whoever buys and takes deliveries)
+ *   approve, reject  purchase-requests.approve; a rejection says why
+ *   order, receive   purchase-requests.receive (whoever buys and takes deliveries)
  *   cancel           whoever asked (while waiting) or an approver (until ordered)
  */
 class PurchaseWorkflow
 {
     public const ACTIONS = [
-        'approve' => ['from' => [PR::STATUS_PENDING], 'to' => PR::STATUS_APPROVED, 'permission' => 'asset.approve'],
-        'reject' => ['from' => [PR::STATUS_PENDING], 'to' => PR::STATUS_REJECTED, 'permission' => 'asset.approve'],
-        'order' => ['from' => [PR::STATUS_APPROVED], 'to' => PR::STATUS_ORDERED, 'permission' => 'stock.receive'],
-        'receive' => ['from' => [PR::STATUS_ORDERED], 'to' => PR::STATUS_RECEIVED, 'permission' => 'stock.receive'],
+        'approve' => ['from' => [PR::STATUS_PENDING], 'to' => PR::STATUS_APPROVED, 'permission' => 'purchase-requests.approve'],
+        'reject' => ['from' => [PR::STATUS_PENDING], 'to' => PR::STATUS_REJECTED, 'permission' => 'purchase-requests.approve'],
+        'order' => ['from' => [PR::STATUS_APPROVED], 'to' => PR::STATUS_ORDERED, 'permission' => 'purchase-requests.receive'],
+        'receive' => ['from' => [PR::STATUS_ORDERED], 'to' => PR::STATUS_RECEIVED, 'permission' => 'purchase-requests.receive'],
         'cancel' => ['from' => [PR::STATUS_PENDING, PR::STATUS_APPROVED], 'to' => PR::STATUS_CANCELLED, 'permission' => null],
     ];
 

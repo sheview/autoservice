@@ -50,7 +50,7 @@ class PurchaseRequestController extends Controller
                 ->through(fn (PurchaseRequest $pr) => PurchaseRequestRow::of($pr)),
             'filters' => $filters,
             'statuses' => PurchaseRequest::STATUSES,
-            'can' => ['create' => $request->user()->can('create', PurchaseRequest::class), 'seesAll' => PurchaseRequestPolicy::seesAll($request->user())],
+            'can' => ['create' => $request->user()->can('create', PurchaseRequest::class), 'viewAll' => PurchaseRequestPolicy::seesEveryone($request->user())],
         ]);
     }
 
@@ -94,7 +94,7 @@ class PurchaseRequestController extends Controller
                 'update' => $user->can('update', $purchaseRequest),
                 'attach' => $this->canAttach($request, $purchaseRequest),
                 // Once received: register what arrived as assets.
-                'createAsset' => $purchaseRequest->status === PurchaseRequest::STATUS_RECEIVED && $modules->enabled('asset') && $user->can('asset.create'),
+                'createAsset' => $purchaseRequest->status === PurchaseRequest::STATUS_RECEIVED && $modules->enabled('asset') && $user->can('assets.create'),
             ],
         ]);
     }
@@ -172,13 +172,13 @@ class PurchaseRequestController extends Controller
         return $this->destroyAttachment($purchaseRequest, $attachment);
     }
 
-    /** Quotations: by whoever asked (while it waits), or by approvers and buyers until it is closed. */
+    /** Quotations: by whoever may change it (while it waits), or by approvers and buyers until it is closed. */
     private function canAttach(Request $request, PurchaseRequest $pr): bool
     {
         $user = $request->user();
 
         return $user->can('update', $pr)
-            || (PurchaseRequestPolicy::seesAll($user) && in_array($pr->status, PurchaseRequest::OPEN_STATUSES, true));
+            || (in_array($pr->status, PurchaseRequest::OPEN_STATUSES, true) && app(PurchaseRequestPolicy::class)->handles($user, $pr));
     }
 
     /**

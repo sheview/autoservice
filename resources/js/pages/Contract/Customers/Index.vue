@@ -20,6 +20,7 @@ interface CustomerRow {
     email: string | null;
     contracts_count: number;
     short_name: string | null;
+    can: { update: boolean; delete: boolean };
 }
 
 interface Filters {
@@ -120,14 +121,14 @@ const destroy = (customer: CustomerRow) => {
                             </td>
                             <td class="whitespace-nowrap px-4 py-2 text-right">
                                 <Link
-                                    v-if="can.update"
+                                    v-if="customer.can.update"
                                     :href="route('contract.customers.edit', customer.id)"
                                     class="text-primary underline-offset-4 hover:underline"
                                 >
                                     {{ t('common.edit') }}
                                 </Link>
                                 <button
-                                    v-if="can.delete && customer.contracts_count === 0"
+                                    v-if="customer.can.delete && customer.contracts_count === 0"
                                     type="button"
                                     class="ml-3 text-red-700 underline-offset-4 hover:underline dark:text-red-400"
                                     @click="destroy(customer)"

@@ -22,6 +22,12 @@ trait HasAttachments
         return false;
     }
 
+    /** The largest file accepted, in KB. */
+    public function attachmentMaxKb(): int
+    {
+        return Attachments::MAX_KB;
+    }
+
     protected function registerAttachmentCollection(): void
     {
         $this->addMediaCollection($this->attachmentCollection())->acceptsMimeTypes(Attachments::mimeTypes($this->attachmentsTakeImages()));

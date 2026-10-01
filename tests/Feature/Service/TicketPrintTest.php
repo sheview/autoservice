@@ -47,7 +47,7 @@ it('renders the job sheet with the work notes and the parts used, without intern
 
 it('leaves the parts table out for users who do not see stock, or with the module off', function () {
     // a customer account may print its own ticket, without anything about stock
-    $client = userWithRole('customer', ['customer_id' => $this->acme->id]);
+    $client = userWithRole('customer_it', ['customer_id' => $this->acme->id]);
     $this->actingAs($client)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts', null)->where('ticket.customer', 'Acme'));
 
     $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts', []));
@@ -58,7 +58,7 @@ it('leaves the parts table out for users who do not see stock, or with the modul
 it('only prints tickets the user may see', function () {
     $this->get($this->url)->assertRedirect('/login');
 
-    $otherClient = userWithRole('customer', ['customer_id' => createCustomer()->id]);
+    $otherClient = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($otherClient)->get($this->url)->assertForbidden();
 
     $other = createTenant('other');

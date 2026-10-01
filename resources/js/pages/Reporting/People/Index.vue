@@ -34,7 +34,7 @@ const sortBy = (column: string) => {
     filters.sort = column;
 };
 
-const money = (baht: string) => (Number(baht) === 0 ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
+const money = (baht: string | undefined) => (Number(baht ?? 0) === 0 ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
 

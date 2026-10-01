@@ -6,6 +6,7 @@ use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Contract\Actions\SaveContract;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Models\Customer;
+use App\Modules\Identity\Actions\SyncRoleGrants;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -86,12 +87,38 @@ function userWithRole(string $role, array $attributes = [], ?Tenant $tenant = nu
 }
 
 /**
- * Lets a role of the current tenant see every branch (branch.all), as a company does for its
- * head-office dispatchers. By default only the company admin has it.
+ * Sets the scope of every grant of a role of the current tenant (or only of $permissions).
+ */
+function setRoleScope(string $role, string $scope, ?array $permissions = null): void
+{
+    $sync = app(SyncRoleGrants::class);
+    $model = Role::findByName($role);
+    $grants = $sync->grantsOf($model);
+    foreach ($grants as $name => $current) {
+        if ($permissions === null || in_array($name, $permissions, true)) {
+            $grants[$name] = $scope;
+        }
+    }
+    $sync->handle($model, $grants);
+}
+
+/**
+ * Lets a role of the current tenant reach every branch (scope "all" on all its grants), as a
+ * company does for its head-office dispatchers.
  */
 function allowAllBranches(string $role): void
 {
-    Role::findByName($role)->givePermissionTo(PermissionCatalog::ALL_BRANCHES);
+    setRoleScope($role, PermissionCatalog::SCOPE_ALL);
+}
+
+/**
+ * Gives a role of the current tenant permissions (scope all unless said), on top of what it has.
+ */
+function grantTo(string $role, array $permissions, string $scope = PermissionCatalog::SCOPE_ALL): void
+{
+    $sync = app(SyncRoleGrants::class);
+    $model = Role::findByName($role);
+    $sync->handle($model, [...$sync->grantsOf($model), ...array_fill_keys($permissions, $scope)]);
 }
 
 /**

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\PartCheckout;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 
@@ -12,9 +13,10 @@ use Illuminate\Database\Query\Builder as QueryBuilder;
  */
 class PartCheckoutSummaryRows
 {
-    public function handle(): QueryBuilder
+    /** Given the viewer, only the forms they may see (SearchPartCheckouts::visibleTo). */
+    public function handle(?User $viewer = null): QueryBuilder
     {
-        return PartCheckout::query()
+        return SearchPartCheckouts::visibleTo(PartCheckout::query(), $viewer)
             ->whereNotIn('status', [PartCheckout::STATUS_REJECTED, PartCheckout::STATUS_CANCELLED])
             ->select(['borrower_user_id as user_id', 'borrower_name as name', 'contract_id', 'type as kind'])
             ->selectRaw('case when status = ? or (status = ? and type = ?) then 1 else 0 end as is_open',

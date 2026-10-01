@@ -22,15 +22,18 @@ class SummaryTotals
         count(*) as total,
         max(at) as last_at";
 
+    /** The keys about purchases, left out for those who may not see purchases or amounts. */
+    public const PURCHASE_KEYS = ['purchases', 'purchases_open', 'purchase_amount'];
+
     /**
-     * @return array{issues: int, issues_open: int, loans: int, loans_open: int, purchases: int, purchases_open: int,
-     *     purchase_amount: string, open_count: int, total: int, last_at: string|null}
+     * @return array{issues: int, issues_open: int, loans: int, loans_open: int, purchases?: int, purchases_open?: int,
+     *     purchase_amount?: string, open_count: int, total: int, last_at: string|null}
      */
-    public static function of(?object $row): array
+    public static function of(?object $row, bool $purchases = true): array
     {
         $count = fn (string $key) => (int) ($row->{$key} ?? 0);
 
-        return [
+        $totals = [
             'issues' => $count('issues'),
             'issues_open' => $count('issues_open'),
             'loans' => $count('loans'),
@@ -42,5 +45,7 @@ class SummaryTotals
             'total' => $count('total'),
             'last_at' => isset($row->last_at) ? Carbon::parse($row->last_at)->toIso8601String() : null,
         ];
+
+        return $purchases ? $totals : array_diff_key($totals, array_flip(self::PURCHASE_KEYS));
     }
 }

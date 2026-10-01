@@ -5,6 +5,8 @@ namespace App\Modules\Survey\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
+use App\Modules\Identity\Support\DataScope;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Survey\Actions\SearchTicketSurveys;
 use App\Modules\Survey\Actions\SummariseTicketSurveys;
@@ -27,13 +29,21 @@ class SurveyController extends Controller
         Gate::authorize('viewAny', TicketSurvey::class);
 
         $filters = SearchTicketSurveys::filtersFrom($request);
-        $query = $search->handle($filters);
+        $query = $search->handle($request->user(), $filters);
         $surveys = (clone $query)->paginate(20)->withQueryString();
 
         $customers = $modules->enabled('contract') ? $listCustomers->handle(withTrashed: true) : [];
         $customerNames = collect($customers)->pluck('name', 'id');
-        // Every technician who has a survey, for the filter (and the names of this page).
-        $technicians = $userNames->handle(TicketSurvey::query()->whereNotNull('assignee_id')->distinct()->pluck('assignee_id')->all());
+        // Every technician who has a survey the user sees, for the filter (and the names of this page).
+        $visible = fn () => SearchTicketSurveys::visibleTo(TicketSurvey::query(), $request->user());
+        $technicians = $userNames->handle($visible()->whereNotNull('assignee_id')->distinct()->pluck('assignee_id')->all());
+        // Customers for the filter: everyone's for whoever sees every survey, otherwise only
+        // those of the surveys the user sees.
+        $filterCustomers = $modules->enabled('contract') ? $listCustomers->handle() : [];
+        if (! in_array(DataScope::of($request->user(), 'surveys.view'), [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH], true)) {
+            $reachable = $visible()->whereNotNull('customer_id')->distinct()->pluck('customer_id')->map(fn ($id) => (int) $id)->all();
+            $filterCustomers = array_values(array_filter($filterCustomers, fn (array $c) => in_array($c['id'], $reachable, true)));
+        }
 
         return Inertia::render('Survey/Index', [
             'surveys' => $surveys->through(fn (TicketSurvey $survey) => [
@@ -46,9 +56,9 @@ class SurveyController extends Controller
             'summary' => $summarise->handle($query),
             'filters' => $filters,
             'statuses' => SearchTicketSurveys::STATUSES,
-            'customers' => $modules->enabled('contract') ? $listCustomers->handle() : [],
+            'customers' => $filterCustomers,
             'technicians' => collect($technicians)->map(fn (string $name, int $id) => ['id' => $id, 'name' => $name])->sortBy('name')->values(),
-            'can' => ['viewTickets' => $modules->enabled('service') && $request->user()->can('ticket.view')],
+            'can' => ['viewTickets' => $modules->enabled('service') && $request->user()->can('tickets.view')],
         ]);
     }
 }

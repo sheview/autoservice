@@ -29,7 +29,8 @@ class ContractController extends Controller
 
         $filters = SearchContracts::filtersFrom($request);
 
-        $contracts = $search->handle($filters)
+        $user = $request->user();
+        $contracts = $search->handle($filters, $user)
             ->with('customer:id,code,name')
             ->withCount('contractAssets')
             ->paginate(20)
@@ -50,10 +51,11 @@ class ContractController extends Controller
         return Inertia::render('Contract/Contracts/Index', [
             'contracts' => $contracts,
             'filters' => $filters,
-            'customers' => $listCustomers->handle(),
+            // Only the customers whose contracts the user reaches.
+            'customers' => $listCustomers->handle(user: $user, permission: 'contracts.view'),
             'phases' => ContractPhase::PHASES,
             'serviceWindows' => Contract::SERVICE_WINDOWS,
-            'can' => ['create' => $request->user()->can('create', Contract::class)],
+            'can' => ['create' => $user->can('create', Contract::class)],
         ]);
     }
 
@@ -61,7 +63,7 @@ class ContractController extends Controller
     {
         Gate::authorize('create', Contract::class);
 
-        return Inertia::render('Contract/Contracts/Form', $this->formProps(null, $listCustomers) + [
+        return Inertia::render('Contract/Contracts/Form', $this->formProps($request, null, $listCustomers) + [
             'preselectedCustomerId' => $request->integer('customer_id') ?: null,
         ]);
     }
@@ -85,7 +87,7 @@ class ContractController extends Controller
         $user = $request->user();
         $assetIds = $contract->contractAssets()->pluck('asset_id')->all();
         $canUpdate = $user->can('update', $contract);
-        $assetsOn = $modules->enabled('asset') && $user->can('asset.view');
+        $assetsOn = $modules->enabled('asset') && $user->can('assets.view');
 
         return Inertia::render('Contract/Contracts/Show', [
             'contract' => [
@@ -133,11 +135,11 @@ class ContractController extends Controller
         ]);
     }
 
-    public function edit(Contract $contract, ListCustomers $listCustomers): Response
+    public function edit(Request $request, Contract $contract, ListCustomers $listCustomers): Response
     {
         Gate::authorize('update', $contract);
 
-        return Inertia::render('Contract/Contracts/Form', $this->formProps($contract, $listCustomers));
+        return Inertia::render('Contract/Contracts/Form', $this->formProps($request, $contract, $listCustomers));
     }
 
     public function update(ContractRequest $request, Contract $contract, SaveContract $saveContract, AddAttachments $addAttachments): RedirectResponse
@@ -165,8 +167,14 @@ class ContractController extends Controller
         return Attachments::list($contract, $contract->attachmentCollection(), fn (int $id) => route('contract.contracts.documents.show', [$contract, $id]));
     }
 
-    private function formProps(?Contract $contract, ListCustomers $listCustomers): array
+    private function formProps(Request $request, ?Contract $contract, ListCustomers $listCustomers): array
     {
+        // The customers the contract may be for: within reach of creating / changing contracts.
+        $customers = $listCustomers->handle(user: $request->user(), permission: $contract ? 'contracts.update' : 'contracts.create');
+        if ($contract && ! collect($customers)->contains('id', $contract->customer_id)) {
+            $customers = [...$customers, ...collect($listCustomers->handle(true))->where('id', $contract->customer_id)->values()->all()];
+        }
+
         return [
             'documents' => $contract ? $this->documents($contract) : [],
             'contract' => $contract ? [
@@ -179,7 +187,7 @@ class ContractController extends Controller
                     'resolve_hours' => $sla->resolve_minutes / 60,
                 ]]),
             ] : null,
-            'customers' => $listCustomers->handle(),
+            'customers' => $customers,
             'statuses' => Contract::STATUSES,
             'serviceWindows' => Contract::SERVICE_WINDOWS,
             'pmIntervals' => Contract::PM_INTERVALS,

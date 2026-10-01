@@ -41,6 +41,8 @@ const props = defineProps<{
     categories: { id: number; name: string }[];
     templates: { key: string }[];
     maxLabels: number;
+    // labels.print: without it the page lists assets but cannot print.
+    can: { print: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -114,16 +116,20 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <span class="text-sm font-medium">{{ t('labels.selected', { count: selected.length }) }}</span>
                 <Button v-if="selected.length" variant="ghost" size="sm" @click="selected = []">{{ t('labels.clear') }}</Button>
                 <span class="flex-1" />
-                <select v-model="template" :class="selectClass" :aria-label="t('labels.template')">
-                    <option v-for="tpl in templates" :key="tpl.key" :value="tpl.key">{{ t(`labels.templates.${tpl.key}`) }}</option>
-                </select>
-                <Button :disabled="selected.length === 0 || selected.length > maxLabels" as-child>
-                    <a :href="selected.length && selected.length <= maxLabels ? printUrl : undefined" target="_blank" rel="noopener">
-                        <Printer class="h-4 w-4" />
-                        {{ t('labels.print') }}
-                    </a>
-                </Button>
-                <p v-if="selected.length > maxLabels" class="w-full text-xs text-red-600">{{ t('labels.max_hint', { max: maxLabels }) }}</p>
+                <template v-if="can.print">
+                    <select v-model="template" :class="selectClass" :aria-label="t('labels.template')">
+                        <option v-for="tpl in templates" :key="tpl.key" :value="tpl.key">{{ t(`labels.templates.${tpl.key}`) }}</option>
+                    </select>
+                    <Button :disabled="selected.length === 0 || selected.length > maxLabels" as-child>
+                        <a :href="selected.length && selected.length <= maxLabels ? printUrl : undefined" target="_blank" rel="noopener">
+                            <Printer class="h-4 w-4" />
+                            {{ t('labels.print') }}
+                        </a>
+                    </Button>
+                </template>
+                <p v-if="can.print && selected.length > maxLabels" class="w-full text-xs text-red-600">
+                    {{ t('labels.max_hint', { max: maxLabels }) }}
+                </p>
             </div>
 
             <div class="overflow-x-auto rounded-md border">

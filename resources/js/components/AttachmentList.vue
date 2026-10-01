@@ -19,8 +19,8 @@ export interface Attachment {
  * The files attached to a record. With uploadUrl, more files can be attached right here.
  */
 const props = withDefaults(
-    defineProps<{ attachments: Attachment[]; canDelete?: boolean; uploadUrl?: string | null; images?: boolean; title?: boolean }>(),
-    { canDelete: false, uploadUrl: null, images: false, title: true },
+    defineProps<{ attachments: Attachment[]; canDelete?: boolean; uploadUrl?: string | null; images?: boolean; title?: boolean; maxMb?: number }>(),
+    { canDelete: false, uploadUrl: null, images: false, title: true, maxMb: 2 },
 );
 
 const upload = useForm({ attachments: [] as File[] });
@@ -66,7 +66,7 @@ const destroy = (file: Attachment) => {
         <p v-else class="text-sm text-muted-foreground">{{ t('attachments.none') }}</p>
 
         <form v-if="uploadUrl" class="space-y-2" @submit.prevent="send">
-            <AttachmentPicker v-model="upload.attachments" :images="images" :errors="upload.errors" />
+            <AttachmentPicker v-model="upload.attachments" :images="images" :errors="upload.errors" :max-mb="maxMb" />
             <Button v-if="upload.attachments.length" size="sm" :disabled="upload.processing">{{ t('attachments.upload') }}</Button>
         </form>
     </section>

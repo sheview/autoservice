@@ -7,9 +7,10 @@ export interface SummaryTotals {
     issues_open: number;
     loans: number;
     loans_open: number;
-    purchases: number;
-    purchases_open: number;
-    purchase_amount: string; // baht
+    // Left out for customer accounts, who never see purchases or amounts.
+    purchases?: number;
+    purchases_open?: number;
+    purchase_amount?: string; // baht
     open_count: number;
     total: number;
     last_at: string | null;

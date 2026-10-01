@@ -26,6 +26,19 @@ it('manages the holidays of a year', function () {
     $helpdesk = userWithRole('helpdesk');
     $this->actingAs($helpdesk)->get('/holidays')->assertOk();
     $this->actingAs($helpdesk)->post('/holidays', ['date' => '2026-05-01', 'name' => 'x'])->assertForbidden();
+    $this->actingAs($helpdesk)->get('/holidays')->assertInertia(fn (Assert $page) => $page->where('can', ['create' => false, 'delete' => false]));
+});
+
+it('lets holidays.manage add and remove holidays, and keeps roles without holidays.view out', function () {
+    grantTo('helpdesk', ['holidays.manage']);
+    $helpdesk = userWithRole('helpdesk');
+
+    $this->actingAs($helpdesk)->get('/holidays')->assertInertia(fn (Assert $page) => $page->where('can', ['create' => true, 'delete' => true]));
+    $this->actingAs($helpdesk)->post('/holidays', ['date' => '2026-05-01', 'name' => 'วันแรงงาน'])->assertSessionHasNoErrors();
+    $this->actingAs($helpdesk)->delete('/holidays/'.Holiday::sole()->id)->assertSessionHasNoErrors();
+    expect(Holiday::count())->toBe(0);
+
+    $this->actingAs(userWithRole('technician'))->get('/holidays')->assertForbidden();
 });
 
 it('keeps tickets, holidays and their numbers per tenant', function () {

@@ -3,6 +3,7 @@
 namespace App\Modules\Contract\Http\Requests;
 
 use App\Modules\Contract\Models\Contract;
+use App\Modules\Contract\Support\ContractScope;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Platform\Support\Money;
 use Illuminate\Foundation\Http\FormRequest;
@@ -31,7 +32,14 @@ class ContractRequest extends FormRequest
     {
         $contract = $this->route('contract');
         $rules = [
-            'customer_id' => ['required', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
+            'customer_id' => ['required', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at'),
+                // A customer within reach of the user's contracts.create / contracts.update (kept when unchanged).
+                function (string $attribute, mixed $value, \Closure $fail) use ($contract) {
+                    $permission = $contract ? 'contracts.update' : 'contracts.create';
+                    if ((int) $value !== (int) $contract?->customer_id && ! ContractScope::coversCustomerId($this->user(), (int) $value, $permission)) {
+                        $fail(__('validation.exists', ['attribute' => __('contract.fields.customer_id')]));
+                    }
+                }],
             // Unique including deleted contracts.
             'contract_no' => ['required', 'string', 'max:50', Rule::unique('contracts', 'contract_no')->ignore($contract?->id)],
             'title' => ['required', 'string', 'max:255'],
