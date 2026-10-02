@@ -1,4 +1,4 @@
-import type { CheckoutRow } from '@/types/checkout';
+import type { CheckoutLineRow } from '@/types/checkout';
 import type { PurchaseRequestRow } from '@/types/purchase';
 
 // The counts of a person or a project (App\Modules\Reporting\Support\SummaryTotals).
@@ -36,7 +36,22 @@ export interface ProjectSummary extends SummaryTotals {
 
 export type ContractLabel = { id: number; contract_no: string; title: string } | null;
 
-export type SummaryCheckout = CheckoutRow & { contract: ContractLabel };
+// A request line in a person's or project's lists (App\Modules\Asset\Actions\SearchSummaryLines).
+export type SummaryCheckout = CheckoutLineRow & {
+    request: {
+        ulid: string;
+        request_no: string;
+        status: string;
+        borrower_user_id: number | null;
+        borrower_name: string;
+        borrower_department: string | null;
+        requester_name: string | null;
+        contract_id: number | null;
+        needed_by: string | null;
+        requested_at: string | null;
+    };
+    contract: ContractLabel;
+};
 
 export type SummaryPurchase = PurchaseRequestRow & { contract: ContractLabel };
 

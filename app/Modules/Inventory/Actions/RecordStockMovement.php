@@ -3,6 +3,7 @@
 namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Events\PartRestocked;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
 use Illuminate\Support\Facades\DB;
@@ -71,6 +72,10 @@ class RecordStockMovement
         });
 
         $part->refresh();
+
+        if ($movement->quantity > 0) {
+            PartRestocked::dispatch($part->id, (int) $part->qty_on_hand);
+        }
 
         return $movement;
     }

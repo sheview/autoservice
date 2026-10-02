@@ -12,7 +12,7 @@ import { ImageUp } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 const props = defineProps<{
-    company: { name: string; service_phone: string | null; service_email: string | null; logo_url: string | null };
+    company: { name: string; service_phone: string | null; service_email: string | null; logo_url: string | null; auto_approve_limit: string | null };
     logoMaxKb: number;
     // company.manage: without it the page is read only.
     can: { manage: boolean };
@@ -24,6 +24,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: t('company.title'), href: route(
 const form = useForm({
     service_phone: props.company.service_phone ?? '',
     service_email: props.company.service_email ?? '',
+    auto_approve_limit: props.company.auto_approve_limit ?? '',
     logo: null as File | null,
     remove_logo: false as boolean,
 });
@@ -126,6 +127,20 @@ const submit = () =>
                                 <Label for="service_email">{{ t('company.service_email') }}</Label>
                                 <Input id="service_email" v-model="form.service_email" type="email" />
                                 <InputError :message="form.errors.service_email" />
+                            </div>
+                            <div class="grid gap-2">
+                                <Label for="auto_approve_limit">{{ t('company.auto_approve_limit') }}</Label>
+                                <Input
+                                    id="auto_approve_limit"
+                                    v-model="form.auto_approve_limit"
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    class="w-48"
+                                    :disabled="!can.manage"
+                                />
+                                <p class="text-xs text-muted-foreground">{{ t('company.auto_approve_hint') }}</p>
+                                <InputError :message="form.errors.auto_approve_limit" />
                             </div>
                         </div>
 

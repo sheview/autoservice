@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * parts.* permissions. Parts have no branch or customer: one stock for the whole company, so
  * any scope but customer reaches every part. Stock changes need stock-movements.create
- * (StockMovementRequest); issue/loan forms parts.issue (PartCheckoutController).
+ * (StockMovementRequest); parts used on tickets parts.issue (TicketPartController).
  */
 class PartPolicy extends TenantPolicy
 {

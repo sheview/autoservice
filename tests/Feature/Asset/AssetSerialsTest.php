@@ -2,8 +2,8 @@
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
-use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Asset\Models\AssetImport;
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -150,13 +150,14 @@ it('registers an asset that is already issued or lent, with who has it and since
         ->assertSessionHasNoErrors();
 
     $asset = Asset::sole();
-    $checkout = AssetCheckout::sole();
+    $request = CheckoutRequest::sole();
     expect($asset->status)->toBe(Asset::STATUS_IN_USE)
-        ->and($checkout->only(['asset_id', 'type', 'status', 'borrower_name']))
-        ->toBe(['asset_id' => $asset->id, 'type' => 'loan', 'status' => 'approved', 'borrower_name' => 'สมชาย ใจดี'])
-        ->and($checkout->decided_at->toDateString())->toBe('2026-09-15');
+        ->and($request->only(['status', 'borrower_name']))->toBe(['status' => 'fulfilled', 'borrower_name' => 'สมชาย ใจดี'])
+        ->and($request->items()->sole()->only(['asset_id', 'checkout_type', 'status']))
+        ->toBe(['asset_id' => $asset->id, 'checkout_type' => 'loan', 'status' => 'fulfilled'])
+        ->and($request->approved_at->toDateString())->toBe('2026-09-15');
 
-    // only when creating: an asset already registered is handed out through a checkout form
+    // only when creating: an asset already registered is handed out through an issue/loan request
     $this->actingAs($this->admin)->put("/assets/{$asset->ulid}", [...$base, 'status' => 'issued', 'holder_name' => 'X', 'handed_out_on' => '2026-09-15'])
         ->assertSessionHasErrors('status');
     $this->actingAs($this->admin)->get("/assets/{$asset->ulid}/edit")->assertInertia(fn (Assert $page) => $page->where('handedOutStatuses', []));

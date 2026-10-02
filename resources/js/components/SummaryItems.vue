@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import CheckoutStatusBadge from '@/components/CheckoutStatusBadge.vue';
-import CheckoutSteps from '@/components/CheckoutSteps.vue';
 import Pagination from '@/components/Pagination.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
+import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import StepDots from '@/components/StepDots.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
@@ -46,7 +45,7 @@ const project = (contract: ContractLabel) => (contract ? `${contract.contract_no
                 <thead class="bg-muted/50 text-left">
                     <tr>
                         <th class="px-4 py-2 font-medium">{{ t('checkouts.checkout_no') }}</th>
-                        <th class="px-4 py-2 font-medium">{{ list.key === 'parts' ? t('part_checkouts.part') : t('summary.asset') }}</th>
+                        <th class="px-4 py-2 font-medium">{{ list.key === 'parts' ? t('summary.part') : t('summary.asset') }}</th>
                         <th class="px-4 py-2 font-medium">{{ by === 'person' ? t('summary.project') : t('summary.borrower') }}</th>
                         <th class="px-4 py-2 font-medium">{{ t('summary.date') }}</th>
                         <th class="px-4 py-2 font-medium">{{ t('checkouts.due_on') }}</th>
@@ -54,25 +53,34 @@ const project = (contract: ContractLabel) => (contract ? `${contract.contract_no
                     </tr>
                 </thead>
                 <tbody>
-                    <tr v-for="row in list.rows.data" :key="row.ulid" class="border-t align-top">
+                    <tr v-for="row in list.rows.data" :key="row.id" class="border-t align-top">
                         <td class="whitespace-nowrap px-4 py-2">
-                            <div class="font-mono text-xs">{{ row.checkout_no }}</div>
+                            <Link
+                                :href="route('asset.requests.show', row.request.ulid)"
+                                class="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                                {{ row.request.request_no }}
+                            </Link>
                             <div class="text-xs text-muted-foreground">
-                                {{ t(`${row.kind === 'part' ? 'part_checkouts' : 'checkouts'}.types.${row.type}`)
-                                }}<template v-if="row.quantity > 1"> · {{ row.quantity }} {{ row.asset?.unit ?? '' }}</template>
+                                {{ t(`checkouts.types.${row.checkout_type}`) }} · {{ row.qty_approved ?? row.qty_requested }} {{ row.unit ?? '' }}
                             </div>
                         </td>
                         <td class="px-4 py-2">
                             <Link
-                                v-if="row.asset"
-                                :href="
-                                    row.kind === 'part' ? route('inventory.parts.show', row.asset.ulid) : route('asset.assets.show', row.asset.ulid)
-                                "
+                                v-if="row.item_type === 'asset' && row.asset_ulid"
+                                :href="route('asset.assets.show', row.asset_ulid)"
                                 class="font-mono text-xs text-primary underline-offset-4 hover:underline"
                             >
-                                {{ row.asset.asset_code }}
+                                {{ row.item_code }}
                             </Link>
-                            <div>{{ row.asset?.name }}</div>
+                            <Link
+                                v-else-if="row.item_type === 'part' && row.part_id"
+                                :href="route('inventory.parts.show', row.part_id)"
+                                class="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                            >
+                                {{ row.item_code }}
+                            </Link>
+                            <div>{{ row.item_name }}</div>
                         </td>
                         <td class="px-4 py-2">
                             <template v-if="by === 'person'">
@@ -90,24 +98,23 @@ const project = (contract: ContractLabel) => (contract ? `${contract.contract_no
                                     :href="
                                         route(
                                             'reporting.people.show',
-                                            personParams({ user_id: row.borrower_user_id, outside_name: row.borrower_name }),
+                                            personParams({ user_id: row.request.borrower_user_id, outside_name: row.request.borrower_name }),
                                         )
                                     "
                                     class="text-primary underline-offset-4 hover:underline"
                                 >
-                                    {{ row.borrower_name }}
+                                    {{ row.request.borrower_name }}
                                 </Link>
-                                <div v-if="row.borrower_department" class="text-xs text-muted-foreground">{{ row.borrower_department }}</div>
+                                <div v-if="row.request.borrower_department" class="text-xs text-muted-foreground">
+                                    {{ row.request.borrower_department }}
+                                </div>
                             </template>
                         </td>
-                        <td class="whitespace-nowrap px-4 py-2">{{ dateTime(row.requested_at) }}</td>
+                        <td class="whitespace-nowrap px-4 py-2">{{ dateTime(row.request.requested_at) }}</td>
                         <td class="whitespace-nowrap px-4 py-2" :class="{ 'text-red-700 dark:text-red-400': row.overdue }">
-                            {{ row.due_on ?? '-' }}
+                            {{ row.due_return_date ?? '-' }}
                         </td>
-                        <td class="px-4 py-2">
-                            <CheckoutSteps :checkout="row" compact />
-                            <div class="mt-1"><CheckoutStatusBadge :status="row.status" :overdue="row.overdue" /></div>
-                        </td>
+                        <td class="px-4 py-2"><RequestStatusBadge :status="row.status" kind="line" :overdue="row.overdue" /></td>
                     </tr>
                     <tr v-if="list.rows.data.length === 0">
                         <td colspan="6" class="px-4 py-6 text-center text-muted-foreground">{{ t('summary.no_checkouts') }}</td>

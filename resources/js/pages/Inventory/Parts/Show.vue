@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import AssetCheckoutPanel from '@/components/AssetCheckoutPanel.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import ItemRequestsPanel from '@/components/ItemRequestsPanel.vue';
 import Pagination from '@/components/Pagination.vue';
 import PhotoSlots from '@/components/PhotoSlots.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
@@ -12,6 +12,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
+import type { ItemRequestsPanelData } from '@/types/checkout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 
 interface PartDetail {
@@ -47,7 +48,7 @@ const props = defineProps<{
     part: PartDetail;
     movements: Paginated<MovementRow> | null;
     // Issue/loan of this part (same panel as an asset's); null when the user does not handle them.
-    checkouts: InstanceType<typeof AssetCheckoutPanel>['$props']['checkouts'] | null;
+    checkouts: ItemRequestsPanelData | null;
     photos: { slot: number; action: string; url: string | null }[];
     movementTypes: string[];
     can: { update: boolean; delete: boolean; viewTickets: boolean };
@@ -110,13 +111,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
             <PhotoSlots :photos="photos" :editable="can.update" />
 
-            <AssetCheckoutPanel
-                v-if="checkouts"
-                :asset-ulid="String(part.id)"
-                :checkouts="checkouts"
-                :store-url="route('inventory.part-checkouts.store', part.id)"
-                :request-title="t('part_checkouts.request_title')"
-            />
+            <ItemRequestsPanel v-if="checkouts" :checkouts="checkouts" :query="{ part: part.id }" />
 
             <div class="grid gap-6 lg:grid-cols-3">
                 <dl class="space-y-3 rounded-md border p-4 text-sm">

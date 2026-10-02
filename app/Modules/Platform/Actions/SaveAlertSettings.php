@@ -31,6 +31,7 @@ class SaveAlertSettings
 
         $settings['alerts'] = [
             'events' => array_values(array_intersect(AlertSettings::events(), $data['events'] ?? [])),
+            'thresholds' => collect(AlertSettings::THRESHOLDS)->map(fn (int $default, string $key) => (int) ($data['thresholds'][$key] ?? $old['thresholds'][$key] ?? $default))->all(),
             'line' => [
                 'enabled' => (bool) ($data['line']['enabled'] ?? false),
                 'to' => trim((string) ($data['line']['to'] ?? '')),

@@ -37,8 +37,9 @@ class PermissionCatalog
         'pm-checklists' => ['view', 'manage'],
         'ip-check' => ['view', 'run'],
         'assets' => ['view', 'create', 'update', 'delete', 'export', 'import'],
-        // request = ask for oneself; create = make a form for anyone; return = take back.
-        'asset-checkouts' => ['view', 'request', 'create', 'approve', 'return'],
+        // Issue/loan requests (assets and parts, several lines): request = ask for oneself; create =
+        // a request for anyone; approve = decide; fulfill = hand out (and backorder); return = take back.
+        'asset-checkouts' => ['view', 'request', 'create', 'approve', 'fulfill', 'return'],
         'asset-categories' => ['view', 'manage'],
         'labels' => ['view', 'print'],
         'customers' => ['view', 'create', 'update', 'delete'],
@@ -91,7 +92,7 @@ class PermissionCatalog
                 'tickets.view', 'tickets.create', 'tickets.update', 'tickets.assign',
                 'pm-visits.view', 'pm-visits.update', 'pm-plans.view', 'pm-plans.update', 'pm-checklists.view',
                 'ip-check.view', 'ip-check.run',
-                'assets.view', 'asset-checkouts.view', 'asset-checkouts.create', 'asset-categories.view', 'labels.view',
+                'assets.view', 'asset-checkouts.view', 'asset-checkouts.create', 'asset-checkouts.fulfill', 'asset-checkouts.return', 'asset-categories.view', 'labels.view',
                 'customers.view', 'contracts.view',
                 'parts.view', 'stock-movements.view', 'purchase-requests.view', 'purchase-requests.create',
                 'reports.view', 'summary-people.view', 'summary-projects.view', 'surveys.view', 'holidays.view', 'manuals.view',
@@ -142,7 +143,7 @@ class PermissionCatalog
                 'pm-checklists.view' => 'all',
                 'ip-check.view' => 'all',
                 'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.export' => 'all',
-                'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.approve' => 'all', 'asset-checkouts.return' => 'all',
+                'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.fulfill' => 'all', 'asset-checkouts.return' => 'all',
                 'asset-categories.view' => 'all',
                 'labels.view' => 'all', 'labels.print' => 'all',
                 'customers.view' => 'all', 'customers.create' => 'all', 'customers.update' => 'all',

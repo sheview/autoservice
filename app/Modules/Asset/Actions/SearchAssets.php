@@ -3,7 +3,8 @@
 namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
-use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Models\CheckoutItem;
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -113,19 +114,24 @@ class SearchAssets
     /** Whether the user holds the asset now (asked for or handed over to them, not back yet). */
     public static function holds(User $user, int $assetId): bool
     {
-        return self::heldIds($user)->where('asset_id', $assetId)->exists();
+        return self::heldIds($user)->where('checkout_items.asset_id', $assetId)->exists();
     }
 
     /**
-     * Ids of the assets the user holds now.
+     * Ids of the assets the user holds now: lines of their requests (as the borrower) that are
+     * asked for, approved, or handed out and not back.
      *
-     * @return Builder<AssetCheckout>
+     * @return Builder<CheckoutItem>
      */
     private static function heldIds(User $user): Builder
     {
-        return AssetCheckout::query()
-            ->select('asset_id')
-            ->where('borrower_user_id', $user->id)
-            ->whereIn('status', AssetCheckout::OPEN_STATUSES);
+        return CheckoutItem::query()
+            ->select('checkout_items.asset_id')
+            ->join('checkout_requests', 'checkout_requests.id', '=', 'checkout_items.request_id')
+            ->whereNull('checkout_requests.deleted_at')
+            ->where('checkout_requests.borrower_user_id', $user->id)
+            ->whereIn('checkout_requests.status', [...CheckoutRequest::OPEN_STATUSES, CheckoutRequest::STATUS_FULFILLED])
+            ->where('checkout_items.item_type', CheckoutItem::TYPE_ASSET)
+            ->whereRaw(AssetHeldQuantities::HELD_SQL.' > 0');
     }
 }

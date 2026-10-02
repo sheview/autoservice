@@ -16,6 +16,7 @@ type Channel = 'line' | 'telegram' | 'mail';
 const props = defineProps<{
     settings: {
         events: string[];
+        thresholds: { approval_hours: number; backorder_days: number; needed_soon_days: number };
         line: { enabled: boolean; to: string; token_set: boolean };
         telegram: { enabled: boolean; chat_id: string; token_set: boolean };
         mail: { enabled: boolean; recipients: string[] };
@@ -30,6 +31,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: t('alerts.title'), href: route('
 // Tokens are never sent back: the boxes start empty and an empty box keeps the saved token.
 const form = useForm({
     events: [...props.settings.events],
+    thresholds: { ...props.settings.thresholds },
     line: { enabled: props.settings.line.enabled, to: props.settings.line.to, token: '', remove_token: false },
     telegram: { enabled: props.settings.telegram.enabled, chat_id: props.settings.telegram.chat_id, token: '', remove_token: false },
     mail: { enabled: props.settings.mail.enabled, recipients: props.settings.mail.recipients.length ? [...props.settings.mail.recipients] : [''] },
@@ -90,6 +92,22 @@ const removeRecipient = (index: number) => {
                                 {{ t(`alerts.event_labels.${event}`) }}
                             </label>
                         </fieldset>
+                    </div>
+                </section>
+
+                <!-- When the hourly check calls a request late -->
+                <section class="space-y-3 rounded-md border p-4">
+                    <h3 class="text-sm font-semibold">{{ t('alerts.thresholds') }}</h3>
+                    <div class="grid gap-4 sm:grid-cols-3">
+                        <div
+                            v-for="key in ['approval_hours', 'backorder_days', 'needed_soon_days'] as const"
+                            :key="key"
+                            class="grid content-start gap-2"
+                        >
+                            <Label :for="`threshold-${key}`">{{ t(`alerts.threshold_labels.${key}`) }}</Label>
+                            <Input :id="`threshold-${key}`" v-model.number="form.thresholds[key]" type="number" min="0" class="w-32" />
+                            <InputError :message="errors[`thresholds.${key}`]" />
+                        </div>
                     </div>
                 </section>
 

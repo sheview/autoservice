@@ -3,20 +3,17 @@
 namespace App\Modules\Reporting\Http\Controllers;
 
 use App\Http\Controllers\Controller;
-use App\Modules\Asset\Actions\SearchCheckouts;
-use App\Modules\Asset\Models\AssetCheckout;
-use App\Modules\Asset\Support\CheckoutRow;
+use App\Modules\Asset\Actions\ItemRequestLines;
+use App\Modules\Asset\Actions\SearchSummaryLines;
+use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Contract\Actions\ContractDetails;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Contract\Support\ContractPhase;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
-use App\Modules\Inventory\Actions\SearchPartCheckouts;
 use App\Modules\Inventory\Actions\SearchPurchaseRequests;
-use App\Modules\Inventory\Models\PartCheckout;
 use App\Modules\Inventory\Models\PurchaseRequest;
-use App\Modules\Inventory\Support\PartCheckoutRow;
 use App\Modules\Inventory\Support\PurchaseRequestRow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Reporting\Actions\CountSummaryRows;
@@ -39,9 +36,8 @@ class SummaryController extends Controller
         private Modules $modules,
         private CountSummaryRows $countRows,
         private ContractLabels $contractLabels,
-        private SearchCheckouts $searchCheckouts,
+        private SearchSummaryLines $searchLines,
         private SearchPurchaseRequests $searchPurchases,
-        private SearchPartCheckouts $searchPartCheckouts,
     ) {}
 
     public function people(Request $request, SummarizePeople $summarize): Response
@@ -79,7 +75,7 @@ class SummaryController extends Controller
             'checkouts' => $this->modules->enabled('asset')
                 ? $this->checkouts($viewer, [...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
                 : null,
-            'partCheckouts' => $this->modules->enabled('inventory')
+            'partCheckouts' => $this->modules->enabled('asset') && $this->modules->enabled('inventory')
                 ? $this->partCheckouts($viewer, [...$filters, 'borrower_user_id' => $userId, 'borrower_name' => $outsideName])
                 : null,
             // People from outside cannot ask to buy.
@@ -127,7 +123,7 @@ class SummaryController extends Controller
             'totals' => $this->countRows->handle($viewer, ['contract_id' => $contract], $purchases),
             'filters' => $filters,
             'checkouts' => $this->modules->enabled('asset') ? $this->checkouts($viewer, [...$filters, 'contract_id' => $contract]) : null,
-            'partCheckouts' => $this->modules->enabled('inventory') ? $this->partCheckouts($viewer, [...$filters, 'contract_id' => $contract]) : null,
+            'partCheckouts' => $this->modules->enabled('asset') && $this->modules->enabled('inventory') ? $this->partCheckouts($viewer, [...$filters, 'contract_id' => $contract]) : null,
             // Customer accounts never see what was bought, or for how much.
             'purchases' => $purchases && $this->modules->enabled('inventory') ? $this->purchases($viewer, [...$filters, 'contract_id' => $contract]) : null,
             'showsPurchases' => $purchases,
@@ -149,27 +145,34 @@ class SummaryController extends Controller
     }
 
     /**
+     * The asset lines of the issue/loan requests (ItemRequestLines::row + the project).
+     *
      * @param  array<string, mixed>  $filters
      */
     private function checkouts(User $viewer, array $filters): LengthAwarePaginator
     {
-        $page = $this->searchCheckouts->handle($viewer, [...$filters, 'type' => null, 'sort' => 'created_at'])
-            ->paginate(10, pageName: 'checkouts_page')->withQueryString();
-        $labels = $this->contractLabels->handle($page->getCollection()->pluck('contract_id')->all());
+        return $this->lines($viewer, $filters, CheckoutItem::TYPE_ASSET, 'checkouts_page');
+    }
 
-        return $page->through(fn (AssetCheckout $checkout) => [...CheckoutRow::of($checkout), 'contract' => $labels[$checkout->contract_id] ?? null]);
+    /**
+     * The part lines of the issue/loan requests (same rows as the assets').
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function partCheckouts(User $viewer, array $filters): LengthAwarePaginator
+    {
+        return $this->lines($viewer, $filters, CheckoutItem::TYPE_PART, 'parts_page');
     }
 
     /**
      * @param  array<string, mixed>  $filters
      */
-    private function partCheckouts(User $viewer, array $filters): LengthAwarePaginator
+    private function lines(User $viewer, array $filters, string $itemType, string $pageName): LengthAwarePaginator
     {
-        $page = $this->searchPartCheckouts->handle([...$filters, 'type' => null, 'sort' => 'created_at'], $viewer)
-            ->paginate(10, pageName: 'parts_page')->withQueryString();
-        $labels = $this->contractLabels->handle($page->getCollection()->pluck('contract_id')->all());
+        $page = $this->searchLines->handle($viewer, $filters, $itemType)->paginate(10, pageName: $pageName)->withQueryString();
+        $labels = $this->contractLabels->handle($page->getCollection()->map(fn (CheckoutItem $item) => $item->request->contract_id)->all());
 
-        return $page->through(fn (PartCheckout $checkout) => [...PartCheckoutRow::of($checkout), 'contract' => $labels[$checkout->contract_id] ?? null]);
+        return $page->through(fn (CheckoutItem $item) => [...ItemRequestLines::row($item), 'contract' => $labels[$item->request->contract_id] ?? null]);
     }
 
     /**

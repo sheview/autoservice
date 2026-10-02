@@ -4,8 +4,8 @@ namespace App\Modules\Asset\Http\Requests;
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
-use App\Modules\Asset\Models\AssetCheckout;
 use App\Modules\Asset\Models\AssetSerial;
+use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Support\SpecFields;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Support\DataScope;
@@ -29,9 +29,9 @@ class AssetRequest extends FormRequest
 
     /**
      * Statuses offered when creating only: the asset is already out with someone. It is saved in use,
-     * with an approved issue/loan form for that person (RecordCheckout).
+     * with a request already handed out to that person (RecordHandedOut).
      */
-    public const HANDED_OUT = ['issued' => AssetCheckout::TYPE_ISSUE, 'loaned' => AssetCheckout::TYPE_LOAN];
+    public const HANDED_OUT = ['issued' => CheckoutItem::ISSUE, 'loaned' => CheckoutItem::LOAN];
 
     private ?AssetCategory $category = null;
 

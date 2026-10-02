@@ -1,7 +1,7 @@
 <?php
 
 use App\Modules\Asset\Models\Asset;
-use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Platform\Support\Modules;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -21,25 +21,36 @@ beforeEach(function () {
     $this->switch = createAsset($category, ['name' => 'Switch 24 port', 'status' => Asset::STATUS_SPARE]);
     $this->cables = createAsset($category, ['name' => 'สาย LAN', 'quantity' => 24, 'unit' => 'เส้น', 'status' => Asset::STATUS_SPARE]);
 
-    // The office makes the forms (asset-checkouts.create: for anyone, or someone from outside).
-    $this->checkout = fn (Asset $asset, array $data) => $this->actingAs($this->admin)->post("/assets/{$asset->ulid}/checkouts", $data + [
-        'type' => 'issue', 'quantity' => 1,
-    ])->assertSessionHasNoErrors();
+    // The office sends the requests (asset-checkouts.create: for anyone, or someone from outside), one line each.
+    $this->checkout = function (Asset $asset, array $data): CheckoutRequest {
+        $this->actingAs($this->admin)->post('/checkout-requests', [
+            'borrower_user_id' => $data['borrower_user_id'] ?? null,
+            'borrower_name' => $data['borrower_name'] ?? null,
+            'contract_id' => $data['contract_id'] ?? null,
+            'submit' => true,
+            'items' => [[
+                'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => $data['quantity'] ?? 1,
+                'checkout_type' => $data['type'] ?? 'issue', 'due_return_date' => $data['due_on'] ?? null,
+            ]],
+        ])->assertSessionHasNoErrors();
+
+        return CheckoutRequest::latest('id')->first();
+    };
     $this->buy = fn ($user, array $data = []) => $this->actingAs($user)->post('/purchase-requests', $data + [
         'item_name' => 'SFP module', 'quantity' => 2, 'unit' => 'ชิ้น', 'unit_price' => '1500.00',
         'links' => ['https://shop.example.com/sfp'], 'reason' => 'Uplink', 'needed_by' => '2026-11-01',
     ])->assertSessionHasNoErrors();
 });
 
-it('keeps the project on issue/loan forms and purchase requests', function () {
-    $this->actingAs($this->tech)->get("/assets/{$this->switch->ulid}")->assertInertia(fn (Assert $page) => $page
-        ->where('checkouts.contracts', fn ($contracts) => collect($contracts)->pluck('label')->contains('MA-2026-01 · Network MA · Acme Hospital')));
+it('keeps the project on issue/loan requests and purchase requests', function () {
+    $this->actingAs($this->tech)->get('/checkout-requests/create')->assertInertia(fn (Assert $page) => $page
+        ->where('contracts', fn ($contracts) => collect($contracts)->pluck('label')->contains('MA-2026-01 · Network MA · Acme Hospital')));
     $this->actingAs($this->staff)->get('/purchase-requests/create')->assertInertia(fn (Assert $page) => $page->has('contracts', 2));
 
     ($this->checkout)($this->switch, ['borrower_user_id' => $this->tech->id, 'contract_id' => $this->contract->id]);
     ($this->buy)($this->staff, ['contract_id' => $this->contract->id]);
 
-    expect(AssetCheckout::sole()->contract_id)->toBe($this->contract->id)
+    expect(CheckoutRequest::sole()->contract_id)->toBe($this->contract->id)
         ->and(PurchaseRequest::sole()->contract_id)->toBe($this->contract->id);
 
     $pr = PurchaseRequest::sole();
@@ -62,14 +73,16 @@ it('sums up what each person borrowed, was issued and asked to buy', function ()
     ($this->buy)($this->tech, ['contract_id' => $this->contract->id]);
     ($this->buy)($this->staff);
 
-    // a cancelled form never went out: not counted
-    ($this->checkout)($this->cables, ['quantity' => 1, 'borrower_user_id' => $this->staff->id]);
-    AssetCheckout::latest('id')->first()->update(['status' => AssetCheckout::STATUS_CANCELLED]);
+    // a cancelled request never went out: not counted
+    $cancelled = ($this->checkout)($this->cables, ['quantity' => 1, 'borrower_user_id' => $this->staff->id]);
+    $this->actingAs($this->admin)->post("/checkout-requests/{$cancelled->ulid}/cancel")->assertSessionHasNoErrors();
 
     // the loan comes back: still counted, no longer open
-    $loan = AssetCheckout::where('type', 'loan')->sole();
-    $this->actingAs($this->admin)->post("/asset-checkouts/{$loan->ulid}/approve")->assertSessionHasNoErrors();
-    $this->actingAs($this->admin)->post("/asset-checkouts/{$loan->ulid}/return")->assertSessionHasNoErrors();
+    $loan = CheckoutRequest::whereHas('items', fn ($q) => $q->where('checkout_type', 'loan'))->sole();
+    $line = $loan->items()->sole();
+    $this->actingAs($this->admin)->post("/checkout-requests/{$loan->ulid}/approve")->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/checkout-items/{$line->id}/fulfill", ['qty' => 1])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasNoErrors();
 
     $this->actingAs($this->admin)->get('/summary/people?sort=name&direction=asc')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Reporting/People/Index')
@@ -120,7 +133,7 @@ it('shows one person with their forms and purchases', function () {
     $this->actingAs($this->admin)->get('/summary/people/view?name='.urlencode('Contractor Lek'))->assertInertia(fn (Assert $page) => $page
         ->where('person.outside_name', 'Contractor Lek')
         ->where('totals.issues', 1)
-        ->where('checkouts.data.0.quantity', 3)
+        ->where('checkouts.data.0.qty_requested', 3)
         ->where('purchases', null));
 
     $this->actingAs($this->admin)->get('/summary/people/view')->assertNotFound();
@@ -157,7 +170,7 @@ it('sums up what went out and was bought for each project', function () {
         ->has('checkouts.data', 2)
         ->has('purchases.data', 1));
     $this->actingAs($this->admin)->get("/summary/projects/{$this->contract->id}?search=lek")->assertInertia(fn (Assert $page) => $page
-        ->has('checkouts.data', 1)->where('checkouts.data.0.borrower_name', 'Contractor Lek'));
+        ->has('checkouts.data', 1)->where('checkouts.data.0.request.borrower_name', 'Contractor Lek'));
 
     $this->actingAs($this->admin)->get('/summary/projects/999999')->assertNotFound();
 });
@@ -171,10 +184,10 @@ it('is for office staff, follows the modules and never shows another tenant', fu
         $contract = createContract(createCustomer(), ['contract_no' => 'MA-OTHER']);
         $asset = createAsset(createAssetCategory(), ['status' => Asset::STATUS_SPARE]);
         $user = userWithRole('technician', ['name' => 'Other Tech']);
-        AssetCheckout::create([
-            'asset_id' => $asset->id, 'contract_id' => $contract->id, 'checkout_no' => 'CO-X', 'type' => 'issue',
-            'borrower_user_id' => $user->id, 'borrower_name' => 'Other Tech', 'requested_by' => $user->id,
-        ]);
+        CheckoutRequest::create([
+            'contract_id' => $contract->id, 'request_no' => 'CR-X', 'status' => CheckoutRequest::STATUS_PENDING,
+            'borrower_user_id' => $user->id, 'borrower_name' => 'Other Tech', 'requester_id' => $user->id,
+        ])->items()->create(['item_type' => 'asset', 'asset_id' => $asset->id, 'item_name' => $asset->name, 'qty_requested' => 1]);
 
         return compact('contract', 'user');
     });
@@ -213,12 +226,12 @@ it('shows a technician only their own person summary (scope own)', function () {
     $this->actingAs($this->tech)->get("/summary/people/view?user={$this->staff->id}")->assertForbidden();
     $this->actingAs($this->tech)->get('/summary/people/view?name='.urlencode('Contractor Lek'))->assertForbidden();
 
-    // with scope all, everyone in the forms they may see (not the office's purchase: purchase-requests.view is own)
-    setRoleScope('technician', 'all', ['summary-people.view']);
+    // with scope all, everyone in the requests they may see (not the office's purchase: purchase-requests.view is own)
+    setRoleScope('technician', 'all', ['summary-people.view', 'asset-checkouts.view']);
     $this->actingAs($this->tech)->get('/summary/people')->assertInertia(fn (Assert $page) => $page->where('people.total', 2));
 });
 
-it('shows a customer account only the projects of its customer, never purchases or amounts', function () {
+it('shows a customer account only the projects of its customer, never requests, purchases or amounts', function () {
     ($this->checkout)($this->switch, ['borrower_user_id' => $this->tech->id, 'contract_id' => $this->contract->id]);
     ($this->checkout)($this->cables, ['quantity' => 1, 'borrower_name' => 'Contractor Lek', 'contract_id' => $this->other->id]);
     ($this->buy)($this->staff, ['contract_id' => $this->contract->id]);
@@ -237,7 +250,9 @@ it('shows a customer account only the projects of its customer, never purchases 
 
     $this->actingAs($client)->get("/summary/projects/{$this->contract->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
         ->where('purchases', null)
-        ->where('totals.total', 1)
+        // issue/loan requests are the company's own business
+        ->where('checkouts.data', [])
+        ->where('totals.total', 0)
         ->where('totals', fn ($totals) => ! collect($totals)->has('purchase_amount') && ! collect($totals)->has('purchases')));
     $this->actingAs($client)->get("/summary/projects/{$this->other->id}")->assertForbidden();
 

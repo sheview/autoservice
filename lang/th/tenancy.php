@@ -9,6 +9,7 @@ return [
             'service_phone' => 'เบอร์แจ้งบริการ',
             'service_email' => 'อีเมลแจ้งบริการ',
             'logo' => 'โลโก้',
+            'auto_approve_limit' => 'วงเงินอนุมัติอัตโนมัติ',
         ],
     ],
 ];

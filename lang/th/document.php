@@ -18,6 +18,27 @@ return [
 
     'unavailable' => 'ระบบสร้างไฟล์ PDF ยังไม่พร้อมใช้งาน กรุณาลองใหม่ภายหลัง หรือใช้ปุ่ม "พิมพ์" แทน',
 
+    // An issue/loan request with lines (documents.checkout-request).
+    'request' => [
+        'title' => 'ใบเบิก / ยืม',
+        'receiver' => 'ผู้รับ',
+        'needed_by' => 'วันที่ต้องใช้',
+        'items' => 'รายการ',
+        'code' => 'รหัส',
+        'kind' => 'ประเภท',
+        'approved' => 'อนุมัติ',
+        'handed' => 'จ่ายแล้ว',
+        'kinds' => [
+            'asset_issue' => 'เบิกทรัพย์สิน',
+            'asset_loan' => 'ยืมทรัพย์สิน',
+            'part_issue' => 'เบิกอะไหล่',
+            'part_loan' => 'เบิกอะไหล่',
+        ],
+        'terms_issue' => 'ข้าพเจ้าได้รับของตามรายการข้างต้นไปใช้งานตามวัตถุประสงค์ที่ระบุ และจะดูแลรักษาเป็นอย่างดี',
+        'terms_loan' => 'ข้าพเจ้าได้รับของตามรายการข้างต้น จะดูแลรักษาเป็นอย่างดี และจะส่งคืนรายการที่ยืมภายในวันกำหนดคืน หากชำรุดหรือสูญหายจะรับผิดชอบตามระเบียบของบริษัท',
+        'sign_receiver' => 'ผู้รับของ',
+    ],
+
     // A part issue/loan form: the same page as an asset's, with these in place of the asset's words.
     'part_checkout' => [
         'title_issue' => 'ใบเบิกอะไหล่',

@@ -2,10 +2,11 @@
 
 use App\Modules\Asset\Http\Controllers\AssetAttachmentController;
 use App\Modules\Asset\Http\Controllers\AssetCategoryController;
-use App\Modules\Asset\Http\Controllers\AssetCheckoutController;
 use App\Modules\Asset\Http\Controllers\AssetController;
 use App\Modules\Asset\Http\Controllers\AssetImportController;
 use App\Modules\Asset\Http\Controllers\AssetPhotoController;
+use App\Modules\Asset\Http\Controllers\CheckoutItemController;
+use App\Modules\Asset\Http\Controllers\CheckoutRequestController;
 use App\Modules\Asset\Http\Controllers\IpCheckController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,16 +26,24 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::get('assets/{asset}/photos/{slot}', [AssetPhotoController::class, 'show'])->where('slot', '[0-3]')->name('assets.photos.show');
     Route::delete('assets/{asset}/photos/{slot}', [AssetPhotoController::class, 'destroy'])->where('slot', '[0-3]')->name('assets.photos.destroy');
 
-    // Issue / loan
-    Route::get('asset-checkouts', [AssetCheckoutController::class, 'index'])->name('checkouts.index');
-    Route::get('asset-checkouts/create', [AssetCheckoutController::class, 'create'])->name('checkouts.create');
-    Route::post('assets/{asset}/checkouts', [AssetCheckoutController::class, 'store'])->name('checkouts.store');
-    Route::post('asset-checkouts/{checkout}/approve', [AssetCheckoutController::class, 'approve'])->name('checkouts.approve');
-    Route::post('asset-checkouts/{checkout}/reject', [AssetCheckoutController::class, 'reject'])->name('checkouts.reject');
-    Route::post('asset-checkouts/{checkout}/return', [AssetCheckoutController::class, 'giveBack'])->name('checkouts.return');
-    Route::post('asset-checkouts/{checkout}/cancel', [AssetCheckoutController::class, 'cancel'])->name('checkouts.cancel');
-    Route::get('asset-checkouts/{checkout}/print', [AssetCheckoutController::class, 'print'])->name('checkouts.print');
-    Route::get('asset-checkouts/{checkout}/pdf', [AssetCheckoutController::class, 'pdf'])->name('checkouts.pdf');
+    // Issue / loan requests with lines (assets and parts)
+    Route::get('checkout-requests/items', [CheckoutRequestController::class, 'items'])->name('requests.items');
+    Route::get('checkout-requests/tickets', [CheckoutRequestController::class, 'tickets'])->name('requests.tickets');
+    Route::get('checkout-requests', [CheckoutRequestController::class, 'index'])->name('requests.index');
+    Route::get('checkout-requests/create', [CheckoutRequestController::class, 'create'])->name('requests.create');
+    Route::post('checkout-requests', [CheckoutRequestController::class, 'store'])->name('requests.store');
+    Route::get('checkout-requests/{checkout}', [CheckoutRequestController::class, 'show'])->name('requests.show');
+    Route::get('checkout-requests/{checkout}/edit', [CheckoutRequestController::class, 'edit'])->name('requests.edit');
+    Route::put('checkout-requests/{checkout}', [CheckoutRequestController::class, 'update'])->name('requests.update');
+    foreach (['submit', 'approve', 'reject', 'cancel', 'close'] as $action) {
+        Route::post("checkout-requests/{checkout}/{$action}", [CheckoutRequestController::class, $action])->name("requests.{$action}");
+    }
+    Route::get('checkout-requests/{checkout}/print', [CheckoutRequestController::class, 'print'])->name('requests.print');
+    Route::get('checkout-requests/{checkout}/pdf', [CheckoutRequestController::class, 'pdf'])->name('requests.pdf');
+    Route::post('checkout-items/{item}/fulfill', [CheckoutItemController::class, 'fulfill'])->whereNumber('item')->name('items.fulfill');
+    Route::post('checkout-items/{item}/backorder', [CheckoutItemController::class, 'backorder'])->whereNumber('item')->name('items.backorder');
+    Route::post('checkout-items/{item}/cancel', [CheckoutItemController::class, 'cancel'])->whereNumber('item')->name('items.cancel');
+    Route::post('checkout-items/{item}/return', [CheckoutItemController::class, 'giveBack'])->whereNumber('item')->name('items.return');
 
     Route::post('assets/{asset}/attachments', [AssetAttachmentController::class, 'store'])->name('assets.attachments.store');
     Route::get('assets/{asset}/attachments/{attachment}', [AssetAttachmentController::class, 'show'])

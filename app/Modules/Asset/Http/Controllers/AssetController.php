@@ -3,27 +3,24 @@
 namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Actions\AssetSuggestions;
-use App\Modules\Asset\Actions\CheckedOutQuantities;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
-use App\Modules\Asset\Actions\RequestCheckout;
+use App\Modules\Asset\Actions\ItemRequestLines;
 use App\Modules\Asset\Actions\SameModelAssets;
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Actions\SearchAssets;
-use App\Modules\Asset\Actions\SearchCheckouts;
 use App\Modules\Asset\Exports\AssetsExport;
 use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
-use App\Modules\Asset\Models\AssetCheckout;
-use App\Modules\Contract\Actions\ContractOptions;
+use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\AddAttachments;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Document\Support\PhotoSlots;
-use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -49,7 +46,7 @@ class AssetController extends Controller
         private AssetSuggestions $suggestions,
     ) {}
 
-    public function index(Request $request, SearchAssets $search, CheckedOutQuantities $checkedOut): Response
+    public function index(Request $request, SearchAssets $search, AssetHeldQuantities $heldQuantities): Response
     {
         Gate::authorize('viewAny', Asset::class);
 
@@ -61,8 +58,8 @@ class AssetController extends Controller
             ->with(['category:id,name', 'branch:id,name'])
             ->paginate(20)
             ->withQueryString();
-        // Held by issue/loan forms that are asked for or out; the rest of each asset is available.
-        $held = $checkedOut->handle($assets->getCollection()->modelKeys());
+        // Held by request lines asked for, approved or out; the rest of each asset is available.
+        $held = $heldQuantities->handle($assets->getCollection()->modelKeys());
 
         $assets = $assets
             ->through(fn (Asset $asset) => [
@@ -158,7 +155,8 @@ class AssetController extends Controller
         TicketsForAsset $ticketsForAsset,
         PmHistoryForAsset $pmHistoryForAsset,
         SameModelAssets $sameModelAssets,
-        UsersWithPermission $usersWithPermission,
+        ItemRequestLines $requestLines,
+        AssetHeldQuantities $heldQuantities,
     ): Response {
         Gate::authorize('view', $asset);
 
@@ -166,6 +164,7 @@ class AssetController extends Controller
         $user = $request->user();
         $showContracts = $this->modules->enabled('contract') && $user->can('contracts.view');
         $serviceOn = $this->modules->enabled('service');
+        $available = max(0, (int) $asset->quantity - ($heldQuantities->handle([$asset->id])[$asset->id] ?? 0));
 
         return Inertia::render('Asset/Assets/Show', [
             'asset' => [
@@ -174,7 +173,7 @@ class AssetController extends Controller
                     'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes',
                 ]),
                 'serials' => $asset->serials->pluck('serial_number'),
-                'available' => RequestCheckout::availableQuantity($asset),
+                'available' => $available,
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
                 'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $asset->customer_id)['name'] ?? null,
@@ -187,7 +186,7 @@ class AssetController extends Controller
             ],
             // Every device of the same category, brand and model (this one included).
             'sameModel' => $sameModelAssets->handle($user, $asset),
-            'checkouts' => $this->checkouts($request, $asset, $usersWithPermission),
+            'checkouts' => $this->checkouts($user, $asset, $requestLines, $available),
             'photos' => PhotoSlots::list($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
             'attachments' => Attachments::list($asset, $asset->attachmentCollection(), fn (int $id) => route('asset.assets.attachments.show', [$asset, $id])),
             // null = the user cannot see contracts here (module off or no contracts.view)
@@ -294,42 +293,29 @@ class AssetController extends Controller
     }
 
     /**
-     * Issue/loan on the asset page: the form in progress, the last ones, and whether a new one can
-     * be asked for (with the staff to choose from). Null when the user has nothing to do with them.
+     * Issue/loan requests on the asset page (ItemRequestsPanel): the lines of this asset, how much
+     * of it may still be asked for, and whether the user may start a request with it. Null when
+     * the user has nothing to do with requests.
      *
      * @return array<string, mixed>|null
      */
-    private function checkouts(Request $request, Asset $asset, UsersWithPermission $usersWithPermission): ?array
+    private function checkouts(User $user, Asset $asset, ItemRequestLines $requestLines, int $available): ?array
     {
-        $user = $request->user();
-        $can = AssetCheckoutController::abilities($request);
-        if (! $can['view'] && ! $can['request'] && ! $can['approve'] && ! $can['return']) {
+        $panel = $requestLines->handle($user, CheckoutItem::TYPE_ASSET, $asset->id);
+        if ($panel === null) {
             return null;
         }
 
-        // Every form still holding some of the asset (several at once for an asset bought by the
-        // lot), then the last closed ones: those the user reaches (SearchCheckouts).
-        $forms = fn () => SearchCheckouts::visibleTo(AssetCheckout::query(), $user)->where('asset_id', $asset->id)->with('asset:id,branch_id');
-        $open = $forms()->whereIn('status', AssetCheckout::OPEN_STATUSES)->oldest('id')->get();
-        $recent = $forms()->whereNotIn('status', AssetCheckout::OPEN_STATUSES)->latest('id')->limit(10)->get();
-        $available = RequestCheckout::available($asset);
-        $row = fn (AssetCheckout $checkout) => AssetCheckoutController::row($checkout, $user);
+        $handOut = in_array($asset->status, [Asset::STATUS_IN_USE, Asset::STATUS_SPARE], true) && $available > 0;
+        $askable = SearchAssets::askableBy(Asset::query()->whereKey($asset->id), $user)->exists();
 
         return [
-            // The first open form (kept for pages that show one), and all of them.
-            'current' => $open->isNotEmpty() ? $row($open->first()) : null,
-            'open' => $open->map($row)->values(),
-            'history' => $recent->map($row)->values(),
-            'available' => $available,
-            'available_quantity' => RequestCheckout::availableQuantity($asset),
-            'quantity' => $asset->quantity,
+            'lines' => $panel['lines'],
+            'available' => $handOut,
+            'available_quantity' => $available,
+            'quantity' => (int) $asset->quantity,
             'unit' => $asset->unit,
-            // Asking only for oneself (forSelf): nobody to choose.
-            'borrowers' => $available && $can['request'] && ! $can['forSelf']
-                ? $usersWithPermission->handle('assets.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
-                : [],
-            'contracts' => $available && $can['request'] && $this->modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
-            'can' => [...$can, 'userId' => $user->id],
+            'can' => ['create' => $panel['can']['create'] && $askable],
         ];
     }
 

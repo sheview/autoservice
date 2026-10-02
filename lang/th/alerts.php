@@ -27,20 +27,55 @@ return [
     ],
     'events' => [
         'checkout_requested' => [
-            'title' => 'มีคำขอ:typeใหม่ :no',
-            'body' => "รายการ: :asset\nจำนวน: :quantity\nผู้:type: :borrower\nขอโดย: :actor",
+            'title' => 'ใบเบิก/ยืมใหม่รออนุมัติ :no',
+            'body' => 'ผู้รับ: :borrower
+รายการ: :items
+ต้องใช้วันที่: :needed_by
+ขอโดย: :actor',
         ],
         'checkout_approved' => [
-            'title' => 'อนุมัติ:type :no',
-            'body' => "รายการ: :asset\nผู้:type: :borrower\nอนุมัติโดย: :actor",
+            'title' => 'อนุมัติใบเบิก/ยืม :no',
+            'body' => 'ผู้รับ: :borrower
+รายการ: :items
+อนุมัติโดย: :actor',
         ],
         'checkout_rejected' => [
-            'title' => 'ไม่อนุมัติ:type :no',
-            'body' => "รายการ: :asset\nผู้:type: :borrower\nโดย: :actor\nเหตุผล: :note",
+            'title' => 'ไม่อนุมัติใบเบิก/ยืม :no',
+            'body' => 'ผู้รับ: :borrower
+รายการ: :items
+โดย: :actor
+เหตุผล: :note',
         ],
         'checkout_returned' => [
-            'title' => 'คืนทรัพย์สินแล้ว :no',
-            'body' => "รายการ: :asset\nผู้คืน: :borrower\nรับคืนโดย: :actor",
+            'title' => 'รับคืนแล้ว :no',
+            'body' => 'รายการ: :items
+ผู้คืน: :borrower
+รับคืนโดย: :actor
+สภาพ: :note',
+        ],
+        'checkout_restocked' => [
+            'title' => 'ของที่ค้างจ่ายเข้าสต็อกแล้ว :no',
+            'body' => 'รายการ: :items
+ผู้รับ: :borrower
+พร้อมจ่ายแล้ว',
+        ],
+        'checkout_approval_overdue' => [
+            'title' => 'ใบเบิก/ยืมรออนุมัตินานเกินกำหนด :no',
+            'body' => 'ผู้รับ: :borrower
+รายการ: :items
+ต้องใช้วันที่: :needed_by',
+        ],
+        'checkout_backorder_overdue' => [
+            'title' => 'มีรายการค้างจ่าย :no',
+            'body' => 'รายการ: :items
+ผู้รับ: :borrower
+ต้องใช้วันที่: :needed_by',
+        ],
+        'checkout_return_overdue' => [
+            'title' => 'ของยืมเลยกำหนดคืน :no',
+            'body' => 'รายการ: :items
+ผู้ยืม: :borrower
+กำหนดคืน: :note',
         ],
         'ticket_opened' => [
             'title' => 'แจ้งซ่อมใหม่ :no',

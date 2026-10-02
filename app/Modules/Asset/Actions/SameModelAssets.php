@@ -3,7 +3,7 @@
 namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
-use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Identity\Models\User;
 
 /**
@@ -38,11 +38,15 @@ class SameModelAssets
             ->limit(self::LIMIT)
             ->get();
 
-        // Who has each device now (issued or lent).
-        $holders = AssetCheckout::query()
-            ->whereIn('asset_id', $units->modelKeys())
-            ->where('status', AssetCheckout::STATUS_APPROVED)
-            ->pluck('borrower_name', 'asset_id');
+        // Who has each device now: handed out on a request line and not back yet (the latest).
+        $holders = CheckoutItem::query()
+            ->join('checkout_requests', 'checkout_requests.id', '=', 'checkout_items.request_id')
+            ->whereNull('checkout_requests.deleted_at')
+            ->where('checkout_items.item_type', CheckoutItem::TYPE_ASSET)
+            ->whereIn('checkout_items.asset_id', $units->modelKeys())
+            ->whereColumn('checkout_items.qty_fulfilled', '>', 'checkout_items.qty_returned')
+            ->orderBy('checkout_items.id')
+            ->pluck('checkout_requests.borrower_name', 'checkout_items.asset_id');
 
         return $units->map(fn (Asset $unit) => [
             ...$unit->only(['ulid', 'asset_code', 'serial_number', 'property_no', 'status', 'location']),

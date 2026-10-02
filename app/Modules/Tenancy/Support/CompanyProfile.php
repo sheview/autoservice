@@ -2,6 +2,7 @@
 
 namespace App\Modules\Tenancy\Support;
 
+use App\Modules\Platform\Support\Money;
 use App\Modules\Tenancy\Models\Tenant;
 
 /**
@@ -27,7 +28,7 @@ class CompanyProfile
     public const FIELDS = ['service_phone', 'service_email'];
 
     /**
-     * @return array{name: string, service_phone: string|null, service_email: string|null, logo_url: string|null}
+     * @return array{name: string, service_phone: string|null, service_email: string|null, logo_url: string|null, auto_approve_limit: string|null}
      */
     public static function of(Tenant $tenant): array
     {
@@ -39,6 +40,8 @@ class CompanyProfile
             'service_email' => $tenant->settings['service_email'] ?? null,
             // The media id changes with a new logo, so the browser does not show the old one.
             'logo_url' => $logo ? route('tenancy.company.logo', ['v' => $logo->id]) : null,
+            // Issue/loan requests of cheap parts skip approval (baht; null = off).
+            'auto_approve_limit' => Money::toBaht($tenant->settings['checkout']['auto_approve_limit'] ?? null),
         ];
     }
 }

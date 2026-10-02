@@ -39,8 +39,8 @@ class StockMovement extends Model
 
     /**
      * The permission entering a movement of this type on the part page needs: writing the
-     * ledger directly is stock-movements.create for every type. Taking parts out for a ticket or
-     * on an issue/loan form is parts.issue instead (Service module, PartCheckoutController).
+     * ledger directly is stock-movements.create for every type. Taking parts out for a ticket is
+     * parts.issue instead (Service module); on an issue/loan request, asset-checkouts.fulfill.
      */
     public static function permissionFor(string $type): string
     {

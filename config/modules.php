@@ -42,7 +42,7 @@ return [
         ['group' => 'service', 'title' => 'nav.ip_check', 'route' => 'asset.ip-check', 'icon' => 'network', 'permission' => 'ip-check.view', 'module' => 'asset', 'staff' => true],
 
         ['group' => 'assets', 'title' => 'nav.assets', 'route' => 'asset.assets.index', 'icon' => 'hard-drive', 'permission' => 'assets.view', 'module' => 'asset'],
-        ['group' => 'assets', 'title' => 'nav.checkouts', 'route' => 'asset.checkouts.index', 'icon' => 'hand-helping', 'permission' => 'asset-checkouts.view', 'module' => 'asset', 'staff' => true],
+        ['group' => 'assets', 'title' => 'nav.checkouts', 'route' => 'asset.requests.index', 'icon' => 'hand-helping', 'permission' => 'asset-checkouts.view', 'module' => 'asset', 'staff' => true],
         ['group' => 'assets', 'title' => 'nav.asset_categories', 'route' => 'asset.categories.index', 'icon' => 'tags', 'permission' => 'asset-categories.view', 'module' => 'asset'],
         ['group' => 'assets', 'title' => 'nav.labels', 'route' => 'labeling.labels.index', 'icon' => 'qr-code', 'permission' => 'labels.view', 'module' => 'labeling', 'staff' => true],
 
@@ -50,7 +50,6 @@ return [
         ['group' => 'customers', 'title' => 'nav.contracts', 'route' => 'contract.contracts.index', 'icon' => 'file-text', 'permission' => 'contracts.view', 'module' => 'contract'],
 
         ['group' => 'stock', 'title' => 'nav.parts', 'route' => 'inventory.parts.index', 'icon' => 'package', 'permission' => 'parts.view', 'module' => 'inventory', 'staff' => true],
-        ['group' => 'stock', 'title' => 'nav.part_checkouts', 'route' => 'inventory.part-checkouts.index', 'icon' => 'hand-helping', 'permission' => 'parts.issue', 'module' => 'inventory', 'staff' => true],
         ['group' => 'stock', 'title' => 'nav.purchase_requests', 'route' => 'inventory.purchase-requests.index', 'icon' => 'shopping-cart', 'permission' => 'purchase-requests.view', 'module' => 'inventory', 'staff' => true],
         ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock-movements.view', 'module' => 'inventory', 'staff' => true],
 

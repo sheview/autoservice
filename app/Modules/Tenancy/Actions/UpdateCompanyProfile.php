@@ -2,6 +2,7 @@
 
 namespace App\Modules\Tenancy\Actions;
 
+use App\Modules\Platform\Support\Money;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\CompanyProfile;
 use Illuminate\Http\UploadedFile;
@@ -12,13 +13,17 @@ use Illuminate\Http\UploadedFile;
 class UpdateCompanyProfile
 {
     /**
-     * @param  array{service_phone?: string|null, service_email?: string|null}  $data
+     * @param  array{service_phone?: string|null, service_email?: string|null, auto_approve_limit?: string|float|null}  $data  auto_approve_limit in baht
      */
     public function handle(Tenant $tenant, array $data, ?UploadedFile $logo = null, bool $removeLogo = false): Tenant
     {
         $settings = $tenant->settings;
         foreach (CompanyProfile::FIELDS as $field) {
             $settings[$field] = filled($data[$field] ?? null) ? trim($data[$field]) : null;
+        }
+        if (array_key_exists('auto_approve_limit', $data)) {
+            $limit = Money::toSatang($data['auto_approve_limit']);
+            $settings['checkout'] = [...($settings['checkout'] ?? []), 'auto_approve_limit' => $limit > 0 ? $limit : null];
         }
         $tenant->settings = $settings;
         $tenant->save();

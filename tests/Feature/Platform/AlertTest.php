@@ -2,7 +2,7 @@
 
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
-use App\Modules\Asset\Models\AssetCheckout;
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Platform\Actions\SaveAlertSettings;
 use App\Modules\Platform\Jobs\DeliverAlert;
 use App\Modules\Platform\Models\Activity;
@@ -82,26 +82,30 @@ it('alerts on LINE, Telegram and e-mail when an asset is asked for and approved'
     app(SaveAlertSettings::class)->handle($this->tenant, $this->settings);
 
     // a technician asks for themself (asset-checkouts.request)
-    $this->actingAs($this->tech)->post("/assets/{$this->asset->ulid}/checkouts", [
-        'type' => 'loan', 'due_on' => '2026-10-10',
+    $this->actingAs($this->tech)->post('/checkout-requests', [
+        'submit' => true,
+        'items' => [['item_type' => 'asset', 'asset_id' => $this->asset->id, 'qty' => 1, 'checkout_type' => 'loan', 'due_return_date' => '2026-10-10']],
     ])->assertSessionHasNoErrors();
+    $request = CheckoutRequest::sole();
 
     Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.line.me/v2/bot/message/push'
         && $request->hasHeader('Authorization', 'Bearer line-secret-token')
         && $request['to'] === 'Cgroup123'
-        && str_contains($request['messages'][0]['text'], 'มีคำขอยืมใหม่')
-        && str_contains($request['messages'][0]['text'], 'SW-001 Core switch')
+        && str_contains($request['messages'][0]['text'], 'ใบเบิก/ยืมใหม่รออนุมัติ')
+        && str_contains($request['messages'][0]['text'], 'Core switch × 1')
         && str_contains($request['messages'][0]['text'], 'Somsak Tech'));
     Http::assertSent(fn (HttpRequest $request) => $request->url() === 'https://api.telegram.org/bot123:telegram-secret/sendMessage'
         && $request['chat_id'] === '-100555');
     Notification::assertSentTo(new AnonymousNotifiable, AlertMail::class, fn (AlertMail $mail, array $channels, AnonymousNotifiable $notifiable) => $notifiable->routes['mail'] === ['boss@example.com', 'ops@example.com']
-        && str_contains($mail->title, 'มีคำขอยืมใหม่'));
+        && str_contains($mail->title, 'ใบเบิก/ยืมใหม่รออนุมัติ'));
 
-    $this->actingAs($this->admin)->post('/asset-checkouts/'.AssetCheckout::sole()->ulid.'/approve')->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
     Http::assertSentCount(4);
 
     // returned is not one of the events chosen
-    $this->actingAs($this->admin)->post('/asset-checkouts/'.AssetCheckout::sole()->ulid.'/return')->assertSessionHasNoErrors();
+    $line = $request->items()->sole();
+    $this->actingAs($this->admin)->post("/checkout-items/{$line->id}/fulfill", ['qty' => 1])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasNoErrors();
     Http::assertSentCount(4);
 });
 

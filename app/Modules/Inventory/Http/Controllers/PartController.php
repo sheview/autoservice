@@ -3,22 +3,20 @@
 namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\ItemRequestLines;
+use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Document\Support\PhotoSlots;
-use App\Modules\Identity\Actions\UsersWithPermission;
+use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\DeletePart;
-use App\Modules\Inventory\Actions\RequestPartCheckout;
 use App\Modules\Inventory\Actions\SavePart;
-use App\Modules\Inventory\Actions\SearchPartCheckouts;
 use App\Modules\Inventory\Actions\SearchParts;
 use App\Modules\Inventory\Actions\SearchStockMovements;
 use App\Modules\Inventory\Exports\PartsExport;
 use App\Modules\Inventory\Http\Requests\PartRequest;
 use App\Modules\Inventory\Models\Part;
-use App\Modules\Inventory\Models\PartCheckout;
 use App\Modules\Inventory\Models\StockMovement;
-use App\Modules\Inventory\Support\PartCheckoutRow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\TicketLabels;
@@ -87,7 +85,7 @@ class PartController extends Controller
         return redirect()->route('inventory.parts.show', $part)->with('success', __('inventory.parts.created'));
     }
 
-    public function show(Request $request, Part $part, Modules $modules, TicketLabels $ticketLabels, UsersWithPermission $usersWithPermission): Response
+    public function show(Request $request, Part $part, Modules $modules, TicketLabels $ticketLabels, ItemRequestLines $requestLines): Response
     {
         Gate::authorize('view', $part);
 
@@ -115,7 +113,7 @@ class PartController extends Controller
                     ? app(ContractLabels::class)->handle([$part->contract_id])[$part->contract_id] ?? null
                     : null,
             ],
-            'checkouts' => $this->checkouts($request, $part, $modules, $usersWithPermission),
+            'checkouts' => $modules->enabled('asset') ? $this->checkouts($user, $part, $requestLines) : null,
             'photos' => PhotoSlots::list($part, fn (int $slot) => route('inventory.parts.photos.show', [$part, $slot])),
             'movements' => $movements,
             // Stock changes the user may enter here.
@@ -142,43 +140,26 @@ class PartController extends Controller
     }
 
     /**
-     * Issue/loan on the part page: the forms still to act on (waiting, or lent and not back), the
-     * last closed ones, and whether more can be asked for. Null for users who do not handle them.
+     * Issue/loan requests on the part page (ItemRequestsPanel, Asset module): the lines of this
+     * part and whether the user may start a request with it. A part short of stock may still be
+     * asked for (what is missing is backordered). Null when the user has nothing to do with requests.
      *
      * @return array<string, mixed>|null
      */
-    private function checkouts(Request $request, Part $part, Modules $modules, UsersWithPermission $usersWithPermission): ?array
+    private function checkouts(User $user, Part $part, ItemRequestLines $requestLines): ?array
     {
-        $can = PartCheckoutController::abilities($request);
-        if (! $can['request'] && ! $can['approve']) {
+        $panel = $requestLines->handle($user, CheckoutItem::TYPE_PART, $part->id);
+        if ($panel === null) {
             return null;
         }
 
-        $isOpen = fn ($q) => $q->where('status', PartCheckout::STATUS_PENDING)
-            ->orWhere(fn ($q) => $q->where('status', PartCheckout::STATUS_APPROVED)->where('type', PartCheckout::TYPE_LOAN));
-        // Only the forms the user may see (with scope own: their own).
-        $user = $request->user();
-        $open = SearchPartCheckouts::visibleTo(PartCheckout::query(), $user)->where('part_id', $part->id)->where($isOpen)->with('part')->oldest('id')->get();
-        $recent = SearchPartCheckouts::visibleTo(PartCheckout::query(), $user)->where('part_id', $part->id)->whereNot($isOpen)->with('part')->latest('id')->limit(10)->get();
-        $left = RequestPartCheckout::availableQuantity($part);
-        $available = $part->is_active && $left > 0;
-
         return [
-            'open' => $open->map(fn (PartCheckout $checkout) => PartCheckoutRow::of($checkout))->values(),
-            'history' => $recent->map(fn (PartCheckout $checkout) => PartCheckoutRow::of($checkout))->values(),
-            'available' => $available,
-            'available_quantity' => $left,
+            'lines' => $panel['lines'],
+            'available' => (bool) $part->is_active,
+            'available_quantity' => max(0, (int) $part->qty_on_hand),
             'quantity' => (int) $part->qty_on_hand,
             'unit' => $part->unit,
-            // With scope own the form is only ever for the user themself.
-            'borrowers' => match (true) {
-                ! $available || ! $can['request'] => [],
-                ! $can['forOthers'] => [$user->only(['id', 'name'])],
-                default => $usersWithPermission->handle('parts.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values(),
-            },
-            'contracts' => $available && $can['request'] && $modules->enabled('contract') ? app(ContractOptions::class)->handle($part->contract_id) : [],
-            'default_contract_id' => $part->contract_id,
-            'can' => [...$can, 'userId' => $user->id],
+            'can' => ['create' => $panel['can']['create'] && $part->is_active],
         ];
     }
 

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import AssetCheckoutPanel from '@/components/AssetCheckoutPanel.vue';
 import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
+import ItemRequestsPanel from '@/components/ItemRequestsPanel.vue';
 import PhotoSlots from '@/components/PhotoSlots.vue';
 import PmResultBadge from '@/components/PmResultBadge.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
+import type { ItemRequestsPanelData } from '@/types/checkout';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Barcode, Plus } from 'lucide-vue-next';
 import { computed } from 'vue';
@@ -83,7 +84,7 @@ const props = defineProps<{
     asset: AssetDetail;
     sameModel: SameModelUnit[];
     // Issue/loan; null = the user has nothing to do with it.
-    checkouts: InstanceType<typeof AssetCheckoutPanel>['$props']['checkouts'] | null;
+    checkouts: ItemRequestsPanelData | null;
     photos: { slot: number; action: string; url: string | null }[];
     attachments: Attachment[];
     history: HistoryEntry[];
@@ -192,7 +193,7 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                 <p v-else class="text-sm text-muted-foreground">{{ t('assets.no_specs') }}</p>
             </section>
 
-            <AssetCheckoutPanel v-if="checkouts" :asset-ulid="asset.ulid" :checkouts="checkouts" />
+            <ItemRequestsPanel v-if="checkouts" :checkouts="checkouts" :query="{ asset: asset.ulid }" />
 
             <AttachmentList
                 :attachments="attachments"

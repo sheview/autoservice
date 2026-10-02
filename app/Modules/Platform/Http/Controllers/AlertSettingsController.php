@@ -38,6 +38,9 @@ class AlertSettingsController extends Controller
         $data = $request->validate([
             'events' => ['array'],
             'events.*' => ['string', Rule::in(AlertSettings::events())],
+            'thresholds.approval_hours' => ['nullable', 'integer', 'min:1', 'max:720'],
+            'thresholds.backorder_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'thresholds.needed_soon_days' => ['nullable', 'integer', 'min:0', 'max:90'],
             'line.enabled' => ['boolean'],
             'line.to' => ['nullable', 'required_if_accepted:line.enabled', 'string', 'max:100'],
             'line.token' => ['nullable', 'string', 'max:500'],
