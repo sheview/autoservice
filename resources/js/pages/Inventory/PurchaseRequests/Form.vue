@@ -17,8 +17,11 @@ import { computed } from 'vue';
 const props = defineProps<{
     request: PurchaseRequestRow | null;
     attachments: Attachment[];
-    // From the issue/loan search: what was looked for.
+    // From the issue/loan search: what was looked for, and the request (a saved draft) it was looked for on.
     item: string;
+    source: { id: number; ulid: string; request_no: string } | null;
+    // Asset categories, for what it goes into the system as; none = assets are off.
+    categories: { id: number; name: string }[];
     maxLinks: number;
     // Projects (MA contracts) the purchase can be for; none = the field is hidden.
     contracts: { id: number; label: string }[];
@@ -41,6 +44,9 @@ const form = useForm({
     links: (props.request?.links.length ? [...props.request.links] : ['']) as string[],
     reason: props.request?.reason ?? '',
     needed_by: props.request?.needed_by ?? '',
+    checkout_request_id: props.source?.id ?? null,
+    item_kind: (props.request?.item_kind ?? null) as 'asset' | 'part' | null,
+    asset_category_id: props.request?.asset_category_id ?? (null as number | null),
     attachments: [] as File[],
 });
 
@@ -59,10 +65,11 @@ const removeLink = (index: number) => {
 
 const submit = () => {
     // Empty link boxes are not sent; an edit with files is a POST that says PUT.
-    const transformed = form.transform((data) => ({
+    // The issue/loan request it was asked from is set only when it is opened.
+    const transformed = form.transform(({ checkout_request_id, ...data }) => ({
         ...data,
         links: data.links.map((link) => link.trim()).filter(Boolean),
-        ...(props.request ? { _method: 'put' } : {}),
+        ...(props.request ? { _method: 'put' } : { checkout_request_id }),
     }));
     if (props.request) {
         transformed.post(route('inventory.purchase-requests.update', props.request.ulid));
@@ -83,6 +90,13 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
 
         <div class="p-4">
             <Heading :title="title" :description="t('purchase_requests.description')" />
+
+            <p v-if="source" class="mb-4 rounded-md bg-muted/60 px-4 py-2 text-sm">
+                {{ t('purchase_requests.from_checkout') }}
+                <Link :href="route('asset.requests.show', source.ulid)" class="font-mono text-primary underline-offset-4 hover:underline">
+                    {{ source.request_no }}
+                </Link>
+            </p>
 
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -137,6 +151,36 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <InputError :message="form.errors.contract_id" />
                     </div>
                 </div>
+
+                <!-- What it goes into the system as when it arrives -->
+                <section class="space-y-2">
+                    <Label>{{ t('purchase_requests.kind.label') }}</Label>
+                    <div class="flex flex-wrap gap-4 text-sm">
+                        <label class="flex items-center gap-2"
+                            ><input v-model="form.item_kind" type="radio" :value="null" /> {{ t('purchase_requests.kind.none') }}</label
+                        >
+                        <label v-if="categories.length" class="flex items-center gap-2"
+                            ><input v-model="form.item_kind" type="radio" value="asset" /> {{ t('purchase_requests.kind.asset') }}</label
+                        >
+                        <label class="flex items-center gap-2"
+                            ><input v-model="form.item_kind" type="radio" value="part" /> {{ t('purchase_requests.kind.part') }}</label
+                        >
+                    </div>
+                    <div v-if="form.item_kind === 'asset'" class="max-w-sm">
+                        <select
+                            v-model="form.asset_category_id"
+                            required
+                            :aria-label="t('purchase_requests.kind.category')"
+                            class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                        >
+                            <option :value="null" disabled>{{ t('purchase_requests.kind.choose_category') }}</option>
+                            <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                        </select>
+                        <InputError :message="form.errors.asset_category_id" />
+                    </div>
+                    <p class="text-xs text-muted-foreground">{{ t('purchase_requests.kind.hint') }}</p>
+                    <InputError :message="form.errors.item_kind" />
+                </section>
 
                 <section class="space-y-2">
                     <Label>{{ t('purchase_requests.links') }}<span class="text-red-600"> *</span></Label>

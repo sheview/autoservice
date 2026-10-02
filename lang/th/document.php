@@ -39,6 +39,22 @@ return [
         'sign_receiver' => 'ผู้รับของ',
     ],
 
+    // What was handed out on an issue/loan request (documents.delivery-note).
+    'delivery' => [
+        'title' => 'ใบส่งสินค้า',
+        'ref' => 'อ้างอิงใบเบิก/ยืม :no',
+        'ship_to' => 'ส่งถึง',
+        'project' => 'โครงการ',
+        'items' => 'รายการสินค้าที่ส่ง',
+        'serials' => 'Serial Number',
+        'qty' => 'จำนวน',
+        'purchase' => 'ใบขอซื้อ',
+        'total_items' => 'รวม :count รายการ',
+        'terms' => 'ได้รับสินค้าตามรายการข้างต้นครบถ้วน ในสภาพเรียบร้อย',
+        'sign_sender' => 'ผู้ส่งสินค้า',
+        'sign_receiver' => 'ผู้รับสินค้า',
+    ],
+
     // A part issue/loan form: the same page as an asset's, with these in place of the asset's words.
     'part_checkout' => [
         'title_issue' => 'ใบเบิกอะไหล่',

@@ -150,6 +150,17 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                             <a :href="route('asset.requests.pdf', request.ulid)">{{ t('requests.pdf') }}</a>
                         </Button>
                     </template>
+                    <!-- Something handed out: the delivery note of it -->
+                    <template v-if="request.items.some((item) => item.qty_fulfilled > 0)">
+                        <Button variant="outline" as-child>
+                            <a :href="route('asset.requests.delivery-note.print', request.ulid)" target="_blank" rel="noopener">{{
+                                t('requests.delivery_note_print')
+                            }}</a>
+                        </Button>
+                        <Button variant="outline" as-child>
+                            <a :href="route('asset.requests.delivery-note', request.ulid)">{{ t('requests.delivery_note_pdf') }}</a>
+                        </Button>
+                    </template>
                 </div>
             </div>
 

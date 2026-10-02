@@ -129,7 +129,8 @@ const details: [string, (a: AssetDetail) => string | null][] = [
     ['model', (a) => a.model],
     ['subtype', (a) => a.subtype],
     ['serial_number', (a) => (a.serials.length ? a.serials.join(', ') : null)],
-    ['quantity', (a) => [`/`, a.unit].filter(Boolean).join(' ')],
+    // Free now / how many the asset holds, as on the list.
+    ['quantity', (a) => [`${a.available}/${a.quantity}`, a.unit].filter(Boolean).join(' ')],
     ['property_no', (a) => a.property_no],
     ['purchased_at', (a) => a.purchased_at],
     ['purchase_price', (a) => money(a.purchase_price)],

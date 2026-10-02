@@ -101,11 +101,10 @@ it('goes from approval to order to delivery, each by the right people', function
     $move($this->staff, 'cancel')->assertForbidden();
 
     $move($this->admin, 'order', 'Supplier ABC, PO-123')->assertSessionHasNoErrors();
-    $move($this->admin, 'receive')->assertSessionHasNoErrors();
-    expect($pr->fresh()->only(['status', 'order_note']))->toBe(['status' => 'received', 'order_note' => 'Supplier ABC, PO-123']);
+    $this->actingAs($this->admin)->post("/purchase-requests/{$pr->ulid}/receipts", ['quantity' => 2, 'item_kind' => 'part'])->assertSessionHasNoErrors();
+    expect($pr->fresh()->only(['status', 'order_note']))->toBe(['status' => 'registered', 'order_note' => 'Supplier ABC, PO-123']);
 
-    // what arrived is registered from the request: name, price, date, one row per unit
-    $this->actingAs($this->admin)->get("/purchase-requests/{$pr->ulid}")->assertInertia(fn (Assert $page) => $page->where('can.createAsset', true));
+    // what arrived can still be entered on the full asset form: name, price, date, one row per unit
     $this->actingAs($this->admin)->get("/assets/create?purchase_request={$pr->ulid}")->assertInertia(fn (Assert $page) => $page
         ->where('copy.name', 'Notebook for accounting')
         ->where('copy.purchase_price', '25900.50')

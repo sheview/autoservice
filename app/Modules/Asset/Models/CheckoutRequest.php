@@ -44,6 +44,9 @@ class CheckoutRequest extends Model
     /** Still in progress: something to decide or hand out. */
     public const OPEN_STATUSES = [self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_PARTIAL];
 
+    /** Not approved (yet): no hand-over paper to print. */
+    public const UNPRINTABLE = [self::STATUS_DRAFT, self::STATUS_PENDING, self::STATUS_REJECTED, self::STATUS_CANCELLED];
+
     protected $fillable = [
         'request_no', 'status', 'requester_id', 'requester_name',
         'borrower_user_id', 'borrower_name', 'borrower_department', 'borrower_phone',

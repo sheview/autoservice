@@ -8,21 +8,25 @@ use App\Modules\Asset\Support\CheckoutRules;
 use App\Modules\Asset\Support\CheckoutStatus;
 use App\Modules\Asset\Support\RequestAlert;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Actions\ApprovedPurchases;
 use App\Modules\Inventory\Actions\PartsForCheckout;
+use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Sends a draft for approval. A request of parts only, each line worth no more than the company's
- * auto-approval limit (CheckoutRules), is approved at once in full; anything else waits for an
- * approver.
+ * Sends a draft for approval. It is approved at once in full when every line needs no decision:
+ * a line handing out what an approved purchase request bought (no more than it brought; it was
+ * approved when it was asked to buy), or a part worth no more than the company's auto-approval
+ * limit (CheckoutRules). Anything else waits for an approver.
  */
 class SubmitCheckoutRequest
 {
     public function __construct(
         private PartsForCheckout $parts,
         private TenantContext $context,
+        private Modules $modules,
     ) {}
 
     public function handle(CheckoutRequest $request, User $actor): CheckoutRequest
@@ -58,21 +62,30 @@ class SubmitCheckoutRequest
         });
     }
 
-    /** Parts only, each line priced and worth at most the limit. */
+    /** Every line bought on an approved purchase, or a part priced and worth at most the limit. */
     private function autoApproves(CheckoutRequest $request): bool
     {
         $limit = CheckoutRules::autoApproveLimit($this->context->tenant());
         $items = $request->items()->get();
-        if ($limit === null || $items->isEmpty() || $items->contains(fn (CheckoutItem $item) => $item->item_type !== CheckoutItem::TYPE_PART)) {
+        if ($items->isEmpty()) {
             return false;
         }
 
-        $parts = $this->parts->handle($items->pluck('part_id')->all());
+        $purchases = $this->modules->enabled('inventory') ? app(ApprovedPurchases::class)->handle($items->pluck('purchase_request_id')->all()) : [];
+        $partIds = $items->where('item_type', CheckoutItem::TYPE_PART)->pluck('part_id')->all();
+        $parts = $partIds === [] ? [] : $this->parts->handle($partIds);
+        // What each purchase still has to hand out, used up line by line.
+        $left = $purchases;
 
-        return $items->every(function (CheckoutItem $item) use ($parts, $limit) {
-            $cost = $parts[$item->part_id]['unit_cost'] ?? null;
+        return $items->every(function (CheckoutItem $item) use ($parts, $limit, &$left) {
+            if ($item->purchase_request_id !== null && ($left[$item->purchase_request_id] ?? 0) >= $item->qty_requested) {
+                $left[$item->purchase_request_id] -= $item->qty_requested;
 
-            return $cost !== null && $cost * $item->qty_requested <= $limit;
+                return true;
+            }
+            $cost = $item->item_type === CheckoutItem::TYPE_PART ? ($parts[$item->part_id]['unit_cost'] ?? null) : null;
+
+            return $limit !== null && $cost !== null && $cost * $item->qty_requested <= $limit;
         });
     }
 }

@@ -5,6 +5,7 @@ namespace App\Modules\Asset\Http\Requests;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Identity\Actions\UsersWithPermission;
+use App\Modules\Inventory\Actions\PurchaseRequestLabels;
 use App\Modules\Service\Actions\TicketsForCheckout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -61,6 +62,14 @@ class CheckoutRequestForm extends FormRequest
             'items.*.qty' => ['required', 'integer', 'min:1', 'max:1000000'],
             'items.*.due_return_date' => ['nullable', 'date', 'after_or_equal:today'],
             'items.*.note' => ['nullable', 'string', 'max:500'],
+            // Bought on this purchase request (Inventory module): handing it out counts there.
+            'items.*.purchase_request_id' => ['nullable', 'integer', function (string $attribute, mixed $value, \Closure $fail) {
+                if (app(PurchaseRequestLabels::class)->handle([(int) $value]) === []) {
+                    $fail(__('validation.exists', ['attribute' => __('asset.requests.fields.purchase_request_id')]));
+                }
+            }],
+            // Save the draft, then open a purchase request for this (nothing to hand out was found).
+            'then_purchase' => ['nullable', 'string', 'max:255'],
         ];
     }
 
@@ -72,6 +81,6 @@ class CheckoutRequestForm extends FormRequest
     /** @return array<string, mixed> */
     public function requestData(): array
     {
-        return $this->safe()->except('submit');
+        return $this->safe()->except(['submit', 'then_purchase']);
     }
 }

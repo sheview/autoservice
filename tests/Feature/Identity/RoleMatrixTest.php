@@ -26,7 +26,7 @@ it('seeds the default roles exactly as permissions.json says', function () {
 it('shows the matrix of every role to whoever manages roles only', function () {
     $this->actingAs($this->admin)->get('/roles')->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Identity/Roles/Index')
-        ->has('roles', 5)
+        ->has('roles', 6)
         ->where('roles.0.locked', true)
         ->where("grants.{$this->technician->id}", fn ($grants) => $grants['tickets.view'] === 'own')
         ->has('resources'));

@@ -3,25 +3,44 @@ import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
+import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import StepProgress from '@/components/StepProgress.vue';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { purchaseSteps } from '@/lib/purchaseSteps';
 import type { BreadcrumbItem, SharedData } from '@/types';
-import type { PurchaseRequestRow } from '@/types/purchase';
+import type { PurchaseCheckoutRow, PurchaseEventRow, PurchaseReceiptRow, PurchaseRequestRow } from '@/types/purchase';
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { ExternalLink, PackagePlus, Printer } from 'lucide-vue-next';
+import { ExternalLink, FileDown, PackageCheck, PackagePlus, Printer, Truck } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
+/**
+ * A purchase request: its details, the moves (approve, order, cancel), and for the buyers the
+ * deliveries (some or all of it, several times) and registering each as an asset or a part.
+ * Once registered it is handed out on an issue/loan request ("เบิกต่อ"), whose papers are linked here.
+ */
 const props = defineProps<{
     request: PurchaseRequestRow;
     contract: { id: number; contract_no: string; title: string } | null;
+    receipts: PurchaseReceiptRow[];
+    events: PurchaseEventRow[];
+    checkouts: PurchaseCheckoutRow[];
+    issueUrl: string | null;
+    register: {
+        asset: boolean;
+        part: boolean;
+        newPart: boolean;
+        categories: { id: number; name: string }[];
+        parts: { id: number; code: string; name: string; unit: string }[];
+    } | null;
     attachments: Attachment[];
     actions: string[];
     needsNote: string[];
-    can: { update: boolean; attach: boolean; createAsset: boolean };
+    can: { update: boolean; attach: boolean; receive: boolean; register: boolean; handOut: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -45,6 +64,82 @@ const confirm = () => {
 };
 const actionVariant = (action: string) => (['reject', 'cancel'].includes(action) ? 'outline' : 'default');
 
+// --- a delivery: how many came and what was read off the goods ----------------
+// It goes into the system at once, as what the request says (asked here when it does not say).
+const left = computed(() => props.request.quantity - props.request.qty_received);
+const choosingKind = ref(props.request.item_kind === null);
+const receive = useForm({
+    quantity: left.value,
+    brand: '',
+    model: '',
+    unit_price: props.request.unit_price ?? '',
+    serials: '',
+    note: '',
+    item_kind: props.request.item_kind,
+    asset_category_id: props.request.asset_category_id,
+    location: '',
+    part_id: null as number | null,
+    hand_out: props.can.handOut && props.request.requested_by !== null,
+});
+const serialCount = computed(() => receive.serials.split(/\r?\n/).filter((line) => line.trim() !== '').length);
+const categoryName = computed(() => props.register?.categories.find((c) => c.id === props.request.asset_category_id)?.name ?? '-');
+const submitReceive = () =>
+    receive
+        .transform((data) => ({
+            ...data,
+            // What it becomes is sent only when chosen here; otherwise the request's is used.
+            item_kind: choosingKind.value ? data.item_kind : null,
+            asset_category_id: choosingKind.value && data.item_kind === 'asset' ? data.asset_category_id : null,
+            part_id: data.item_kind === 'part' ? data.part_id : null,
+        }))
+        .post(route('inventory.purchase-requests.receipts.store', props.request.ulid), {
+            preserveScroll: true,
+            onSuccess: () => {
+                receive.reset('quantity', 'brand', 'model', 'serials', 'note', 'location');
+                receive.quantity = left.value;
+                choosingKind.value = props.request.item_kind === null;
+            },
+        });
+
+// --- what is registered and not handed out: to whoever asked for it, in one go ----
+const handOut = useForm({});
+const submitHandOut = () => {
+    if (
+        !window.confirm(
+            t('purchase_requests.hand_out.confirm', { name: props.request.requested_by_name ?? '-', qty: toIssue.value, unit: props.request.unit }),
+        )
+    )
+        return;
+    handOut.post(route('inventory.purchase-requests.hand-out', props.request.ulid), { preserveScroll: true });
+};
+
+// --- registering a delivery: as an asset (category) or stock of a part ----------
+const registering = ref<number | null>(null);
+const registerForm = useForm({
+    as: (props.register?.asset ? 'asset' : 'part') as 'asset' | 'part',
+    category_id: null as number | null,
+    location: '',
+    part_id: null as number | null,
+    part_code: '',
+});
+const openRegister = (receipt: PurchaseReceiptRow) => {
+    registerForm.reset();
+    registerForm.clearErrors();
+    registering.value = receipt.id;
+};
+const submitRegister = (receipt: PurchaseReceiptRow) =>
+    registerForm
+        .transform((data) => ({
+            as: data.as,
+            ...(data.as === 'asset'
+                ? { category_id: data.category_id, location: data.location || null }
+                : { part_id: data.part_id, part_code: data.part_id ? null : data.part_code }),
+        }))
+        .post(route('inventory.purchase-requests.receipts.register', [props.request.ulid, receipt.id]), {
+            preserveScroll: true,
+            onSuccess: () => (registering.value = null),
+        });
+
 // --- links: shown with their site, so a reader sees where they lead -----------
 const host = (url: string) => {
     try {
@@ -54,10 +149,11 @@ const host = (url: string) => {
     }
 };
 
-// --- progress ------------------------------------------------------------------
 const stepBar = computed(() => purchaseSteps(props.request));
-
+const toIssue = computed(() => props.request.qty_registered - props.request.qty_issued);
 const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
+const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
+const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm';
 </script>
 
 <template>
@@ -72,6 +168,17 @@ const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLoc
                         <PurchaseStatusBadge :status="request.status" />
                     </p>
                     <Heading :title="request.item_name" :description="`${request.quantity} ${request.unit}`" />
+                    <p v-if="request.qty_received > 0" class="-mt-4 text-xs text-muted-foreground">
+                        {{
+                            t('purchase_requests.progress', {
+                                received: request.qty_received,
+                                registered: request.qty_registered,
+                                issued: request.qty_issued,
+                                quantity: request.quantity,
+                                unit: request.unit,
+                            })
+                        }}
+                    </p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <Button variant="outline" as-child>
@@ -117,13 +224,7 @@ const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLoc
                     <label for="note" class="text-sm font-medium"
                         >{{ t(`purchase_requests.actions.${pending}`) }} — {{ t(`purchase_requests.notes.${pending}`) }}</label
                     >
-                    <textarea
-                        id="note"
-                        v-model="move.note"
-                        rows="2"
-                        :required="needsNote.includes(pending)"
-                        class="shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    />
+                    <textarea id="note" v-model="move.note" rows="2" :required="needsNote.includes(pending)" :class="textareaClass" />
                     <InputError :message="move.errors.note ?? move.errors.action" />
                     <div class="flex gap-2">
                         <Button size="sm" :variant="pending === 'reject' ? 'destructive' : 'default'" :disabled="move.processing">
@@ -134,19 +235,124 @@ const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLoc
                 </form>
             </div>
 
-            <!-- Received: register it -->
+            <!-- Registered and not all handed out: hand it out -->
             <div
-                v-if="can.createAsset"
+                v-if="toIssue > 0 && (issueUrl || can.handOut)"
                 class="flex flex-wrap items-center gap-3 rounded-md border border-green-300 bg-green-50 p-4 text-sm dark:border-green-900 dark:bg-green-950"
             >
-                <span class="flex-1">{{ t('purchase_requests.create_asset_hint') }}</span>
-                <Button as-child>
-                    <Link :href="route('asset.assets.create', { purchase_request: request.ulid })">
-                        <PackagePlus class="h-4 w-4" />
-                        {{ t('purchase_requests.create_asset') }}
-                    </Link>
+                <span class="flex-1">{{ t('purchase_requests.hand_out.hint', { qty: toIssue, unit: request.unit }) }}</span>
+                <Button v-if="can.handOut && request.requested_by" :disabled="handOut.processing" @click="submitHandOut">
+                    <PackageCheck class="h-4 w-4" />
+                    {{ t('purchase_requests.hand_out.button') }}
                 </Button>
+                <Button v-if="issueUrl" :variant="can.handOut ? 'outline' : 'default'" as-child>
+                    <Link :href="issueUrl">{{ can.handOut ? t('purchase_requests.hand_out.manual') : t('purchase_requests.issue.button') }}</Link>
+                </Button>
+                <InputError class="w-full" :message="(handOut.errors as Record<string, string>).hand_out" />
             </div>
+
+            <!-- A delivery -->
+            <form v-if="can.receive && left > 0" class="space-y-4 rounded-md border p-4" @submit.prevent="submitReceive">
+                <div>
+                    <h3 class="flex items-center gap-2 text-sm font-semibold">
+                        <Truck class="h-4 w-4" /> {{ t('purchase_requests.receive.title') }}
+                    </h3>
+                    <p class="text-xs text-muted-foreground">{{ t('purchase_requests.receive.hint', { left, unit: request.unit }) }}</p>
+                </div>
+
+                <!-- What it goes into the system as -->
+                <div class="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
+                    <div v-if="!choosingKind" class="flex flex-wrap items-center gap-2">
+                        <span>{{
+                            request.item_kind === 'asset'
+                                ? t('purchase_requests.kind.current_asset', { category: categoryName })
+                                : t('purchase_requests.kind.current_part')
+                        }}</span>
+                        <button type="button" class="text-xs text-primary underline" @click="choosingKind = true">
+                            {{ t('purchase_requests.kind.change') }}
+                        </button>
+                    </div>
+                    <template v-else>
+                        <Label>{{ t('purchase_requests.kind.label') }}<span class="text-red-600"> *</span></Label>
+                        <div class="flex flex-wrap gap-4">
+                            <label v-if="register?.asset" class="flex items-center gap-2"
+                                ><input v-model="receive.item_kind" type="radio" value="asset" required />
+                                {{ t('purchase_requests.kind.asset') }}</label
+                            >
+                            <label v-if="register?.part" class="flex items-center gap-2"
+                                ><input v-model="receive.item_kind" type="radio" value="part" required />
+                                {{ t('purchase_requests.kind.part') }}</label
+                            >
+                        </div>
+                        <InputError :message="receive.errors.item_kind" />
+                    </template>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <div v-if="choosingKind && receive.item_kind === 'asset'" class="grid content-start gap-1">
+                            <Label for="receive_category">{{ t('purchase_requests.kind.category') }}<span class="text-red-600"> *</span></Label>
+                            <select id="receive_category" v-model="receive.asset_category_id" required :class="selectClass">
+                                <option :value="null" disabled>{{ t('purchase_requests.kind.choose_category') }}</option>
+                                <option v-for="category in register?.categories ?? []" :key="category.id" :value="category.id">
+                                    {{ category.name }}
+                                </option>
+                            </select>
+                        </div>
+                        <div v-if="(choosingKind ? receive.item_kind : request.item_kind) === 'asset'" class="grid content-start gap-1">
+                            <Label for="receive_location">{{ t('purchase_requests.register.location') }}</Label>
+                            <Input id="receive_location" v-model="receive.location" maxlength="255" />
+                        </div>
+                        <div v-if="(choosingKind ? receive.item_kind : request.item_kind) === 'part'" class="grid content-start gap-1">
+                            <Label for="receive_part">{{ t('purchase_requests.register.part') }}</Label>
+                            <select id="receive_part" v-model="receive.part_id" :class="selectClass">
+                                <option :value="null">{{ t('purchase_requests.register.part_auto') }}</option>
+                                <option v-for="part in register?.parts ?? []" :key="part.id" :value="part.id">
+                                    {{ part.code }} · {{ part.name }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+                    <InputError :message="receive.errors.asset_category_id ?? (receive.errors as Record<string, string>).category_id" />
+                </div>
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div class="grid content-start gap-1">
+                        <Label for="receive_quantity">{{ t('purchase_requests.receive.quantity') }}<span class="text-red-600"> *</span></Label>
+                        <Input id="receive_quantity" v-model.number="receive.quantity" type="number" min="1" :max="left" required />
+                        <InputError :message="receive.errors.quantity" />
+                    </div>
+                    <div class="grid content-start gap-1">
+                        <Label for="receive_brand">{{ t('purchase_requests.receive.brand') }}</Label>
+                        <Input id="receive_brand" v-model="receive.brand" maxlength="100" />
+                        <InputError :message="receive.errors.brand" />
+                    </div>
+                    <div class="grid content-start gap-1">
+                        <Label for="receive_model">{{ t('purchase_requests.receive.model') }}</Label>
+                        <Input id="receive_model" v-model="receive.model" maxlength="100" />
+                        <InputError :message="receive.errors.model" />
+                    </div>
+                    <div class="grid content-start gap-1">
+                        <Label for="receive_price">{{ t('purchase_requests.receive.unit_price') }}</Label>
+                        <Input id="receive_price" v-model="receive.unit_price" type="number" min="0" step="0.01" />
+                        <InputError :message="receive.errors.unit_price" />
+                    </div>
+                    <div class="grid content-start gap-1 sm:col-span-2">
+                        <Label for="receive_serials">{{ t('purchase_requests.receive.serials') }}</Label>
+                        <textarea id="receive_serials" v-model="receive.serials" rows="3" :class="`${textareaClass} font-mono`" />
+                        <p class="text-xs text-muted-foreground">{{ t('purchase_requests.receive.serials_count', { count: serialCount }) }}</p>
+                        <InputError :message="receive.errors.serials" />
+                    </div>
+                    <div class="grid content-start gap-1 sm:col-span-2">
+                        <Label for="receive_note">{{ t('purchase_requests.receive.note') }}</Label>
+                        <textarea id="receive_note" v-model="receive.note" rows="3" :class="textareaClass" />
+                        <InputError :message="receive.errors.note" />
+                    </div>
+                </div>
+                <label v-if="can.handOut && request.requested_by" class="flex items-center gap-2 text-sm">
+                    <input v-model="receive.hand_out" type="checkbox" class="size-4 rounded border-input" />
+                    {{ t('purchase_requests.receive.hand_out', { name: request.requested_by_name ?? '-' }) }}
+                </label>
+                <Button size="sm" :disabled="receive.processing">{{
+                    receive.hand_out && can.handOut ? t('purchase_requests.receive.submit_hand_out') : t('purchase_requests.receive.submit')
+                }}</Button>
+            </form>
 
             <dl class="grid gap-x-6 gap-y-4 rounded-md border p-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                 <div>
@@ -179,6 +385,169 @@ const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLoc
                 </div>
             </dl>
 
+            <!-- Deliveries, and what each became -->
+            <section v-if="receipts.length || can.receive" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('purchase_requests.receipts.title') }}</h3>
+                <p v-if="!receipts.length" class="text-sm text-muted-foreground">{{ t('purchase_requests.receipts.none') }}</p>
+                <ul v-else class="divide-y rounded-md border text-sm">
+                    <li v-for="receipt in receipts" :key="receipt.id" class="space-y-2 px-4 py-3">
+                        <div class="flex flex-wrap items-start gap-3">
+                            <div class="min-w-0 flex-1">
+                                <div class="font-medium">
+                                    {{ receipt.quantity }} {{ request.unit }}
+                                    <span v-if="receipt.brand || receipt.model" class="font-normal text-muted-foreground">
+                                        · {{ [receipt.brand, receipt.model].filter(Boolean).join(' ') }}
+                                    </span>
+                                    <span v-if="receipt.unit_price" class="font-normal tabular-nums text-muted-foreground">
+                                        · {{ money(receipt.unit_price) }}</span
+                                    >
+                                </div>
+                                <div class="text-xs text-muted-foreground">
+                                    {{
+                                        t('purchase_requests.receipts.received_by', {
+                                            name: receipt.received_by_name ?? '-',
+                                            at: dateTime(receipt.received_at),
+                                        })
+                                    }}
+                                </div>
+                                <div v-if="receipt.serials.length" class="mt-1 flex flex-wrap gap-1">
+                                    <span v-for="serial in receipt.serials" :key="serial" class="rounded bg-muted px-1.5 font-mono text-xs">{{
+                                        serial
+                                    }}</span>
+                                </div>
+                                <p v-if="receipt.note" class="whitespace-pre-line text-xs text-muted-foreground">{{ receipt.note }}</p>
+                            </div>
+                            <div class="text-right text-xs">
+                                <template v-if="receipt.registered_as === 'asset'">
+                                    <span class="text-muted-foreground">{{ t('purchase_requests.receipts.registered_asset') }}</span>
+                                    <Link
+                                        v-for="asset in receipt.assets"
+                                        :key="asset.ulid"
+                                        :href="route('asset.assets.show', asset.ulid)"
+                                        class="ml-1 font-mono text-primary underline-offset-4 hover:underline"
+                                        >{{ asset.asset_code }}</Link
+                                    >
+                                </template>
+                                <template v-else-if="receipt.registered_as === 'part'">
+                                    <span class="text-muted-foreground">{{ t('purchase_requests.receipts.registered_part') }}</span>
+                                    <Link
+                                        v-if="receipt.part"
+                                        :href="route('inventory.parts.show', receipt.part.id)"
+                                        class="ml-1 font-mono text-primary underline-offset-4 hover:underline"
+                                        >{{ receipt.part.code }}</Link
+                                    >
+                                </template>
+                                <template v-else>
+                                    <span class="text-amber-700 dark:text-amber-400">{{ t('purchase_requests.receipts.not_registered') }}</span>
+                                    <Button
+                                        v-if="register && registering !== receipt.id"
+                                        size="sm"
+                                        variant="outline"
+                                        class="ml-2"
+                                        @click="openRegister(receipt)"
+                                    >
+                                        <PackagePlus class="h-4 w-4" />
+                                        {{ t('purchase_requests.receipts.register') }}
+                                    </Button>
+                                </template>
+                            </div>
+                        </div>
+
+                        <!-- Register this delivery -->
+                        <form
+                            v-if="register && registering === receipt.id"
+                            class="space-y-3 rounded-md bg-muted/40 p-3"
+                            @submit.prevent="submitRegister(receipt)"
+                        >
+                            <p class="text-xs text-muted-foreground">{{ t('purchase_requests.register.hint') }}</p>
+                            <div class="flex flex-wrap gap-4 text-sm">
+                                <label v-if="register.asset" class="flex items-center gap-2">
+                                    <input v-model="registerForm.as" type="radio" value="asset" /> {{ t('purchase_requests.register.as_asset') }}
+                                </label>
+                                <label v-if="register.part" class="flex items-center gap-2">
+                                    <input v-model="registerForm.as" type="radio" value="part" /> {{ t('purchase_requests.register.as_part') }}
+                                </label>
+                            </div>
+                            <div v-if="registerForm.as === 'asset'" class="grid gap-3 sm:grid-cols-2">
+                                <div class="grid content-start gap-1">
+                                    <Label :for="`category-${receipt.id}`"
+                                        >{{ t('purchase_requests.register.category') }}<span class="text-red-600"> *</span></Label
+                                    >
+                                    <select :id="`category-${receipt.id}`" v-model="registerForm.category_id" required :class="selectClass">
+                                        <option :value="null" disabled>{{ t('purchase_requests.register.choose_category') }}</option>
+                                        <option v-for="category in register.categories" :key="category.id" :value="category.id">
+                                            {{ category.name }}
+                                        </option>
+                                    </select>
+                                    <InputError :message="registerForm.errors.category_id" />
+                                </div>
+                                <div class="grid content-start gap-1">
+                                    <Label :for="`location-${receipt.id}`">{{ t('purchase_requests.register.location') }}</Label>
+                                    <Input :id="`location-${receipt.id}`" v-model="registerForm.location" maxlength="255" />
+                                </div>
+                            </div>
+                            <div v-else class="grid gap-3 sm:grid-cols-2">
+                                <div class="grid content-start gap-1">
+                                    <Label :for="`part-${receipt.id}`">{{ t('purchase_requests.register.part') }}</Label>
+                                    <select :id="`part-${receipt.id}`" v-model="registerForm.part_id" :class="selectClass">
+                                        <option v-if="register.newPart" :value="null">{{ t('purchase_requests.register.new_part') }}</option>
+                                        <option v-for="part in register.parts" :key="part.id" :value="part.id">
+                                            {{ part.code }} · {{ part.name }}
+                                        </option>
+                                    </select>
+                                    <InputError :message="registerForm.errors.part_id" />
+                                </div>
+                                <div v-if="registerForm.part_id === null" class="grid content-start gap-1">
+                                    <Label :for="`part-code-${receipt.id}`">{{ t('purchase_requests.register.part_code') }}</Label>
+                                    <Input
+                                        :id="`part-code-${receipt.id}`"
+                                        v-model="registerForm.part_code"
+                                        maxlength="30"
+                                        class="font-mono"
+                                        :placeholder="t('purchase_requests.register.part_code_auto')"
+                                    />
+                                    <p class="text-xs text-muted-foreground">{{ t('purchase_requests.register.part_code_hint') }}</p>
+                                    <InputError :message="registerForm.errors.part_code" />
+                                </div>
+                            </div>
+                            <InputError :message="registerForm.errors.as ?? (registerForm.errors as Record<string, string>).serials" />
+                            <div class="flex gap-2">
+                                <Button size="sm" :disabled="registerForm.processing">{{ t('purchase_requests.register.submit') }}</Button>
+                                <Button size="sm" type="button" variant="ghost" @click="registering = null">{{ t('common.cancel') }}</Button>
+                            </div>
+                        </form>
+                    </li>
+                </ul>
+            </section>
+
+            <!-- Issue/loan requests it was asked from or handed out on, with their papers -->
+            <section v-if="checkouts.length" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('purchase_requests.checkouts.title') }}</h3>
+                <ul class="divide-y rounded-md border text-sm">
+                    <li v-for="checkout in checkouts" :key="checkout.ulid" class="flex flex-wrap items-center gap-3 px-4 py-2">
+                        <Link :href="route('asset.requests.show', checkout.ulid)" class="font-mono text-primary underline-offset-4 hover:underline">
+                            {{ checkout.request_no }}
+                        </Link>
+                        <RequestStatusBadge :status="checkout.status" />
+                        <span class="text-muted-foreground">{{ checkout.borrower_name }}</span>
+                        <span v-if="checkout.source" class="rounded bg-muted px-1.5 text-xs">{{ t('purchase_requests.checkouts.source') }}</span>
+                        <span class="flex-1" />
+                        <Button v-if="checkout.printable" size="sm" variant="outline" as-child>
+                            <a :href="route('asset.requests.pdf', checkout.ulid)" target="_blank" rel="noopener">
+                                <FileDown class="h-4 w-4" />
+                                {{ t('purchase_requests.checkouts.checkout_pdf') }}
+                            </a>
+                        </Button>
+                        <Button v-if="checkout.delivered" size="sm" variant="outline" as-child>
+                            <a :href="route('asset.requests.delivery-note', checkout.ulid)" target="_blank" rel="noopener">
+                                <FileDown class="h-4 w-4" />
+                                {{ t('purchase_requests.checkouts.delivery_pdf') }}
+                            </a>
+                        </Button>
+                    </li>
+                </ul>
+            </section>
+
             <section v-if="request.links.length" class="space-y-2">
                 <h3 class="text-sm font-semibold">{{ t('purchase_requests.links') }}</h3>
                 <ul class="divide-y rounded-md border text-sm">
@@ -208,24 +577,15 @@ const money = (baht: string | null) => (baht === null ? '-' : Number(baht).toLoc
                 />
             </section>
 
-            <!-- Who decided, ordered and received, with their notes -->
-            <section v-if="request.decided_by_name || request.ordered_by_name || request.received_by_name" class="space-y-2">
-                <h3 class="text-sm font-semibold">{{ t('purchase_requests.timeline') }}</h3>
+            <!-- Every step: what, who, when -->
+            <section v-if="events.length" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('purchase_requests.history') }}</h3>
                 <ul class="space-y-2 border-l pl-4 text-sm">
-                    <li v-if="request.decided_by_name">
-                        <span class="font-medium">{{ t('purchase_requests.step_decided') }}</span>
-                        <span class="text-xs text-muted-foreground"> · {{ request.decided_by_name }} · {{ dateTime(request.decided_at) }}</span>
-                        <p v-if="request.decision_note" class="whitespace-pre-line text-muted-foreground">{{ request.decision_note }}</p>
-                    </li>
-                    <li v-if="request.ordered_by_name">
-                        <span class="font-medium">{{ t('purchase_requests.step_ordered') }}</span>
-                        <span class="text-xs text-muted-foreground"> · {{ request.ordered_by_name }} · {{ dateTime(request.ordered_at) }}</span>
-                        <p v-if="request.order_note" class="whitespace-pre-line text-muted-foreground">{{ request.order_note }}</p>
-                    </li>
-                    <li v-if="request.received_by_name">
-                        <span class="font-medium">{{ t('purchase_requests.step_received') }}</span>
-                        <span class="text-xs text-muted-foreground"> · {{ request.received_by_name }} · {{ dateTime(request.received_at) }}</span>
-                        <p v-if="request.receive_note" class="whitespace-pre-line text-muted-foreground">{{ request.receive_note }}</p>
+                    <li v-for="event in events" :key="event.id">
+                        <span class="font-medium">{{ t(`purchase_requests.event_actions.${event.action}`) }}</span>
+                        <span class="ml-2"><PurchaseStatusBadge :status="event.to_status" /></span>
+                        <span class="text-xs text-muted-foreground"> · {{ event.actor_name ?? '-' }} · {{ dateTime(event.at) }}</span>
+                        <p v-if="event.note" class="whitespace-pre-line text-muted-foreground">{{ event.note }}</p>
                     </li>
                 </ul>
             </section>

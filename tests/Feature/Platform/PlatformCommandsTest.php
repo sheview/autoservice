@@ -41,6 +41,12 @@ it('brings permissions up to date after a deploy without undoing company changes
         ->and(Role::findByName('admin_company')->hasPermissionTo('surveys.view'))->toBeTrue()
         ->and(Role::findByName('technician')->hasPermissionTo('labels.print'))->toBeFalse();
 
+    // a default role added to the catalog later is created for the companies that lack it, as the catalog says
+    Role::findByName('purchasing')->delete();
+    $this->artisan('platform:sync-permissions')->assertSuccessful();
+    expect(Role::findByName('purchasing')->hasPermissionTo('purchase-requests.receive'))->toBeTrue()
+        ->and(Role::findByName('purchasing')->hasPermissionTo('purchase-requests.approve'))->toBeFalse();
+
     // --defaults puts the default roles back exactly as the catalog says
     Role::findByName('technician')->givePermissionTo('reports.view');
     $this->artisan('platform:sync-permissions', ['--defaults' => true])->assertSuccessful();

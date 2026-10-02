@@ -81,6 +81,17 @@ it('saves a draft, edits it, then sends it for approval', function () {
     $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/submit")->assertForbidden();
 });
 
+it('offers a purchase request on the form to those who may open one', function () {
+    $this->actingAs($this->desk)->get('/checkout-requests/create')
+        ->assertInertia(fn (Assert $page) => $page->component('Asset/Requests/Form')->where('canPurchase', true));
+    $this->actingAs($this->staff)->get('/checkout-requests/create')
+        ->assertInertia(fn (Assert $page) => $page->where('canPurchase', false));
+
+    // The button leads to the purchase request form, started with the item.
+    $this->actingAs($this->desk)->get('/purchase-requests/create?item='.urlencode('RAM 16GB'))
+        ->assertInertia(fn (Assert $page) => $page->component('Inventory/PurchaseRequests/Form')->where('item', 'RAM 16GB'));
+});
+
 it('checks the lines: parts need the ticket, loans a due date, assets enough left', function () {
     ($this->send)([($this->part)(2)])->assertSessionHasErrors('ticket_id');
     ($this->send)([($this->asset)($this->notebook, ['checkout_type' => 'loan'])])->assertSessionHasErrors('items.0');

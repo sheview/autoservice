@@ -19,7 +19,7 @@ class PurchaseRequestDetails
     public function handle(string $ulid, User $user): ?array
     {
         $request = PurchaseRequest::query()->where('ulid', $ulid)->first();
-        if ($request === null || $request->status !== PurchaseRequest::STATUS_RECEIVED || ! $user->can('view', $request)) {
+        if ($request === null || ! in_array($request->status, PurchaseRequest::RECEIVING_STATUSES, true) || ! $user->can('view', $request)) {
             return null;
         }
 

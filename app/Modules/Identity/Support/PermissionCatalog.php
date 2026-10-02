@@ -180,6 +180,23 @@ class PermissionCatalog
                 'manuals.view' => 'all',
             ],
         ],
+        // Buys what was asked for: orders, takes deliveries, registers them as assets or parts
+        // and hands them out. Deciding on requests stays with whoever holds purchase-requests.approve.
+        'purchasing' => [
+            'label' => 'ฝ่ายจัดซื้อ',
+            'grants' => [
+                'dashboard.view' => 'all',
+                'purchase-requests.view' => 'all', 'purchase-requests.create' => 'all', 'purchase-requests.update' => 'own',
+                'purchase-requests.receive' => 'all',
+                'assets.view' => 'all', 'assets.create' => 'all',
+                'asset-categories.view' => 'all',
+                'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.fulfill' => 'all',
+                'parts.view' => 'all', 'parts.create' => 'all', 'parts.update' => 'all',
+                'stock-movements.view' => 'all', 'stock-movements.create' => 'all',
+                'contracts.view' => 'all',
+                'manuals.view' => 'all',
+            ],
+        ],
         'user' => [
             'label' => 'ผู้ใช้งานทั่วไป',
             'grants' => [

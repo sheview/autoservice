@@ -40,6 +40,8 @@ export interface CheckoutLineRow {
     overdue: boolean;
     // Parts only: stock on hand now.
     on_hand: number | null;
+    // The purchase request it waits for, or that bought what it hands out.
+    purchase_request_id: number | null;
     purchase_request: { ulid: string; pr_no: string; status: string } | null;
     // The request page: each hand-out of this line.
     fulfillments?: { qty: number; by: string | null; at: string | null }[];

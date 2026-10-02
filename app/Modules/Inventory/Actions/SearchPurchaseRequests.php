@@ -16,16 +16,23 @@ class SearchPurchaseRequests
 {
     public const SORTABLE = ['created_at', 'pr_no', 'needed_by'];
 
-    /** "open" = waiting, approved or ordered. */
+    /** "open" = waiting, approved, ordered or partly delivered. */
     public const STATUS_FILTERS = ['open', 'all', ...PurchaseRequest::STATUSES];
 
     /**
-     * @return array{search: string, status: string, mine: bool, sort: string, direction: string}
+     * Work queues (the list's tabs), each instead of the status filter: to decide, to order, to
+     * take deliveries of, to register what came, to hand out what was registered.
+     */
+    public const QUEUES = ['to_approve', 'to_order', 'to_receive', 'to_register', 'to_issue'];
+
+    /**
+     * @return array{search: string, queue: string|null, status: string, mine: bool, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
     {
         return [
             'search' => $request->string('search')->trim()->value(),
+            'queue' => in_array($request->input('queue'), self::QUEUES, true) ? $request->input('queue') : null,
             'status' => in_array($request->input('status'), self::STATUS_FILTERS, true) ? $request->input('status') : 'open',
             'mine' => $request->boolean('mine'),
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'created_at',
@@ -40,7 +47,8 @@ class SearchPurchaseRequests
     public function handle(User $user, array $filters): Builder
     {
         $search = $filters['search'] ?? '';
-        $status = $filters['status'] ?? 'open';
+        $queue = $filters['queue'] ?? null;
+        $status = $queue === null ? ($filters['status'] ?? 'open') : 'all';
 
         return self::visibleTo(PurchaseRequest::query(), $user)
             ->when($filters['mine'] ?? false, fn (Builder $q) => $q->where('requested_by', $user->id))
@@ -52,12 +60,30 @@ class SearchPurchaseRequests
                 ->orWhere('item_name', 'ilike', "%{$search}%")
                 ->orWhere('description', 'ilike', "%{$search}%")
                 ->orWhere('requested_by_name', 'ilike', "%{$search}%")))
+            ->when($queue !== null, fn (Builder $q) => self::inQueue($q, $queue))
             ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', PurchaseRequest::OPEN_STATUSES))
             ->when(in_array($status, PurchaseRequest::STATUSES, true), fn (Builder $q) => $q->where('status', $status))
             ->when(($filters['sort'] ?? 'created_at') === 'needed_by',
                 fn (Builder $q) => $q->orderByRaw('needed_by '.($filters['direction'] === 'asc' ? 'asc' : 'desc').' nulls last'),
                 fn (Builder $q) => $q->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc'))
             ->orderByDesc('id');
+    }
+
+    /**
+     * @template T of Builder
+     *
+     * @param  T  $query
+     * @return T
+     */
+    public static function inQueue(Builder $query, string $queue): Builder
+    {
+        return match ($queue) {
+            'to_approve' => $query->where('status', PurchaseRequest::STATUS_PENDING),
+            'to_order' => $query->where('status', PurchaseRequest::STATUS_APPROVED),
+            'to_receive' => $query->whereIn('status', [PurchaseRequest::STATUS_ORDERED, PurchaseRequest::STATUS_PARTIALLY_RECEIVED]),
+            'to_register' => $query->whereIn('status', PurchaseRequest::RECEIVING_STATUSES)->whereColumn('qty_registered', '<', 'qty_received'),
+            'to_issue' => $query->whereIn('status', PurchaseRequest::RECEIVING_STATUSES)->whereColumn('qty_issued', '<', 'qty_registered'),
+        };
     }
 
     /**

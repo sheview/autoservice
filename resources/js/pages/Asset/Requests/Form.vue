@@ -8,8 +8,8 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import type { CheckoutItemOption, CheckoutRequestRow, CheckoutTicketOption } from '@/types/checkout';
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { Plus, Trash2, X } from 'lucide-vue-next';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Plus, ShoppingCart, Trash2, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 /**
@@ -23,10 +23,20 @@ const props = defineProps<{
     contracts: { id: number; label: string }[];
     partsEnabled: boolean;
     maxItems: number;
+    // May open a purchase request for what is not there (or not free).
+    canPurchase: boolean;
     can: { view: boolean; create: boolean; forOthers: boolean; approve: boolean; fulfill: boolean; return: boolean };
     // Start with this line (?asset= / ?part=) and this ticket (?ticket=).
     firstItem: CheckoutItemOption | null;
     ticket: CheckoutTicketOption | null;
+    // ?purchase_request=: what that purchase brought, as lines tied to it ("เบิกต่อ").
+    purchase: {
+        ulid: string;
+        pr_no: string;
+        borrower_user_id: number | null;
+        contract_id: number | null;
+        items: (CheckoutItemOption & { qty: number; purchase_request_id: number })[];
+    } | null;
 }>();
 
 interface Line {
@@ -44,6 +54,8 @@ interface Line {
     qty: number;
     due_return_date: string;
     note: string;
+    // Bought on this purchase request: handing it out counts there.
+    purchase_request_id: number | null;
 }
 
 const page = usePage<SharedData>();
@@ -73,6 +85,7 @@ const lineFrom = (option: CheckoutItemOption): Line => ({
     qty: 1,
     due_return_date: '',
     note: '',
+    purchase_request_id: null,
 });
 
 const initialLines = (): Line[] => {
@@ -91,19 +104,39 @@ const initialLines = (): Line[] => {
             qty: item.qty_requested,
             due_return_date: item.due_return_date ?? '',
             note: item.note ?? '',
+            purchase_request_id: item.purchase_request_id,
         }));
     }
     return props.firstItem ? [lineFrom(props.firstItem)] : [];
 };
 
+// What the purchase brought, added to the lines (once each).
+const purchaseLines = (): Line[] =>
+    (props.purchase?.items ?? []).map((option) => ({
+        ...lineFrom(option),
+        checkout_type: 'issue',
+        qty: option.lot ? option.qty : 1,
+        purchase_request_id: option.purchase_request_id,
+    }));
+
 const r = props.request;
 const borrowerKind = ref<'staff' | 'other'>(r && r.borrower_user_id === null ? 'other' : 'staff');
+// A new request for a purchase is for whoever asked for it, by default.
+const purchaseBorrower =
+    props.can.forOthers && props.purchase?.borrower_user_id && props.borrowers.some((u) => u.id === props.purchase?.borrower_user_id);
 const form = useForm({
-    borrower_user_id: (r ? r.borrower_user_id : me.id) as number | null,
+    // Oneself by default, unless not one of the staff listed (e.g. central staff inside the company).
+    borrower_user_id: (r
+        ? r.borrower_user_id
+        : purchaseBorrower
+          ? props.purchase!.borrower_user_id
+          : !props.can.forOthers || props.borrowers.some((u) => u.id === me.id)
+            ? me.id
+            : null) as number | null,
     borrower_name: r && r.borrower_user_id === null ? r.borrower_name : '',
     borrower_department: r?.borrower_department ?? '',
     borrower_phone: r?.borrower_phone ?? '',
-    contract_id: (r?.contract_id ?? null) as number | null,
+    contract_id: (r ? r.contract_id : (props.purchase?.contract_id ?? null)) as number | null,
     purpose: r?.purpose ?? '',
     needed_by: r?.needed_by ?? '',
 });
@@ -115,6 +148,15 @@ const ticketResults = ref<CheckoutTicketOption[]>([]);
 const ticketOpen = ref(false);
 // The lines, kept beside the form (its data type cannot hold them); sent by save().
 const lines = ref<Line[]>(initialLines());
+for (const line of purchaseLines()) {
+    if (
+        !lines.value.some(
+            (l) => l.item_type === line.item_type && (line.item_type === 'asset' ? l.asset_id === line.asset_id : l.part_id === line.part_id),
+        )
+    ) {
+        lines.value.push(line);
+    }
+}
 const hasParts = computed(() => lines.value.some((line) => line.item_type === 'part'));
 
 const getJson = async <T,>(url: string): Promise<T> => {
@@ -176,6 +218,17 @@ const addLine = (option: CheckoutItemOption) => {
 };
 const removeLine = (index: number) => lines.value.splice(index, 1);
 
+// The purchase request form, started with the item's name. With lines already written, the
+// request is saved as a draft first and the purchase is tied to it (nothing is lost).
+const purchaseUrl = (item: string) => route('inventory.purchase-requests.create', { item });
+const askPurchase = (item: string) => {
+    if (lines.value.length === 0) {
+        router.visit(purchaseUrl(item));
+        return;
+    }
+    save(false, item);
+};
+
 // A saved draft knows its lines but not what is free now: look each one up once.
 onMounted(() => {
     lines.value.forEach(async (line) => {
@@ -202,7 +255,7 @@ const lineErrors = (index: number) =>
         .map(([, message]) => message);
 
 // --- Save -----------------------------------------------------------------------------------
-const save = (submit: boolean) => {
+const save = (submit: boolean, thenPurchase: string | null = null) => {
     form.transform((data) => ({
         borrower_user_id: !props.can.forOthers ? me.id : borrowerKind.value === 'staff' ? data.borrower_user_id : null,
         borrower_name: props.can.forOthers && borrowerKind.value === 'other' ? data.borrower_name : null,
@@ -213,6 +266,7 @@ const save = (submit: boolean) => {
         purpose: data.purpose || null,
         needed_by: data.needed_by || null,
         submit,
+        then_purchase: thenPurchase,
         items: lines.value.map((line) => ({
             item_type: line.item_type,
             asset_id: line.asset_id,
@@ -221,6 +275,7 @@ const save = (submit: boolean) => {
             qty: line.lot ? line.qty : 1,
             due_return_date: line.item_type === 'asset' && line.checkout_type === 'loan' ? line.due_return_date || null : null,
             note: line.note || null,
+            purchase_request_id: line.purchase_request_id,
         })),
     }));
     if (props.request) {
@@ -239,9 +294,10 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <form class="max-w-5xl space-y-6 p-4" @submit.prevent="save(true)">
+        <form class="space-y-6 p-4" @submit.prevent="save(true)">
             <Heading :title="title" :description="t('requests.form_description')" />
             <InputError :message="(form.errors as Record<string, string>).request" />
+            <p v-if="purchase" class="rounded-md bg-muted/60 px-4 py-2 text-sm">{{ t('requests.from_purchase', { no: purchase.pr_no }) }}</p>
 
             <!-- Who and what for -->
             <section class="grid gap-4 rounded-md border p-4 sm:grid-cols-2">
@@ -409,6 +465,17 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                                     >
                                         {{ t('requests.available', { qty: option.available, unit: option.unit ?? '' }) }}
                                     </span>
+                                    <Button
+                                        v-if="canPurchase && option.available <= 0"
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        :disabled="form.processing"
+                                        @click="askPurchase(option.name)"
+                                    >
+                                        <ShoppingCart class="h-4 w-4" />
+                                        {{ t('requests.purchase') }}
+                                    </Button>
                                     <span v-if="added(option)" class="text-xs text-muted-foreground">{{ t('requests.added') }}</span>
                                     <Button v-else type="button" size="sm" variant="outline" :disabled="full" @click="addLine(option)">
                                         <Plus class="h-4 w-4" />
@@ -417,12 +484,24 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                                 </div>
                             </template>
                         </template>
-                        <p
+                        <div
                             v-if="itemResults.assets.length === 0 && itemResults.parts.length === 0"
-                            class="px-3 py-4 text-center text-sm text-muted-foreground"
+                            class="space-y-2 px-3 py-4 text-center text-sm text-muted-foreground"
                         >
-                            {{ t('requests.no_items_found') }}
-                        </p>
+                            <p>{{ t('requests.no_items_found') }}</p>
+                            <Button
+                                v-if="canPurchase"
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                :disabled="form.processing"
+                                @click="askPurchase(itemSearch.trim())"
+                            >
+                                <ShoppingCart class="h-4 w-4" />
+                                {{ t('requests.purchase_not_found', { item: itemSearch.trim() }) }}
+                            </Button>
+                            <p v-if="canPurchase && lines.length" class="text-xs">{{ t('requests.purchase_saves_draft') }}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -485,13 +564,25 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
 
                     <p
                         v-if="line.available !== null && (line.lot ? line.qty : 1) > line.available"
-                        class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                        class="flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950 dark:text-amber-200"
                     >
-                        {{
-                            line.item_type === 'part'
-                                ? t('requests.short_part', { qty: line.available })
-                                : t('requests.short_asset', { qty: line.available })
-                        }}
+                        <span class="flex-1">
+                            {{
+                                line.item_type === 'part'
+                                    ? t('requests.short_part', { qty: line.available })
+                                    : t('requests.short_asset', { qty: line.available })
+                            }}
+                        </span>
+                        <button
+                            v-if="canPurchase && !line.purchase_request_id"
+                            type="button"
+                            class="inline-flex items-center gap-1 font-medium underline"
+                            :disabled="form.processing"
+                            @click="askPurchase(line.name)"
+                        >
+                            <ShoppingCart class="h-3 w-3" />
+                            {{ t('requests.purchase') }}
+                        </button>
                     </p>
                     <InputError v-for="message in lineErrors(index)" :key="message" :message="message" />
                 </div>

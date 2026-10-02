@@ -47,7 +47,7 @@ class RequestRow
             ...$item->only([
                 'id', 'item_type', 'asset_id', 'part_id', 'item_code', 'item_name', 'unit', 'checkout_type',
                 'qty_requested', 'qty_approved', 'qty_fulfilled', 'qty_returned', 'status', 'return_condition',
-                'returned_by_name', 'reject_reason', 'note',
+                'returned_by_name', 'reject_reason', 'note', 'purchase_request_id',
             ]),
             'asset_ulid' => $item->item_type === CheckoutItem::TYPE_ASSET ? $item->asset?->ulid : null,
             'due_return_date' => $item->due_return_date?->toDateString(),

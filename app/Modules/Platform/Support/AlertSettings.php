@@ -23,6 +23,7 @@ class AlertSettings
         // Sent by the hourly check (checkouts:notify-delays), with the thresholds below.
         'checkout_delays' => ['checkout_approval_overdue', 'checkout_backorder_overdue', 'checkout_return_overdue'],
         'repair' => ['ticket_opened', 'ticket_resolved', 'asset_in_repair'],
+        'purchase' => ['purchase_requested', 'purchase_approved', 'purchase_rejected', 'purchase_ordered', 'purchase_received', 'purchase_cancelled'],
     ];
 
     public const MAX_RECIPIENTS = 10;

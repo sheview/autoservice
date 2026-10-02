@@ -56,6 +56,12 @@ class PurchaseRequestRequest extends FormRequest
             'reason' => ['required', 'string', 'max:5000'],
             // Not in the past when asked; an existing request keeps the date it had.
             'needed_by' => ['required', 'date', $request instanceof PurchaseRequest ? 'nullable' : 'after_or_equal:today'],
+            // What it becomes once it arrives, when the requester knows (else the buyer says).
+            'item_kind' => ['nullable', Rule::in([PurchaseRequest::KIND_ASSET, PurchaseRequest::KIND_PART])],
+            'asset_category_id' => ['nullable', 'required_if:item_kind,asset', 'integer', Rule::exists('asset_categories', 'id')->whereNull('deleted_at')],
+            // The issue/loan request it was asked from (only when opened).
+            'checkout_request_id' => [$request instanceof PurchaseRequest ? 'prohibited' : 'nullable', 'integer',
+                Rule::exists('checkout_requests', 'id')->whereNull('deleted_at')],
             ...Attachments::rules(),
         ];
     }

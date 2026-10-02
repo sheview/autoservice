@@ -33,7 +33,7 @@ class SaveCheckoutRequest
      * @param  array{borrower_user_id?: int|null, borrower_name?: string|null, borrower_department?: string|null,
      *     borrower_phone?: string|null, ticket_id?: int|null, contract_id?: int|null, purpose?: string|null, needed_by?: string|null,
      *     items: list<array{item_type: string, asset_id?: int|null, part_id?: int|null, checkout_type?: string|null,
-     *     qty?: int|null, due_return_date?: string|null, note?: string|null}>}  $data  validated
+     *     qty?: int|null, due_return_date?: string|null, note?: string|null, purchase_request_id?: int|null}>}  $data  validated
      */
     public function handle(?CheckoutRequest $request, array $data, User $actor): CheckoutRequest
     {
@@ -134,6 +134,7 @@ class SaveCheckoutRequest
                     'checkout_type' => $type, 'qty_requested' => $qty, 'status' => CheckoutItem::STATUS_PENDING,
                     'due_return_date' => $type === CheckoutItem::LOAN ? $item['due_return_date'] : null,
                     'note' => $item['note'] ?? null,
+                    'purchase_request_id' => $item['purchase_request_id'] ?? null,
                 ];
             } else {
                 $part = $parts[(int) ($item['part_id'] ?? 0)] ?? null;
@@ -147,6 +148,7 @@ class SaveCheckoutRequest
                     'item_code' => $part['code'], 'item_name' => $part['name'], 'unit' => $part['unit'],
                     'checkout_type' => CheckoutItem::ISSUE, 'qty_requested' => $qty, 'status' => CheckoutItem::STATUS_PENDING,
                     'due_return_date' => null, 'note' => $item['note'] ?? null,
+                    'purchase_request_id' => $item['purchase_request_id'] ?? null,
                 ];
             }
         }

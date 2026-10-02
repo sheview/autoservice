@@ -3,6 +3,7 @@
 use App\Modules\Inventory\Http\Controllers\PartController;
 use App\Modules\Inventory\Http\Controllers\PartImportController;
 use App\Modules\Inventory\Http\Controllers\PartPhotoController;
+use App\Modules\Inventory\Http\Controllers\PurchaseReceiptController;
 use App\Modules\Inventory\Http\Controllers\PurchaseRequestController;
 use App\Modules\Inventory\Http\Controllers\StockMovementController;
 use Illuminate\Support\Facades\Route;
@@ -28,6 +29,11 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     // Purchase requests
     Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);
     Route::post('purchase-requests/{purchase_request}/move', [PurchaseRequestController::class, 'move'])->name('purchase-requests.move');
+    // Deliveries (some or all of it, several times) and registering what came as assets / parts.
+    Route::post('purchase-requests/{purchase_request}/receipts', [PurchaseReceiptController::class, 'store'])->name('purchase-requests.receipts.store');
+    Route::post('purchase-requests/{purchase_request}/hand-out', [PurchaseReceiptController::class, 'handOut'])->name('purchase-requests.hand-out');
+    Route::post('purchase-requests/{purchase_request}/receipts/{receipt}/register', [PurchaseReceiptController::class, 'register'])
+        ->whereNumber('receipt')->name('purchase-requests.receipts.register');
     Route::get('purchase-requests/{purchase_request}/print', [PurchaseRequestController::class, 'print'])->name('purchase-requests.print');
     Route::get('purchase-requests/{purchase_request}/pdf', [PurchaseRequestController::class, 'pdf'])->name('purchase-requests.pdf');
     Route::post('purchase-requests/{purchase_request}/attachments', [PurchaseRequestController::class, 'storeAttachment'])

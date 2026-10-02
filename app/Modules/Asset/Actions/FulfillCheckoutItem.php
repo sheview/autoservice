@@ -2,6 +2,7 @@
 
 namespace App\Modules\Asset\Actions;
 
+use App\Modules\Asset\Events\PurchasedItemHandedOut;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
@@ -70,6 +71,10 @@ class FulfillCheckoutItem
             $item->save();
 
             CheckoutStatus::refresh($request);
+            if ($item->purchase_request_id !== null) {
+                // Bought for this line: the purchase request counts it as handed out.
+                PurchasedItemHandedOut::dispatch((int) $item->purchase_request_id, $qty, $actor->id);
+            }
 
             activity()->performedOn($request)->causedBy($actor)->event('checkout_item_fulfilled')
                 ->withProperties(['request_no' => $request->request_no, 'item' => $item->item_name, 'qty' => $qty, 'status' => $item->status])

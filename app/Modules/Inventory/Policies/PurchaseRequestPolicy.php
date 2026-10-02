@@ -13,9 +13,9 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * purchase-requests.* permissions. Requests have no branch or customer: scope own = the ones the
  * user asked for, any wider scope = every request of the company. Listed with view, asked with
- * create, changed by the requester while pending with update, approved/rejected with approve, marked ordered and
- * received with receive (PurchaseWorkflow); cancelled by whoever asked (while pending) or an
- * approver. Customer accounts never see them.
+ * create, changed by the requester while pending with update, approved/rejected with approve; ordered,
+ * received and registered with receive (the buyers); cancelled by whoever asked (while pending), an
+ * approver (until ordered) or a buyer (ordered, nothing delivered). Customer accounts never see them.
  */
 class PurchaseRequestPolicy extends TenantPolicy
 {
@@ -58,13 +58,32 @@ class PurchaseRequestPolicy extends TenantPolicy
             return false;
         }
         if ($action === 'cancel') {
-            return $this->approves($user, $request)
+            return ($request->status !== PurchaseRequest::STATUS_ORDERED && $this->approves($user, $request))
+                || ($request->status === PurchaseRequest::STATUS_ORDERED && $this->buys($user, $request))
                 || ($request->status === PurchaseRequest::STATUS_PENDING && $request->requested_by === $user->id);
         }
 
         $permission = PurchaseWorkflow::ACTIONS[$action]['permission'];
 
         return $user->checkPermissionTo($permission) && $this->inScope($user, $request, $this->abilityOf($permission));
+    }
+
+    /** A delivery may be recorded: ordered and not all of it here yet, by a buyer. */
+    public function receive(User $user, PurchaseRequest $request): bool
+    {
+        return PurchaseWorkflow::receivable($request) && $this->buys($user, $request);
+    }
+
+    /** What arrived may be registered (as assets or parts), by a buyer, while some of it is not yet. */
+    public function register(User $user, PurchaseRequest $request): bool
+    {
+        return PurchaseWorkflow::registrable($request) && $this->buys($user, $request);
+    }
+
+    /** A buyer (purchase-requests.receive) who reaches this request. */
+    public function buys(User $user, PurchaseRequest $request): bool
+    {
+        return $this->permits($user, 'receive') && $this->inScope($user, $request, 'receive');
     }
 
     /** An approver who reaches this request. */
@@ -76,7 +95,7 @@ class PurchaseRequestPolicy extends TenantPolicy
     /** An approver or buyer who reaches this request (they may add quotations while it is open). */
     public function handles(User $user, PurchaseRequest $request): bool
     {
-        return $this->approves($user, $request) || ($this->permits($user, 'receive') && $this->inScope($user, $request, 'receive'));
+        return $this->approves($user, $request) || $this->buys($user, $request);
     }
 
     protected function permits(User $user, string $ability): bool

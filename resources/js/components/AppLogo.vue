@@ -13,11 +13,10 @@ const page = usePage<SharedData>();
 </script>
 
 <template>
-    <div class="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-        <AppLogoIcon class="size-5 fill-current text-white dark:text-black" />
-    </div>
-    <div class="ml-1 grid flex-1 text-left text-sm">
-        <span class="mb-0.5 truncate font-semibold leading-none">{{ page.props.name }}</span>
+    <!-- ! beats the sidebar button's size for its icons (16px); shrunk to an icon in a collapsed sidebar. -->
+    <AppLogoIcon class="aspect-square !size-11 shrink-0 drop-shadow-sm group-data-[collapsible=icon]:!size-8" />
+    <div class="ml-1 grid flex-1 text-left">
+        <span class="mb-1 truncate text-base font-bold leading-none">{{ page.props.name }}</span>
         <span v-if="page.props.tenant" class="truncate text-xs text-muted-foreground">{{ page.props.tenant.name }}</span>
     </div>
 </template>

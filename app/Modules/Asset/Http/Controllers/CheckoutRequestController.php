@@ -27,6 +27,7 @@ use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\PartsForCheckout;
+use App\Modules\Inventory\Actions\PurchaseIssueLines;
 use App\Modules\Inventory\Actions\PurchaseRequestLabels;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketsForCheckout;
@@ -97,23 +98,22 @@ class CheckoutRequestController extends Controller
             ? (app(TicketsForCheckout::class)->handle($user, [$request->integer('ticket')])[$request->integer('ticket')] ?? null)
             : null;
 
+        $purchase = $this->purchaseItems($request);
+
         return Inertia::render('Asset/Requests/Form', [
             'request' => null,
-            ...$this->formProps($request),
+            ...$this->formProps($request, $purchase['contract_id'] ?? null),
             'firstItem' => $first,
             'ticket' => $ticket,
+            'purchase' => $purchase,
         ]);
     }
 
     public function store(CheckoutRequestForm $form, SaveCheckoutRequest $save, SubmitCheckoutRequest $submit): RedirectResponse
     {
         $checkout = $save->handle(null, $form->requestData(), $form->user());
-        if ($form->boolean('submit')) {
-            $checkout = $submit->handle($checkout, $form->user());
-        }
 
-        return redirect()->route('asset.requests.show', $checkout)
-            ->with('success', __($form->boolean('submit') ? 'asset.requests.submitted' : 'asset.requests.saved', ['no' => $checkout->request_no]));
+        return $this->afterSave($form, $checkout, $submit);
     }
 
     public function show(Request $request, CheckoutRequest $checkout, PartsForCheckout $parts): Response
@@ -180,12 +180,28 @@ class CheckoutRequestController extends Controller
             ...$this->formProps($request, $checkout->contract_id),
             'firstItem' => null,
             'ticket' => $checkout->ticket_id ? (app(TicketsForCheckout::class)->handle($request->user(), [$checkout->ticket_id])[$checkout->ticket_id] ?? null) : null,
+            // ?purchase_request=: the draft it was asked from gets what the purchase brought.
+            'purchase' => $this->purchaseItems($request),
         ]);
     }
 
     public function update(CheckoutRequestForm $form, CheckoutRequest $checkout, SaveCheckoutRequest $save, SubmitCheckoutRequest $submit): RedirectResponse
     {
         $checkout = $save->handle($checkout, $form->requestData(), $form->user());
+
+        return $this->afterSave($form, $checkout, $submit);
+    }
+
+    /**
+     * Sent for approval, or kept as a draft. With then_purchase the draft is kept and the purchase
+     * request form opens for what was not found, tied to this request.
+     */
+    private function afterSave(CheckoutRequestForm $form, CheckoutRequest $checkout, SubmitCheckoutRequest $submit): RedirectResponse
+    {
+        if ($form->filled('then_purchase') && $this->modules->enabled('inventory') && $form->user()->can('purchase-requests.create')) {
+            return redirect()->route('inventory.purchase-requests.create', ['item' => $form->input('then_purchase'), 'checkout' => $checkout->ulid])
+                ->with('success', __('asset.requests.saved', ['no' => $checkout->request_no]));
+        }
         if ($form->boolean('submit')) {
             $checkout = $submit->handle($checkout, $form->user());
         }
@@ -292,6 +308,55 @@ class CheckoutRequestController extends Controller
         }
     }
 
+    /** The delivery note of what was handed out, as an A4 page for the browser to print. */
+    public function deliveryNotePrint(Request $request, CheckoutRequest $checkout, TenantContext $context): View
+    {
+        return view('documents.delivery-note', [...$this->deliverySheet($request, $checkout, $context), 'forBrowser' => true]);
+    }
+
+    /** The delivery note (ใบส่งสินค้า) of what was handed out so far, as a PDF. */
+    public function deliveryNote(Request $request, CheckoutRequest $checkout, TenantContext $context, RenderPdf $renderPdf): HttpResponse|RedirectResponse
+    {
+        $sheet = $this->deliverySheet($request, $checkout, $context);
+
+        try {
+            return $renderPdf->handle('documents.delivery-note', $sheet, "DN-{$checkout->request_no}.pdf");
+        } catch (PdfUnavailable) {
+            return back()->with('error', __('document.unavailable'));
+        }
+    }
+
+    /**
+     * What a delivery note shows: the lines handed out (with the serials of their assets and the
+     * purchase that bought them), the project, who handed them out and when. Only once something
+     * has been handed out.
+     *
+     * @return array<string, mixed>
+     */
+    private function deliverySheet(Request $request, CheckoutRequest $checkout, TenantContext $context): array
+    {
+        Gate::authorize('view', $checkout);
+        $checkout->load(['items.fulfillments', 'items.asset.serials']);
+        $items = $checkout->items->where('qty_fulfilled', '>', 0)->values();
+        abort_if($items->isEmpty(), 404);
+
+        $fulfillments = $items->flatMap(fn (CheckoutItem $item) => $item->fulfillments);
+
+        return [
+            ...$this->sheet($checkout, $context),
+            'items' => $items,
+            'serials' => $items->filter(fn (CheckoutItem $item) => $item->asset !== null)
+                ->mapWithKeys(fn (CheckoutItem $item) => [$item->asset_id => $item->asset->serials->pluck('serial_number')->take($item->qty_fulfilled)->all()])
+                ->all(),
+            'purchases' => $this->modules->enabled('inventory') ? app(PurchaseRequestLabels::class)->handle($items->pluck('purchase_request_id')->all()) : [],
+            'project' => $checkout->contract_id && $this->modules->enabled('contract')
+                ? (app(ContractLabels::class)->handle([$checkout->contract_id])[$checkout->contract_id] ?? null)
+                : null,
+            'senders' => $fulfillments->pluck('fulfilled_by_name')->filter()->unique()->implode(', '),
+            'deliveredAt' => $fulfillments->max('fulfilled_at') ?? $checkout->approved_at,
+        ];
+    }
+
     /**
      * @return array{view: bool, create: bool, forOthers: bool, approve: bool, fulfill: bool, return: bool}
      */
@@ -321,7 +386,48 @@ class CheckoutRequestController extends Controller
             'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle($contractId) : [],
             'partsEnabled' => $this->modules->enabled('inventory'),
             'maxItems' => CheckoutRequestForm::MAX_ITEMS,
+            // Nothing free to hand out: offer to open a purchase request for it instead.
+            'canPurchase' => $this->modules->enabled('inventory') && $user->can('purchase-requests.create'),
             'can' => $this->abilities($user),
+        ];
+    }
+
+    /**
+     * ?purchase_request={ulid}: what that purchase brought and is not handed out yet, as lines
+     * tied to it (Inventory module), for whom it was bought and for which project.
+     *
+     * @return array{ulid: string, pr_no: string, borrower_user_id: int|null, contract_id: int|null, items: list<array<string, mixed>>}|null
+     */
+    private function purchaseItems(Request $request): ?array
+    {
+        if (! $request->filled('purchase_request') || ! $this->modules->enabled('inventory')) {
+            return null;
+        }
+        $purchase = app(PurchaseIssueLines::class)->handle($request->string('purchase_request')->value(), $request->user());
+        if ($purchase === null) {
+            return null;
+        }
+
+        $assetIds = collect($purchase['lines'])->where('item_type', CheckoutItem::TYPE_ASSET)->pluck('id')->all();
+        $partIds = collect($purchase['lines'])->where('item_type', CheckoutItem::TYPE_PART)->pluck('id')->all();
+        $assets = Asset::query()->whereKey($assetIds)->get()->keyBy('id');
+        $held = app(AssetHeldQuantities::class)->handle($assetIds);
+        $parts = $partIds === [] ? [] : app(PartsForCheckout::class)->handle($partIds);
+
+        $items = collect($purchase['lines'])->map(function (array $line) use ($assets, $held, $parts, $purchase) {
+            $option = $line['item_type'] === CheckoutItem::TYPE_ASSET
+                ? ($assets->has($line['id']) ? $this->assetOption($assets[$line['id']], $held[$line['id']] ?? 0) : null)
+                : (isset($parts[$line['id']]) ? $this->partOption($parts[$line['id']]) : null);
+
+            return $option ? [...$option, 'qty' => $line['qty'], 'purchase_request_id' => $purchase['id']] : null;
+        })->filter()->values()->all();
+
+        return [
+            'ulid' => $purchase['ulid'],
+            'pr_no' => $purchase['pr_no'],
+            'borrower_user_id' => $purchase['requested_by'],
+            'contract_id' => $purchase['contract_id'],
+            'items' => $items,
         ];
     }
 
@@ -380,7 +486,7 @@ class CheckoutRequestController extends Controller
     private function authorizePrint(Request $request, CheckoutRequest $checkout): void
     {
         Gate::authorize('view', $checkout);
-        abort_if(in_array($checkout->status, [CheckoutRequest::STATUS_DRAFT, CheckoutRequest::STATUS_PENDING, CheckoutRequest::STATUS_REJECTED, CheckoutRequest::STATUS_CANCELLED], true), 404);
+        abort_if(in_array($checkout->status, CheckoutRequest::UNPRINTABLE, true), 404);
     }
 
     /** @return array<string, mixed> */

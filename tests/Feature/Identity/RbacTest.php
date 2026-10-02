@@ -6,10 +6,10 @@ use App\Modules\Tenancy\Models\Branch;
 
 it('seeds the default roles into every new tenant', function () {
     expect(Role::orderBy('name')->pluck('name')->all())
-        ->toBe(['admin_company', 'customer_it', 'helpdesk', 'technician', 'user']);
+        ->toBe(['admin_company', 'customer_it', 'helpdesk', 'purchasing', 'technician', 'user']);
 
     $other = createTenant('other');
-    expect(asTenant($other, fn () => Role::count()))->toBe(5);
+    expect(asTenant($other, fn () => Role::count()))->toBe(6);
 });
 
 it('does not let a grant with scope branch open data of another branch', function () {

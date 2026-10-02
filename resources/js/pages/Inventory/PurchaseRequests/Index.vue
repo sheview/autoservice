@@ -17,6 +17,8 @@ import { ArrowDown, ArrowUp, ExternalLink, ShoppingCart } from 'lucide-vue-next'
 
 interface Filters {
     search: string;
+    // A work queue (tab) instead of the status filter.
+    queue: string | null;
     status: string;
     mine: boolean;
     sort: string;
@@ -28,6 +30,8 @@ const props = defineProps<{
     requests: Paginated<PurchaseRequestRow>;
     filters: Filters;
     statuses: string[];
+    // The user's work queues with how many wait in each; none = no tabs.
+    queues: Record<string, number>;
     can: { create: boolean; viewAll: boolean };
 }>();
 
@@ -63,9 +67,23 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ page.props.flash.success }}
             </p>
 
+            <nav v-if="Object.keys(queues).length" class="flex flex-wrap gap-1 border-b">
+                <button
+                    v-for="key in [null, ...Object.keys(queues)]"
+                    :key="key ?? 'all'"
+                    type="button"
+                    class="-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm"
+                    :class="filters.queue === key ? 'border-primary font-medium' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                    @click="filters.queue = key"
+                >
+                    {{ t(`purchase_requests.queues.${key ?? 'all'}`) }}
+                    <span v-if="key && queues[key]" class="rounded-full bg-primary px-1.5 text-xs text-primary-foreground">{{ queues[key] }}</span>
+                </button>
+            </nav>
+
             <div class="flex flex-wrap items-center gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('purchase_requests.search_placeholder')" />
-                <select v-model="filters.status" :class="selectClass" :aria-label="t('purchase_requests.status')">
+                <select v-if="!filters.queue" v-model="filters.status" :class="selectClass" :aria-label="t('purchase_requests.status')">
                     <option v-for="key in ['open', 'all']" :key="key" :value="key">{{ t(`purchase_requests.status_filters.${key}`) }}</option>
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`purchase_requests.statuses.${status}`) }}</option>
                 </select>

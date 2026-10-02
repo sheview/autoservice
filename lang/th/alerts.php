@@ -89,5 +89,29 @@ return [
             'title' => 'ทรัพย์สินส่งซ่อม :code',
             'body' => "ทรัพย์สิน: :name\nสถานที่: :location",
         ],
+        'purchase_requested' => [
+            'title' => 'ใบขอซื้อใหม่ :no',
+            'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโครงการ: :project\nต้องการใช้ภายใน: :needed_by",
+        ],
+        'purchase_approved' => [
+            'title' => 'อนุมัติใบขอซื้อ :no รอสั่งซื้อ',
+            'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโครงการ: :project\nต้องการใช้ภายใน: :needed_by\nอนุมัติโดย: :actor",
+        ],
+        'purchase_rejected' => [
+            'title' => 'ไม่อนุมัติใบขอซื้อ :no',
+            'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโดย: :actor\nเหตุผล: :note",
+        ],
+        'purchase_ordered' => [
+            'title' => 'สั่งซื้อแล้ว :no',
+            'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโครงการ: :project\nต้องการใช้ภายใน: :needed_by\nสั่งซื้อโดย: :actor",
+        ],
+        'purchase_received' => [
+            'title' => 'ได้รับของตามใบขอซื้อ :no',
+            'body' => "ผู้ขอ: :requester\nรายการ: :item\nรับครั้งนี้: :qty\nโครงการ: :project\nรับโดย: :actor",
+        ],
+        'purchase_cancelled' => [
+            'title' => 'ยกเลิกใบขอซื้อ :no',
+            'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโดย: :actor\nเหตุผล: :note",
+        ],
     ],
 ];

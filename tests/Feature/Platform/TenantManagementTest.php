@@ -36,7 +36,7 @@ it('creates a customer company with its roles and first admin', function () {
         $admin = User::where('email', 'admin@itservice.test')->sole();
         expect($admin->hasRole('admin_company'))->toBeTrue()
             ->and($admin->can('users.manage'))->toBeTrue()
-            ->and(Role::count())->toBe(5);
+            ->and(Role::count())->toBe(6);
     });
 
     // the new admin can sign in to their company

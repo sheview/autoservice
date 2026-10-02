@@ -40,6 +40,9 @@ class BackorderCheckoutItem
                     'reason' => __('asset.requests.backorder_reason', ['no' => $request->request_no, 'borrower' => $request->borrower_name]),
                     'needed_by' => $request->needed_by?->isFuture() ? $request->needed_by->toDateString() : now()->addDays(7)->toDateString(),
                     'contract_id' => $request->contract_id,
+                    'checkout_request_id' => $request->id,
+                    // A part goes back into stock of that part when it comes (found by its name).
+                    'item_kind' => $item->item_type === CheckoutItem::TYPE_PART ? 'part' : null,
                     'links' => [],
                 ], $actor);
                 $item->purchase_request_id = $purchase->id;
