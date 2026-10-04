@@ -16,9 +16,10 @@ class IssuePartToTicket
     public function __construct(private RecordStockMovement $recordMovement) {}
 
     /**
+     * @param  int|null  $ticketId  null = taken for another company's job (a request through a share; the note says which)
      * @param  string  $type  one of StockMovement::OUT_TYPES: used up (issue), lent (loan) or put in as a spare
      */
-    public function handle(int $ticketId, int $partId, int $quantity, User $actor, ?string $note = null, string $type = StockMovement::TYPE_ISSUE): StockMovement
+    public function handle(?int $ticketId, int $partId, int $quantity, User $actor, ?string $note = null, string $type = StockMovement::TYPE_ISSUE): StockMovement
     {
         if (! in_array($type, StockMovement::OUT_TYPES, true)) {
             throw ValidationException::withMessages(['type' => __('validation.in', ['attribute' => __('inventory.fields.type')])]);

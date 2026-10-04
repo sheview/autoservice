@@ -21,6 +21,8 @@ import { computed, reactive, ref } from 'vue';
  */
 const props = defineProps<{
     request: CheckoutRequestRow;
+    // A request of a person of another company (through a share).
+    askedBy: { company: string | null; ticket_no: string | null; by: string | null } | null;
     can: {
         edit: boolean;
         submit: boolean;
@@ -131,6 +133,10 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     <RequestStatusBadge :status="request.status" />
                     <span v-if="request.auto_approved" class="ml-2 text-xs text-muted-foreground">{{ t('requests.auto_approved') }}</span>
                 </div>
+                <p v-if="askedBy" class="rounded-md bg-sky-50 px-4 py-2 text-sm text-sky-900 dark:bg-sky-950 dark:text-sky-100">
+                    {{ t('shares.asked_by', { company: askedBy.company ?? '', by: askedBy.by ?? '' }) }}
+                    <template v-if="askedBy.ticket_no"> · {{ t('shares.asked_for_ticket', { no: askedBy.ticket_no }) }}</template>
+                </p>
                 <div class="flex flex-wrap gap-2">
                     <Button v-if="can.edit" variant="outline" as-child>
                         <Link :href="route('asset.requests.edit', request.ulid)">{{ t('common.edit') }}</Link>

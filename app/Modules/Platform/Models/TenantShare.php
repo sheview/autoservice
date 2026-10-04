@@ -18,8 +18,11 @@ class TenantShare extends Model
 
     public const STATUS_REVOKED = 'revoked';
 
-    /** What can be shared now. Requests and ticket forwarding come in later phases. */
-    public const ABILITIES = ['parts.view', 'assets.view'];
+    /**
+     * What can be shared: seeing parts / assets, and asking for them (an issue/loan request made in
+     * the owner company, approved by its approver). Ticket forwarding comes in a later phase.
+     */
+    public const ABILITIES = ['parts.view', 'assets.view', 'parts.request', 'assets.request'];
 
     /** Roles of the platform that may use a share while working inside the "from" company. */
     public const CENTRAL_ROLES = ['central_technician', 'central_helpdesk'];

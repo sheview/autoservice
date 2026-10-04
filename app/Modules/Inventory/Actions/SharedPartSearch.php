@@ -12,7 +12,7 @@ use App\Modules\Inventory\Models\Part;
 class SharedPartSearch
 {
     /**
-     * @return list<array{code: string, name: string, part_number: string|null, brand: string|null, unit: string|null, qty_on_hand: int}>
+     * @return list<array{id: int, code: string, name: string, part_number: string|null, brand: string|null, unit: string|null, qty_on_hand: int}>
      */
     public function handle(string $search, int $limit = 30): array
     {
@@ -29,7 +29,7 @@ class SharedPartSearch
             ->limit($limit)
             ->get()
             ->map(fn (Part $part) => [
-                ...$part->only(['code', 'name', 'part_number', 'brand', 'unit']),
+                ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit']),
                 'qty_on_hand' => (int) $part->qty_on_hand,
             ])
             ->all();

@@ -26,6 +26,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('settings/shares', [CompanyShareController::class, 'index'])->name('platform.company-shares.index');
     Route::post('settings/shares/{share}', [CompanyShareController::class, 'decide'])->whereNumber('share')->name('platform.company-shares.decide');
     Route::get('shared-search', SharedSearchController::class)->name('platform.shared-search');
+    Route::post('shared-search/requests', [SharedSearchController::class, 'store'])->name('platform.shared-search.request');
 });
 
 Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(function () {

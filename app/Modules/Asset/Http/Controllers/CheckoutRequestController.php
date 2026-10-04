@@ -29,6 +29,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Inventory\Actions\PurchaseIssueLines;
 use App\Modules\Inventory\Actions\PurchaseRequestLabels;
+use App\Modules\Platform\CrossTenant\SharedRequests;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketsForCheckout;
 use App\Modules\Tenancy\Support\CompanyProfile;
@@ -140,6 +141,8 @@ class CheckoutRequestController extends Controller
 
         return Inertia::render('Asset/Requests/Show', [
             'request' => $row,
+            // Asked by a person of another company through a share: which company, for which job.
+            'askedBy' => app(SharedRequests::class)->askedBy($checkout->id),
             'can' => [
                 'edit' => $user->can('update', $checkout),
                 'submit' => $user->can('update', $checkout),

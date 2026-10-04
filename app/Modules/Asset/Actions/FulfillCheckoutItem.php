@@ -42,8 +42,9 @@ class FulfillCheckoutItem
 
             if ($item->item_type === CheckoutItem::TYPE_PART) {
                 // Refuses more than is on hand (the part row is locked meanwhile).
-                $movementId = $this->issuePart->handle((int) $request->ticket_id, (int) $item->part_id, $qty, $actor,
-                    __('asset.requests.issued_for', ['no' => $request->request_no]))->id;
+                // A request of another company has no ticket here: the note names the request (and so them).
+                $movementId = $this->issuePart->handle($request->ticket_id ? (int) $request->ticket_id : null, (int) $item->part_id, $qty, $actor,
+                    __('asset.requests.issued_for', ['no' => $request->request_no]).($request->ticket_id ? '' : ' · '.$request->requester_name))->id;
             } else {
                 $asset = Asset::query()->lockForUpdate()->find($item->asset_id);
                 if ($asset === null || ! in_array($asset->status, [Asset::STATUS_IN_USE, Asset::STATUS_SPARE], true)) {

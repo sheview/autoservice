@@ -2,6 +2,7 @@
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import SharedRequestList, { type SharedRequestRow } from '@/components/SharedRequestList.vue';
 import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
 import StepProgress, { type Step } from '@/components/StepProgress.vue';
@@ -129,6 +130,8 @@ const props = defineProps<{
         suggested: { key: string; ip: string; cidr: string | null } | null;
         can_change: boolean;
     } | null;
+    sharedRequests: SharedRequestRow[];
+    askOthersUrl: string | null;
     ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
     can: { update: boolean; comment: boolean; internalNotes: boolean; deleteAttachments: boolean; checkWarranty: boolean; report: boolean };
 }>();
@@ -419,6 +422,15 @@ const stepBar = computed(() => {
                     </section>
 
                     <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
+
+                    <!-- Parts and assets asked of other companies for this job -->
+                    <section v-if="sharedRequests.length || askOthersUrl" class="space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <h3 class="text-sm font-semibold">{{ t('shares.requests_title') }}</h3>
+                            <Link v-if="askOthersUrl" :href="askOthersUrl" class="text-sm text-primary hover:underline">+ {{ t('shares.ask') }}</Link>
+                        </div>
+                        <SharedRequestList v-if="sharedRequests.length" :requests="sharedRequests" />
+                    </section>
 
                     <!-- Repair report: printed on the job sheet for the customer to sign -->
                     <section v-if="ticket.report" class="space-y-2">

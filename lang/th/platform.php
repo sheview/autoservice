@@ -42,6 +42,11 @@ return [
             'branch_ids' => 'สาขาที่แชร์',
             'reason' => 'เหตุผล',
             'expires_on' => 'วันหมดอายุ',
+            'company' => 'บริษัท',
+            'ticket_id' => 'ใบงาน',
+            'items' => 'รายการ',
+            'items.*.qty' => 'จำนวน',
+            'items.*.due_return_date' => 'วันกำหนดคืน',
         ],
         'central' => 'ส่วนกลาง',
         'central_roles' => [
@@ -52,5 +57,8 @@ return [
         'revoked' => 'ยกเลิกการแชร์เรียบร้อยแล้ว',
         'accepted' => 'ยอมรับการแชร์เรียบร้อยแล้ว',
         'not_pending' => 'การแชร์นี้ไม่ได้รอการยอมรับแล้ว',
+        'requested' => 'ส่งคำขอ :no ไปที่ :company แล้ว รอผู้อนุมัติของ :company',
+        'for_ticket' => '[ใบงาน :no ของ :company]',
+        'ticket_unknown' => 'ไม่พบใบงานนี้ หรือใบงานปิดไปแล้ว',
     ],
 ];

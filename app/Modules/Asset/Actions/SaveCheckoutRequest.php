@@ -34,16 +34,18 @@ class SaveCheckoutRequest
      *     borrower_phone?: string|null, ticket_id?: int|null, contract_id?: int|null, purpose?: string|null, needed_by?: string|null,
      *     items: list<array{item_type: string, asset_id?: int|null, part_id?: int|null, checkout_type?: string|null,
      *     qty?: int|null, due_return_date?: string|null, note?: string|null, purchase_request_id?: int|null}>}  $data  validated
+     * @param  string|null  $outsideRequester  a person of another company asking through a share (no $actor here,
+     *                                         and no ticket of this company: the job is theirs)
      */
-    public function handle(?CheckoutRequest $request, array $data, User $actor): CheckoutRequest
+    public function handle(?CheckoutRequest $request, array $data, ?User $actor, ?string $outsideRequester = null): CheckoutRequest
     {
         if ($request !== null && $request->status !== CheckoutRequest::STATUS_DRAFT) {
             throw ValidationException::withMessages(['request' => __('asset.requests.not_draft')]);
         }
 
-        return DB::transaction(function () use ($request, $data, $actor) {
+        return DB::transaction(function () use ($request, $data, $actor, $outsideRequester) {
             $lines = $this->lines($data, $request);
-            if (collect($lines)->contains('item_type', CheckoutItem::TYPE_PART) && empty($data['ticket_id'])) {
+            if ($outsideRequester === null && collect($lines)->contains('item_type', CheckoutItem::TYPE_PART) && empty($data['ticket_id'])) {
                 throw ValidationException::withMessages(['ticket_id' => __('asset.requests.ticket_required')]);
             }
 
@@ -54,7 +56,7 @@ class SaveCheckoutRequest
                 'borrower_name' => $userId ? ($this->userNames->handle([$userId])[$userId] ?? '') : trim((string) ($data['borrower_name'] ?? '')),
                 'borrower_department' => $data['borrower_department'] ?? null,
                 'borrower_phone' => $data['borrower_phone'] ?? null,
-                'branch_id' => $borrower?->branch_id ?? $actor->branch_id,
+                'branch_id' => $borrower?->branch_id ?? $actor?->branch_id,
                 'ticket_id' => $data['ticket_id'] ?? null,
                 'contract_id' => $data['contract_id'] ?? null,
                 'purpose' => $data['purpose'] ?? null,
@@ -66,8 +68,8 @@ class SaveCheckoutRequest
                     ...$fields,
                     'request_no' => $this->generateNumber->handle(),
                     'status' => CheckoutRequest::STATUS_DRAFT,
-                    'requester_id' => $actor->id,
-                    'requester_name' => $actor->name,
+                    'requester_id' => $actor?->id,
+                    'requester_name' => $outsideRequester ?? $actor?->name,
                 ]);
             } else {
                 $request->update($fields);

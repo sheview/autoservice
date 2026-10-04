@@ -1,7 +1,11 @@
 <?php
 
+use App\Modules\Asset\Models\Asset;
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Platform\Models\CrossTenantLink;
 use App\Modules\Platform\Models\TenantShare;
 use App\Modules\Tenancy\Models\Branch;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -125,4 +129,55 @@ it('keeps sharing settings to the superadmin and customer accounts out', functio
     ($this->share)(['activate' => true]);
     $client = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     ($this->search)($client)->assertForbidden();
+});
+
+it('asks another company for parts for a ticket, which that company approves and hands out', function () {
+    ($this->share)(['activate' => true, 'abilities' => ['parts.view', 'parts.request']]);
+    $ticket = openTicket($this->tech);
+    $partB = asTenant($this->b, fn () => Part::where('code', 'SFP-01')->first());
+
+    $this->actingAs($this->tech)->post('/shared-search/requests', [
+        'company' => $this->b->id,
+        'ticket_id' => $ticket->id,
+        'purpose' => 'Uplink',
+        'items' => [['item_type' => 'part', 'id' => $partB->id, 'qty' => 2]],
+    ])->assertSessionHasNoErrors();
+
+    // Made in B, waiting for B's approver; nothing of it in A.
+    $request = asTenant($this->b, fn () => CheckoutRequest::with('items')->first());
+    expect($request->only(['status', 'requester_id', 'requester_name', 'borrower_name', 'ticket_id']))
+        ->toBe(['status' => 'pending', 'requester_id' => null, 'requester_name' => 'Tech A (Default)', 'borrower_name' => 'Tech A (Default)', 'ticket_id' => null])
+        ->and($request->purpose)->toContain($ticket->ticket_no)
+        ->and(CheckoutRequest::count())->toBe(0);
+
+    $this->actingAs($this->adminB)->get("/checkout-requests/{$request->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('askedBy', ['company' => 'Default', 'ticket_no' => $ticket->ticket_no, 'by' => 'Tech A']));
+    $this->actingAs($this->adminB)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
+    $this->actingAs($this->adminB)->post("/checkout-items/{$request->items->first()->id}/fulfill", ['qty' => 2])->assertSessionHasNoErrors();
+
+    asTenant($this->b, function () {
+        expect(Part::where('code', 'SFP-01')->value('qty_on_hand'))->toBe(5)
+            ->and(StockMovement::latest('id')->first()->only(['type', 'quantity', 'ticket_id']))->toBe(['type' => 'issue', 'quantity' => -2, 'ticket_id' => null]);
+    });
+
+    // A follows it on its ticket.
+    $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('sharedRequests.0.company', 'Beta')
+        ->where('sharedRequests.0.request_no', $request->request_no)
+        ->where('sharedRequests.0.status', 'fulfilled')
+        ->where('sharedRequests.0.items.0.qty_fulfilled', 2));
+    expect(CrossTenantLink::first()->only(['source_id', 'target_id']))->toBe(['source_id' => $ticket->id, 'target_id' => $request->id]);
+});
+
+it('asks only for what the share allows', function () {
+    ($this->share)(['activate' => true, 'abilities' => ['parts.view', 'assets.view', 'assets.request'], 'branch_ids' => [$this->bangna->id]]);
+    [$partB, $northSwitch] = asTenant($this->b, fn () => [Part::first(), Asset::where('name', 'North Switch')->first()]);
+
+    // Parts were not shared for asking.
+    $this->actingAs($this->tech)->post('/shared-search/requests', ['company' => $this->b->id, 'items' => [['item_type' => 'part', 'id' => $partB->id, 'qty' => 1]]])
+        ->assertForbidden();
+    // An asset of a branch that is not shared.
+    $this->actingAs($this->tech)->post('/shared-search/requests', ['company' => $this->b->id, 'items' => [['item_type' => 'asset', 'id' => $northSwitch->id, 'qty' => 1]]])
+        ->assertSessionHasErrors('items');
+    expect(asTenant($this->b, fn () => CheckoutRequest::count()))->toBe(0);
 });

@@ -12,8 +12,10 @@ use App\Modules\Asset\Models\Asset;
  */
 class SharedAssetSearch
 {
+    public function __construct(private AssetHeldQuantities $held) {}
+
     /**
-     * @return list<array{asset_code: string, name: string, category: string|null, brand: string|null, model: string|null,
+     * @return list<array{id: int, available: int, asset_code: string, name: string, category: string|null, brand: string|null, model: string|null,
      *     serial_number: string|null, status: string, location: string|null, quantity: int, unit: string|null}>
      */
     /**
@@ -23,7 +25,7 @@ class SharedAssetSearch
     {
         $search = trim($search);
 
-        return Asset::query()
+        $assets = Asset::query()
             ->with('category:id,name')
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
                 ->where('asset_code', 'ilike', "%{$search}%")
@@ -35,8 +37,14 @@ class SharedAssetSearch
             ->when($branchIds !== [], fn ($q) => $q->whereIn('branch_id', $branchIds))
             ->orderBy('asset_code')
             ->limit($limit)
-            ->get()
+            ->get();
+        // What is not already asked for or out on a request.
+        $held = $this->held->handle($assets->pluck('id')->all());
+
+        return $assets
             ->map(fn (Asset $asset) => [
+                'id' => $asset->id,
+                'available' => max(0, (int) $asset->quantity - ($held[$asset->id] ?? 0)),
                 ...$asset->only(['asset_code', 'name', 'brand', 'model', 'serial_number', 'status', 'location', 'quantity', 'unit']),
                 'category' => $asset->category?->name,
             ])

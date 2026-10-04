@@ -23,6 +23,8 @@ use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\TicketParts;
 use App\Modules\Labeling\Actions\QrSvg;
+use App\Modules\Platform\CrossTenant\SharedRequests;
+use App\Modules\Platform\CrossTenant\ShareGateway;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\OpenTicket;
@@ -158,6 +160,8 @@ class TicketController extends Controller
         IpLabels $ipLabels,
         IpOfAsset $ipOfAsset,
         IpChoices $ipChoices,
+        SharedRequests $sharedRequests,
+        ShareGateway $gateway,
     ): Response {
         Gate::authorize('view', $ticket);
 
@@ -223,6 +227,12 @@ class TicketController extends Controller
                 'suggested' => ! $ticket->ip_address_id && $ticket->asset_id ? $ipOfAsset->handle($ticket->asset_id) : null,
                 'can_change' => $user->can('update', $ticket),
             ] : null,
+            // Parts and assets asked of other companies for this job (Platform\CrossTenant); staff only.
+            'sharedRequests' => $user->customer_id === null ? $sharedRequests->forTicket($ticket->id) : [],
+            // Where to ask other companies for parts for this job (only when one shares with us).
+            'askOthersUrl' => $user->customer_id === null && ($user->can('asset-checkouts.request') || $user->can('asset-checkouts.create'))
+                && ($gateway->targets($user, 'parts.request')->isNotEmpty() || $gateway->targets($user, 'assets.request')->isNotEmpty())
+                ? route('platform.shared-search', ['ticket' => $ticket->id]) : null,
             'ipChoices' => Inertia::optional(fn () => $ipChoices->handle(
                 $request->string('ip_search')->value(),
                 $ticket->customer_id ?? 0,
