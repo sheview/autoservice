@@ -72,12 +72,19 @@ return [
 
     // Sharing data between companies
     'shares' => [
+        // Nested as the ability names read (parts.view = parts > view), so t('shares.abilities.parts.view') finds them.
         'abilities' => [
-            'parts.view' => 'ดูอะไหล่และสต็อก',
-            'assets.view' => 'ดูทรัพย์สิน',
-            'parts.request' => 'ขอเบิกอะไหล่',
-            'assets.request' => 'ขอเบิก/ยืมทรัพย์สิน',
-            'tickets.forward' => 'รับใบงานที่ส่งต่อมา',
+            'parts' => [
+                'view' => 'ดูอะไหล่และจำนวนคงเหลือ',
+                'request' => 'ขอเบิกอะไหล่',
+            ],
+            'assets' => [
+                'view' => 'ดูทรัพย์สิน',
+                'request' => 'ขอเบิก/ยืมทรัพย์สิน',
+            ],
+            'tickets' => [
+                'forward' => 'ส่งใบงานมาให้ทำแทนได้',
+            ],
         ],
         // Forwarding tickets
         'forward_title' => 'ส่งต่อใบงานไปบริษัทอื่น',
@@ -124,7 +131,7 @@ return [
         'link_list' => 'แชร์ข้อมูลให้บริษัทอื่น',
         'who' => 'ผู้ที่เห็น',
         'company' => 'บริษัทที่เห็นข้อมูล',
-        'abilities_label' => 'ให้ดู',
+        'abilities_label' => 'อนุญาตให้',
         'roles_label' => 'ทุกคนในบทบาท',
         'people_label' => 'หรือเลือกรายคน',
         'who_hint' => 'เลือกบทบาท รายคน หรือทั้งสองอย่าง อย่างน้อยหนึ่งอย่าง',
