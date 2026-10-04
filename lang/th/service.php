@@ -3,6 +3,9 @@
 return [
     'tickets' => [
         'created' => 'เปิดใบงาน :no เรียบร้อยแล้ว',
+        'appointment_saved' => 'บันทึกวันนัดเข้าหน้างานแล้ว',
+        'appointment_set' => 'นัดเข้าหน้างาน :at',
+        'appointment_cleared' => 'ยกเลิกวันนัดเข้าหน้างาน',
         'report_first' => 'กรุณากรอกผลการซ่อม (สาเหตุที่พบ และผู้อนุมัติการซ่อมฝั่งลูกค้า) แล้วกดบันทึกก่อนปิดงาน',
         'ip_saved' => 'บันทึก IP ของใบงานเรียบร้อยแล้ว',
         'forwarded' => 'ส่งต่อใบงานไปที่ :company แล้ว (ใบงาน :no)',
@@ -64,6 +67,7 @@ return [
 
     // Field names for validation messages and "edited" entries in the timeline.
     'fields' => [
+        'appointment_at' => 'วันนัดเข้าหน้างาน',
         'customer_id' => 'ลูกค้า',
         'asset_id' => 'ทรัพย์สิน',
         'contract_id' => 'สัญญา',
@@ -102,5 +106,11 @@ return [
     'holiday_fields' => [
         'date' => 'วันที่',
         'name' => 'ชื่อวันหยุด',
+    ],
+
+    'my_work' => [
+        'fields' => ['title' => 'หัวข้อ', 'date' => 'วันที่', 'start_time' => 'เวลาเริ่ม', 'end_time' => 'เวลาสิ้นสุด', 'notes' => 'หมายเหตุ'],
+        'saved' => 'บันทึกนัดหมายแล้ว',
+        'deleted' => 'ลบนัดหมายแล้ว',
     ],
 ];

@@ -75,6 +75,8 @@ class TicketController extends Controller
                 'out_of_contract' => $ticket->contract_id === null,
                 'resolve_due_at' => $ticket->resolve_due_at?->toIso8601String(),
                 'sla' => TicketSlaState::of($ticket),
+                // For a datetime-local input, in the app's time zone.
+                'appointment_at' => $ticket->appointment_at?->timezone(config('app.timezone'))->format('Y-m-d\TH:i'),
                 'created_at' => $ticket->created_at->toIso8601String(),
             ]),
             'filters' => $filters,
@@ -207,6 +209,8 @@ class TicketController extends Controller
                 'assignee' => $names[$ticket->assignee_id] ?? null,
                 'reporter' => $names[$ticket->reported_by] ?? null,
                 'sla' => TicketSlaState::of($ticket),
+                // For a datetime-local input, in the app's time zone.
+                'appointment_at' => $ticket->appointment_at?->timezone(config('app.timezone'))->format('Y-m-d\TH:i'),
                 ...collect(['response_due_at', 'resolve_due_at', 'responded_at', 'on_hold_since', 'resolved_at', 'closed_at', 'cancelled_at', 'created_at'])
                     ->mapWithKeys(fn ($field) => [$field => $ticket->{$field}?->toIso8601String()]),
             ],

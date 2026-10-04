@@ -12,9 +12,11 @@ use App\Modules\Service\Actions\CommentOnTicket;
 use App\Modules\Service\Actions\LinkTicketIp;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\SaveRepairReport;
+use App\Modules\Service\Actions\SetTicketAppointment;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Support\TicketWorkflow;
 use App\Modules\Tenancy\Models\Tenant;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -84,6 +86,20 @@ class TicketActionController extends Controller
         $linkTicketIp->handle($ticket, $validated['ip'] ?? null);
 
         return back()->with('success', __('service.tickets.ip_saved'));
+    }
+
+    /** When the technician is due on site (or none): puts the job on that day of their calendar. */
+    public function appointment(Request $request, Ticket $ticket, SetTicketAppointment $setAppointment): RedirectResponse
+    {
+        Gate::authorize('update', $ticket);
+        $validated = $request->validate(['appointment_at' => ['nullable', 'date']], attributes: __('service.fields'));
+
+        $at = filled($validated['appointment_at'] ?? null)
+            ? CarbonImmutable::parse($validated['appointment_at'], config('app.timezone'))->toDateTimeString()
+            : null;
+        $setAppointment->handle($ticket, $at, $request->user());
+
+        return back()->with('success', __('service.tickets.appointment_saved'));
     }
 
     /** Sends the job on to another company that takes tickets from us (cross-company sharing). */

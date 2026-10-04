@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Service\Http\Controllers\HolidayController;
+use App\Modules\Service\Http\Controllers\MyWorkController;
 use App\Modules\Service\Http\Controllers\TicketActionController;
 use App\Modules\Service\Http\Controllers\TicketAttachmentController;
 use App\Modules\Service\Http\Controllers\TicketController;
@@ -10,8 +11,11 @@ use App\Modules\Service\Http\Controllers\TicketSurveyController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->group(function () {
-    // My work: the running tickets assigned to the user.
-    Route::get('my-work', fn () => redirect()->route('service.tickets.index', ['assignee' => 'me', 'status' => 'open', 'sort' => 'resolve_due_at', 'direction' => 'asc']))->name('my-work');
+    // My work: calendar and to-do list of the user (assigned tickets, loans, own appointments).
+    Route::get('my-work', [MyWorkController::class, 'index'])->name('my-work');
+    Route::post('my-work/events', [MyWorkController::class, 'store'])->name('my-work.events.store');
+    Route::put('my-work/events/{event}', [MyWorkController::class, 'update'])->whereNumber('event')->name('my-work.events.update');
+    Route::delete('my-work/events/{event}', [MyWorkController::class, 'destroy'])->whereNumber('event')->name('my-work.events.destroy');
     Route::resource('tickets', TicketController::class)->except(['destroy']);
     Route::get('tickets/{ticket}/print', [TicketPrintController::class, 'show'])->name('tickets.print');
     Route::get('tickets/{ticket}/pdf', [TicketPrintController::class, 'pdf'])->name('tickets.pdf');
@@ -19,6 +23,7 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     Route::post('tickets/{ticket}/warranty', [TicketActionController::class, 'warranty'])->name('tickets.warranty');
     Route::post('tickets/{ticket}/report', [TicketActionController::class, 'report'])->name('tickets.report');
     Route::post('tickets/{ticket}/ip', [TicketActionController::class, 'ip'])->name('tickets.ip');
+    Route::post('tickets/{ticket}/appointment', [TicketActionController::class, 'appointment'])->name('tickets.appointment');
     Route::post('tickets/{ticket}/forward', [TicketActionController::class, 'forward'])->name('tickets.forward');
     Route::post('tickets/{ticket}/move', [TicketActionController::class, 'move'])->name('tickets.move');
     Route::post('tickets/{ticket}/comments', [TicketActionController::class, 'comment'])->name('tickets.comments.store');

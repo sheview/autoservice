@@ -7,6 +7,7 @@ import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
 import StepProgress, { type Step } from '@/components/StepProgress.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
+import TicketAppointment from '@/components/TicketAppointment.vue';
 import TicketForwardPanel, { type TicketForwards } from '@/components/TicketForwardPanel.vue';
 import TicketIpPanel from '@/components/TicketIpPanel.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
@@ -22,6 +23,7 @@ import { computed, ref } from 'vue';
 
 interface TicketDetail {
     ulid: string;
+    appointment_at: string | null;
     ticket_no: string;
     title: string;
     description: string | null;
@@ -424,6 +426,8 @@ const stepBar = computed(() => {
                     </section>
 
                     <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
+
+                    <TicketAppointment :ticket-ulid="ticket.ulid" :appointment-at="ticket.appointment_at" :can-change="can.update" />
 
                     <TicketForwardPanel v-if="forwards" :ticket-ulid="ticket.ulid" :forwards="forwards" />
 

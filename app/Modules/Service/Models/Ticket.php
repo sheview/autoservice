@@ -58,7 +58,7 @@ class Ticket extends Model implements HasMedia
 
     protected $fillable = [
         'ticket_no', 'customer_id', 'asset_id', 'ip_address_id', 'contract_id', 'branch_id', 'title', 'description',
-        'priority', 'status', 'source', 'contact_name', 'contact_phone', 'reported_by', 'assignee_id',
+        'priority', 'status', 'source', 'contact_name', 'contact_phone', 'reported_by', 'assignee_id', 'appointment_at',
         'service_window', 'response_minutes', 'resolve_minutes', 'response_due_at', 'resolve_due_at',
         'responded_at', 'response_breach_notified_at', 'resolve_breach_notified_at', 'on_hold_since', 'hold_minutes', 'resolved_at', 'closed_at', 'cancelled_at',
         'device_name', 'device_brand', 'device_model', 'device_serial', 'device_serial_unknown', 'device_location', 'device_ip',
@@ -85,6 +85,7 @@ class Ticket extends Model implements HasMedia
             'hold_minutes' => 'integer',
             'response_due_at' => 'datetime',
             'resolve_due_at' => 'datetime',
+            'appointment_at' => 'datetime',
             'responded_at' => 'datetime',
             'response_breach_notified_at' => 'datetime',
             'resolve_breach_notified_at' => 'datetime',
