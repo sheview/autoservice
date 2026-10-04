@@ -3,6 +3,7 @@
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Platform\Models\TenantShare;
+use App\Modules\Tenancy\Models\Branch;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -18,15 +19,21 @@ beforeEach(function () {
 
     $this->b = createTenant('beta');
     $this->adminB = userWithRole('admin_company', ['name' => 'Admin B'], $this->b);
-    asTenant($this->b, function () {
+    [$this->bangna, $this->chiangmai] = asTenant($this->b, function () {
         createPart(['name' => 'SFP 10G', 'code' => 'SFP-01'], 7);
-        createAsset(createAssetCategory(), ['name' => 'Spare Switch']);
+        $bangna = Branch::create(['code' => 'BN', 'name' => 'Bangna']);
+        $chiangmai = Branch::create(['code' => 'CM', 'name' => 'Chiang Mai']);
+        $category = createAssetCategory();
+        createAsset($category, ['name' => 'Spare Switch', 'branch_id' => $bangna->id]);
+        createAsset($category, ['name' => 'North Switch', 'branch_id' => $chiangmai->id]);
+
+        return [$bangna, $chiangmai];
     });
     $this->c = createTenant('gamma');
     $this->adminC = userWithRole('admin_company', [], $this->c);
 
     $this->share = fn (array $data = []) => $this->actingAs($this->superadmin)
-        ->put("/platform/tenants/{$this->a->ulid}/shares/{$this->b->ulid}", $data + [
+        ->put("/platform/tenants/{$this->b->ulid}/shares/{$this->a->ulid}", $data + [
             'abilities' => ['parts.view'],
             'roles' => ['technician', 'central_technician'],
             'activate' => false,
@@ -77,6 +84,25 @@ it('lets the superadmin put a share in force at once, and either company revoke 
     ($this->search)($this->tech)->assertInertia(fn (Assert $page) => $page->where('companies', []));
 });
 
+it('shows each company only what was shared with it: named people, and assets of chosen branches', function () {
+    $named = userWithRole('user', ['name' => 'Named User']);
+    grantTo('user', ['assets.view']);
+    ($this->share)(['activate' => true, 'abilities' => ['assets.view'], 'roles' => [], 'user_ids' => [$named->id], 'branch_ids' => [$this->bangna->id]])
+        ->assertSessionHasNoErrors();
+
+    // The named person sees only Bangna's assets; technicians (no longer listed) see nothing.
+    ($this->search)($named, 'kind=assets&search=switch')->assertInertia(fn (Assert $page) => $page
+        ->where('results.0.rows', fn ($rows) => collect($rows)->pluck('name')->all() === ['Spare Switch']));
+    ($this->search)($this->tech, 'kind=assets&search=switch')->assertInertia(fn (Assert $page) => $page->where('companies', []));
+
+    // Company C was not given anything.
+    $techC = userWithRole('technician', [], $this->c);
+    ($this->search)($techC, 'kind=assets&search=switch')->assertInertia(fn (Assert $page) => $page->where('companies', []));
+
+    // Who must be named somehow.
+    ($this->share)(['roles' => [], 'user_ids' => []])->assertSessionHasErrors(['roles', 'user_ids']);
+});
+
 it('stops an expired share', function () {
     ($this->share)(['activate' => true]);
     TenantShare::query()->update(['expires_on' => now()->subDay()->toDateString()]);
@@ -92,7 +118,7 @@ it('lets central technicians use the share of the company they work in', functio
 });
 
 it('keeps sharing settings to the superadmin and customer accounts out', function () {
-    $this->actingAs($this->adminA)->put("/platform/tenants/{$this->a->ulid}/shares/{$this->b->ulid}", [
+    $this->actingAs($this->adminA)->put("/platform/tenants/{$this->b->ulid}/shares/{$this->a->ulid}", [
         'abilities' => ['parts.view'], 'roles' => ['technician'], 'activate' => true,
     ])->assertForbidden();
 

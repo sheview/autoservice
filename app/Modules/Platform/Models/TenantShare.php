@@ -25,17 +25,19 @@ class TenantShare extends Model
     public const CENTRAL_ROLES = ['central_technician', 'central_helpdesk'];
 
     protected $fillable = [
-        'from_tenant_id', 'to_tenant_id', 'abilities', 'roles', 'status', 'reason', 'expires_on',
+        'from_tenant_id', 'to_tenant_id', 'abilities', 'roles', 'user_ids', 'branch_ids', 'status', 'reason', 'expires_on',
         'granted_by_name', 'accepted_by_name', 'accepted_at', 'revoked_by_name', 'revoked_at',
     ];
 
-    protected $attributes = ['abilities' => '[]', 'roles' => '[]'];
+    protected $attributes = ['abilities' => '[]', 'roles' => '[]', 'user_ids' => '[]', 'branch_ids' => '[]'];
 
     protected function casts(): array
     {
         return [
             'abilities' => 'array',
             'roles' => 'array',
+            'user_ids' => 'array',
+            'branch_ids' => 'array',
             'expires_on' => 'date',
             'accepted_at' => 'datetime',
             'revoked_at' => 'datetime',

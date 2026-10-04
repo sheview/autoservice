@@ -37,10 +37,13 @@ return [
     'shares' => [
         'fields' => [
             'abilities' => 'ข้อมูลที่แชร์',
-            'roles' => 'บทบาทที่ใช้ได้',
+            'roles' => 'บทบาทที่เห็นได้',
+            'user_ids' => 'พนักงานที่เห็นได้',
+            'branch_ids' => 'สาขาที่แชร์',
             'reason' => 'เหตุผล',
             'expires_on' => 'วันหมดอายุ',
         ],
+        'central' => 'ส่วนกลาง',
         'central_roles' => [
             'central_technician' => 'ช่างส่วนกลาง',
             'central_helpdesk' => 'Helpdesk ส่วนกลาง',

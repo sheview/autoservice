@@ -12,7 +12,7 @@ use Illuminate\Support\Collection;
  * The only door into another company's data. A user working in company A may use an ability
  * (parts.view, ...) on company B when a share A -> B is active, not expired, holds the ability
  * and lists one of the user's roles in their own (home) company — a company role, or a central
- * role for platform staff working inside A. Customer accounts never pass.
+ * role for platform staff working inside A — or names the user. Customer accounts never pass.
  *
  * run() switches the tenant context to B for the callback only, so B's row level security
  * applies as usual: the callback reads B's data as B, and nothing else of B's leaks.
@@ -29,6 +29,33 @@ class ShareGateway
      */
     public function targets(User $user, string $ability): Collection
     {
+        return $this->shares($user, $ability)
+            ->map(fn (TenantShare $share) => $share->toTenant)
+            ->sortBy('name')
+            ->values();
+    }
+
+    /**
+     * Runs the callback inside company $target, when the user may reach it with the ability.
+     * The callback gets the share, to keep to what it allows (e.g. its branch_ids).
+     *
+     * @param  callable(TenantShare): mixed  $callback
+     */
+    public function run(User $user, Tenant $target, string $ability, callable $callback): mixed
+    {
+        $share = $this->shares($user, $ability)->firstWhere('to_tenant_id', $target->id);
+        abort_if($share === null, 403);
+
+        return $this->context->run($target, fn () => $callback($share));
+    }
+
+    /**
+     * The shares in force that reach the user, from the company they work in now.
+     *
+     * @return Collection<int, TenantShare>
+     */
+    private function shares(User $user, string $ability): Collection
+    {
         $from = $this->context->id();
         if ($from === null || $user->customer_id !== null) {
             return collect();
@@ -42,21 +69,10 @@ class ShareGateway
             ->where(fn ($q) => $q->whereNull('expires_on')->orWhere('expires_on', '>=', now()->toDateString()))
             ->whereJsonContains('abilities', $ability)
             ->get()
-            ->filter(fn (TenantShare $share) => array_intersect($share->roles, $roles) !== [])
-            ->map(fn (TenantShare $share) => $share->toTenant)
-            ->filter(fn (?Tenant $tenant) => $tenant !== null && ! $tenant->is_platform)
-            ->sortBy('name')
+            ->filter(fn (TenantShare $share) => array_intersect($share->roles, $roles) !== []
+                || in_array((int) $user->id, array_map('intval', $share->user_ids), true))
+            ->filter(fn (TenantShare $share) => $share->toTenant !== null && ! $share->toTenant->is_platform)
             ->values();
-    }
-
-    /**
-     * Runs the callback inside company $target, when the user may reach it with the ability.
-     */
-    public function run(User $user, Tenant $target, string $ability, callable $callback): mixed
-    {
-        abort_unless($this->targets($user, $ability)->contains('id', $target->id), 403);
-
-        return $this->context->run($target, $callback);
     }
 
     /**

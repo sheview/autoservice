@@ -42,7 +42,7 @@ Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(functi
     Route::put('tenants/{tenant:ulid}/modules', [TenantModuleController::class, 'update'])->name('tenants.modules.update');
 
     Route::get('tenants/{tenant:ulid}/shares', [TenantShareController::class, 'edit'])->name('tenants.shares.edit');
-    Route::put('tenants/{tenant:ulid}/shares/{to:ulid}', [TenantShareController::class, 'update'])->withoutScopedBindings()->name('tenants.shares.update');
+    Route::put('tenants/{tenant:ulid}/shares/{viewer:ulid}', [TenantShareController::class, 'update'])->withoutScopedBindings()->name('tenants.shares.update');
     Route::post('tenants/{tenant:ulid}/shares/{share}/revoke', [TenantShareController::class, 'revoke'])->whereNumber('share')->name('tenants.shares.revoke');
 
     Route::get('settings', [PlatformSettingsController::class, 'edit'])->name('settings.edit');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\SharedAssetSearch;
 use App\Modules\Inventory\Actions\SharedPartSearch;
 use App\Modules\Platform\CrossTenant\ShareGateway;
+use App\Modules\Platform\Models\TenantShare;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -35,9 +36,9 @@ class SharedSearchController extends Controller
         $results = ($search === '' && ! $chosen) ? [] : ($chosen ? collect([$chosen]) : $companies)
             ->map(fn (Tenant $company) => [
                 'company' => $company->name,
-                'rows' => $gateway->run($user, $company, $ability, fn () => $kind === 'parts'
+                'rows' => $gateway->run($user, $company, $ability, fn (TenantShare $share) => $kind === 'parts'
                     ? $parts->handle($search)
-                    : $assets->handle($search)),
+                    : $assets->handle($search, array_map('intval', $share->branch_ids))),
             ])
             ->filter(fn (array $group) => $group['rows'] !== [])
             ->values()

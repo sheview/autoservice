@@ -12,6 +12,8 @@ interface ShareRow {
     id: number;
     company: string | null;
     abilities: string[];
+    branches: string[];
+    people_count: number;
     status: 'pending' | 'active' | 'revoked';
     reason: string | null;
     expires_on: string | null;
@@ -64,7 +66,17 @@ const statusClass: Record<string, string> = {
                                     t(`shares.statuses.${share.status}`)
                                 }}</span>
                             </div>
-                            <div class="text-sm">{{ share.abilities.map((a) => t(`shares.abilities.${a}`)).join(', ') }}</div>
+                            <div class="text-sm">
+                                {{ share.abilities.map((a) => t(`shares.abilities.${a}`)).join(', ') }}
+                                <span v-if="share.people_count"> · {{ t('shares.people_count', { count: share.people_count }) }}</span>
+                            </div>
+                            <div v-if="side === 'incoming'" class="text-sm text-muted-foreground">
+                                {{
+                                    share.branches.length
+                                        ? t('shares.branches_count', { names: share.branches.join(', ') })
+                                        : t('shares.all_branches')
+                                }}
+                            </div>
                             <div class="text-xs text-muted-foreground">
                                 <span v-if="share.reason">{{ share.reason }} · </span>
                                 <span v-if="share.granted_by_name">{{ t('shares.granted_by', { name: share.granted_by_name }) }}</span>

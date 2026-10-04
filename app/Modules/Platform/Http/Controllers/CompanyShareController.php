@@ -5,6 +5,7 @@ namespace App\Modules\Platform\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Platform\Actions\DecideTenantShare;
 use App\Modules\Platform\Models\TenantShare;
+use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,7 +27,10 @@ class CompanyShareController extends Controller
         Gate::authorize(self::PERMISSION);
         $id = $this->company($context);
 
+        $branches = Branch::pluck('name', 'id'); // ours: the branches of our data that are shared
         $row = fn (TenantShare $share, string $other) => [
+            'people_count' => count($share->user_ids),
+            'branches' => $other === 'fromTenant' ? collect($share->branch_ids)->map(fn ($id) => $branches[$id] ?? null)->filter()->values() : [],
             ...$share->only(['id', 'abilities', 'roles', 'status', 'reason', 'granted_by_name', 'accepted_by_name', 'revoked_by_name']),
             'company' => $share->{$other}?->name,
             'expires_on' => $share->expires_on?->toDateString(),

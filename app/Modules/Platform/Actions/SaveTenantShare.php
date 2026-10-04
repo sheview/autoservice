@@ -7,14 +7,15 @@ use App\Modules\Platform\Models\TenantShare;
 use App\Modules\Tenancy\Models\Tenant;
 
 /**
- * The superadmin sets what company $from may see of company $to. "activate" puts it in force
+ * The superadmin sets what company $from may see of company $to (who: roles and/or named people;
+ * which assets: some of $to's branches, or all). "activate" puts it in force
  * at once; otherwise it waits for $to's admin to accept (a changed share asks again, unless
  * activated). A revoked share comes back through here.
  */
 class SaveTenantShare
 {
     /**
-     * @param  array{abilities: list<string>, roles: list<string>, reason?: string|null, expires_on?: string|null, activate: bool}  $data  validated
+     * @param  array{abilities: list<string>, roles: list<string>, user_ids: list<int>, branch_ids: list<int>, reason?: string|null, expires_on?: string|null, activate: bool}  $data  validated
      */
     public function handle(Tenant $from, Tenant $to, array $data, User $superadmin): TenantShare
     {
@@ -23,6 +24,8 @@ class SaveTenantShare
         $share->fill([
             'abilities' => array_values(array_unique($data['abilities'])),
             'roles' => array_values(array_unique($data['roles'])),
+            'user_ids' => array_values(array_unique(array_map('intval', $data['user_ids']))),
+            'branch_ids' => array_values(array_unique(array_map('intval', $data['branch_ids']))),
             'reason' => $data['reason'] ?? null,
             'expires_on' => $data['expires_on'] ?? null,
             'granted_by_name' => $superadmin->name,
