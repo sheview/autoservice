@@ -3,6 +3,7 @@
 namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
+use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Identity\Models\User;
@@ -25,7 +26,7 @@ class SearchAssets
     public const EXPIRING_DAYS = 90;
 
     /**
-     * @return array{search: string, branch_id: int|null, customer_id: int|null, category_id: int|null, status: string|null,
+     * @return array{search: string, branch_id: int|null, customer_id: int|null, category_id: int|null, asset_type: string|null, status: string|null,
      *     warranty: string|null, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
@@ -35,6 +36,8 @@ class SearchAssets
             'branch_id' => $request->integer('branch_id') ?: null,
             'customer_id' => $request->integer('customer_id') ?: null,
             'category_id' => $request->integer('category_id') ?: null,
+            // Hardware or software: the type of the asset's category.
+            'asset_type' => in_array($request->input('asset_type'), AssetCategory::ASSET_TYPES, true) ? $request->input('asset_type') : null,
             'status' => in_array($request->input('status'), Asset::STATUSES, true) ? $request->input('status') : null,
             'warranty' => in_array($request->input('warranty'), self::WARRANTY_FILTERS, true) ? $request->input('warranty') : null,
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'asset_code',
@@ -66,6 +69,7 @@ class SearchAssets
             ->when($filters['branch_id'] ?? null, fn (Builder $q, $id) => $q->where('branch_id', $id))
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['category_id'] ?? null, fn (Builder $q, $id) => $q->where('category_id', $id))
+            ->when($filters['asset_type'] ?? null, fn (Builder $q, $type) => $q->whereHas('category', fn (Builder $q) => $q->where('asset_type', $type)))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
             ->when(($filters['warranty'] ?? null) === 'active', fn (Builder $q) => $q->where('warranty_expires_at', '>=', $today))
             ->when(($filters['warranty'] ?? null) === 'expiring', fn (Builder $q) => $q

@@ -6,11 +6,15 @@ use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Asset\Actions\AssetDevices;
 use App\Modules\Asset\Actions\AssetSummaries;
+use App\Modules\Asset\Actions\IpChoices;
+use App\Modules\Asset\Actions\IpLabels;
+use App\Modules\Asset\Actions\IpOfAsset;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\CoveringContracts;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\AddAttachments;
 use App\Modules\Document\Support\Attachments;
+use App\Modules\Identity\Actions\ContactPeople;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
@@ -92,6 +96,7 @@ class TicketController extends Controller
         AssetSummaries $assetSummaries,
         CoveringContracts $coveringContracts,
         UsersWithPermission $usersWithPermission,
+        ContactPeople $contactPeople,
     ): Response {
         Gate::authorize('create', Ticket::class);
 
@@ -124,6 +129,8 @@ class TicketController extends Controller
             'assignees' => $user->can('tickets.assign')
                 ? $usersWithPermission->handle(self::ASSIGNABLE_PERMISSION)->map(fn (User $u) => $u->only(['id', 'name']))->values()
                 : [],
+            // Who may be reporting: the customer's accounts, or the tenant's own staff without a customer.
+            'contactPeople' => fn () => $contactPeople->handle($customerId),
             'priorities' => Ticket::PRIORITIES,
             'sources' => Ticket::SOURCES,
         ]);
@@ -148,6 +155,9 @@ class TicketController extends Controller
         IssuableParts $issuableParts,
         SurveyOfTicket $surveyOfTicket,
         QrSvg $qrSvg,
+        IpLabels $ipLabels,
+        IpOfAsset $ipOfAsset,
+        IpChoices $ipChoices,
     ): Response {
         Gate::authorize('view', $ticket);
 
@@ -207,6 +217,16 @@ class TicketController extends Controller
                 ->keys()
                 ->values(),
             'needsComment' => TicketWorkflow::NEEDS_COMMENT,
+            // The IP address the job is about (IP management, staff only); "choices" fill the picker (ip_search).
+            'ip' => $user->customer_id === null && $this->modules->enabled('asset') && $user->can('ip-check.view') ? [
+                'current' => $ticket->ip_address_id ? ($ipLabels->handle([$ticket->ip_address_id])[$ticket->ip_address_id] ?? null) : null,
+                'suggested' => ! $ticket->ip_address_id && $ticket->asset_id ? $ipOfAsset->handle($ticket->asset_id) : null,
+                'can_change' => $user->can('update', $ticket),
+            ] : null,
+            'ipChoices' => Inertia::optional(fn () => $ipChoices->handle(
+                $request->string('ip_search')->value(),
+                $ticket->customer_id ?? 0,
+            )),
             'assignees' => $canAssign && in_array($ticket->status, Ticket::OPEN_STATUSES, true)
                 ? $usersWithPermission->handle(self::ASSIGNABLE_PERMISSION)->map(fn (User $u) => $u->only(['id', 'name']))->values()
                 : null,

@@ -3,6 +3,7 @@ import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue
 import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import TicketTitlePicker from '@/components/TicketTitlePicker.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -60,7 +61,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             <form class="grid gap-6 sm:grid-cols-2" @submit.prevent="submit">
                 <div class="grid content-start gap-2 sm:col-span-2">
                     <Label for="title">{{ t('tickets.title_field') }}</Label>
-                    <Input id="title" v-model="form.title" required />
+                    <TicketTitlePicker v-model="form.title" />
                     <InputError :message="form.errors.title" />
                 </div>
 

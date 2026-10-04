@@ -59,6 +59,14 @@ return [
         'low' => 'ต่ำ',
     ],
 
+    'sites' => [
+        'name' => 'ชื่อ Site',
+        'address' => 'ที่อยู่',
+        'created' => 'เพิ่ม Site เรียบร้อยแล้ว',
+        'updated' => 'บันทึก Site เรียบร้อยแล้ว',
+        'deleted' => 'ลบ Site เรียบร้อยแล้ว',
+    ],
+
     'expiring_mail' => [
         'subject' => 'สัญญาใกล้หมดอายุ :count ฉบับ — :tenant',
         'greeting' => 'เรียน คุณ:name',

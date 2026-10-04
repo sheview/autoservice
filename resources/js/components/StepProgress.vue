@@ -63,7 +63,7 @@ const lineClass = (index: number) => (index <= props.current ? 'bg-green-600' : 
                 >
                     {{ t(`steps.${state}`) }}
                 </span>
-                <span v-else-if="step.at" class="hidden text-[11px] text-muted-foreground sm:block">{{ step.at }}</span>
+                <span v-else-if="step.at" class="hidden text-[12px] text-muted-foreground sm:block">{{ step.at }}</span>
             </li>
         </ol>
     </nav>

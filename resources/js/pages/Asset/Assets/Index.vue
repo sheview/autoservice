@@ -35,6 +35,7 @@ interface Filters {
     branch_id: number | null;
     customer_id: number | null;
     category_id: number | null;
+    asset_type: string | null;
     status: string | null;
     warranty: string | null;
     sort: string;
@@ -47,7 +48,8 @@ const props = defineProps<{
     filters: Filters;
     branches: { id: number; name: string }[];
     customers: { id: number; code: string; name: string }[];
-    categories: { id: number; name: string }[];
+    categories: { id: number; name: string; asset_type: string }[];
+    assetTypes: string[];
     statuses: string[];
     expiringDays: number;
     can: { create: boolean; import: boolean; export: boolean };
@@ -113,9 +115,19 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('assets.search_placeholder')" />
+                <select v-model="filters.asset_type" :class="selectClass" :aria-label="t('asset_categories.asset_type')">
+                    <option :value="null">{{ t('asset_categories.all_asset_types') }}</option>
+                    <option v-for="type in assetTypes" :key="type" :value="type">{{ t(`asset_categories.asset_types.${type}`) }}</option>
+                </select>
                 <select v-model="filters.category_id" :class="selectClass" :aria-label="t('assets.category')">
                     <option :value="null">{{ t('assets.all_categories') }}</option>
-                    <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                    <option
+                        v-for="category in categories.filter((c) => !filters.asset_type || c.asset_type === filters.asset_type)"
+                        :key="category.id"
+                        :value="category.id"
+                    >
+                        {{ category.name }}
+                    </option>
                 </select>
                 <select v-if="branches.length > 1" v-model="filters.branch_id" :class="selectClass" :aria-label="t('assets.branch')">
                     <option :value="null">{{ t('assets.all_branches') }}</option>

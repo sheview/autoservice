@@ -35,6 +35,8 @@ return [
     'navigation' => [
         ['title' => 'nav.dashboard', 'route' => 'dashboard', 'icon' => 'layout-grid', 'permission' => 'dashboard.view'],
 
+        // The user's own open tickets (the ticket list filtered to them).
+        ['group' => 'service', 'title' => 'nav.my_work', 'route' => 'service.my-work', 'icon' => 'user-check', 'permission' => 'tickets.view', 'module' => 'service', 'staff' => true],
         ['group' => 'service', 'title' => 'nav.tickets', 'route' => 'service.tickets.index', 'icon' => 'wrench', 'permission' => 'tickets.view', 'module' => 'service'],
         ['group' => 'service', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'calendar-check', 'permission' => 'pm-visits.view', 'module' => 'maintenance'],
         ['group' => 'service', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'clipboard-list', 'permission' => 'pm-plans.view', 'module' => 'maintenance'],

@@ -35,7 +35,9 @@ class PermissionCatalog
         'pm-visits' => ['view', 'create', 'update', 'complete', 'delete'],
         'pm-plans' => ['view', 'create', 'update', 'delete'],
         'pm-checklists' => ['view', 'manage'],
-        'ip-check' => ['view', 'run'],
+        // Free IP / IP management: run = find, reserve, give out and release addresses;
+        // manage = keep networks and subnets, exclude addresses.
+        'ip-check' => ['view', 'run', 'manage'],
         'assets' => ['view', 'create', 'update', 'delete', 'export', 'import'],
         // Issue/loan requests (assets and parts, several lines): request = ask for oneself; create =
         // a request for anyone; approve = decide; fulfill = hand out (and backorder); return = take back.
@@ -141,7 +143,7 @@ class PermissionCatalog
                 'pm-visits.view' => 'all', 'pm-visits.create' => 'all', 'pm-visits.update' => 'all',
                 'pm-plans.view' => 'all', 'pm-plans.create' => 'all', 'pm-plans.update' => 'all',
                 'pm-checklists.view' => 'all',
-                'ip-check.view' => 'all',
+                'ip-check.view' => 'all', 'ip-check.run' => 'all', 'ip-check.manage' => 'all',
                 'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.export' => 'all',
                 'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.fulfill' => 'all', 'asset-checkouts.return' => 'all',
                 'asset-categories.view' => 'all',

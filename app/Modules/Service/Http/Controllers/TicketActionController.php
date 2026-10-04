@@ -8,6 +8,7 @@ use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\CommentOnTicket;
+use App\Modules\Service\Actions\LinkTicketIp;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Models\Ticket;
@@ -72,6 +73,17 @@ class TicketActionController extends Controller
      * The repair report of the job sheet (cause, extra cost, approver), by whoever works on the job,
      * until it is closed.
      */
+    /** Which IP address the ticket is about (IP management), or none: staff who may update the ticket. */
+    public function ip(Request $request, Ticket $ticket, LinkTicketIp $linkTicketIp): RedirectResponse
+    {
+        abort_unless($request->user()->customer_id === null && $request->user()->can('update', $ticket), 403);
+
+        $validated = $request->validate(['ip' => ['nullable', 'string', 'max:40']]);
+        $linkTicketIp->handle($ticket, $validated['ip'] ?? null);
+
+        return back()->with('success', __('service.tickets.ip_saved'));
+    }
+
     public function report(Request $request, Ticket $ticket, SaveRepairReport $saveReport): RedirectResponse
     {
         abort_unless(self::canReport($request->user(), $ticket), 403);

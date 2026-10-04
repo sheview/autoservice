@@ -14,6 +14,17 @@ export default {
             fontFamily: {
                 sans: ['Anuphan', ...defaultTheme.fontFamily.sans],
             },
+            // Thai reads small at Tailwind's sizes: body text (text-sm) matches the sidebar menu (15px)
+            // and small print (text-xs) is 14px, on every page at once.
+            fontSize: {
+                xs: ['0.875rem', { lineHeight: '1.25rem' }],
+                sm: ['0.9375rem', { lineHeight: '1.375rem' }],
+            },
+            // Bold is kept for headings (font-semibold / font-bold); "medium" (labels, buttons, table
+            // cells) reads as normal text, so the important headings stand out.
+            fontWeight: {
+                medium: '400',
+            },
             borderRadius: {
                 lg: 'var(--radius)',
                 md: 'calc(var(--radius) - 2px)',

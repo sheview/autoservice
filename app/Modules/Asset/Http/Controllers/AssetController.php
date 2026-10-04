@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Actions\AssetSuggestions;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
+use App\Modules\Asset\Actions\IpOfAsset;
 use App\Modules\Asset\Actions\ItemRequestLines;
 use App\Modules\Asset\Actions\SameModelAssets;
 use App\Modules\Asset\Actions\SaveAsset;
@@ -84,7 +85,8 @@ class AssetController extends Controller
             'filters' => $filters,
             'branches' => $this->branchOptions($user, 'assets.view'),
             'customers' => $this->customers(),
-            'categories' => AssetCategory::orderBy('name')->get(['id', 'name']),
+            'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'asset_type']),
+            'assetTypes' => AssetCategory::ASSET_TYPES,
             'statuses' => Asset::STATUSES,
             'expiringDays' => SearchAssets::EXPIRING_DAYS,
             'can' => [
@@ -153,6 +155,7 @@ class AssetController extends Controller
         Asset $asset,
         ContractsForAsset $contractsForAsset,
         TicketsForAsset $ticketsForAsset,
+        IpOfAsset $ipOfAsset,
         PmHistoryForAsset $pmHistoryForAsset,
         SameModelAssets $sameModelAssets,
         ItemRequestLines $requestLines,
@@ -166,7 +169,11 @@ class AssetController extends Controller
         $serviceOn = $this->modules->enabled('service');
         $available = max(0, (int) $asset->quantity - ($heldQuantities->handle([$asset->id])[$asset->id] ?? 0));
 
+        // Its address in IP management, to open from the page.
+        $ip = $asset->ip_address && $user->can('ip-check.view') && $user->customer_id === null ? $ipOfAsset->handle($asset->id) : null;
+
         return Inertia::render('Asset/Assets/Show', [
+            'ipPage' => $ip ? route('asset.ip-check.ips.show', ['subnet' => (int) explode(':', $ip['key'])[0], 'ip' => $ip['ip']]) : null,
             'asset' => [
                 ...$asset->only([
                     'ulid', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit', 'property_no', 'status',

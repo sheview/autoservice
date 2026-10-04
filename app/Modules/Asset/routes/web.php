@@ -8,6 +8,7 @@ use App\Modules\Asset\Http\Controllers\AssetPhotoController;
 use App\Modules\Asset\Http\Controllers\CheckoutItemController;
 use App\Modules\Asset\Http\Controllers\CheckoutRequestController;
 use App\Modules\Asset\Http\Controllers\IpCheckController;
+use App\Modules\Asset\Http\Controllers\NetworkController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(function () {
@@ -17,7 +18,23 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::post('assets/imports', [AssetImportController::class, 'store'])->name('imports.store');
     Route::get('assets/imports/template', [AssetController::class, 'template'])->name('imports.template');
 
-    Route::get('ip-check', IpCheckController::class)->name('ip-check');
+    // Free IP (IP address management): networks -> subnets -> addresses.
+    Route::get('ip-check', [IpCheckController::class, 'index'])->name('ip-check');
+    Route::post('ip-check/networks', [NetworkController::class, 'store'])->name('ip-check.networks.store');
+    Route::put('ip-check/networks/{network}', [NetworkController::class, 'update'])->whereNumber('network')->name('ip-check.networks.update');
+    Route::delete('ip-check/networks/{network}', [NetworkController::class, 'destroy'])->whereNumber('network')->name('ip-check.networks.destroy');
+    Route::post('ip-check/subnets', [NetworkController::class, 'storeSubnet'])->name('ip-check.subnets.store');
+    Route::put('ip-check/subnets/{subnet}', [NetworkController::class, 'updateSubnet'])->whereNumber('subnet')->name('ip-check.subnets.update');
+    Route::delete('ip-check/subnets/{subnet}', [NetworkController::class, 'destroySubnet'])->whereNumber('subnet')->name('ip-check.subnets.destroy');
+    Route::get('ip-check/ips/{address}', [IpCheckController::class, 'open'])->name('ip-check.ips.by-ulid');
+    Route::post('ip-check/subnets/{subnet}/reserve', [IpCheckController::class, 'reserve'])->whereNumber('subnet')->name('ip-check.reserve');
+    Route::prefix('ip-check/subnets/{subnet}/ips/{ip}')->whereNumber('subnet')->where(['ip' => '[0-9.]+'])->name('ip-check.ips.')->group(function () {
+        Route::get('/', [IpCheckController::class, 'show'])->name('show');
+        Route::put('/', [IpCheckController::class, 'update'])->name('update');
+        Route::post('assign', [IpCheckController::class, 'assign'])->name('assign');
+        Route::post('release', [IpCheckController::class, 'release'])->name('release');
+        Route::post('exclude', [IpCheckController::class, 'exclude'])->name('exclude');
+    });
 
     Route::resource('assets', AssetController::class);
 

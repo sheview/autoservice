@@ -59,7 +59,43 @@ class IpRange
         return $one === null ? 'invalid' : [long2ip($one)];
     }
 
-    private static function toInt(string $ip): ?int
+    /**
+     * A subnet as stored: "192.168.1.77/24" -> cidr "192.168.1.0/24", first = the network address.
+     * At most MAX addresses (a /22), so a subnet can always be listed whole.
+     *
+     * @return array{cidr: string, first: int, prefix: int}|string the subnet, or "invalid" | "too_large"
+     */
+    public static function subnet(string $text): array|string
+    {
+        $text = preg_replace('/\s+/', '', $text) ?? '';
+        if (! preg_match('#^([\d.]+)/(\d{1,2})$#', $text, $m) || ($base = self::toInt($m[1])) === null || (int) $m[2] > 32) {
+            return 'invalid';
+        }
+        $prefix = (int) $m[2];
+        $size = 2 ** (32 - $prefix);
+        if ($size > self::MAX) {
+            return 'too_large';
+        }
+        $first = $base & ~($size - 1) & 0xFFFFFFFF;
+
+        return ['cidr' => long2ip($first).'/'.$prefix, 'first' => $first, 'prefix' => $prefix];
+    }
+
+    /**
+     * The addresses that can be given out in a subnet: without the network and broadcast
+     * addresses for /30 and wider.
+     *
+     * @return array{0: int, 1: int} first and last, as integers
+     */
+    public static function usable(int $first, int $prefix): array
+    {
+        $size = 2 ** (32 - $prefix);
+
+        return $size >= 4 ? [$first + 1, $first + $size - 2] : [$first, $first + $size - 1];
+    }
+
+    /** The address as an integer, or null when it is not an IPv4 address. */
+    public static function toInt(string $ip): ?int
     {
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) === false) {
             return null;

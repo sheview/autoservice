@@ -2,6 +2,7 @@
 import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import TicketTitlePicker from '@/components/TicketTitlePicker.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,6 +32,13 @@ interface CoveringContract {
     slas: Record<string, { response_minutes: number; resolve_minutes: number }>;
 }
 
+interface ContactPerson {
+    id: number;
+    name: string;
+    phone: string | null;
+    position: string | null;
+}
+
 const props = defineProps<{
     preset: { asset: AssetOption | null; customer_id: number | null };
     customerAccount: boolean;
@@ -38,6 +46,7 @@ const props = defineProps<{
     assetOptions: AssetOption[];
     contracts: CoveringContract[];
     assignees: { id: number; name: string }[];
+    contactPeople: ContactPerson[];
     priorities: string[];
     sources: string[];
 }>();
@@ -70,6 +79,32 @@ const form = useForm({
 });
 
 const selectedAsset = ref<AssetOption | null>(props.preset.asset);
+
+// The person reporting: someone with an account (the customer's, or our staff), or a name typed by hand.
+const contactMode = ref<'system' | 'manual'>(props.contactPeople.length ? 'system' : 'manual');
+const contactId = ref<number | null>(null);
+const pickContact = () => {
+    const person = props.contactPeople.find((p) => p.id === contactId.value);
+    form.contact_name = person?.name ?? '';
+    form.contact_phone = person?.phone ?? '';
+};
+// Only when the user flips it: offering the asset's user also sets the mode, and must keep the name.
+const clearContact = () => {
+    contactId.value = null;
+    form.contact_name = '';
+    form.contact_phone = '';
+};
+// Another customer means other people: a picked person who is no longer listed is let go.
+watch(
+    () => props.contactPeople,
+    (people) => {
+        if (contactMode.value === 'system' && contactId.value && !people.some((p) => p.id === contactId.value)) {
+            contactId.value = null;
+            pickContact();
+        }
+        if (!people.length) contactMode.value = 'manual';
+    },
+);
 // Is the device a registered asset, or one described by hand?
 const deviceMode = ref<'registered' | 'unregistered'>('registered');
 watch(deviceMode, (mode) => {
@@ -78,7 +113,11 @@ watch(deviceMode, (mode) => {
 
 // The regular user of the asset is most likely the one reporting: offered, never overwriting what was typed.
 const offerContact = (asset: AssetOption | null) => {
-    if (asset?.used_by && form.contact_name.trim() === '') form.contact_name = asset.used_by;
+    if (asset?.used_by && form.contact_name.trim() === '') {
+        form.contact_name = asset.used_by;
+        contactId.value = props.contactPeople.find((p) => p.name === asset.used_by)?.id ?? null;
+        contactMode.value = contactId.value ? 'system' : 'manual';
+    }
 };
 offerContact(props.preset.asset);
 const assetSearch = ref('');
@@ -104,7 +143,7 @@ watch(
             selectedAsset.value = null;
             form.asset_id = null;
         }
-        reload(['contracts', 'assetOptions']);
+        reload(['contracts', 'assetOptions', 'contactPeople']);
     },
 );
 
@@ -269,7 +308,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 <section class="grid gap-6 sm:grid-cols-2">
                     <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="title">{{ t('tickets.title_field') }}</Label>
-                        <Input id="title" v-model="form.title" required />
+                        <TicketTitlePicker v-model="form.title" />
                         <InputError :message="form.errors.title" />
                     </div>
 
@@ -310,8 +349,22 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
 
                     <div class="grid content-start gap-2">
-                        <Label for="contact_name">{{ t('tickets.contact_name') }}</Label>
-                        <Input id="contact_name" v-model="form.contact_name" />
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <Label for="contact_name">{{ t('tickets.contact_name') }}</Label>
+                            <div v-if="contactPeople.length" class="flex gap-4 text-xs">
+                                <label v-for="mode in ['system', 'manual'] as const" :key="mode" class="flex items-center gap-1.5">
+                                    <input v-model="contactMode" type="radio" :value="mode" class="size-3.5" @change="clearContact" />
+                                    {{ t(`tickets.contact_modes.${mode}`) }}
+                                </label>
+                            </div>
+                        </div>
+                        <select v-if="contactMode === 'system'" id="contact_name" v-model="contactId" :class="selectClass" @change="pickContact">
+                            <option :value="null">{{ t('tickets.contact_pick') }}</option>
+                            <option v-for="person in contactPeople" :key="person.id" :value="person.id">
+                                {{ person.name }}{{ person.position ? ` (${person.position})` : '' }}
+                            </option>
+                        </select>
+                        <Input v-else id="contact_name" v-model="form.contact_name" />
                         <InputError :message="form.errors.contact_name" />
                     </div>
 

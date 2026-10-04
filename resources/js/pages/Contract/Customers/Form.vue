@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import AttachmentPicker from '@/components/AttachmentPicker.vue';
+import CustomerSites from '@/components/CustomerSites.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,12 @@ interface CustomerForm {
 }
 
 // attachments: files already attached (editing).
-const props = defineProps<{ customer: CustomerForm | null; attachments: Attachment[] }>();
+// sites: the customer's places (editing only; saved on their own).
+const props = defineProps<{
+    customer: CustomerForm | null;
+    attachments: Attachment[];
+    sites: { id: number; name: string; address: string | null }[];
+}>();
 
 const title = props.customer ? t('customers.edit') : t('customers.create');
 const breadcrumbs: BreadcrumbItem[] = [
@@ -139,6 +145,8 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                     </Button>
                 </div>
             </form>
+
+            <CustomerSites v-if="customer" class="mt-10" :customer-id="customer.id" :sites="sites" />
         </div>
     </AppLayout>
 </template>

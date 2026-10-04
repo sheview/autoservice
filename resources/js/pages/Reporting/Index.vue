@@ -181,7 +181,7 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
                             :title="`${point.label}: ${point.count}`"
                         >
                             <div class="rounded-t bg-primary" :style="{ height: point.count ? share(point.count, trendMax) : '0' }" />
-                            <div class="mt-1 text-center text-[10px] leading-none text-muted-foreground">{{ trendLabel(point.label) }}</div>
+                            <div class="mt-1 text-center text-[11px] leading-none text-muted-foreground">{{ trendLabel(point.label) }}</div>
                         </div>
                     </div>
                     <p v-else class="text-sm text-muted-foreground">{{ t('reports.no_data') }}</p>

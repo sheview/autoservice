@@ -4,6 +4,7 @@ namespace App\Modules\Contract\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Contract\Actions\DeleteCustomer;
+use App\Modules\Contract\Actions\ListSites;
 use App\Modules\Contract\Actions\SaveCustomer;
 use App\Modules\Contract\Http\Requests\CustomerRequest;
 use App\Modules\Contract\Models\Customer;
@@ -66,7 +67,7 @@ class CustomerController extends Controller
     {
         Gate::authorize('create', Customer::class);
 
-        return Inertia::render('Contract/Customers/Form', ['customer' => null, 'attachments' => []]);
+        return Inertia::render('Contract/Customers/Form', ['customer' => null, 'attachments' => [], 'sites' => []]);
     }
 
     public function store(CustomerRequest $request, SaveCustomer $saveCustomer, AddAttachments $addAttachments): RedirectResponse
@@ -78,13 +79,15 @@ class CustomerController extends Controller
     }
 
     /** The edit page is also where a customer's files are seen (there is no separate detail page). */
-    public function edit(Customer $customer): Response
+    public function edit(Customer $customer, ListSites $listSites): Response
     {
         Gate::authorize('update', $customer);
 
         return Inertia::render('Contract/Customers/Form', [
             'customer' => $customer->only(['id', 'code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes']),
             'attachments' => Attachments::list($customer, $customer->attachmentCollection(), fn (int $id) => route('contract.customers.attachments.show', [$customer, $id])),
+            // Where the customer's networks are (IP management).
+            'sites' => $listSites->handle($customer->id),
         ]);
     }
 

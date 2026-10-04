@@ -6,6 +6,7 @@ import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
 import StepProgress, { type Step } from '@/components/StepProgress.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
+import TicketIpPanel from '@/components/TicketIpPanel.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -122,6 +123,13 @@ const props = defineProps<{
     parts: { items: TicketPart[]; options: PartOption[]; types: string[]; canIssue: boolean; canReturn: boolean } | null;
     survey: TicketSurvey | null;
     attachments: Attachment[];
+    // IP management: null = not shown to this user.
+    ip: {
+        current: { id: number; ulid: string; ip: string; status: string; cidr: string | null } | null;
+        suggested: { key: string; ip: string; cidr: string | null } | null;
+        can_change: boolean;
+    } | null;
+    ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
     can: { update: boolean; comment: boolean; internalNotes: boolean; deleteAttachments: boolean; checkWarranty: boolean; report: boolean };
 }>();
 
@@ -409,6 +417,8 @@ const stepBar = computed(() => {
                             </div>
                         </dl>
                     </section>
+
+                    <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
 
                     <!-- Repair report: printed on the job sheet for the customer to sign -->
                     <section v-if="ticket.report" class="space-y-2">

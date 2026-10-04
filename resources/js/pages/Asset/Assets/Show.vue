@@ -82,6 +82,8 @@ interface AssetContract {
 
 const props = defineProps<{
     asset: AssetDetail;
+    // Its page in IP management (เช็ค IP ว่าง), when the address is in a known subnet.
+    ipPage: string | null;
     sameModel: SameModelUnit[];
     // Issue/loan; null = the user has nothing to do with it.
     checkouts: ItemRequestsPanelData | null;
@@ -179,7 +181,12 @@ const details: [string, (a: AssetDetail) => string | null][] = [
             <dl class="grid gap-x-6 gap-y-4 rounded-md border p-4 sm:grid-cols-3 lg:grid-cols-5">
                 <div v-for="[key, value] in details" :key="key">
                     <dt class="text-xs text-muted-foreground">{{ t(`assets.${key}`) }}</dt>
-                    <dd class="text-sm">{{ value(asset) ?? t('common.none') }}</dd>
+                    <dd class="text-sm">
+                        <Link v-if="key === 'ip_address' && ipPage" :href="ipPage" class="font-mono text-primary hover:underline">{{
+                            value(asset)
+                        }}</Link>
+                        <template v-else>{{ value(asset) ?? t('common.none') }}</template>
+                    </dd>
                 </div>
             </dl>
 

@@ -58,7 +58,7 @@ const isEmpty = computed(() => props.series.every((s) => s.values.every((value) 
 
         <div class="flex gap-2" aria-hidden="true">
             <!-- y axis -->
-            <div class="relative h-48 min-w-6 text-right text-[11px] tabular-nums leading-none text-muted-foreground">
+            <div class="relative h-48 min-w-6 text-right text-[12px] tabular-nums leading-none text-muted-foreground">
                 <span v-for="tick in scale.ticks" :key="tick" class="absolute right-0 translate-y-1/2" :style="{ bottom: height(tick) }">{{
                     tick.toLocaleString()
                 }}</span>
@@ -130,7 +130,7 @@ const isEmpty = computed(() => props.series.every((s) => s.values.every((value) 
                 </div>
 
                 <!-- x axis -->
-                <div class="mt-1 flex text-[11px] text-muted-foreground">
+                <div class="mt-1 flex text-[12px] text-muted-foreground">
                     <span v-for="category in categories" :key="category" class="flex-1 truncate text-center">{{ category }}</span>
                 </div>
             </div>

@@ -5,6 +5,7 @@ use App\Modules\Contract\Http\Controllers\ContractController;
 use App\Modules\Contract\Http\Controllers\ContractDocumentController;
 use App\Modules\Contract\Http\Controllers\CustomerAttachmentController;
 use App\Modules\Contract\Http\Controllers\CustomerController;
+use App\Modules\Contract\Http\Controllers\CustomerSiteController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:contract'])->name('contract.')->group(function () {
@@ -14,6 +15,10 @@ Route::middleware(['auth', 'verified', 'module:contract'])->name('contract.')->g
         ->whereNumber('attachment')->name('customers.attachments.show');
     Route::delete('customers/{customer}/attachments/{attachment}', [CustomerAttachmentController::class, 'destroy'])
         ->whereNumber('attachment')->name('customers.attachments.destroy');
+
+    Route::post('customers/{customer}/sites', [CustomerSiteController::class, 'store'])->name('customers.sites.store');
+    Route::put('customers/{customer}/sites/{site}', [CustomerSiteController::class, 'update'])->whereNumber('site')->name('customers.sites.update');
+    Route::delete('customers/{customer}/sites/{site}', [CustomerSiteController::class, 'destroy'])->whereNumber('site')->name('customers.sites.destroy');
 
     Route::resource('contracts', ContractController::class);
 

@@ -19,7 +19,7 @@ it('builds the sidebar from config, filtered by permission', function () {
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))
             ->toBe([
                 'หน้าหลัก',
-                'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง',
+                'งานของฉัน', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง',
                 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
                 'ลูกค้า', 'สัญญา MA',
                 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
@@ -35,7 +35,7 @@ it('builds the sidebar from config, filtered by permission', function () {
 
     $this->actingAs(userWithRole('technician'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe([
-            'หน้าหลัก', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'พิมพ์ป้าย QR',
+            'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'พิมพ์ป้าย QR',
             'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'สรุปรายบุคคล', 'ผลประเมินความพึงพอใจ', 'คู่มือ',
         ]));
 });

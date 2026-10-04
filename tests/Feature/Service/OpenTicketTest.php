@@ -104,6 +104,20 @@ it('lets helpdesk assign on opening but not a user without tickets.assign', func
         ->assertSessionHasErrors('assignee_id');
 });
 
+it('offers the customer\'s people as the person reporting, or our staff without a customer', function () {
+    userWithRole('customer_it', ['name' => 'Acme IT', 'phone' => '081-111-1111', 'customer_id' => $this->customer->id]);
+    userWithRole('customer_it', ['name' => 'Beta IT', 'customer_id' => createCustomer(['name' => 'Beta'])->id]);
+    userWithRole('customer_it', ['name' => 'Acme Gone', 'customer_id' => $this->customer->id, 'is_active' => false]);
+
+    $this->actingAs($this->helpdesk)->get("/tickets/create?customer_id={$this->customer->id}")
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('contactPeople', [['id' => User::where('name', 'Acme IT')->value('id'), 'name' => 'Acme IT', 'phone' => '081-111-1111', 'position' => null]]));
+
+    $this->actingAs($this->helpdesk)->get('/tickets/create')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('contactPeople', fn ($people) => collect($people)->pluck('name')->sort()->values()->all() === ['Helpdesk Here', 'Tech One']));
+});
+
 it('fills the form from an asset and offers its covering contracts', function () {
     $this->actingAs($this->helpdesk)->get("/tickets/create?asset={$this->asset->ulid}")
         ->assertOk()

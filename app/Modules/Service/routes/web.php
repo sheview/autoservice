@@ -10,12 +10,15 @@ use App\Modules\Service\Http\Controllers\TicketSurveyController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->group(function () {
+    // My work: the running tickets assigned to the user.
+    Route::get('my-work', fn () => redirect()->route('service.tickets.index', ['assignee' => 'me', 'status' => 'open', 'sort' => 'resolve_due_at', 'direction' => 'asc']))->name('my-work');
     Route::resource('tickets', TicketController::class)->except(['destroy']);
     Route::get('tickets/{ticket}/print', [TicketPrintController::class, 'show'])->name('tickets.print');
     Route::get('tickets/{ticket}/pdf', [TicketPrintController::class, 'pdf'])->name('tickets.pdf');
     Route::post('tickets/{ticket}/assign', [TicketActionController::class, 'assign'])->name('tickets.assign');
     Route::post('tickets/{ticket}/warranty', [TicketActionController::class, 'warranty'])->name('tickets.warranty');
     Route::post('tickets/{ticket}/report', [TicketActionController::class, 'report'])->name('tickets.report');
+    Route::post('tickets/{ticket}/ip', [TicketActionController::class, 'ip'])->name('tickets.ip');
     Route::post('tickets/{ticket}/move', [TicketActionController::class, 'move'])->name('tickets.move');
     Route::post('tickets/{ticket}/comments', [TicketActionController::class, 'comment'])->name('tickets.comments.store');
 
