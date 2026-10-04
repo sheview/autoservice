@@ -2,6 +2,7 @@
 
 namespace App\Modules\Survey\Support;
 
+use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Survey\Models\TicketSurvey;
 use App\Modules\Tenancy\Support\TenantContext;
 
@@ -15,6 +16,6 @@ class SurveyLink
 
     public function for(TicketSurvey $survey): string
     {
-        return route('survey.public.show', ['tenant' => $this->context->tenant()->ulid, 'token' => $survey->token]);
+        return PublicUrl::route('survey.public.show', ['tenant' => $this->context->tenant()->ulid, 'token' => $survey->token]);
     }
 }

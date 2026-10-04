@@ -6,6 +6,7 @@ use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\CustomerLabelNames;
 use App\Modules\Document\Support\ThaiDate;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\PublicUrl;
 
 /**
  * What is printed on each label, from the asset rows (AssetSummaries) the user may see. A detailed
@@ -36,7 +37,7 @@ class BuildLabels
             'customer' => $customers[$asset['customer_id']] ?? null,
             'province' => $asset['branch_province'] ?? null,
             'contract' => $detailed && $contractOn ? $this->contract($asset['id']) : null,
-            'qr' => $this->qr->handle(route('labeling.scan', $asset['ulid'])),
+            'qr' => $this->qr->handle(PublicUrl::route('labeling.scan', $asset['ulid'])),
         ], $assets);
     }
 

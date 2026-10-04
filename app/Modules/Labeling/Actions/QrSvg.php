@@ -21,7 +21,8 @@ class QrSvg
             'outputBase64' => false,
             'svgAddXmlHeader' => false,
             'addQuietzone' => true,
-            'quietzoneSize' => 1,
+            // A white margin of 2 modules: phone cameras find the code more easily.
+            'quietzoneSize' => 2,
             'drawLightModules' => false,
             'connectPaths' => true,
         ]));
