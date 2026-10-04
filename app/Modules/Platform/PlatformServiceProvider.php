@@ -5,11 +5,14 @@ namespace App\Modules\Platform;
 use App\Modules\Platform\Console\InstallPlatformCommand;
 use App\Modules\Platform\Console\PruneActivityLogCommand;
 use App\Modules\Platform\Console\SyncPermissionsCommand;
+use App\Modules\Platform\Listeners\FollowForwardedTicket;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Service\Events\TicketStatusChanged;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pennant\Feature;
 
@@ -22,6 +25,9 @@ class PlatformServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // A ticket another company forwarded to us moved: noted on theirs (cross-company sharing).
+        Event::listen(TicketStatusChanged::class, FollowForwardedTicket::class);
+
         // Module switches are per tenant, not per user.
         Feature::resolveScopeUsing(fn () => $this->app->make(TenantContext::class)->tenant());
 

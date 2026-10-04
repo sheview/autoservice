@@ -5,6 +5,7 @@ namespace App\Modules\Service\Actions;
 use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Actions\SendAlert;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Service\Events\TicketStatusChanged;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
 use App\Modules\Service\Support\TicketSla;
@@ -91,6 +92,9 @@ class MoveTicket
                     $actor,
                 );
             }
+
+            // E.g. the company that forwarded the job follows it.
+            TicketStatusChanged::dispatch($ticket, $from, $actor->name);
 
             return $ticket;
         });

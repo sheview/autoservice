@@ -20,9 +20,9 @@ class TenantShare extends Model
 
     /**
      * What can be shared: seeing parts / assets, and asking for them (an issue/loan request made in
-     * the owner company, approved by its approver). Ticket forwarding comes in a later phase.
+     * the owner company, approved by its approver), and sending tickets on to be done there.
      */
-    public const ABILITIES = ['parts.view', 'assets.view', 'parts.request', 'assets.request'];
+    public const ABILITIES = ['parts.view', 'assets.view', 'parts.request', 'assets.request', 'tickets.forward'];
 
     /** Roles of the platform that may use a share while working inside the "from" company. */
     public const CENTRAL_ROLES = ['central_technician', 'central_helpdesk'];

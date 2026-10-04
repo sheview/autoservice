@@ -4,6 +4,7 @@ namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\CrossTenant\ForwardedTickets;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\CheckTicketWarranty;
@@ -13,6 +14,7 @@ use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Support\TicketWorkflow;
+use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -82,6 +84,23 @@ class TicketActionController extends Controller
         $linkTicketIp->handle($ticket, $validated['ip'] ?? null);
 
         return back()->with('success', __('service.tickets.ip_saved'));
+    }
+
+    /** Sends the job on to another company that takes tickets from us (cross-company sharing). */
+    public function forward(Request $request, Ticket $ticket, ForwardedTickets $forwarded): RedirectResponse
+    {
+        abort_unless($request->user()->customer_id === null && $request->user()->can('update', $ticket), 403);
+
+        $validated = $request->validate([
+            'company' => ['required', 'integer'],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $target = Tenant::query()->where('is_platform', false)->find($validated['company']);
+        abort_if($target === null, 404);
+
+        $link = $forwarded->forward($request->user(), $target, $ticket, $validated['note'] ?? null);
+
+        return back()->with('success', __('service.tickets.forwarded', ['company' => $target->name, 'no' => $link->target_label]));
     }
 
     public function report(Request $request, Ticket $ticket, SaveRepairReport $saveReport): RedirectResponse

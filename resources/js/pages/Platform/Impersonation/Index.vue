@@ -93,7 +93,7 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                                         <Link :href="route('platform.tenants.modules.edit', tenant.ulid)">{{ t('tenant_modules.link') }}</Link>
                                     </Button>
                                     <Button v-if="can('platform.tenants') && !page.props.impersonation" size="sm" variant="ghost" as-child>
-                                        <Link :href="route('platform.tenants.shares.edit', tenant.ulid)">{{ t('shares.link') }}</Link>
+                                        <Link :href="route('platform.tenants.shares.edit', tenant.ulid)">{{ t('shares.link_list') }}</Link>
                                     </Button>
                                     <Button size="sm" variant="outline" :disabled="!!page.props.impersonation" @click="enter(tenant)">
                                         {{ t('impersonation.enter') }}

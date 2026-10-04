@@ -53,6 +53,9 @@ class Ticket extends Model implements HasMedia
     /** pm = found during a PM round (Maintenance module). */
     public const SOURCES = ['phone', 'email', 'walk_in', 'portal', 'pm'];
 
+    /** Sent on by another company through a share (OpenForwardedTicket); never picked on a form. */
+    public const SOURCE_PARTNER = 'partner';
+
     protected $fillable = [
         'ticket_no', 'customer_id', 'asset_id', 'ip_address_id', 'contract_id', 'branch_id', 'title', 'description',
         'priority', 'status', 'source', 'contact_name', 'contact_phone', 'reported_by', 'assignee_id',

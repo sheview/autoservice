@@ -19,6 +19,7 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     Route::post('tickets/{ticket}/warranty', [TicketActionController::class, 'warranty'])->name('tickets.warranty');
     Route::post('tickets/{ticket}/report', [TicketActionController::class, 'report'])->name('tickets.report');
     Route::post('tickets/{ticket}/ip', [TicketActionController::class, 'ip'])->name('tickets.ip');
+    Route::post('tickets/{ticket}/forward', [TicketActionController::class, 'forward'])->name('tickets.forward');
     Route::post('tickets/{ticket}/move', [TicketActionController::class, 'move'])->name('tickets.move');
     Route::post('tickets/{ticket}/comments', [TicketActionController::class, 'comment'])->name('tickets.comments.store');
 

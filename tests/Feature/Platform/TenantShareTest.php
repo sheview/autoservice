@@ -7,6 +7,7 @@ use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Platform\Models\CrossTenantLink;
 use App\Modules\Platform\Models\TenantShare;
+use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -180,4 +181,64 @@ it('asks only for what the share allows', function () {
     $this->actingAs($this->tech)->post('/shared-search/requests', ['company' => $this->b->id, 'items' => [['item_type' => 'asset', 'id' => $northSwitch->id, 'qty' => 1]]])
         ->assertSessionHasErrors('items');
     expect(asTenant($this->b, fn () => CheckoutRequest::count()))->toBe(0);
+});
+
+it('shows the superadmin, for one company, every other company to share with', function () {
+    ($this->share)(['activate' => true]);
+
+    $this->actingAs($this->superadmin)->get("/platform/tenants/{$this->b->ulid}/shares")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Platform/Tenants/Shares')
+            ->where('tenant.name', 'Beta')
+            ->where('companies', fn ($companies) => collect($companies)->pluck('name')->sort()->values()->all() === ['Default', 'Gamma'])
+            ->where('companies', fn ($companies) => collect($companies)->firstWhere('name', 'Default')['share']['status'] === 'active'
+                && collect($companies)->firstWhere('name', 'Gamma')['share'] === null
+                && collect(collect($companies)->firstWhere('name', 'Default')['people'])->pluck('name')->contains('Tech A'))
+            ->where('branches', fn ($branches) => collect($branches)->pluck('name')->sort()->values()->all() === ['Bangna', 'Chiang Mai']));
+});
+
+it('forwards a ticket to another company and follows it there', function () {
+    ($this->share)(['activate' => true, 'abilities' => ['tickets.forward']]);
+    $ticket = openTicket($this->tech, ['title' => 'Core switch down', 'contact_name' => 'Somsri', 'priority' => 'high', 'device_name' => 'Core SW']);
+
+    $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('forwards.companies.0.name', 'Beta')->where('forwards.tickets', []));
+
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/forward", ['company' => $this->b->id, 'note' => 'Please check on site'])
+        ->assertSessionHasNoErrors();
+
+    // B has its own ticket, nobody of B linked as the opener.
+    $theirs = asTenant($this->b, fn () => Ticket::first());
+    expect($theirs->only(['title', 'priority', 'contact_name', 'device_name', 'source', 'reported_by', 'status']))
+        ->toBe(['title' => 'Core switch down', 'priority' => 'high', 'contact_name' => 'Somsri', 'device_name' => 'Core SW', 'source' => 'partner', 'reported_by' => null, 'status' => 'new'])
+        ->and($theirs->description)->toStartWith('Please check on site')
+        ->and($theirs->ticket_no)->not->toBeNull();
+
+    $this->actingAs($this->adminB)->get("/tickets/{$theirs->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('forwards.from', ['company' => 'Default', 'ticket_no' => $ticket->ticket_no, 'by' => 'Tech A']));
+
+    // B works on it; A sees each move on its own ticket.
+    $techB = userWithRole('technician', ['name' => 'Tech B'], $this->b);
+    $this->actingAs($this->adminB)->post("/tickets/{$theirs->ulid}/assign", ['assignee_id' => $techB->id])->assertSessionHasNoErrors();
+    asTenant($this->b, fn () => checkWarranty($theirs->fresh(), $techB));
+    $this->actingAs($techB)->post("/tickets/{$theirs->ulid}/move", ['action' => 'start'])->assertSessionHasNoErrors();
+
+    $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('forwards.tickets.0.company', 'Beta')
+        ->where('forwards.tickets.0.ticket_no', $theirs->ticket_no)
+        ->where('forwards.tickets.0.status', 'in_progress')
+        ->where('forwards.tickets.0.assignee', 'Tech B'));
+    expect($ticket->events()->where('type', 'comment')->where('is_internal', true)->pluck('body')->all())
+        ->toHaveCount(2)
+        ->sequence(fn ($body) => $body->toContain($theirs->ticket_no), fn ($body) => $body->toContain('Tech B'));
+});
+
+it('forwards only to companies that take tickets from us', function () {
+    ($this->share)(['activate' => true, 'abilities' => ['parts.view']]);
+    $ticket = openTicket($this->tech);
+
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/forward", ['company' => $this->b->id])->assertForbidden();
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/forward", ['company' => $this->c->id])->assertForbidden();
+    expect(asTenant($this->b, fn () => Ticket::count()))->toBe(0);
 });

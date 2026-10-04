@@ -16,6 +16,8 @@ class CrossTenantLink extends Model
 
     public const TARGET_CHECKOUT = 'checkout_request';
 
+    public const TARGET_TICKET = 'ticket';
+
     protected $fillable = [
         'source_tenant_id', 'source_type', 'source_id', 'source_label',
         'target_tenant_id', 'target_type', 'target_id', 'target_label',

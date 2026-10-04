@@ -120,9 +120,20 @@ const statusClass: Record<string, string> = {
                             <span class="inline-block rounded-full px-2 py-0.5 text-xs" :class="statusClass[viewer.share.status]">
                                 {{ t(`shares.statuses.${viewer.share.status}`) }}
                             </span>
-                            <div class="text-sm">
-                                {{ viewer.share.abilities.map((a) => t(`shares.abilities.${a}`)).join(', ') }} · {{ who(viewer, viewer.share) }}
+                            <div class="flex flex-wrap gap-1.5 text-xs">
+                                <span
+                                    v-for="ability in abilities"
+                                    :key="ability"
+                                    class="rounded-full border px-2 py-0.5"
+                                    :class="
+                                        viewer.share.status !== 'revoked' && viewer.share.abilities.includes(ability)
+                                            ? 'border-green-300 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200'
+                                            : 'text-muted-foreground line-through'
+                                    "
+                                    >{{ viewer.share.abilities.includes(ability) ? '✓' : '✗' }} {{ t(`shares.abilities.${ability}`) }}</span
+                                >
                             </div>
+                            <div class="text-sm">{{ t('shares.who') }}: {{ who(viewer, viewer.share) }}</div>
                             <div class="text-sm text-muted-foreground">{{ branchNames(viewer.share) }}</div>
                             <div class="text-xs text-muted-foreground">
                                 <span v-if="viewer.share.granted_by_name">{{ t('shares.granted_by', { name: viewer.share.granted_by_name }) }}</span>

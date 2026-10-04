@@ -7,6 +7,7 @@ import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
 import StepProgress, { type Step } from '@/components/StepProgress.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
+import TicketForwardPanel, { type TicketForwards } from '@/components/TicketForwardPanel.vue';
 import TicketIpPanel from '@/components/TicketIpPanel.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
@@ -131,6 +132,7 @@ const props = defineProps<{
         can_change: boolean;
     } | null;
     sharedRequests: SharedRequestRow[];
+    forwards: TicketForwards | null;
     askOthersUrl: string | null;
     ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
     can: { update: boolean; comment: boolean; internalNotes: boolean; deleteAttachments: boolean; checkWarranty: boolean; report: boolean };
@@ -422,6 +424,8 @@ const stepBar = computed(() => {
                     </section>
 
                     <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
+
+                    <TicketForwardPanel v-if="forwards" :ticket-ulid="ticket.ulid" :forwards="forwards" />
 
                     <!-- Parts and assets asked of other companies for this job -->
                     <section v-if="sharedRequests.length || askOthersUrl" class="space-y-2">

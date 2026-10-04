@@ -23,6 +23,7 @@ use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\TicketParts;
 use App\Modules\Labeling\Actions\QrSvg;
+use App\Modules\Platform\CrossTenant\ForwardedTickets;
 use App\Modules\Platform\CrossTenant\SharedRequests;
 use App\Modules\Platform\CrossTenant\ShareGateway;
 use App\Modules\Platform\Support\Modules;
@@ -162,6 +163,7 @@ class TicketController extends Controller
         IpChoices $ipChoices,
         SharedRequests $sharedRequests,
         ShareGateway $gateway,
+        ForwardedTickets $forwardedTickets,
     ): Response {
         Gate::authorize('view', $ticket);
 
@@ -229,6 +231,12 @@ class TicketController extends Controller
             ] : null,
             // Parts and assets asked of other companies for this job (Platform\CrossTenant); staff only.
             'sharedRequests' => $user->customer_id === null ? $sharedRequests->forTicket($ticket->id) : [],
+            // The job sent on to other companies, and where it came from if another company sent it to us.
+            'forwards' => $user->customer_id === null ? [
+                'tickets' => $forwardedTickets->forTicket($ticket->id),
+                'companies' => $user->can('update', $ticket) ? $gateway->targets($user, 'tickets.forward')->map(fn ($c) => $c->only(['id', 'name']))->values() : [],
+                'from' => $forwardedTickets->forwardedFrom($ticket->id),
+            ] : null,
             // Where to ask other companies for parts for this job (only when one shares with us).
             'askOthersUrl' => $user->customer_id === null && ($user->can('asset-checkouts.request') || $user->can('asset-checkouts.create'))
                 && ($gateway->targets($user, 'parts.request')->isNotEmpty() || $gateway->targets($user, 'assets.request')->isNotEmpty())

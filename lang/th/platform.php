@@ -59,6 +59,8 @@ return [
         'not_pending' => 'การแชร์นี้ไม่ได้รอการยอมรับแล้ว',
         'requested' => 'ส่งคำขอ :no ไปที่ :company แล้ว รอผู้อนุมัติของ :company',
         'for_ticket' => '[ใบงาน :no ของ :company]',
+        'forwarded_to' => 'ส่งต่อใบงานไปที่ :company เป็นใบงาน :no',
+        'forward_moved' => ':company: ใบงาน :no เปลี่ยนสถานะเป็น ":status" (โดย :by)',
         'ticket_unknown' => 'ไม่พบใบงานนี้ หรือใบงานปิดไปแล้ว',
     ],
 ];
