@@ -9,6 +9,7 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Trash2 } from 'lucide-vue-next';
+import { ref, watch } from 'vue';
 
 interface SpecField {
     key: string;
@@ -74,6 +75,20 @@ const submit = () => {
     }
 };
 
+// The prefix follows the name (its English letters, up to 4) until it is typed in by hand;
+// a Thai name leaves it empty and the server makes one (CAT, CAT2, ...).
+const prefixTyped = ref(!!props.category);
+watch(
+    () => form.name,
+    (name) => {
+        if (!prefixTyped.value)
+            form.code_prefix = name
+                .replace(/[^A-Za-z0-9]/g, '')
+                .slice(0, 4)
+                .toUpperCase();
+    },
+);
+
 const fieldError = (index: number, name: string) => (form.errors as Record<string, string>)[`spec_fields.${index}.${name}`];
 
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
@@ -94,8 +109,16 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.name" />
                     </div>
                     <div class="grid content-start gap-2">
-                        <Label for="code_prefix" required>{{ t('asset_categories.code_prefix') }}</Label>
-                        <Input id="code_prefix" v-model="form.code_prefix" class="font-mono uppercase" maxlength="10" required autocomplete="off" />
+                        <Label for="code_prefix">{{ t('asset_categories.code_prefix') }}</Label>
+                        <Input
+                            id="code_prefix"
+                            v-model="form.code_prefix"
+                            class="font-mono uppercase"
+                            maxlength="10"
+                            autocomplete="off"
+                            :placeholder="t('asset_categories.code_prefix_auto')"
+                            @input="prefixTyped = true"
+                        />
                         <p class="text-xs text-muted-foreground">{{ t('asset_categories.code_prefix_hint') }}</p>
                         <InputError :message="form.errors.code_prefix" />
                     </div>

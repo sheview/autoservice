@@ -104,3 +104,16 @@ it('lets helpdesk view but not change categories', function () {
 
     $this->actingAs(userWithRole('technician'))->get('/asset-categories')->assertForbidden();
 });
+
+it('makes the code prefix from the name when none is typed, never twice the same', function () {
+    $this->actingAs($this->admin)->post('/asset-categories', ['name' => 'Notebook Dell'])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/asset-categories', ['name' => 'Notebook HP'])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/asset-categories', ['name' => 'เครื่องพิมพ์'])->assertSessionHasNoErrors();
+
+    expect(AssetCategory::orderBy('id')->pluck('code_prefix')->all())->toBe(['NOTE', 'NOTE2', 'CAT']);
+
+    // Editing without a prefix keeps the one it has.
+    $category = AssetCategory::where('code_prefix', 'CAT')->first();
+    $this->actingAs($this->admin)->put("/asset-categories/{$category->id}", ['name' => 'เครื่องพิมพ์เลเซอร์'])->assertSessionHasNoErrors();
+    expect($category->fresh()->code_prefix)->toBe('CAT');
+});

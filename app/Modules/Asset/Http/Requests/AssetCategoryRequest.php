@@ -35,7 +35,7 @@ class AssetCategoryRequest extends FormRequest
                     $fail(__('validation.unique', ['attribute' => __('asset.columns.category')]));
                 }
             }],
-            'code_prefix' => ['required', 'string', 'regex:/^[A-Za-z0-9]{1,10}$/'],
+            'code_prefix' => ['nullable', 'string', 'regex:/^[A-Za-z0-9]{1,10}$/'], // empty: made from the name (GenerateCategoryPrefix)
             'service_line' => ['nullable', Rule::in(AssetCategory::SERVICE_LINES)],
             // Left out (e.g. an older client): a new category is hardware, an existing one keeps its type.
             'asset_type' => ['sometimes', 'required', Rule::in(AssetCategory::ASSET_TYPES)],

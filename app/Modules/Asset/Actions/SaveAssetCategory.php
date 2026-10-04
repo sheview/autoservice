@@ -11,17 +11,22 @@ use App\Modules\Asset\Support\SpecFields;
  */
 class SaveAssetCategory
 {
+    public function __construct(private GenerateCategoryPrefix $generatePrefix) {}
+
     /**
-     * @param  array{name: string, code_prefix: string, service_line?: string|null, asset_type?: string, requires_serial?: bool,
+     * @param  array{name: string, code_prefix?: string|null, service_line?: string|null, asset_type?: string, requires_serial?: bool,
      *     spec_fields?: list<array<string, mixed>>}  $data
      */
     public function handle(?AssetCategory $category, array $data): AssetCategory
     {
         $category ??= new AssetCategory;
+        // None typed: a new category gets one made from its name; an existing one keeps its own.
+        $prefix = filled($data['code_prefix'] ?? null) ? strtoupper(trim($data['code_prefix']))
+            : ($category->exists ? $category->code_prefix : $this->generatePrefix->handle($data['name']));
 
         $category->fill([
             'name' => trim($data['name']),
-            'code_prefix' => strtoupper($data['code_prefix']),
+            'code_prefix' => $prefix,
             'service_line' => $data['service_line'] ?? null,
             'asset_type' => $data['asset_type'] ?? $category->asset_type ?? AssetCategory::TYPE_HARDWARE,
             'requires_serial' => (bool) ($data['requires_serial'] ?? $category->requires_serial ?? false),
