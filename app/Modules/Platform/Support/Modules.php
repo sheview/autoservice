@@ -2,6 +2,8 @@
 
 namespace App\Modules\Platform\Support;
 
+use App\Modules\Identity\Models\User;
+use App\Modules\Platform\CrossTenant\ShareGateway;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Laravel\Pennant\Feature;
@@ -67,9 +69,10 @@ class Modules
      *
      * @param  iterable<string>  $permissions  the permission names the UI already received
      * @param  bool  $customerAccount  hide items marked "staff" (pages a customer account may not open)
+     * @param  User|null  $user  for items marked "shared": shown only when another company shares that with them
      * @return list<array{title: string, href: string, icon: string, group: string|null}>
      */
-    public function navigation(iterable $permissions, bool $customerAccount = false): array
+    public function navigation(iterable $permissions, bool $customerAccount = false, ?User $user = null): array
     {
         $permissions = collect($permissions)->all();
         $items = [];
@@ -84,6 +87,12 @@ class Modules
             }
             // "module": one key, or several that must all be on.
             if (isset($item['module']) && collect((array) $item['module'])->contains(fn (string $key) => ! $this->enabled($key))) {
+                continue;
+            }
+            // "shared": abilities of which at least one must be shared with the user by another company.
+            if (isset($item['shared']) && ($user === null || collect((array) $item['shared'])->every(
+                fn (string $ability) => app(ShareGateway::class)->targets($user, $ability)->isEmpty()
+            ))) {
                 continue;
             }
             // Pages about the company itself: not in the platform tenant (it is no company).

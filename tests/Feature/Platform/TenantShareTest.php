@@ -242,3 +242,16 @@ it('forwards only to companies that take tickets from us', function () {
     $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/forward", ['company' => $this->c->id])->assertForbidden();
     expect(asTenant($this->b, fn () => Ticket::count()))->toBe(0);
 });
+
+it('shows the menu to search other companies only to those something is shared with', function () {
+    $menu = fn ($user) => collect($this->actingAs($user)->get('/dashboard')->viewData('page')['props']['navigation'])->pluck('title');
+
+    expect($menu($this->tech))->not->toContain('ค้นของบริษัทอื่น');
+
+    ($this->share)(); // pending: not yet
+    expect($menu($this->tech))->not->toContain('ค้นของบริษัทอื่น');
+
+    TenantShare::query()->update(['status' => TenantShare::STATUS_ACTIVE]);
+    expect($menu($this->tech))->toContain('ค้นของบริษัทอื่น')
+        ->and($menu($this->helpdesk))->not->toContain('ค้นของบริษัทอื่น'); // role not given the share
+});

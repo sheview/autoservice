@@ -53,7 +53,7 @@ class DashboardController extends Controller
         $platformHome = ($context->tenant()?->is_platform ?? false) && $user->can('platform.impersonate');
 
         if (! $platformHome && ! $user->can(self::PERMISSION)) {
-            $first = $modules->navigation($user->getAllPermissions()->pluck('name'), $user->customer_id !== null)[0]['href'] ?? null;
+            $first = $modules->navigation($user->getAllPermissions()->pluck('name'), $user->customer_id !== null, $user)[0]['href'] ?? null;
             abort_if($first === null, 403);
 
             return redirect($first);

@@ -13,7 +13,7 @@
 |
 | "navigation": the sidebar, in order. An item is shown when the user has "permission" (if set)
 | (one name, or a list = any of them) and the tenant has "module" switched on (if set; a list = all of them); "staff" items are hidden from customer
-| accounts; "company" items are only shown inside a customer company (not the platform). "icon" is a lucide icon name that
+| accounts; "shared" items only when another company shares one of those abilities with the user; "company" items are only shown inside a customer company (not the platform). "icon" is a lucide icon name that
 | resources/js/components/AppSidebar.vue knows. "title" is a key of lang/{locale}/ui.php.
 |
 */
@@ -54,7 +54,7 @@ return [
         ['group' => 'stock', 'title' => 'nav.parts', 'route' => 'inventory.parts.index', 'icon' => 'package', 'permission' => 'parts.view', 'module' => 'inventory', 'staff' => true],
         ['group' => 'stock', 'title' => 'nav.purchase_requests', 'route' => 'inventory.purchase-requests.index', 'icon' => 'shopping-cart', 'permission' => 'purchase-requests.view', 'module' => 'inventory', 'staff' => true],
         // Parts and assets other companies share with this one (Platform\CrossTenant).
-        ['group' => 'stock', 'title' => 'nav.shared_search', 'route' => 'platform.shared-search', 'icon' => 'scan-search', 'permission' => ['parts.view', 'assets.view'], 'staff' => true, 'company' => true],
+        ['group' => 'stock', 'title' => 'nav.shared_search', 'route' => 'platform.shared-search', 'icon' => 'scan-search', 'permission' => ['parts.view', 'assets.view'], 'shared' => ['parts.view', 'assets.view'], 'staff' => true, 'company' => true],
         ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock-movements.view', 'module' => 'inventory', 'staff' => true],
 
         ['group' => 'reports', 'title' => 'nav.reports', 'route' => 'reporting.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'reports.view', 'module' => 'reporting'],
