@@ -318,7 +318,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                         </div>
                     </div>
                     <div v-if="borrowerKind === 'staff'" class="grid content-start gap-2">
-                        <Label for="borrower_user_id">{{ t('requests.borrower_name') }}</Label>
+                        <Label for="borrower_user_id" required>{{ t('requests.borrower_name') }}</Label>
                         <select id="borrower_user_id" v-model="form.borrower_user_id" required :class="selectClass">
                             <option :value="null" disabled>{{ t('requests.choose_staff') }}</option>
                             <option v-for="user in borrowers" :key="user.id" :value="user.id">{{ user.name }}</option>
@@ -326,7 +326,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                         <InputError :message="form.errors.borrower_user_id" />
                     </div>
                     <div v-else class="grid content-start gap-2">
-                        <Label for="borrower_name">{{ t('requests.borrower_name') }}</Label>
+                        <Label for="borrower_name" required>{{ t('requests.borrower_name') }}</Label>
                         <Input id="borrower_name" v-model="form.borrower_name" required />
                         <InputError :message="form.errors.borrower_name" />
                     </div>
@@ -364,10 +364,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
 
                 <!-- Ticket -->
                 <div class="grid content-start gap-2 sm:col-span-2">
-                    <Label for="ticket_search">
-                        {{ t('requests.ticket') }}
-                        <span v-if="hasParts" class="text-red-600">*</span>
-                    </Label>
+                    <Label for="ticket_search" :required="hasParts">{{ t('requests.ticket') }}</Label>
                     <div v-if="chosenTicket" class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                         <span class="font-mono text-xs">{{ chosenTicket.ticket_no }}</span>
                         <span class="flex-1">{{ chosenTicket.title }}</span>
@@ -434,7 +431,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                 </div>
 
                 <div class="space-y-2">
-                    <Label for="item_search">{{ t('requests.add_item') }}</Label>
+                    <Label for="item_search" required>{{ t('requests.add_item') }}</Label>
                     <Input
                         id="item_search"
                         v-model="itemSearch"
@@ -529,7 +526,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
 
                     <div class="grid gap-3 sm:grid-cols-4">
                         <div class="grid content-start gap-1">
-                            <Label :for="`qty-${index}`">{{ t('requests.qty') }}</Label>
+                            <Label :for="`qty-${index}`" required>{{ t('requests.qty') }}</Label>
                             <div class="flex items-center gap-2">
                                 <Input v-if="line.lot" :id="`qty-${index}`" v-model.number="line.qty" type="number" min="1" required class="w-28" />
                                 <span v-else :id="`qty-${index}`" class="text-sm">1</span>
@@ -548,7 +545,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                                 </select>
                             </div>
                             <div v-if="line.checkout_type === 'loan'" class="grid content-start gap-1">
-                                <Label :for="`due-${index}`">{{ t('requests.due_return_date') }}</Label>
+                                <Label :for="`due-${index}`" required>{{ t('requests.due_return_date') }}</Label>
                                 <Input :id="`due-${index}`" v-model="line.due_return_date" type="date" :min="today" required />
                             </div>
                         </template>

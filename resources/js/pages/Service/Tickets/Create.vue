@@ -215,24 +215,22 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     <!-- A device not in the system: what it is, as told -->
                     <div v-if="deviceMode === 'unregistered'" class="grid gap-6 rounded-md border p-4 sm:col-span-2 sm:grid-cols-2">
                         <div class="grid content-start gap-2 sm:col-span-2">
-                            <Label for="device_name">{{ t('tickets.device_name') }} <span class="text-red-600">*</span></Label>
+                            <Label for="device_name" required>{{ t('tickets.device_name') }}</Label>
                             <Input id="device_name" v-model="form.device_name" :placeholder="t('tickets.device_name_placeholder')" />
                             <InputError :message="form.errors.device_name" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="device_brand">{{ t('tickets.device_brand') }} <span class="text-red-600">*</span></Label>
+                            <Label for="device_brand" required>{{ t('tickets.device_brand') }}</Label>
                             <Input id="device_brand" v-model="form.device_brand" />
                             <InputError :message="form.errors.device_brand" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="device_model">{{ t('tickets.device_model') }} <span class="text-red-600">*</span></Label>
+                            <Label for="device_model" required>{{ t('tickets.device_model') }}</Label>
                             <Input id="device_model" v-model="form.device_model" />
                             <InputError :message="form.errors.device_model" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="device_serial">
-                                {{ t('tickets.device_serial') }} <span v-if="!form.device_serial_unknown" class="text-red-600">*</span>
-                            </Label>
+                            <Label for="device_serial" :required="!form.device_serial_unknown">{{ t('tickets.device_serial') }}</Label>
                             <Input id="device_serial" v-model="form.device_serial" class="font-mono" :disabled="form.device_serial_unknown" />
                             <label class="flex items-center gap-2 text-sm">
                                 <input v-model="form.device_serial_unknown" type="checkbox" class="size-4 rounded border-input" />
@@ -307,7 +305,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
                 <section class="grid gap-6 sm:grid-cols-2">
                     <div class="grid content-start gap-2 sm:col-span-2">
-                        <Label for="title">{{ t('tickets.title_field') }}</Label>
+                        <Label for="title" required>{{ t('tickets.title_field') }}</Label>
                         <TicketTitlePicker v-model="form.title" />
                         <InputError :message="form.errors.title" />
                     </div>
@@ -324,7 +322,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
 
                     <div class="grid content-start gap-2">
-                        <Label for="priority">{{ t('tickets.priority') }}</Label>
+                        <Label for="priority" required>{{ t('tickets.priority') }}</Label>
                         <select id="priority" v-model="form.priority" :class="selectClass">
                             <option v-for="priority in priorities" :key="priority" :value="priority">
                                 {{ t(`tickets.priorities.${priority}`) }}
@@ -341,7 +339,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
 
                     <div v-if="!customerAccount" class="grid content-start gap-2">
-                        <Label for="source">{{ t('tickets.source') }}</Label>
+                        <Label for="source" required>{{ t('tickets.source') }}</Label>
                         <select id="source" v-model="form.source" :class="selectClass">
                             <option v-for="source in sources" :key="source" :value="source">{{ t(`tickets.sources.${source}`) }}</option>
                         </select>

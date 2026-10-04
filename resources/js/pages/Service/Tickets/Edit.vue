@@ -60,7 +60,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
             <form class="grid gap-6 sm:grid-cols-2" @submit.prevent="submit">
                 <div class="grid content-start gap-2 sm:col-span-2">
-                    <Label for="title">{{ t('tickets.title_field') }}</Label>
+                    <Label for="title" required>{{ t('tickets.title_field') }}</Label>
                     <TicketTitlePicker v-model="form.title" />
                     <InputError :message="form.errors.title" />
                 </div>
@@ -77,7 +77,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 </div>
 
                 <div class="grid content-start gap-2">
-                    <Label for="priority">{{ t('tickets.priority') }}</Label>
+                    <Label for="priority" required>{{ t('tickets.priority') }}</Label>
                     <select id="priority" v-model="form.priority" :class="selectClass">
                         <option v-for="priority in priorities" :key="priority" :value="priority">{{ t(`tickets.priorities.${priority}`) }}</option>
                     </select>
@@ -85,7 +85,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 </div>
 
                 <div class="grid content-start gap-2">
-                    <Label for="source">{{ t('tickets.source') }}</Label>
+                    <Label for="source" required>{{ t('tickets.source') }}</Label>
                     <select id="source" v-model="form.source" :class="selectClass">
                         <option v-for="source in sources" :key="source" :value="source">{{ t(`tickets.sources.${source}`) }}</option>
                     </select>
