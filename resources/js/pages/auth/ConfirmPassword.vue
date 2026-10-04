@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthLayout from '@/layouts/AuthLayout.vue';
+import { t } from '@/lib/i18n';
 import { Head, useForm } from '@inertiajs/vue3';
 import { LoaderCircle } from 'lucide-vue-next';
 
@@ -21,13 +22,13 @@ const submit = () => {
 </script>
 
 <template>
-    <AuthLayout title="Confirm your password" description="This is a secure area of the application. Please confirm your password before continuing.">
-        <Head title="Confirm password" />
+    <AuthLayout :title="t('auth.confirm_title')" :description="t('auth.confirm_description')">
+        <Head :title="t('auth.confirm_title')" />
 
         <form @submit.prevent="submit">
             <div class="space-y-6">
                 <div class="grid gap-2">
-                    <Label htmlFor="password">Password</Label>
+                    <Label for="password">{{ t('auth.confirm_password') }}</Label>
                     <Input
                         id="password"
                         type="password"
@@ -44,7 +45,7 @@ const submit = () => {
                 <div class="flex items-center">
                     <Button class="w-full" :disabled="form.processing">
                         <LoaderCircle v-if="form.processing" class="h-4 w-4 animate-spin" />
-                        Confirm Password
+                        {{ t('auth.confirm_button') }}
                     </Button>
                 </div>
             </div>
