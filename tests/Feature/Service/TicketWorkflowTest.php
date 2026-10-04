@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -135,7 +136,7 @@ it('moves the due times when the priority changes', function () {
     $ticket = $this->ticket->fresh();
     expect($ticket->resolve_minutes)->toBeNull()
         ->and($ticket->resolve_due_at)->toBeNull()
-        ->and($ticket->events()->where('type', 'updated')->value('body'))->toBe('หัวข้อ, ความเร่งด่วน, ช่องทางแจ้ง');
+        ->and($ticket->events()->where('type', 'updated')->latest('id')->value('body'))->toBe('หัวข้อ, ความเร่งด่วน, ช่องทางแจ้ง');
 });
 
 it('adds comments and internal notes', function () {
@@ -159,4 +160,17 @@ it('needs the warranty checked before work starts', function () {
     $this->post("/tickets/{$ticket->ulid}/warranty", ['warranty_status' => 'in_warranty'])->assertSessionHasNoErrors();
     moveTicket($ticket, 'start')->assertSessionHasNoErrors();
     expect($ticket->fresh())->warranty_status->toBe('in_warranty')->status->toBe(Ticket::STATUS_IN_PROGRESS);
+});
+
+it('needs the repair report before the job is done or closed', function () {
+    $ticket = openTicket($this->helpdesk, reportFilled: false);
+    app(AssignTicket::class)->handle($ticket, $this->tech->id, $this->helpdesk);
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/move", ['action' => 'start'])->assertSessionHasNoErrors();
+
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/move", ['action' => 'resolve'])->assertSessionHasErrors('action');
+    expect($ticket->fresh()->status)->toBe('in_progress');
+
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/report", ['cause' => 'Fan dead', 'approver_name' => 'Khun A'])->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->post("/tickets/{$ticket->ulid}/move", ['action' => 'resolve'])->assertSessionHasNoErrors();
+    expect($ticket->fresh()->status)->toBe('resolved');
 });

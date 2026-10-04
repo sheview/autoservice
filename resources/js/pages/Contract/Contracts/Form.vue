@@ -111,7 +111,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     <h3 class="text-sm font-semibold">{{ t('contracts.general') }}</h3>
                     <div class="grid gap-6 sm:grid-cols-2">
                         <div class="grid content-start gap-2 sm:col-span-2">
-                            <Label for="customer_id">{{ t('contracts.customer') }}</Label>
+                            <Label for="customer_id" required>{{ t('contracts.customer') }}</Label>
                             <select id="customer_id" v-model="form.customer_id" :class="selectClass" required>
                                 <option :value="null" disabled>{{ t('contracts.choose_customer') }}</option>
                                 <option v-for="customer in customers" :key="customer.id" :value="customer.id">
@@ -122,12 +122,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </div>
 
                         <div class="grid content-start gap-2">
-                            <Label for="contract_no">{{ t('contracts.contract_no') }}</Label>
+                            <Label for="contract_no" required>{{ t('contracts.contract_no') }}</Label>
                             <Input id="contract_no" v-model="form.contract_no" class="font-mono" required autocomplete="off" />
                             <InputError :message="form.errors.contract_no" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="status">{{ t('contracts.status') }}</Label>
+                            <Label for="status" required>{{ t('contracts.status') }}</Label>
                             <select id="status" v-model="form.status" :class="selectClass" required>
                                 <option v-for="status in statuses" :key="status" :value="status">{{ t(`contracts.statuses.${status}`) }}</option>
                             </select>
@@ -135,18 +135,18 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </div>
 
                         <div class="grid content-start gap-2 sm:col-span-2">
-                            <Label for="title">{{ t('contracts.title_field') }}</Label>
+                            <Label for="title" required>{{ t('contracts.title_field') }}</Label>
                             <Input id="title" v-model="form.title" required />
                             <InputError :message="form.errors.title" />
                         </div>
 
                         <div class="grid content-start gap-2">
-                            <Label for="starts_on">{{ t('contracts.starts_on') }}</Label>
+                            <Label for="starts_on" required>{{ t('contracts.starts_on') }}</Label>
                             <Input id="starts_on" v-model="form.starts_on" type="date" required />
                             <InputError :message="form.errors.starts_on" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="ends_on">{{ t('contracts.ends_on') }}</Label>
+                            <Label for="ends_on" required>{{ t('contracts.ends_on') }}</Label>
                             <Input id="ends_on" v-model="form.ends_on" type="date" required />
                             <InputError :message="form.errors.ends_on" />
                         </div>
@@ -157,7 +157,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <InputError :message="form.errors.value" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="service_window">{{ t('contracts.service_window') }}</Label>
+                            <Label for="service_window" required>{{ t('contracts.service_window') }}</Label>
                             <select id="service_window" v-model="form.service_window" :class="selectClass" required>
                                 <option v-for="window in serviceWindows" :key="window" :value="window">
                                     {{ t(`contracts.service_windows.${window}`) }}
@@ -177,7 +177,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <InputError :message="form.errors.pm_interval_months" />
                         </div>
                         <div class="grid content-start gap-2">
-                            <Label for="notify_days_before">{{ t('contracts.notify_days_before') }}</Label>
+                            <Label for="notify_days_before" required>{{ t('contracts.notify_days_before') }}</Label>
                             <Input id="notify_days_before" v-model="form.notify_days_before" type="number" min="0" max="365" required />
                             <p class="text-xs text-muted-foreground">{{ t('contracts.notify_hint') }}</p>
                             <InputError :message="form.errors.notify_days_before" />

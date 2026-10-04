@@ -42,6 +42,10 @@ class MoveTicket
         if ($action === 'start' && $ticket->warranty_checked_at === null) {
             throw ValidationException::withMessages(['action' => __('service.tickets.warranty_first')]);
         }
+        // The repair report (cause, who approved it at the customer) is filled in before the job is done.
+        if (in_array($action, ['resolve', 'approve'], true) && (blank($ticket->cause) || blank($ticket->approver_name))) {
+            throw ValidationException::withMessages(['action' => __('service.tickets.report_first')]);
+        }
         if (in_array($action, TicketWorkflow::NEEDS_COMMENT, true) && blank($comment)) {
             throw ValidationException::withMessages(['comment' => __('service.tickets.reason_required')]);
         }

@@ -444,7 +444,9 @@ const stepBar = computed(() => {
                         </div>
                         <form v-if="can.report" class="grid gap-4 rounded-md border p-4 sm:grid-cols-2" @submit.prevent="saveReport">
                             <div class="grid gap-1.5 sm:col-span-2">
-                                <label for="cause" class="text-xs text-muted-foreground">{{ t('tickets.cause') }}</label>
+                                <label for="cause" class="text-xs text-muted-foreground"
+                                    >{{ t('tickets.cause') }} <span class="text-red-600" aria-hidden="true">*</span></label
+                                >
                                 <textarea
                                     id="cause"
                                     v-model="report.cause"
@@ -467,7 +469,9 @@ const stepBar = computed(() => {
                                 <InputError :message="report.errors.extra_cost" />
                             </div>
                             <div class="grid gap-1.5">
-                                <label for="approver_name" class="text-xs text-muted-foreground">{{ t('tickets.approver_name') }}</label>
+                                <label for="approver_name" class="text-xs text-muted-foreground"
+                                    >{{ t('tickets.approver_name') }} <span class="text-red-600" aria-hidden="true">*</span></label
+                                >
                                 <input
                                     id="approver_name"
                                     v-model="report.approver_name"

@@ -89,12 +89,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             <form class="space-y-8" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="grid content-start gap-2">
-                        <Label for="name">{{ t('asset_categories.name') }}</Label>
+                        <Label for="name" required>{{ t('asset_categories.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
                     <div class="grid content-start gap-2">
-                        <Label for="code_prefix">{{ t('asset_categories.code_prefix') }}</Label>
+                        <Label for="code_prefix" required>{{ t('asset_categories.code_prefix') }}</Label>
                         <Input id="code_prefix" v-model="form.code_prefix" class="font-mono uppercase" maxlength="10" required autocomplete="off" />
                         <p class="text-xs text-muted-foreground">{{ t('asset_categories.code_prefix_hint') }}</p>
                         <InputError :message="form.errors.code_prefix" />
@@ -108,7 +108,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.service_line" />
                     </div>
                     <div class="grid content-start gap-2">
-                        <Label for="asset_type">{{ t('asset_categories.asset_type') }}</Label>
+                        <Label for="asset_type" required>{{ t('asset_categories.asset_type') }}</Label>
                         <select id="asset_type" v-model="form.asset_type" required :class="selectClass">
                             <option v-for="type in assetTypes" :key="type" :value="type">{{ t(`asset_categories.asset_types.${type}`) }}</option>
                         </select>
@@ -132,25 +132,27 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
                     <div v-for="(field, index) in form.spec_fields" :key="index" class="grid gap-4 rounded-md border p-4 sm:grid-cols-12">
                         <div class="grid content-start gap-2 sm:col-span-3">
-                            <Label :for="`field_label_${index}`">{{ t('asset_categories.field_label') }}</Label>
+                            <Label :for="`field_label_${index}`" required>{{ t('asset_categories.field_label') }}</Label>
                             <Input :id="`field_label_${index}`" v-model="field.label" required />
                             <InputError :message="fieldError(index, 'label')" />
                         </div>
                         <div class="grid content-start gap-2 sm:col-span-3">
-                            <Label :for="`field_key_${index}`">{{ t('asset_categories.field_key') }}</Label>
+                            <Label :for="`field_key_${index}`" required>{{ t('asset_categories.field_key') }}</Label>
                             <Input :id="`field_key_${index}`" v-model="field.key" class="font-mono" required pattern="[a-z][a-z0-9_]*" />
                             <p class="text-xs text-muted-foreground">{{ t('asset_categories.field_key_hint') }}</p>
                             <InputError :message="fieldError(index, 'key')" />
                         </div>
                         <div class="grid content-start gap-2 sm:col-span-2">
-                            <Label :for="`field_type_${index}`">{{ t('asset_categories.field_type') }}</Label>
+                            <Label :for="`field_type_${index}`" required>{{ t('asset_categories.field_type') }}</Label>
                             <select :id="`field_type_${index}`" v-model="field.type" :class="selectClass">
                                 <option v-for="type in fieldTypes" :key="type" :value="type">{{ t(`asset_categories.field_types.${type}`) }}</option>
                             </select>
                         </div>
                         <div class="grid content-start gap-2 sm:col-span-3">
                             <template v-if="field.type === 'select'">
-                                <Label :for="`field_options_${index}`">{{ t('asset_categories.field_options') }}</Label>
+                                <Label :for="`field_options_${index}`" :required="field.type === 'select'">{{
+                                    t('asset_categories.field_options')
+                                }}</Label>
                                 <Input :id="`field_options_${index}`" v-model="field.optionsText" required />
                                 <InputError :message="fieldError(index, 'options')" />
                             </template>

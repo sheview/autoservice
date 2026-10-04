@@ -16,6 +16,7 @@ use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -202,15 +203,20 @@ function createPart(array $attributes = [], int $stock = 0): Part
 
 /**
  * A ticket opened by $actor through OpenTicket (number, SLA and due times as in the app).
- * Its warranty is already checked (work cannot start before that) unless $warrantyChecked is false.
+ * Its warranty is already checked (work cannot start before that) unless $warrantyChecked is false,
+ * and its repair report is filled in (the job cannot be done before that) unless $reportFilled is false.
  */
-function openTicket(User $actor, array $attributes = [], bool $warrantyChecked = true): Ticket
+function openTicket(User $actor, array $attributes = [], bool $warrantyChecked = true, bool $reportFilled = true): Ticket
 {
     $ticket = app(OpenTicket::class)->handle($actor, $attributes + [
         'title' => 'Printer does not print',
         'priority' => 'medium',
         'source' => 'phone',
     ]);
+
+    if ($reportFilled) {
+        app(SaveRepairReport::class)->handle($ticket, $actor, ['cause' => 'Worn part', 'extra_cost' => null, 'approver_name' => 'Customer IT']);
+    }
 
     return $warrantyChecked ? checkWarranty($ticket, $actor) : $ticket;
 }

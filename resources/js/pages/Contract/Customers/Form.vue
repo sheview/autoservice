@@ -74,13 +74,13 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-3">
                     <div class="grid content-start gap-2">
-                        <Label for="code">{{ t('customers.code') }}</Label>
+                        <Label for="code" required>{{ t('customers.code') }}</Label>
                         <Input id="code" v-model="form.code" class="font-mono uppercase" required maxlength="30" autocomplete="off" />
                         <p class="text-xs text-muted-foreground">{{ t('customers.code_hint') }}</p>
                         <InputError :message="form.errors.code" />
                     </div>
                     <div class="grid content-start gap-2">
-                        <Label for="name">{{ t('customers.name') }}</Label>
+                        <Label for="name" required>{{ t('customers.name') }}</Label>
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
