@@ -8,6 +8,7 @@ use App\Modules\Service\Http\Controllers\TicketController;
 use App\Modules\Service\Http\Controllers\TicketPartController;
 use App\Modules\Service\Http\Controllers\TicketPrintController;
 use App\Modules\Service\Http\Controllers\TicketSurveyController;
+use App\Modules\Service\Http\Controllers\TrackController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->group(function () {
@@ -46,3 +47,6 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
 
     Route::resource('holidays', HolidayController::class)->only(['index', 'store', 'destroy']);
 });
+
+// Track my repair: public, no sign-in (TrackController finds the company); limited against guessing.
+Route::get('track', TrackController::class)->middleware('throttle:20,1')->name('service.track');

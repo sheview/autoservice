@@ -4,7 +4,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import AuthBrandLayout from '@/layouts/auth/AuthBrandLayout.vue';
 import { t } from '@/lib/i18n';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { CircleCheck, Eye, EyeOff, LoaderCircle, Lock, LogIn, Mail, ShieldCheck } from 'lucide-vue-next';
+import { CircleCheck, Eye, EyeOff, LoaderCircle, Lock, LogIn, Mail, Search, ShieldCheck } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 defineProps<{
@@ -114,6 +114,15 @@ const submit = () => {
                     {{ t('auth.login_button') }}
                 </button>
             </form>
+
+            <!-- Track my repair: for customers, no sign-in -->
+            <Link
+                :href="route('service.track')"
+                class="mt-4 flex items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:text-violet-700"
+            >
+                <Search class="h-4 w-4" />
+                {{ t('track.link') }}
+            </Link>
 
             <div class="mt-8 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-6">
                 <div v-for="item in trust" :key="item" class="flex items-center gap-1.5 text-xs text-slate-500">
