@@ -19,6 +19,8 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Reporting\Actions\CountSummaryRows;
 use App\Modules\Reporting\Actions\SummarizePeople;
 use App\Modules\Reporting\Actions\SummarizeProjects;
+use App\Modules\Reporting\Actions\SummarizeTicketKpi;
+use App\Modules\Service\Actions\TicketKpi;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -49,13 +51,27 @@ class SummaryController extends Controller
             'people' => $summarize->handle($request->user(), $filters),
             'filters' => $filters,
             'kinds' => $this->kinds(),
+            'canKpi' => $this->modules->enabled('service'),
+        ]);
+    }
+
+    /** Ticket KPI by person for a year: opened, fixed, on time, time to fix. */
+    public function kpi(Request $request, SummarizeTicketKpi $summarize): Response
+    {
+        abort_unless($request->user()->can(SummarizePeople::PERMISSION) && $this->modules->enabled('service'), 403);
+        $filters = SummarizeTicketKpi::filtersFrom($request);
+
+        return Inertia::render('Reporting/People/Kpi', [
+            'people' => $summarize->handle($request->user(), $filters),
+            'filters' => $filters,
+            'years' => range((int) now()->year, (int) now()->year - 4),
         ]);
     }
 
     /**
      * One person: ?user= a user of the company, or ?name= someone from outside (loans and issues only).
      */
-    public function person(Request $request, UserNames $userNames): Response
+    public function person(Request $request, UserNames $userNames, TicketKpi $ticketKpi): Response
     {
         $viewer = $request->user();
         abort_unless($viewer->can(SummarizePeople::PERMISSION), 403);
@@ -70,6 +86,12 @@ class SummaryController extends Controller
 
         return Inertia::render('Reporting/People/Show', [
             'person' => ['user_id' => $userId, 'outside_name' => $outsideName, 'name' => $name],
+            // Ticket work by month of a year (staff of the company only).
+            'kpi' => $userId && $this->modules->enabled('service') ? [
+                'year' => $kpiYear = SummarizeTicketKpi::filtersFrom($request)['year'],
+                'months' => array_values($ticketKpi->handle($kpiYear, [$userId], byMonth: true)),
+                'years' => range((int) now()->year, (int) now()->year - 4),
+            ] : null,
             'totals' => $this->countRows->handle($viewer, $userId ? ['user_id' => $userId] : ['outside_name' => $outsideName]),
             'filters' => $filters,
             'checkouts' => $this->modules->enabled('asset')

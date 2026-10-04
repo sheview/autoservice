@@ -10,6 +10,7 @@ Route::middleware(['auth', 'verified', 'module:reporting'])->name('reporting.')-
 
     // What each person / project (MA contract) has been issued, lent or bought.
     Route::get('summary/people', [SummaryController::class, 'people'])->name('people.index');
+    Route::get('summary/people/kpi', [SummaryController::class, 'kpi'])->name('people.kpi');
     Route::get('summary/people/view', [SummaryController::class, 'person'])->name('people.show');
     Route::get('summary/projects', [SummaryController::class, 'projects'])->name('projects.index');
     Route::get('summary/projects/{contract}', [SummaryController::class, 'project'])->whereNumber('contract')->name('projects.show');

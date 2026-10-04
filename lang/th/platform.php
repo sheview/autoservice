@@ -32,4 +32,22 @@ return [
         'admin_password' => 'รหัสผ่านผู้ดูแล',
         'session_timeout_minutes' => 'เวลาออกจากระบบอัตโนมัติ',
     ],
+
+    // Sharing data between companies
+    'shares' => [
+        'fields' => [
+            'abilities' => 'ข้อมูลที่แชร์',
+            'roles' => 'บทบาทที่ใช้ได้',
+            'reason' => 'เหตุผล',
+            'expires_on' => 'วันหมดอายุ',
+        ],
+        'central_roles' => [
+            'central_technician' => 'ช่างส่วนกลาง',
+            'central_helpdesk' => 'Helpdesk ส่วนกลาง',
+        ],
+        'saved' => 'บันทึกการแชร์ :from → :to เรียบร้อยแล้ว',
+        'revoked' => 'ยกเลิกการแชร์เรียบร้อยแล้ว',
+        'accepted' => 'ยอมรับการแชร์เรียบร้อยแล้ว',
+        'not_pending' => 'การแชร์นี้ไม่ได้รอการยอมรับแล้ว',
+    ],
 ];

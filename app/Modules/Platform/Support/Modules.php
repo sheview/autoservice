@@ -75,7 +75,8 @@ class Modules
         $items = [];
 
         foreach (config('modules.navigation', []) as $item) {
-            if (isset($item['permission']) && ! in_array($item['permission'], $permissions, true)) {
+            // "permission": one name, or several of which any will do.
+            if (isset($item['permission']) && array_intersect((array) $item['permission'], $permissions) === []) {
                 continue;
             }
             if ($customerAccount && ($item['staff'] ?? false)) {

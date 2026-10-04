@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
+import PeopleSummaryTabs from '@/components/PeopleSummaryTabs.vue';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -24,6 +25,8 @@ const props = defineProps<{
     people: Paginated<PersonSummary>;
     filters: Filters;
     kinds: string[];
+    // The ticket KPI tab (Service module on).
+    canKpi: boolean;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('summary.people_title'), href: route('reporting.people.index') }];
@@ -44,6 +47,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
         <div class="space-y-6 p-4">
             <Heading :title="t('summary.people_title')" :description="t('summary.people_description')" />
+            <PeopleSummaryTabs v-if="canKpi" active="items" />
 
             <div class="flex flex-wrap items-center gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('summary.search_people')" />
