@@ -24,7 +24,7 @@ it('shows who did what, with search, filters, sort and pages', function () {
         ->where('keepDays', 90)
         ->where('entries.data.0.description', 'อนุมัติเบิก/ยืม')
         ->where('entries.data.0.actor', 'Admin Boss')
-        ->where('entries.data.0.subject', 'Asset')
+        ->where('entries.data.0.subject', 'ทรัพย์สิน')
         ->where('entries.data.0.details.note', 'อนุมัติเบิก/ยืม note')
         ->missing('entries.data.0.details.actor'));
 
@@ -34,10 +34,21 @@ it('shows who did what, with search, filters, sort and pages', function () {
     $this->actingAs($this->admin)->get('/activity-log?from=2026-10-01&to=2026-10-01&search=เบิก')->assertInertia(fn (Assert $page) => $page
         ->where('entries.data', fn ($rows) => collect($rows)->pluck('description')->all() === ['อนุมัติเบิก/ยืม']));
     $this->actingAs($this->admin)->get('/activity-log?direction=asc&subject='.urlencode(Asset::class))->assertInertia(fn (Assert $page) => $page
-        ->where('entries.data.0.subject', 'Asset')
+        ->where('entries.data.0.subject', 'ทรัพย์สิน')
         ->where('filters.subject', Asset::class));
     // a date that is not one is ignored
     $this->actingAs($this->admin)->get('/activity-log?from=2026-02-31')->assertInertia(fn (Assert $page) => $page->where('filters.from', null));
+});
+
+it('reads in Thai: what a model logged by itself, its kind of record and the details', function () {
+    $asset = createAsset(createAssetCategory(['name' => 'Notebook']));
+    $asset->update(['name' => 'Notebook ใหม่']);
+
+    $this->actingAs($this->admin)->get('/activity-log?subject='.urlencode(Asset::class))->assertInertia(fn (Assert $page) => $page
+        ->where('entries.data.0.description', 'แก้ไขทรัพย์สิน')
+        ->where('entries.data.0.subject', 'ทรัพย์สิน')
+        ->where('entries.data.0.details.ค่าใหม่.name', 'Notebook ใหม่')
+        ->where('subjects', fn ($list) => collect($list)->pluck('label')->contains('ทรัพย์สิน')));
 });
 
 it('is for the company admin and never shows another tenant', function () {

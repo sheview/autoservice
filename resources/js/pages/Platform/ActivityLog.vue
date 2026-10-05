@@ -117,7 +117,6 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 </td>
                                 <td class="px-4 py-2">
                                     <div>{{ entry.description }}</div>
-                                    <div v-if="entry.event" class="font-mono text-xs text-muted-foreground">{{ entry.event }}</div>
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">
                                     <template v-if="entry.subject">{{ entry.subject }} #{{ entry.subject_id }}</template>
