@@ -53,6 +53,9 @@ class PermissionCatalog
         // receive = mark an approved request ordered, then received.
         'purchase-requests' => ['view', 'create', 'update', 'approve', 'delete', 'receive'],
         'stock-movements' => ['view', 'create'],
+        // Entering customers' server rooms: request = ask for oneself; approve = decide (never one's
+        // own); manage = rooms, their rules and approvers; view-id = see entrants' full ID numbers.
+        'room-access' => ['view', 'request', 'approve', 'manage', 'view-id'],
         'reports' => ['view', 'export'],
         'summary-people' => ['view'],
         'summary-projects' => ['view'],
@@ -160,6 +163,7 @@ class PermissionCatalog
                 'surveys.view' => 'all',
                 'holidays.view' => 'all',
                 'manuals.view' => 'all',
+                'room-access.view' => 'all', 'room-access.request' => 'all', 'room-access.approve' => 'all', 'room-access.view-id' => 'all',
             ],
         ],
         'technician' => [
@@ -182,6 +186,7 @@ class PermissionCatalog
                 'summary-people.view' => 'own',
                 'surveys.view' => 'own',
                 'manuals.view' => 'all',
+                'room-access.view' => 'own', 'room-access.request' => 'own',
             ],
         ],
         // Buys what was asked for: orders, takes deliveries, registers them as assets or parts

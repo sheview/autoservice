@@ -12,6 +12,8 @@ import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     ArrowLeftRight,
+    DoorOpen,
+    Server,
     BarChart3,
     Bell,
     BookOpen,
@@ -57,6 +59,8 @@ onMounted(() => nextTick(() => content.value?.$el.scrollTo({ top: savedScroll })
 // Icon names used in config/modules.php "navigation".
 const icons: Record<string, LucideIcon> = {
     'layout-grid': LayoutGrid,
+    'door-open': DoorOpen,
+    server: Server,
     wrench: Wrench,
     'calendar-days': CalendarDays,
     'calendar-check': CalendarCheck,

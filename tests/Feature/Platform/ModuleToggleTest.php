@@ -25,7 +25,7 @@ it('builds the sidebar from config, filtered by permission', function () {
                 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
                 'รายงาน', 'อะไหล่ที่เปลี่ยน/ส่งออก', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ',
                 'คู่มือ',
-                'ผู้ใช้งาน', 'บทบาทและสิทธิ์', 'อาการและวิธีแก้', 'วันหยุด', 'ข้อมูลบริษัท', 'การแจ้งเตือน', 'แชร์ข้อมูลกับบริษัทอื่น', 'Log การใช้งาน',
+                'ผู้ใช้งาน', 'บทบาทและสิทธิ์', 'อาการและวิธีแก้', 'ห้อง Server', 'วันหยุด', 'ข้อมูลบริษัท', 'การแจ้งเตือน', 'แชร์ข้อมูลกับบริษัทอื่น', 'Log การใช้งาน',
             ]));
 
     // each item carries its section
@@ -69,7 +69,7 @@ it('lets a superadmin switch modules of a tenant and logs it', function () {
 
     $this->actingAs($superadmin)->get("/platform/tenants/{$this->customer->ulid}/modules")
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('Platform/Tenants/Modules')->where('modules', ['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true]));
+        ->assertInertia(fn (Assert $page) => $page->component('Platform/Tenants/Modules')->where('modules', ['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true]));
 
     $this->actingAs($superadmin)->put("/platform/tenants/{$this->customer->ulid}/modules", ['modules' => ['asset' => false]])
         ->assertRedirect(route('platform.impersonation.index'))
@@ -79,8 +79,8 @@ it('lets a superadmin switch modules of a tenant and logs it', function () {
 
     $log = asTenant($superadmin->tenant, fn () => Activity::where('event', 'modules_updated')->first());
     // toEqual: JSONB does not keep key order.
-    expect($log->properties['old'])->toEqual(['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true])
-        ->and($log->properties['attributes'])->toEqual(['asset' => false, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true])
+    expect($log->properties['old'])->toEqual(['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true])
+        ->and($log->properties['attributes'])->toEqual(['asset' => false, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true])
         ->and($log->properties['actor']['name'])->toBe('Root');
 });
 
