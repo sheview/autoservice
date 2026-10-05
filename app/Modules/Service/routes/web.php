@@ -9,6 +9,7 @@ use App\Modules\Service\Http\Controllers\TicketPartController;
 use App\Modules\Service\Http\Controllers\TicketPrintController;
 use App\Modules\Service\Http\Controllers\TicketSurveyController;
 use App\Modules\Service\Http\Controllers\TrackController;
+use App\Modules\Service\Http\Controllers\TrackTokenController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->group(function () {
@@ -24,6 +25,7 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     Route::post('tickets/{ticket}/warranty', [TicketActionController::class, 'warranty'])->name('tickets.warranty');
     Route::post('tickets/{ticket}/report', [TicketActionController::class, 'report'])->name('tickets.report');
     Route::post('tickets/{ticket}/ip', [TicketActionController::class, 'ip'])->name('tickets.ip');
+    Route::post('tickets/{ticket}/tracking-token', [TicketActionController::class, 'trackingToken'])->name('tickets.tracking-token');
     Route::post('tickets/{ticket}/appointment', [TicketActionController::class, 'appointment'])->name('tickets.appointment');
     Route::post('tickets/{ticket}/forward', [TicketActionController::class, 'forward'])->name('tickets.forward');
     Route::post('tickets/{ticket}/move', [TicketActionController::class, 'move'])->name('tickets.move');
@@ -50,3 +52,6 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
 
 // Track my repair: public, no sign-in (TrackController finds the company); limited against guessing.
 Route::get('track', TrackController::class)->middleware('throttle:20,1')->name('service.track');
+// A ticket's tracking link: on the company's host, or naming the company by its code on the shared one.
+Route::get('track/{token}', [TrackTokenController::class, 'onHost'])->middleware('throttle:60,1')->name('service.track.token');
+Route::get('t/{code}/track/{token}', [TrackTokenController::class, 'onPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:60,1')->name('service.track.token.path');

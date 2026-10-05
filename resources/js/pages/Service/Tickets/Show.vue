@@ -12,6 +12,7 @@ import TicketForwardPanel, { type TicketForwards } from '@/components/TicketForw
 import TicketIpPanel from '@/components/TicketIpPanel.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
+import TicketTrackingLink from '@/components/TicketTrackingLink.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
@@ -135,6 +136,7 @@ const props = defineProps<{
     } | null;
     sharedRequests: SharedRequestRow[];
     forwards: TicketForwards | null;
+    tracking: { url: string; can_renew: boolean } | null;
     askOthersUrl: string | null;
     ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
     can: { update: boolean; comment: boolean; internalNotes: boolean; deleteAttachments: boolean; checkWarranty: boolean; report: boolean };
@@ -427,6 +429,7 @@ const stepBar = computed(() => {
 
                     <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
 
+                    <TicketTrackingLink v-if="tracking" :ticket-ulid="ticket.ulid" :url="tracking.url" :can-renew="tracking.can_renew" />
                     <TicketAppointment :ticket-ulid="ticket.ulid" :appointment-at="ticket.appointment_at" :can-change="can.update" />
 
                     <TicketForwardPanel v-if="forwards" :ticket-ulid="ticket.ulid" :forwards="forwards" />

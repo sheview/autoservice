@@ -28,6 +28,7 @@ use App\Modules\Platform\CrossTenant\SharedRequests;
 use App\Modules\Platform\CrossTenant\ShareGateway;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
+use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SearchTickets;
 use App\Modules\Service\Actions\TicketCustomerIds;
@@ -227,6 +228,11 @@ class TicketController extends Controller
                 ->keys()
                 ->values(),
             'needsComment' => TicketWorkflow::NEEDS_COMMENT,
+            // The customer's tracking link (no sign-in), for staff to send; customer accounts see their tickets signed in.
+            'tracking' => $user->customer_id === null && $ticket->tracking_token ? [
+                'url' => PublicUrl::forTenant($ticket->tenant, '/track/'.$ticket->tracking_token),
+                'can_renew' => $user->can('update', $ticket),
+            ] : null,
             // The IP address the job is about (IP management, staff only); "choices" fill the picker (ip_search).
             'ip' => $user->customer_id === null && $this->modules->enabled('asset') && $user->can('ip-check.view') ? [
                 'current' => $ticket->ip_address_id ? ($ipLabels->handle([$ticket->ip_address_id])[$ticket->ip_address_id] ?? null) : null,

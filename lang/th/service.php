@@ -3,6 +3,7 @@
 return [
     'tickets' => [
         'created' => 'เปิดใบงาน :no เรียบร้อยแล้ว',
+        'tracking_renewed' => 'สร้างลิงก์ติดตามใหม่แล้ว ลิงก์เดิมใช้ไม่ได้อีก',
         'appointment_saved' => 'บันทึกวันนัดเข้าหน้างานแล้ว',
         'appointment_set' => 'นัดเข้าหน้างาน :at',
         'appointment_cleared' => 'ยกเลิกวันนัดเข้าหน้างาน',

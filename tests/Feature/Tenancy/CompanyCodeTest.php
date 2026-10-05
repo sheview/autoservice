@@ -19,7 +19,7 @@ it('gives every company the next code, never twice, and never to the platform', 
     // A deleted company still keeps its code taken (company_codes never forgets one).
     $gone->delete();
     expect(createTenant('next')->company_code)->toBe('004')
-        ->and(DB::table('company_codes')->pluck('code')->all())->toBe(['001', '002', '003', '004']);
+        ->and(DB::table('company_codes')->orderBy('number')->pluck('code')->all())->toBe(['001', '002', '003', '004']);
 
     $platform = Tenant::create(['name' => 'Platform', 'slug' => 'platform', 'subdomain' => 'admin', 'is_platform' => true]);
     expect($platform->company_code)->toBeNull();

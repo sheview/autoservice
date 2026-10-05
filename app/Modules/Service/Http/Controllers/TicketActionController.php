@@ -11,6 +11,7 @@ use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\CommentOnTicket;
 use App\Modules\Service\Actions\LinkTicketIp;
 use App\Modules\Service\Actions\MoveTicket;
+use App\Modules\Service\Actions\RenewTrackingToken;
 use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Actions\SetTicketAppointment;
 use App\Modules\Service\Models\Ticket;
@@ -86,6 +87,15 @@ class TicketActionController extends Controller
         $linkTicketIp->handle($ticket, $validated['ip'] ?? null);
 
         return back()->with('success', __('service.tickets.ip_saved'));
+    }
+
+    /** A new tracking link for the customer (the old one stops working): who may update the ticket. */
+    public function trackingToken(Request $request, Ticket $ticket, RenewTrackingToken $renew): RedirectResponse
+    {
+        Gate::authorize('update', $ticket);
+        $renew->handle($ticket, $request->user());
+
+        return back()->with('success', __('service.tickets.tracking_renewed'));
     }
 
     /** When the technician is due on site (or none): puts the job on that day of their calendar. */
