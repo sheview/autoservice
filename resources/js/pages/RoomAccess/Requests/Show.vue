@@ -43,9 +43,12 @@ const props = defineProps<{
         acceptances: Acceptance[];
         events: { id: number; action: string; from_status: string | null; to_status: string; actor_name: string | null; note: string | null; at: string }[];
         id_numbers_purged: boolean;
+        approved_at: string | null;
+        approvals: { step: number; side: string; decision: string; note: string | null; actor_name: string | null; round: number; decided_at: string }[];
+        waiting_for: { step: number; side: string; name: string | null } | null;
     };
     attachments: Attachment[];
-    can: { edit: boolean; cancel: boolean; viewIds: boolean; copy: boolean };
+    can: { edit: boolean; cancel: boolean; viewIds: boolean; copy: boolean; decide: boolean; own: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -83,6 +86,20 @@ const reveal = async (personId: number) => {
 };
 
 const shownText = ref<number | null>(null);
+
+// Deciding the step that waits for this user: approve at once; turn down / ask with a message.
+const decision = useForm({ decision: '', note: '' });
+const choice = ref<'reject' | 'ask' | null>(null);
+const decide = (value: 'approve' | 'reject' | 'ask') => {
+    decision.decision = value;
+    decision.post(route('room-access.requests.decide', props.request.ulid), {
+        preserveScroll: true,
+        onSuccess: () => {
+            choice.value = null;
+            decision.reset();
+        },
+    });
+};
 </script>
 
 <template>
@@ -119,6 +136,41 @@ const shownText = ref<number | null>(null);
             <p v-if="request.decision_note" class="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
                 {{ t('room_requests.decision_note') }}: {{ request.decision_note }}
             </p>
+
+            <section v-if="request.status === 'pending' || request.approvals.length" class="space-y-3 rounded-md border p-4">
+                <h3 class="text-sm font-semibold">{{ t('room_requests.approval_title') }}</h3>
+                <p v-if="request.waiting_for" class="text-sm">
+                    {{ t('room_requests.waiting_for', { step: request.waiting_for.step, who: request.waiting_for.name ?? t('room_requests.waiting_anyone') }) }}
+                </p>
+                <p v-if="request.approved_at" class="text-sm text-green-700">{{ t('room_requests.approved_at', { at: dateTime(request.approved_at) }) }}</p>
+                <ul v-if="request.approvals.length" class="space-y-1 text-sm">
+                    <li v-for="(a, i) in request.approvals" :key="i">
+                        {{ t('room_requests.decision_line', { step: a.step, decision: t(`room_requests.decisions.${a.decision}`), name: a.actor_name ?? '-', at: dateTime(a.decided_at) }) }}
+                        <span v-if="a.note" class="block text-xs text-muted-foreground">{{ a.note }}</span>
+                    </li>
+                </ul>
+                <template v-if="can.decide">
+                    <div class="flex flex-wrap gap-2">
+                        <Button :disabled="decision.processing" @click="decide('approve')">{{ t('room_requests.approve') }}</Button>
+                        <Button variant="outline" @click="choice = 'ask'">{{ t('room_requests.ask') }}</Button>
+                        <Button variant="outline" class="text-red-600" @click="choice = 'reject'">{{ t('room_requests.reject') }}</Button>
+                    </div>
+                    <form v-if="choice" class="space-y-2" @submit.prevent="decide(choice)">
+                        <label class="block text-sm font-medium">{{ choice === 'ask' ? t('room_requests.ask_message') : t('room_requests.reject_reason') }}</label>
+                        <textarea v-model="decision.note" rows="3" required maxlength="2000" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
+                        <InputError :message="decision.errors.note" />
+                        <div class="flex gap-2">
+                            <Button :variant="choice === 'reject' ? 'destructive' : 'default'" :disabled="decision.processing">{{
+                                choice === 'ask' ? t('room_requests.send_ask') : t('room_requests.send_reject')
+                            }}</Button>
+                            <Button type="button" variant="ghost" @click="choice = null">{{ t('common.cancel') }}</Button>
+                        </div>
+                    </form>
+                </template>
+                <p v-else-if="request.status === 'pending' && can.own" class="text-xs text-muted-foreground">
+                    {{ t('room_requests.own_request_note') }}
+                </p>
+            </section>
 
             <form v-if="cancelling" class="flex flex-wrap items-end gap-2 rounded-md border p-3" @submit.prevent="cancel">
                 <Input v-model="cancelForm.reason" :placeholder="t('room_requests.cancel_reason')" maxlength="1000" class="max-w-md" />

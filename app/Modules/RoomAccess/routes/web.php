@@ -20,6 +20,7 @@ Route::middleware(['auth', 'verified', 'module:room_access'])->prefix('room-acce
     Route::resource('requests', RoomAccessRequestController::class)->except(['destroy'])->parameters(['requests' => 'roomRequest']);
     Route::post('requests/{roomRequest}/submit', [RoomAccessRequestController::class, 'submit'])->name('requests.submit');
     Route::post('requests/{roomRequest}/cancel', [RoomAccessRequestController::class, 'cancel'])->name('requests.cancel');
+    Route::post('requests/{roomRequest}/decide', [RoomAccessRequestController::class, 'decide'])->name('requests.decide');
     Route::post('requests/{roomRequest}/people/{person}/id', [RoomAccessRequestController::class, 'revealId'])->whereNumber('person')->name('requests.reveal-id');
     Route::post('requests/{roomRequest}/attachments', [RoomAccessAttachmentController::class, 'store'])->name('requests.attachments.store');
     Route::get('requests/{roomRequest}/attachments/{attachment}', [RoomAccessAttachmentController::class, 'show'])->whereNumber('attachment')->name('requests.attachments.show');

@@ -134,7 +134,7 @@ return [
     ],
 
     'printed_at' => 'พิมพ์เมื่อ :at',
-    'page_note' => 'เอกสารนี้ออกโดยระบบ AutoService',
+    'page_note' => 'เอกสารนี้ออกโดยระบบ Governix - ITSM',
     'sign_date' => 'วันที่ ........./........./...........',
     'no' => 'ลำดับ',
 

@@ -5,6 +5,7 @@ namespace App\Modules\RoomAccess\Actions;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
+use App\Modules\RoomAccess\Support\ApprovalFlow;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -26,7 +27,7 @@ class SearchRoomAccessRequests
 
         return [
             'search' => $request->string('search')->trim()->limit(100, '')->value(),
-            'status' => $status === 'all' || in_array($status, RoomAccessRequest::STATUSES, true) ? $status : 'open',
+            'status' => in_array($status, ['all', 'awaiting'], true) || in_array($status, RoomAccessRequest::STATUSES, true) ? $status : 'open',
             'room' => $request->filled('room') ? (string) $request->input('room') : null,
             'sort' => in_array($request->input('sort'), self::SORTS, true) ? $request->input('sort') : 'planned_start',
             'direction' => $request->input('direction') === 'asc' ? 'asc' : 'desc',
@@ -41,11 +42,25 @@ class SearchRoomAccessRequests
     }
 
     /**
+     * Pending requests whose deciding step this user may decide (ApprovalFlow), by id.
+     *
+     * @return list<int>
+     */
+    private static function awaitingIds(User $user): array
+    {
+        return RoomAccessRequest::query()->where('status', RoomAccessRequest::STATUS_PENDING)->get()
+            ->filter(fn (RoomAccessRequest $request) => ApprovalFlow::canDecide($user, $request))
+            ->pluck('id')->values()->all();
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      * @return Builder<RoomAccessRequest>
      */
-    public function handle(User $user, array $filters): Builder
+    public function handle(User $user, array $filters, ?User $awaitingFor = null): Builder
     {
+        // "awaiting": pending requests whose deciding step this user may decide (never their own).
+        $awaiting = ($filters['status'] ?? null) === 'awaiting' && $awaitingFor !== null;
         $search = (string) ($filters['search'] ?? '');
         $like = '%'.addcslashes($search, '%_\\').'%';
 
@@ -57,6 +72,7 @@ class SearchRoomAccessRequests
                 ->orWhereHas('people', fn (Builder $p) => $p->where('name', 'ilike', $like))))
             ->when(($filters['status'] ?? 'open') === 'open', fn (Builder $q) => $q->whereIn('status', RoomAccessRequest::OPEN_STATUSES))
             ->when(in_array($filters['status'] ?? null, RoomAccessRequest::STATUSES, true), fn (Builder $q) => $q->where('status', $filters['status']))
+            ->when($awaiting, fn (Builder $q) => $q->whereIn('id', self::awaitingIds($awaitingFor)))
             ->when($filters['room'] ?? null, fn (Builder $q, string $ulid) => $q->whereHas('room', fn (Builder $r) => $r->where('ulid', $ulid)))
             ->orderBy(in_array($filters['sort'] ?? null, self::SORTS, true) ? $filters['sort'] : 'planned_start', ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc')
             ->orderByDesc('id');

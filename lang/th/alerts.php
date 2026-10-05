@@ -93,6 +93,37 @@ return [
             'title' => 'ทรัพย์สินส่งซ่อม :code',
             'body' => "ทรัพย์สิน: :name\nสถานที่: :location",
         ],
+        'room_access_requested' => [
+            'title' => 'คำขอเข้าห้อง Server รออนุมัติ :no',
+            'body' => 'ลูกค้า: :customer
+ห้อง: :room
+วันเวลา: :when
+ผู้ขอ: :requester (ผู้เข้า :people คน)
+วัตถุประสงค์: :purpose',
+        ],
+        'room_access_approved' => [
+            'title' => 'อนุมัติคำขอเข้าห้อง Server :no',
+            'body' => 'ลูกค้า: :customer
+ห้อง: :room
+วันเวลา: :when
+ผู้ขอ: :requester
+อนุมัติโดย: :actor',
+        ],
+        'room_access_rejected' => [
+            'title' => 'ไม่อนุมัติคำขอเข้าห้อง Server :no',
+            'body' => 'ห้อง: :room (:customer)
+วันเวลา: :when
+ผู้ขอ: :requester
+โดย: :actor
+เหตุผล: :note',
+        ],
+        'room_access_info_requested' => [
+            'title' => 'ขอข้อมูลเพิ่มสำหรับคำขอเข้าห้อง :no',
+            'body' => 'ห้อง: :room (:customer)
+ผู้ขอ: :requester
+โดย: :actor
+ข้อมูลที่ต้องการ: :note',
+        ],
         'purchase_requested' => [
             'title' => 'ใบขอซื้อใหม่ :no',
             'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโครงการ: :project\nต้องการใช้ภายใน: :needed_by",

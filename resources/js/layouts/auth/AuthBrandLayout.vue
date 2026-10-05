@@ -6,6 +6,7 @@ import { CalendarCheck, ClipboardList, FileText, Server, ShieldCheck, Wrench } f
 import { computed } from 'vue';
 
 const page = usePage<SharedData>();
+const appName = computed(() => page.props.name);
 
 const chips = computed(() => {
     const auth = (page.props.translations as Record<string, any> | undefined)?.auth;
@@ -49,7 +50,7 @@ const features = [
                         <ShieldCheck class="h-6 w-6" />
                     </div>
                     <div class="leading-tight">
-                        <div class="text-lg font-bold">AutoService</div>
+                        <div class="text-lg font-bold">{{ appName }}</div>
                         <div class="text-[11px] font-semibold tracking-[0.15em] text-violet-300">{{ t('auth.brand_tagline') }}</div>
                     </div>
                 </div>

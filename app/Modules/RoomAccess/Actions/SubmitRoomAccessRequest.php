@@ -9,6 +9,7 @@ use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Models\RoomVisitor;
 use App\Modules\RoomAccess\Models\ServerRoom;
 use App\Modules\RoomAccess\Support\RequestHistory;
+use App\Modules\RoomAccess\Support\RoomAccessAlert;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,7 +30,7 @@ class SubmitRoomAccessRequest
      */
     public function handle(RoomAccessRequest $request, User $actor, array $acceptance): RoomAccessRequest
     {
-        return DB::transaction(function () use ($request, $actor, $acceptance) {
+        $request = DB::transaction(function () use ($request, $actor, $acceptance) {
             $request = RoomAccessRequest::query()->lockForUpdate()->findOrFail($request->id);
             if ($request->status !== RoomAccessRequest::STATUS_DRAFT) {
                 throw ValidationException::withMessages(['request' => __('room_access.requests.not_draft')]);
@@ -73,6 +74,8 @@ class SubmitRoomAccessRequest
             $from = $request->status;
             $request->fill([
                 'status' => RoomAccessRequest::STATUS_PENDING,
+                // Each sending starts the approval over (after "more information" it is sent again).
+                'round' => $request->round + 1,
                 'rule_version_id' => $rules['version_id'],
                 'submitted_at' => now(),
                 'decision_note' => null,
@@ -84,6 +87,11 @@ class SubmitRoomAccessRequest
 
             return $request;
         });
+
+        // The approvers hear of it where the company set its alerts.
+        RoomAccessAlert::send('room_access_requested', $request, $actor->name);
+
+        return $request;
     }
 
     private function checkTimes(RoomAccessRequest $request, ServerRoom $room): void

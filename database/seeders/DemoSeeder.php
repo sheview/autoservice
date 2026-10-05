@@ -207,7 +207,7 @@ class DemoSeeder extends Seeder
 
         fake()->seed(2026);
 
-        $platform = Tenant::create(['name' => 'AutoService Platform', 'slug' => 'platform', 'subdomain' => 'admin', 'is_platform' => true]);
+        $platform = Tenant::create(['name' => 'Governix - ITSM Platform', 'slug' => 'platform', 'subdomain' => 'admin', 'is_platform' => true]);
         $this->context->run($platform, function () {
             $this->user('admin@platform.test', 'ผู้ดูแลแพลตฟอร์ม', PermissionCatalog::SUPERADMIN);
             // Central staff: enter any company and work there, but configure nothing.

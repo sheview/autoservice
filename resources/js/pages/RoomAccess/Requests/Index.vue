@@ -39,6 +39,8 @@ const props = defineProps<{
     filters: Filters;
     statuses: string[];
     rooms: { ulid: string; name: string; customer: string }[];
+    // How many wait for this user's decision; null = not an approver.
+    awaiting: number | null;
     can: { create: boolean };
 }>();
 
@@ -72,6 +74,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('room_requests.search')" />
                 <select v-model="filters.status" :class="selectClass">
                     <option value="open">{{ t('room_requests.open') }}</option>
+                    <option v-if="awaiting !== null" value="awaiting">{{ t('room_requests.awaiting') }} ({{ awaiting }})</option>
                     <option value="all">{{ t('room_requests.all_statuses') }}</option>
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`room_requests.statuses.${status}`) }}</option>
                 </select>

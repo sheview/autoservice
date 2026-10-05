@@ -25,6 +25,8 @@ class AlertSettings
         // ticket_reported: a customer reported a problem with an asset's QR code (waits for the helpdesk).
         'repair' => ['ticket_reported', 'ticket_opened', 'ticket_resolved', 'asset_in_repair'],
         'purchase' => ['purchase_requested', 'purchase_approved', 'purchase_rejected', 'purchase_ordered', 'purchase_received', 'purchase_cancelled'],
+        // Requests to enter customers' server rooms (RoomAccess module).
+        'room_access' => ['room_access_requested', 'room_access_approved', 'room_access_rejected', 'room_access_info_requested'],
     ];
 
     public const MAX_RECIPIENTS = 10;

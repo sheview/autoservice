@@ -10,11 +10,13 @@ use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\RoomAccess\Actions\CancelRoomAccessRequest;
+use App\Modules\RoomAccess\Actions\DecideRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\RoomRulesForRequest;
 use App\Modules\RoomAccess\Actions\SaveRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\SearchRoomAccessRequests;
 use App\Modules\RoomAccess\Actions\SubmitRoomAccessRequest;
 use App\Modules\RoomAccess\Http\Requests\RoomAccessRequestForm;
+use App\Modules\RoomAccess\Models\RoomAccessApproval;
 use App\Modules\RoomAccess\Models\RoomAccessEvent;
 use App\Modules\RoomAccess\Models\RoomAccessItem;
 use App\Modules\RoomAccess\Models\RoomAccessPerson;
@@ -23,12 +25,14 @@ use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Models\RoomRuleVersion;
 use App\Modules\RoomAccess\Models\RoomVisitor;
 use App\Modules\RoomAccess\Models\ServerRoom;
+use App\Modules\RoomAccess\Support\ApprovalFlow;
 use App\Modules\RoomAccess\Support\IdNumber;
 use App\Modules\Service\Actions\TicketsForCheckout;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -52,7 +56,7 @@ class RoomAccessRequestController extends Controller
         $customers = app(CustomerLabelNames::class)->handle();
 
         return Inertia::render('RoomAccess/Requests/Index', [
-            'requests' => $search->handle($user, $filters)->paginate(20)->withQueryString()->through(fn (RoomAccessRequest $r) => [
+            'requests' => $search->handle($user, $filters, $user)->paginate(20)->withQueryString()->through(fn (RoomAccessRequest $r) => [
                 ...$r->only(['ulid', 'request_no', 'status', 'requester_name', 'purpose', 'people_count']),
                 'room' => $r->room?->name,
                 'customer' => $customers[$r->customer_id] ?? '-',
@@ -62,6 +66,8 @@ class RoomAccessRequestController extends Controller
             'filters' => $filters,
             'statuses' => RoomAccessRequest::STATUSES,
             'rooms' => $this->roomOptions(),
+            // How many wait for this user's decision (the "awaiting" filter).
+            'awaiting' => $user->can('room-access.approve') ? $search->handle($user, ['status' => 'awaiting'], $user)->count() : null,
             'can' => ['create' => $user->can('create', RoomAccessRequest::class)],
         ]);
     }
@@ -96,7 +102,8 @@ class RoomAccessRequestController extends Controller
     {
         Gate::authorize('view', $roomRequest);
         $user = $request->user();
-        $roomRequest->load(['room', 'people', 'items', 'acceptances', 'events']);
+        $roomRequest->load(['room', 'people', 'items', 'acceptances', 'events', 'approvals']);
+        $step = $roomRequest->status === RoomAccessRequest::STATUS_PENDING ? ApprovalFlow::current($roomRequest) : null;
         $room = $roomRequest->room;
 
         return Inertia::render('RoomAccess/Requests/Show', [
@@ -124,6 +131,17 @@ class RoomAccessRequestController extends Controller
                     'at' => $e->created_at->toIso8601String(),
                 ])->values(),
                 'id_numbers_purged' => $roomRequest->id_numbers_purged_at !== null,
+                'approved_at' => $roomRequest->approved_at?->toIso8601String(),
+                'approvals' => $roomRequest->approvals->map(fn (RoomAccessApproval $a) => [
+                    ...$a->only(['step', 'side', 'decision', 'note', 'actor_name', 'round']),
+                    'decided_at' => $a->decided_at->toIso8601String(),
+                ])->values(),
+                // The step deciding now and who it waits for (a named approver, or anyone who may approve).
+                'waiting_for' => $step === null ? null : [
+                    'step' => $step['position'],
+                    'side' => $step['side'],
+                    'name' => $step['approver_user_id'] ? User::query()->whereKey($step['approver_user_id'])->value('name') : null,
+                ],
             ],
             'attachments' => Attachments::list($roomRequest, $roomRequest->attachmentCollection(),
                 fn (int $id) => route('room-access.requests.attachments.show', [$roomRequest, $id])),
@@ -132,6 +150,8 @@ class RoomAccessRequestController extends Controller
                 'cancel' => $user->can('cancel', $roomRequest),
                 'viewIds' => $user->can('room-access.view-id') && $roomRequest->id_numbers_purged_at === null,
                 'copy' => $user->can('create', RoomAccessRequest::class),
+                'decide' => ApprovalFlow::canDecide($user, $roomRequest),
+                'own' => (int) $roomRequest->requester_id === $user->id,
             ],
         ]);
     }
@@ -203,6 +223,20 @@ class RoomAccessRequestController extends Controller
         $cancel->handle($roomRequest, $request->user(), $data['reason'] ?? null);
 
         return back()->with('success', __('room_access.requests.cancelled'));
+    }
+
+    /** Approve, turn down (why), or send back for more information (what): the step deciding now. */
+    public function decide(Request $request, RoomAccessRequest $roomRequest, DecideRoomAccessRequest $decide): RedirectResponse
+    {
+        Gate::authorize('view', $roomRequest);
+        $data = $request->validate([
+            'decision' => ['required', Rule::in(DecideRoomAccessRequest::DECISIONS)],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ], [], __('room_access.fields'));
+
+        $decide->handle($roomRequest, $data['decision'], $request->user(), $data['note'] ?? null);
+
+        return back()->with('success', __("room_access.approvals.done_{$data['decision']}"));
     }
 
     /** The rules of one room for the accept popup (only the room asked about). */

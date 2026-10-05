@@ -51,7 +51,7 @@ class RoomAccessRequest extends Model implements HasMedia
     public const OPEN_STATUSES = [self::STATUS_DRAFT, self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_INSIDE];
 
     protected $fillable = [
-        'request_no', 'status', 'server_room_id', 'customer_id', 'requester_id', 'requester_name', 'planned_start', 'planned_end',
+        'request_no', 'status', 'round', 'approved_at', 'server_room_id', 'customer_id', 'requester_id', 'requester_name', 'planned_start', 'planned_end',
         'purpose', 'ticket_id', 'contract_id', 'rule_version_id', 'decision_note', 'submitted_at', 'entered_at', 'exited_at',
         'work_summary', 'items_confirmed_at', 'id_numbers_purged_at',
     ];
@@ -64,6 +64,8 @@ class RoomAccessRequest extends Model implements HasMedia
             'planned_start' => 'datetime',
             'planned_end' => 'datetime',
             'submitted_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'round' => 'integer',
             'entered_at' => 'datetime',
             'exited_at' => 'datetime',
             'items_confirmed_at' => 'datetime',
@@ -99,6 +101,11 @@ class RoomAccessRequest extends Model implements HasMedia
     public function acceptances(): HasMany
     {
         return $this->hasMany(RoomRuleAcceptance::class, 'request_id')->orderBy('accepted_at');
+    }
+
+    public function approvals(): HasMany
+    {
+        return $this->hasMany(RoomAccessApproval::class, 'request_id')->orderBy('decided_at')->orderBy('id');
     }
 
     public function events(): HasMany
