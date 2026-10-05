@@ -85,9 +85,17 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
             <form class="space-y-6" @submit.prevent="submit">
                 <div class="grid gap-6 sm:grid-cols-3">
                     <div class="grid content-start gap-2">
-                        <Label for="code" required>{{ t('parts.code') }}</Label>
-                        <Input id="code" v-model="form.code" class="font-mono uppercase" required maxlength="30" autocomplete="off" />
-                        <p class="text-xs text-muted-foreground">{{ t('parts.code_hint') }}</p>
+                        <Label for="code" :required="!!part">{{ t('parts.code') }}</Label>
+                        <Input
+                            id="code"
+                            v-model="form.code"
+                            class="font-mono uppercase"
+                            :required="!!part"
+                            maxlength="30"
+                            autocomplete="off"
+                            :placeholder="part ? '' : t('parts.code_auto')"
+                        />
+                        <p class="text-xs text-muted-foreground">{{ part ? t('parts.code_hint') : t('parts.code_auto_hint') }}</p>
                         <InputError :message="form.errors.code" />
                     </div>
                     <div class="grid content-start gap-2 sm:col-span-2">

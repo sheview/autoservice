@@ -111,3 +111,18 @@ it('hides the module when it is switched off', function () {
     $this->actingAs($this->admin)->get("/parts/{$part->id}")->assertNotFound();
     $this->actingAs($this->admin)->get('/stock-movements')->assertNotFound();
 });
+
+it('gives a new part the next code when none is typed', function () {
+    $admin = userWithRole('admin_company');
+    $post = fn (array $data) => $this->actingAs($admin)->post('/parts', $data + ['name' => 'Fan', 'unit' => 'pcs']);
+
+    $post([])->assertSessionHasNoErrors();
+    $post(['code' => ''])->assertSessionHasNoErrors();
+    $post(['code' => 'ram-8g'])->assertSessionHasNoErrors();
+
+    expect(Part::orderBy('id')->pluck('code')->all())->toBe(['PT-00001', 'PT-00002', 'RAM-8G']);
+
+    // Editing still needs one.
+    $part = Part::first();
+    $this->actingAs($admin)->put("/parts/{$part->id}", ['code' => '', 'name' => 'Fan', 'unit' => 'pcs'])->assertSessionHasErrors('code');
+});

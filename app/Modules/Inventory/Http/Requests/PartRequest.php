@@ -24,7 +24,8 @@ class PartRequest extends FormRequest
         $part = $this->route('part');
 
         return [
-            'code' => ['required', 'string', 'regex:/^[A-Za-z0-9_-]{1,30}$/', function (string $attribute, mixed $value, Closure $fail) use ($part) {
+            // A new part without a code gets the next "PT-00001" (SavePart).
+            'code' => [$part instanceof Part ? 'required' : 'nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,30}$/', function (string $attribute, mixed $value, Closure $fail) use ($part) {
                 // Unique per tenant, ignoring case (the tenant scope limits the query to this tenant).
                 $taken = Part::query()
                     ->whereRaw('lower(code) = ?', [mb_strtolower(trim((string) $value))])
