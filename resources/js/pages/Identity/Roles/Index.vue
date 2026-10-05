@@ -28,7 +28,8 @@ interface RoleColumn {
 const props = defineProps<{
     roles: RoleColumn[];
     grants: Record<number, Record<string, string>>;
-    resources: { key: string; actions: string[] }[];
+    // In sidebar order; group = its sidebar section (null = above the sections).
+    resources: { key: string; group: string | null; actions: string[] }[];
     scopes: string[];
 }>();
 
@@ -167,7 +168,15 @@ const reset = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        <template v-for="resource in visible" :key="resource.key">
+                        <template v-for="(resource, i) in visible" :key="resource.key">
+                            <tr v-if="resource.group && resource.group !== visible[i - 1]?.group">
+                                <td
+                                    :colspan="roles.length + 1"
+                                    class="sticky left-0 border-b bg-primary/10 px-4 py-2 text-sm font-bold uppercase tracking-wide text-primary"
+                                >
+                                    {{ t(`nav_groups.${resource.group}`) }}
+                                </td>
+                            </tr>
                             <tr>
                                 <td
                                     :colspan="roles.length + 1"

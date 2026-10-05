@@ -5,7 +5,9 @@ use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Models\Activity;
+use App\Modules\Platform\Support\Modules;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Pennant\Feature;
 
 beforeEach(function () {
     $this->admin = userWithRole('admin_company', ['name' => 'Admin Boss']);
@@ -107,4 +109,21 @@ it('never leaves the company without an active admin', function () {
     $update($third, ['is_active' => false])->assertSessionHasNoErrors();
     $this->actingAs($third->fresh());
     $update($this->admin, ['role' => 'technician'])->assertSessionHasErrors('role');
+});
+
+it('lists permissions in the order of the menu, without modules the company does not use, keeping their grants', function () {
+    expect(array_keys(PermissionCatalog::MENU))->toEqualCanonicalizing(array_values(array_diff(array_keys(PermissionCatalog::PERMISSIONS), ['platform'])));
+
+    $admin = userWithRole('admin_company');
+    $this->actingAs($admin)->get('/roles')->assertInertia(fn (Assert $page) => $page
+        ->where('resources.0.key', 'dashboard')
+        ->where('resources', fn ($rows) => collect($rows)->pluck('key')->contains('pm-visits')
+            && collect($rows)->firstWhere('key', 'room-access')['group'] === 'service'));
+
+    // PM switched off for the company: its permissions leave the matrix, grants stay.
+    Feature::for($this->tenant)->deactivate(Modules::feature('maintenance'));
+    $this->actingAs($admin)->get('/roles')->assertInertia(fn (Assert $page) => $page
+        ->where('resources', fn ($rows) => ! collect($rows)->pluck('key')->contains('pm-visits')));
+    $technician = Role::findByName('technician');
+    expect(app(SyncRoleGrants::class)->grantsOf($technician))->toHaveKey('pm-visits.view');
 });

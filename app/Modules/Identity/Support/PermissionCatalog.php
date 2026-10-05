@@ -73,6 +73,43 @@ class PermissionCatalog
         'platform' => ['impersonate', 'tenants', 'full_access'],
     ];
 
+    /**
+     * Where each resource sits on the sidebar (config/modules.php "navigation"): its section
+     * (lang ui.nav_groups; null = above the sections) and the module it belongs to (null = always
+     * there). The roles matrix lists resources in this order, by section, and leaves out those of
+     * modules the company does not use. Every resource but "platform" is here.
+     */
+    public const MENU = [
+        'dashboard' => [null, null],
+        'tickets' => ['service', 'service'],
+        'pm-visits' => ['service', 'maintenance'],
+        'pm-plans' => ['service', 'maintenance'],
+        'pm-checklists' => ['service', 'maintenance'],
+        'room-access' => ['service', 'room_access'],
+        'ip-check' => ['service', 'asset'],
+        'assets' => ['assets', 'asset'],
+        'asset-checkouts' => ['assets', 'asset'],
+        'asset-categories' => ['assets', 'asset'],
+        'labels' => ['assets', 'labeling'],
+        'customers' => ['customers', 'contract'],
+        'contracts' => ['customers', 'contract'],
+        'parts' => ['stock', 'inventory'],
+        'purchase-requests' => ['stock', 'inventory'],
+        'stock-movements' => ['stock', 'inventory'],
+        'reports' => ['reports', 'reporting'],
+        'summary-people' => ['reports', 'reporting'],
+        'summary-projects' => ['reports', 'reporting'],
+        'surveys' => ['reports', 'survey'],
+        'manuals' => ['help', null],
+        'users' => ['settings', null],
+        'roles' => ['settings', null],
+        'branches' => ['settings', null],
+        'holidays' => ['settings', 'service'],
+        'company' => ['settings', null],
+        'alerts' => ['settings', null],
+        'activity-log' => ['settings', null],
+    ];
+
     public const SUPERADMIN = 'superadmin';
 
     public const CENTRAL_HELPDESK = 'central_helpdesk';
