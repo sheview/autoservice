@@ -7,6 +7,7 @@ use App\Modules\Contract\Actions\CustomerLabelNames;
 use App\Modules\Document\Support\ThaiDate;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicUrl;
+use App\Modules\Tenancy\Support\TenantContext;
 
 /**
  * What is printed on each label, from the asset rows (AssetSummaries) the user may see. A detailed
@@ -20,6 +21,7 @@ class BuildLabels
         private CustomerLabelNames $customerNames,
         private ContractsForAsset $contractsForAsset,
         private Modules $modules,
+        private TenantContext $context,
     ) {}
 
     /**
@@ -37,7 +39,8 @@ class BuildLabels
             'customer' => $customers[$asset['customer_id']] ?? null,
             'province' => $asset['branch_province'] ?? null,
             'contract' => $detailed && $contractOn ? $this->contract($asset['id']) : null,
-            'qr' => $this->qr->handle(PublicUrl::route('labeling.scan', $asset['ulid'])),
+            // The asset's QR page: staff signed in see everything, anyone else only what is public (with its key).
+            'qr' => $this->qr->handle(PublicUrl::forTenant($this->context->tenant(), '/q/'.rawurlencode($asset['asset_code']).'?k='.$asset['public_key'])),
         ], $assets);
     }
 

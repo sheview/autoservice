@@ -9,6 +9,7 @@ use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
 use App\Modules\Asset\Actions\IpOfAsset;
 use App\Modules\Asset\Actions\ItemRequestLines;
+use App\Modules\Asset\Actions\MoveAsset;
 use App\Modules\Asset\Actions\SameModelAssets;
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Actions\SearchAssets;
@@ -34,6 +35,7 @@ use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -306,6 +308,20 @@ class AssetController extends Controller
      *
      * @return array<string, mixed>|null
      */
+    /** Only where the device is (branch, location), e.g. from its QR page on site: assets.move. */
+    public function move(Request $request, Asset $asset, MoveAsset $moveAsset): RedirectResponse
+    {
+        Gate::authorize('move', $asset);
+        $data = $request->validate([
+            'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at')],
+            'location' => ['nullable', 'string', 'max:255'],
+        ], attributes: ['branch_id' => __('ui.assets.branch'), 'location' => __('ui.assets.location')]);
+
+        $moveAsset->handle($asset, $data);
+
+        return back()->with('success', __('asset.assets.moved'));
+    }
+
     private function checkouts(User $user, Asset $asset, ItemRequestLines $requestLines, int $available): ?array
     {
         $panel = $requestLines->handle($user, CheckoutItem::TYPE_ASSET, $asset->id);

@@ -38,7 +38,8 @@ class PermissionCatalog
         // Free IP / IP management: run = find, reserve, give out and release addresses;
         // manage = keep networks and subnets, exclude addresses.
         'ip-check' => ['view', 'run', 'manage'],
-        'assets' => ['view', 'create', 'update', 'delete', 'export', 'import'],
+        // move = change only where a device is (branch, location), e.g. from its QR page.
+        'assets' => ['view', 'create', 'update', 'delete', 'export', 'import', 'move'],
         // Issue/loan requests (assets and parts, several lines): request = ask for oneself; create =
         // a request for anyone; approve = decide; fulfill = hand out (and backorder); return = take back.
         'asset-checkouts' => ['view', 'request', 'create', 'approve', 'fulfill', 'return'],
@@ -94,7 +95,7 @@ class PermissionCatalog
                 'tickets.view', 'tickets.create', 'tickets.update', 'tickets.assign',
                 'pm-visits.view', 'pm-visits.update', 'pm-plans.view', 'pm-plans.update', 'pm-checklists.view',
                 'ip-check.view', 'ip-check.run',
-                'assets.view', 'asset-checkouts.view', 'asset-checkouts.create', 'asset-checkouts.fulfill', 'asset-checkouts.return', 'asset-categories.view', 'labels.view',
+                'assets.view', 'assets.move', 'asset-checkouts.view', 'asset-checkouts.create', 'asset-checkouts.fulfill', 'asset-checkouts.return', 'asset-categories.view', 'labels.view',
                 'customers.view', 'contracts.view',
                 'parts.view', 'stock-movements.view', 'purchase-requests.view', 'purchase-requests.create',
                 'reports.view', 'summary-people.view', 'summary-projects.view', 'surveys.view', 'holidays.view', 'manuals.view',
@@ -108,7 +109,7 @@ class PermissionCatalog
                 'tickets.view', 'tickets.update', 'tickets.close',
                 'pm-visits.view', 'pm-visits.update', 'pm-visits.complete', 'pm-plans.view', 'pm-checklists.view',
                 'ip-check.view', 'ip-check.run',
-                'assets.view', 'assets.update', 'asset-checkouts.view', 'asset-checkouts.request', 'asset-checkouts.return',
+                'assets.view', 'assets.update', 'assets.move', 'asset-checkouts.view', 'asset-checkouts.request', 'asset-checkouts.return',
                 'labels.view', 'labels.print',
                 'customers.view', 'contracts.view',
                 'parts.view', 'parts.issue', 'stock-movements.view', 'purchase-requests.view', 'purchase-requests.create',
@@ -144,7 +145,7 @@ class PermissionCatalog
                 'pm-plans.view' => 'all', 'pm-plans.create' => 'all', 'pm-plans.update' => 'all',
                 'pm-checklists.view' => 'all',
                 'ip-check.view' => 'all', 'ip-check.run' => 'all', 'ip-check.manage' => 'all',
-                'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.export' => 'all',
+                'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.export' => 'all', 'assets.move' => 'all',
                 'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.fulfill' => 'all', 'asset-checkouts.return' => 'all',
                 'asset-categories.view' => 'all',
                 'labels.view' => 'all', 'labels.print' => 'all',
@@ -169,7 +170,7 @@ class PermissionCatalog
                 'pm-plans.view' => 'branch',
                 'pm-checklists.view' => 'all',
                 'ip-check.view' => 'all', 'ip-check.run' => 'all',
-                'assets.view' => 'branch',
+                'assets.view' => 'branch', 'assets.move' => 'branch',
                 'asset-checkouts.view' => 'own', 'asset-checkouts.request' => 'own', 'asset-checkouts.return' => 'own',
                 'labels.view' => 'all', 'labels.print' => 'all',
                 'customers.view' => 'own',

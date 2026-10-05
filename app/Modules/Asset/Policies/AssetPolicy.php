@@ -20,6 +20,12 @@ class AssetPolicy extends TenantPolicy
         return $this->permits($user, 'import');
     }
 
+    /** Only where the asset is (branch, location): assets.move within its scope. */
+    public function move(User $user, Model $asset): bool
+    {
+        return $this->permits($user, 'move') && $this->inScope($user, $asset, 'move');
+    }
+
     public function export(User $user): bool
     {
         return $this->permits($user, 'export');

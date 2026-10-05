@@ -39,6 +39,8 @@ class AssetSummaries
             ->map(fn (Asset $asset) => [
                 'id' => $asset->id,
                 'ulid' => $asset->ulid,
+                // The key of its QR code (labels): staff only, never shown on a public page.
+                'public_key' => $asset->public_key,
                 'asset_code' => $asset->asset_code,
                 'name' => $asset->name,
                 'category' => $asset->category?->name,
