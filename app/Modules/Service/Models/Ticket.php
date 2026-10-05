@@ -141,8 +141,15 @@ class Ticket extends Model implements HasMedia
         return $this->belongsTo(Branch::class);
     }
 
+    /** Photos taken on site when closing (custom property "stage": before | after), and the customer's signature. */
+    public const PHOTOS = 'repair_photos';
+
+    public const SIGNATURE = 'signature';
+
     public function registerMediaCollections(): void
     {
         $this->registerAttachmentCollection();
+        $this->addMediaCollection(self::PHOTOS)->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
+        $this->addMediaCollection(self::SIGNATURE)->singleFile()->acceptsMimeTypes(['image/png']);
     }
 }

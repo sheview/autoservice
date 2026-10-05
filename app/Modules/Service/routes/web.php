@@ -2,8 +2,10 @@
 
 use App\Modules\Service\Http\Controllers\HolidayController;
 use App\Modules\Service\Http\Controllers\MyWorkController;
+use App\Modules\Service\Http\Controllers\RepairPresetController;
 use App\Modules\Service\Http\Controllers\TicketActionController;
 use App\Modules\Service\Http\Controllers\TicketAttachmentController;
+use App\Modules\Service\Http\Controllers\TicketCloseController;
 use App\Modules\Service\Http\Controllers\TicketController;
 use App\Modules\Service\Http\Controllers\TicketPartController;
 use App\Modules\Service\Http\Controllers\TicketPrintController;
@@ -25,6 +27,12 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     Route::post('tickets/{ticket}/warranty', [TicketActionController::class, 'warranty'])->name('tickets.warranty');
     Route::post('tickets/{ticket}/report', [TicketActionController::class, 'report'])->name('tickets.report');
     Route::post('tickets/{ticket}/ip', [TicketActionController::class, 'ip'])->name('tickets.ip');
+    // Closing a job on a phone (one page).
+    Route::get('tickets/{ticket}/close', [TicketCloseController::class, 'show'])->name('tickets.close');
+    Route::post('tickets/{ticket}/close', [TicketCloseController::class, 'store'])->name('tickets.close.store');
+    // The symptom and fix chips of the company.
+    Route::get('settings/repair-presets', [RepairPresetController::class, 'edit'])->name('presets.edit');
+    Route::put('settings/repair-presets', [RepairPresetController::class, 'update'])->name('presets.update');
     Route::post('tickets/{ticket}/tracking-token', [TicketActionController::class, 'trackingToken'])->name('tickets.tracking-token');
     Route::post('tickets/{ticket}/appointment', [TicketActionController::class, 'appointment'])->name('tickets.appointment');
     Route::post('tickets/{ticket}/forward', [TicketActionController::class, 'forward'])->name('tickets.forward');

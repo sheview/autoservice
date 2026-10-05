@@ -151,7 +151,7 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                 <section class="space-y-3">
                     <Link
                         v-if="current"
-                        :href="route('service.tickets.show', current.ulid)"
+                        :href="route('service.tickets.close', current.ulid)"
                         :class="[big, 'bg-primary text-primary-foreground shadow-lg']"
                     >
                         <CircleCheck class="size-6" />{{ t('qr.continue') }}

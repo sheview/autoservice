@@ -23,6 +23,7 @@ interface CustomerForm {
     email: string | null;
     address: string | null;
     notes: string | null;
+    require_signature?: boolean;
 }
 
 // attachments: files already attached (editing).
@@ -49,6 +50,7 @@ const form = useForm({
     email: props.customer?.email ?? '',
     address: props.customer?.address ?? '',
     notes: props.customer?.notes ?? '',
+    require_signature: props.customer?.require_signature ?? false,
     attachments: [] as File[],
 });
 
@@ -131,6 +133,14 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                     <textarea id="notes" v-model="form.notes" rows="3" :class="textareaClass" />
                     <InputError :message="form.errors.notes" />
                 </div>
+
+                <label class="flex items-start gap-2 text-sm">
+                    <input v-model="form.require_signature" type="checkbox" class="mt-0.5 size-4" />
+                    <span>
+                        {{ t('customers.require_signature') }}
+                        <span class="block text-xs text-muted-foreground">{{ t('customers.require_signature_hint') }}</span>
+                    </span>
+                </label>
 
                 <section class="space-y-2">
                     <AttachmentList v-if="customer" :attachments="attachments" can-delete />

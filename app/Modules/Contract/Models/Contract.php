@@ -42,7 +42,7 @@ class Contract extends Model implements HasMedia
 
     protected $fillable = [
         'customer_id', 'contract_no', 'title', 'status', 'starts_on', 'ends_on', 'value',
-        'service_window', 'pm_interval_months', 'notify_days_before', 'expiry_notified_at', 'notes',
+        'service_window', 'pm_interval_months', 'notify_days_before', 'expiry_notified_at', 'notes', 'require_signature',
     ];
 
     protected $attributes = [

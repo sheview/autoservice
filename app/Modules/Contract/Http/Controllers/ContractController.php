@@ -178,7 +178,7 @@ class ContractController extends Controller
         return [
             'documents' => $contract ? $this->documents($contract) : [],
             'contract' => $contract ? [
-                ...$contract->only(['id', 'customer_id', 'contract_no', 'title', 'status', 'service_window', 'pm_interval_months', 'notify_days_before', 'notes']),
+                ...$contract->only(['id', 'customer_id', 'contract_no', 'title', 'status', 'service_window', 'pm_interval_months', 'notify_days_before', 'notes', 'require_signature']),
                 'starts_on' => $contract->starts_on->toDateString(),
                 'ends_on' => $contract->ends_on->toDateString(),
                 'value' => Money::toBaht($contract->value),

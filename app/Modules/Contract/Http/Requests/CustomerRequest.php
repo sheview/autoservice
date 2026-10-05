@@ -42,6 +42,8 @@ class CustomerRequest extends FormRequest
             'email' => ['nullable', 'email', 'max:255'],
             'address' => ['nullable', 'string', 'max:2000'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            // The customer signs on the technician's phone when a job is closed.
+            'require_signature' => ['boolean'],
             ...Attachments::rules(),
         ];
     }

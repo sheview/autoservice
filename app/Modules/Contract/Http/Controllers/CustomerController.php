@@ -84,7 +84,7 @@ class CustomerController extends Controller
         Gate::authorize('update', $customer);
 
         return Inertia::render('Contract/Customers/Form', [
-            'customer' => $customer->only(['id', 'code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes']),
+            'customer' => $customer->only(['id', 'code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes', 'require_signature']),
             'attachments' => Attachments::list($customer, $customer->attachmentCollection(), fn (int $id) => route('contract.customers.attachments.show', [$customer, $id])),
             // Where the customer's networks are (IP management).
             'sites' => $listSites->handle($customer->id),

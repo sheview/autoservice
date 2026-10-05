@@ -23,7 +23,7 @@ class Customer extends Model implements HasMedia
 {
     use BelongsToTenant, HasAttachments, InteractsWithMedia, LogsActivity, SoftDeletes;
 
-    protected $fillable = ['code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes'];
+    protected $fillable = ['code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes', 'require_signature'];
 
     public function contracts(): HasMany
     {

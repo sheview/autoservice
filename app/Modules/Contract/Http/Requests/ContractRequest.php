@@ -51,6 +51,8 @@ class ContractRequest extends FormRequest
             'pm_interval_months' => ['nullable', 'integer', Rule::in(Contract::PM_INTERVALS)],
             'notify_days_before' => ['required', 'integer', 'min:0', 'max:365'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            // null = as the customer says
+            'require_signature' => ['nullable', 'boolean'],
             'slas' => ['array:'.implode(',', Contract::PRIORITIES)],
             // Files attached when saving: Word, Excel, PDF or a scanned page.
             ...Attachments::rules(images: true),

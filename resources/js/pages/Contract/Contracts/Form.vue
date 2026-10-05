@@ -26,6 +26,7 @@ interface ContractForm {
     pm_interval_months: number | null;
     notify_days_before: number;
     notes: string | null;
+    require_signature?: boolean | null;
     slas: Record<string, SlaInput> | unknown[];
 }
 
@@ -63,6 +64,7 @@ const form = useForm({
     pm_interval_months: props.contract?.pm_interval_months ?? null,
     notify_days_before: props.contract?.notify_days_before ?? 60,
     notes: props.contract?.notes ?? '',
+    require_signature: (props.contract?.require_signature ?? null) as boolean | null,
     slas: Object.fromEntries(
         props.priorities.map((p) => [
             p,
@@ -227,6 +229,15 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </table>
                     </div>
                 </section>
+
+                <div class="grid content-start gap-2 sm:max-w-md">
+                    <Label for="require_signature">{{ t('contracts.require_signature') }}</Label>
+                    <select id="require_signature" v-model="form.require_signature" :class="selectClass">
+                        <option :value="null">{{ t('contracts.require_signature_inherit') }}</option>
+                        <option :value="true">{{ t('contracts.require_signature_yes') }}</option>
+                        <option :value="false">{{ t('contracts.require_signature_no') }}</option>
+                    </select>
+                </div>
 
                 <div class="grid content-start gap-2">
                     <Label for="notes">{{ t('contracts.notes') }}</Label>
