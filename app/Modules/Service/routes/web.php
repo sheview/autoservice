@@ -61,7 +61,7 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
 });
 
 // Track my repair: public, no sign-in (TrackController finds the company); limited against guessing.
-Route::get('track', TrackController::class)->middleware('throttle:20,1')->name('service.track');
+Route::get('track', TrackController::class)->middleware('throttle:track')->name('service.track');
 // A ticket's tracking link: on the company's host, or naming the company by its code on the shared one.
-Route::get('track/{token}', [TrackTokenController::class, 'onHost'])->middleware('throttle:60,1')->name('service.track.token');
-Route::get('t/{code}/track/{token}', [TrackTokenController::class, 'onPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:60,1')->name('service.track.token.path');
+Route::get('track/{token}', [TrackTokenController::class, 'onHost'])->middleware('throttle:track-link')->name('service.track.token');
+Route::get('t/{code}/track/{token}', [TrackTokenController::class, 'onPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.track.token.path');

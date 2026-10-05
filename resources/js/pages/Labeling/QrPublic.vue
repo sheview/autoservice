@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import TurnstileWidget from '@/components/TurnstileWidget.vue';
 import { t } from '@/lib/i18n';
 import { Head, useForm } from '@inertiajs/vue3';
 import { Camera, Check, LogIn, Plus, QrCode, Send, Trash2 } from 'lucide-vue-next';
@@ -15,6 +16,7 @@ const props = defineProps<{
     symptoms: string[];
     action: string | null;
     limits: { photos: number; photo_kb: number };
+    captcha: string | null;
     signIn: string | null;
 }>();
 
@@ -26,6 +28,7 @@ const form = useForm({
     email: '',
     photos: [] as File[],
     website: '', // never shown: robots fill it in
+    'cf-turnstile-response': '',
 });
 
 const chips = ref([...props.symptoms]);
@@ -188,6 +191,9 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
 
                 <!-- Never shown to people. -->
                 <input v-model="form.website" type="text" name="website" tabindex="-1" autocomplete="off" class="hidden" aria-hidden="true" />
+
+                <TurnstileWidget v-if="captcha" v-model="form['cf-turnstile-response']" :site-key="captcha" />
+                <InputError :message="(form.errors as Record<string, string>).captcha" />
 
                 <button
                     type="submit"

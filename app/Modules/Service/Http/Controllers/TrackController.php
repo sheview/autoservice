@@ -4,6 +4,8 @@ namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\PublicLookupGuard;
+use App\Modules\Platform\Support\Turnstile;
 use App\Modules\Service\Actions\TrackTickets;
 use App\Modules\Service\Support\TicketNumber;
 use App\Modules\Tenancy\Support\PublicTenant;
@@ -31,13 +33,22 @@ class TrackController extends Controller
         $usable = $tenant !== null && $modules->enabled('service', $tenant)
             && ($codeInNumber === null || (int) $codeInNumber === (int) $tenant->company_code);
 
+        // After a few misses from one address the CAPTCHA is asked for before searching again.
+        $captchaFailed = $query !== '' && PublicLookupGuard::needsCaptcha($request->ip())
+            && ! Turnstile::passes($request->string('cf-turnstile-response')->value(), $request->ip());
+
         // The same search either way (none of a company not found), so the answer takes as long.
-        $results = $query === '' ? [] : $context->run($usable ? $tenant : null, fn () => $track->handle($query));
+        $results = $query === '' || $captchaFailed ? [] : $context->run($usable ? $tenant : null, fn () => $track->handle($query));
+        if ($query !== '' && ! $captchaFailed && $results === []) {
+            PublicLookupGuard::missed($request->ip(), $usable ? $tenant : null, 'track');
+        }
 
         return Inertia::render('Service/Track', [
             'filters' => ['company' => $known ? null : $company, 'q' => $query],
             'askCompany' => ! $known,
-            'searched' => $query !== '',
+            'searched' => $query !== '' && ! $captchaFailed,
+            'captchaFailed' => $captchaFailed,
+            'captcha' => PublicLookupGuard::needsCaptcha($request->ip()) ? Turnstile::siteKey() : null,
             'results' => $results,
         ]);
     }

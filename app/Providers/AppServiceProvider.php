@@ -37,6 +37,12 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(30)->by('ip:'.$request->ip()),
             Limit::perHour(300)->by('device:'.$device($request)),
         ]);
+        // Tracking by number or serial (guessable): per address, and per company asked about.
+        RateLimiter::for('track', fn (Request $request) => [
+            Limit::perMinute(10)->by('ip:'.$request->ip()),
+            Limit::perMinute(120)->by('company:'.mb_strtolower($request->getHost().'/'.$request->string('company')->trim()->value())),
+        ]);
+        RateLimiter::for('track-link', fn (Request $request) => Limit::perMinute(60)->by('ip:'.$request->ip()));
         RateLimiter::for('qr-report', fn (Request $request) => [
             Limit::perMinute(3)->by('ip:'.$request->ip()),
             Limit::perHour(10)->by('ip:'.$request->ip()),

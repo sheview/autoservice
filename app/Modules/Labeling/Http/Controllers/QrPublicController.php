@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\PublicAssetLabel;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicUrl;
+use App\Modules\Platform\Support\Turnstile;
 use App\Modules\Service\Actions\OpenReportedTicket;
 use App\Modules\Service\Actions\OpenTicketOfAsset;
 use App\Modules\Service\Actions\RepairPresetList;
@@ -57,6 +58,7 @@ class QrPublicController extends Controller
             'symptoms' => $presets,
             'action' => $asset ? url($request->path().'/report').'?k='.urlencode($key) : null,
             'limits' => ['photos' => self::MAX_PHOTOS, 'photo_kb' => self::PHOTO_KB],
+            'captcha' => Turnstile::siteKey(),
             'signIn' => url($request->path().'/staff').($key !== '' ? '?k='.urlencode($key) : ''),
         ]);
     }
@@ -94,6 +96,10 @@ class QrPublicController extends Controller
             'email.required_without' => __('service.reported.contact_required'),
             'symptoms.required' => __('service.reported.symptom_required'),
         ], __('service.reported.fields'))->validate();
+
+        if (! Turnstile::passes($request->string('cf-turnstile-response')->value(), $request->ip())) {
+            return $back()->withErrors(['captcha' => __('platform.security.captcha_failed')])->withInput($request->except('photos'));
+        }
 
         $asset = $this->context->run($tenant, fn () => $this->label->handle($code, $key));
         if ($asset === null || $tenant === null || ! $this->modules->enabled('service', $tenant)) {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import PublicTicketCard, { type PublicTicket } from '@/components/PublicTicketCard.vue';
+import TurnstileWidget from '@/components/TurnstileWidget.vue';
 import { t } from '@/lib/i18n';
 import { Head, Link, router } from '@inertiajs/vue3';
 import { LoaderCircle, Search } from 'lucide-vue-next';
@@ -12,14 +13,20 @@ const props = defineProps<{
     askCompany: boolean;
     searched: boolean;
     results: PublicTicket[];
+    captcha: string | null;
+    captchaFailed: boolean;
 }>();
 
-const form = reactive({ company: props.filters.company ?? '', q: props.filters.q });
+const form = reactive({ company: props.filters.company ?? '', q: props.filters.q, captcha: '' });
 const loading = ref(false);
 const submit = () =>
     router.get(
         route('service.track'),
-        { ...(props.askCompany && form.company ? { company: form.company } : {}), q: form.q },
+        {
+            ...(props.askCompany && form.company ? { company: form.company } : {}),
+            q: form.q,
+            ...(form.captcha ? { 'cf-turnstile-response': form.captcha } : {}),
+        },
         {
             preserveState: true,
             onStart: () => (loading.value = true),
@@ -83,6 +90,8 @@ const inputClass =
                         </button>
                     </div>
                 </div>
+                <TurnstileWidget v-if="captcha" v-model="form.captcha" :site-key="captcha" />
+                <p v-if="captchaFailed" class="text-sm text-red-600">{{ t('track.captcha_failed') }}</p>
                 <p class="rounded-xl bg-violet-50 px-4 py-3 text-sm text-violet-900 dark:bg-violet-950/50 dark:text-violet-100">
                     {{ t('track.hint') }}
                 </p>

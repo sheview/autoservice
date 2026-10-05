@@ -4,6 +4,7 @@ namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\PublicLookupGuard;
 use App\Modules\Service\Actions\TicketByToken;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\CompanyCodes;
@@ -36,6 +37,9 @@ class TrackTokenController extends Controller
     {
         $usable = $tenant !== null && ! $tenant->is_platform && $tenant->isActive() && $this->modules->enabled('service', $tenant);
         $ticket = $this->context->run($usable ? $tenant : null, fn () => $this->ticketByToken->handle($token));
+        if ($ticket === null) {
+            PublicLookupGuard::missed(request()->ip(), $usable ? $tenant : null, 'track-link');
+        }
 
         return Inertia::render('Service/TrackLink', [
             'company' => $ticket ? $tenant->name : null,
