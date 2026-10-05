@@ -56,7 +56,9 @@ it('keeps tickets, holidays and their numbers per tenant', function () {
         ];
     });
 
-    expect($mine->ticket_no)->toBe($theirs->ticket_no);
+    // Each company counts its own numbers (shown with its own company code).
+    expect($mine->getRawOriginal('ticket_no'))->toBe($theirs->getRawOriginal('ticket_no'))
+        ->and($mine->ticket_no)->not->toBe($theirs->ticket_no);
 
     $this->actingAs($this->admin)->get('/tickets?status=all')
         ->assertInertia(fn (Assert $page) => $page->where('tickets.total', 1));

@@ -4,9 +4,12 @@ namespace App\Modules\Service\Models;
 
 use App\Modules\Document\Concerns\HasAttachments;
 use App\Modules\Service\Policies\TicketPolicy;
+use App\Modules\Service\Support\TicketNumber;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Branch;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Database\Eloquent\Attributes\UsePolicy;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +29,9 @@ class Ticket extends Model implements HasMedia
 {
     use BelongsToTenant, HasAttachments, HasUlids, InteractsWithMedia, SoftDeletes;
 
+    /** Reported by a customer with the QR form: the helpdesk checks it before it joins the queue. */
+    public const STATUS_PENDING_REVIEW = 'pending_review';
+
     public const STATUS_NEW = 'new';
 
     public const STATUS_ASSIGNED = 'assigned';
@@ -41,7 +47,7 @@ class Ticket extends Model implements HasMedia
     public const STATUS_CANCELLED = 'cancelled';
 
     public const STATUSES = [
-        self::STATUS_NEW, self::STATUS_ASSIGNED, self::STATUS_IN_PROGRESS, self::STATUS_ON_HOLD,
+        self::STATUS_PENDING_REVIEW, self::STATUS_NEW, self::STATUS_ASSIGNED, self::STATUS_IN_PROGRESS, self::STATUS_ON_HOLD,
         self::STATUS_RESOLVED, self::STATUS_CLOSED, self::STATUS_CANCELLED,
     ];
 
@@ -58,7 +64,7 @@ class Ticket extends Model implements HasMedia
 
     protected $fillable = [
         'ticket_no', 'customer_id', 'asset_id', 'ip_address_id', 'contract_id', 'branch_id', 'title', 'description',
-        'priority', 'status', 'source', 'contact_name', 'contact_phone', 'reported_by', 'assignee_id', 'appointment_at',
+        'priority', 'status', 'source', 'contact_name', 'contact_phone', 'contact_email', 'customer_message', 'closed_lat', 'closed_lng', 'reported_by', 'assignee_id', 'appointment_at',
         'service_window', 'response_minutes', 'resolve_minutes', 'response_due_at', 'resolve_due_at',
         'responded_at', 'response_breach_notified_at', 'resolve_breach_notified_at', 'on_hold_since', 'hold_minutes', 'resolved_at', 'closed_at', 'cancelled_at',
         'device_name', 'device_brand', 'device_model', 'device_serial', 'device_serial_unknown', 'device_location', 'device_ip',
@@ -76,6 +82,18 @@ class Ticket extends Model implements HasMedia
         'source' => 'phone',
         'hold_minutes' => 0,
     ];
+
+    /**
+     * Read, the number is shown with the company code (TK001-2569-00001, TicketNumber) everywhere it
+     * goes out; stored and queried it stays the company's own number (TK-2569-00001, unique per tenant).
+     * The stored one: getRawOriginal('ticket_no').
+     */
+    protected function ticketNo(): Attribute
+    {
+        return Attribute::get(fn (?string $value, array $attributes) => $value === null ? null
+            // Read without its tenant_id (a narrow select): it is of the company being worked in.
+            : TicketNumber::shown($value, isset($attributes['tenant_id']) ? (int) $attributes['tenant_id'] : app(TenantContext::class)->id()));
+    }
 
     protected function casts(): array
     {

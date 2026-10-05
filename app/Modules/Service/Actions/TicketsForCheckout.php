@@ -4,6 +4,7 @@ namespace App\Modules\Service\Actions;
 
 use App\Modules\Identity\Models\User;
 use App\Modules\Service\Models\Ticket;
+use App\Modules\Service\Support\TicketNumber;
 
 /**
  * Open tickets the user may see, as plain arrays, for the issue/loan request form (Asset module):
@@ -23,7 +24,7 @@ class TicketsForCheckout
             ->when($ids !== null, fn ($q) => $q->whereKey($ids), fn ($q) => $q
                 ->whereIn('status', Ticket::OPEN_STATUSES)
                 ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
-                    ->where('ticket_no', 'ilike', "%{$search}%")
+                    ->where('ticket_no', 'ilike', '%'.TicketNumber::stored($search).'%')
                     ->orWhere('title', 'ilike', "%{$search}%")))
                 ->latest('id')
                 ->limit(self::LIMIT))

@@ -15,6 +15,7 @@ interface TenantRow {
     ulid: string;
     name: string;
     subdomain: string;
+    company_code: string | null;
     status: string;
     subscription: NonNullable<SharedData['subscription']>;
 }
@@ -57,6 +58,7 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                         <tr>
                             <th class="px-4 py-2 font-medium">{{ t('impersonation.name') }}</th>
                             <th class="px-4 py-2 font-medium">{{ t('impersonation.subdomain') }}</th>
+                            <th class="px-4 py-2 font-medium">{{ t('impersonation.company_code') }}</th>
                             <th class="px-4 py-2 font-medium">{{ t('common.status') }}</th>
                             <th class="px-4 py-2 font-medium">{{ t('tenants.subscription') }}</th>
                             <th class="px-4 py-2 text-right font-medium">{{ t('common.actions') }}</th>
@@ -66,6 +68,7 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                         <tr v-for="tenant in tenants.data" :key="tenant.id" class="border-t">
                             <td class="px-4 py-2 font-medium">{{ tenant.name }}</td>
                             <td class="px-4 py-2 font-mono text-xs">{{ tenant.subdomain }}</td>
+                            <td class="px-4 py-2 font-mono text-xs">{{ tenant.company_code ?? '-' }}</td>
                             <td class="px-4 py-2">{{ t(`impersonation.status.${tenant.status}`) }}</td>
                             <td class="px-4 py-2">
                                 <span
@@ -102,7 +105,7 @@ const enter = (tenant: TenantRow) => router.post(route('platform.impersonation.s
                             </td>
                         </tr>
                         <tr v-if="tenants.data.length === 0">
-                            <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
+                            <td colspan="6" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
                         </tr>
                     </tbody>
                 </table>

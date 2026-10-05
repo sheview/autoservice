@@ -5,6 +5,7 @@ namespace App\Modules\Service\Actions;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Service\Models\Ticket;
+use App\Modules\Service\Support\TicketNumber;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -63,7 +64,7 @@ class SearchTickets
 
         return self::visibleTo(Ticket::query(), $user)
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('ticket_no', 'ilike', "%{$search}%")
+                ->where('ticket_no', 'ilike', '%'.TicketNumber::stored($search).'%')
                 ->orWhere('title', 'ilike', "%{$search}%")
                 ->orWhere('contact_name', 'ilike', "%{$search}%")))
             ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', Ticket::OPEN_STATUSES))

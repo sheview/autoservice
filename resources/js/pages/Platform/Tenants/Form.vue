@@ -13,6 +13,7 @@ interface TenantForm {
     ulid: string;
     name: string;
     subdomain: string;
+    company_code?: string | null;
     status: string;
     subscription_starts_on: string | null;
     subscription_ends_on: string | null;
@@ -85,6 +86,11 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <Input id="subdomain" v-model="form.subdomain" required maxlength="30" class="font-mono lowercase" autocomplete="off" />
                         <p class="text-xs text-muted-foreground">{{ t('tenants.subdomain_hint') }}</p>
                         <InputError :message="form.errors.subdomain" />
+                    </div>
+                    <div v-if="tenant?.company_code" class="grid gap-2">
+                        <Label>{{ t('tenants.company_code') }}</Label>
+                        <p class="font-mono text-sm">{{ tenant.company_code }}</p>
+                        <p class="text-xs text-muted-foreground">{{ t('tenants.company_code_hint') }}</p>
                     </div>
                     <div class="grid content-start gap-2">
                         <Label for="status">{{ t('tenants.status') }}</Label>

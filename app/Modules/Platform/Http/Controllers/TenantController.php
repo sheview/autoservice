@@ -56,7 +56,7 @@ class TenantController extends Controller
     {
         return Inertia::render('Platform/Tenants/Form', [
             'tenant' => $tenant ? [
-                ...$tenant->only(['ulid', 'name', 'subdomain', 'status']),
+                ...$tenant->only(['ulid', 'name', 'subdomain', 'company_code', 'status']),
                 'subscription_starts_on' => $tenant->subscription_starts_on?->toDateString(),
                 'subscription_ends_on' => $tenant->subscription_ends_on?->toDateString(),
                 'subscription' => Subscription::of($tenant),

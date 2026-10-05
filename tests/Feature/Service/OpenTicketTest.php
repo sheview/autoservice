@@ -41,7 +41,7 @@ it('opens a ticket with a number, the contract SLA and business-hour due times',
     $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload())->assertSessionHasNoErrors();
 
     $ticket = Ticket::first();
-    expect($ticket->ticket_no)->toBe('TK-2569-00001')
+    expect($ticket->ticket_no)->toBe('TK001-2569-00001')
         ->and($ticket->status)->toBe(Ticket::STATUS_NEW)
         ->and($ticket->branch_id)->toBe($this->branch->id)
         ->and($ticket->service_window)->toBe('8x5')
@@ -52,7 +52,7 @@ it('opens a ticket with a number, the contract SLA and business-hour due times',
         ->and($ticket->events()->pluck('type')->all())->toBe(['created']);
 
     $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['title' => 'Second']));
-    expect(Ticket::latest('id')->first()->ticket_no)->toBe('TK-2569-00002');
+    expect(Ticket::latest('id')->first()->ticket_no)->toBe('TK001-2569-00002');
 });
 
 it('skips the company holidays when working out due times', function () {
@@ -137,7 +137,7 @@ it('shows the tickets of an asset on the asset page', function () {
 
     $this->actingAs($this->helpdesk)->get("/assets/{$this->asset->ulid}")
         ->assertInertia(fn (Assert $page) => $page
-            ->where('tickets.0.ticket_no', 'TK-2569-00001')
+            ->where('tickets.0.ticket_no', 'TK001-2569-00001')
             ->where('can.openTicket', true));
 });
 

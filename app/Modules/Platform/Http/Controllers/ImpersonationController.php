@@ -30,7 +30,7 @@ class ImpersonationController extends Controller
             ->paginate(20)
             ->withQueryString()
             ->through(fn (Tenant $tenant) => [
-                ...$tenant->only(['id', 'ulid', 'name', 'subdomain', 'status']),
+                ...$tenant->only(['id', 'ulid', 'name', 'subdomain', 'company_code', 'status']),
                 'subscription' => Subscription::of($tenant),
             ]);
 
