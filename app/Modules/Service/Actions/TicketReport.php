@@ -22,7 +22,8 @@ class TicketReport
      *     by_status: array<string, int>, by_priority: array<string, int>,
      *     sla: array<string, array{met: int, breached: int, pending: int, rate: int|null}>,
      *     trend: list<array{label: string, count: int}>, trend_unit: string,
-     *     by_customer: array<int, int>, by_assignee: array<int, array{tickets: int, closed: int, resolve_breached: int}>}
+     *     by_customer: array<int, int>, by_assignee: array<int, array{tickets: int, closed: int, resolve_breached: int}>,
+     *     by_title: list<array{title: string, tickets: int, closed: int}>}
      */
     public function handle(CarbonInterface $from, CarbonInterface $to, ?int $customerId = null): array
     {
@@ -32,7 +33,7 @@ class TicketReport
         $tickets = $query()
             ->whereBetween('created_at', [$from, $to])
             ->get([
-                'id', 'status', 'priority', 'customer_id', 'assignee_id', 'created_at',
+                'id', 'status', 'priority', 'customer_id', 'assignee_id', 'created_at', 'title',
                 'response_due_at', 'resolve_due_at', 'responded_at', 'resolved_at', 'closed_at',
             ]);
 
@@ -63,6 +64,15 @@ class TicketReport
                 'closed' => $own->where('status', Ticket::STATUS_CLOSED)->count(),
                 'resolve_breached' => $own->filter(fn (Ticket $ticket) => $states[$ticket->id]['resolve'] === 'breached')->count(),
             ])->all(),
+            // What goes wrong most: tickets by their topic (the same title, ignoring case and spaces).
+            'by_title' => $tickets->groupBy(fn (Ticket $ticket) => mb_strtolower(preg_replace('/\s+/u', ' ', trim((string) $ticket->title))))
+                ->filter(fn (Collection $same, string $key) => $key !== '')
+                ->map(fn (Collection $same) => [
+                    'title' => trim((string) $same->first()->title),
+                    'tickets' => $same->count(),
+                    'closed' => $same->where('status', Ticket::STATUS_CLOSED)->count(),
+                ])
+                ->sortByDesc('tickets')->values()->all(),
         ];
     }
 

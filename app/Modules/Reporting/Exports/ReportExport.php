@@ -33,6 +33,12 @@ class ReportExport implements Export, WithMultipleSheets
             ], array_map(fn (array $row) => [$row['name'], $row['tickets']], $report['customers']));
         }
 
+        if (($report['topics'] ?? []) !== []) {
+            $sheets[] = new ReportSheet(__('ui.reports.sheets.topics'), [
+                __('ui.reports.topic'), __('ui.reports.topic_group'), __('ui.reports.tickets_count'), __('ui.reports.closed_count'),
+            ], array_map(fn (array $row) => [$row['title'], $row['group'], $row['tickets'], $row['closed']], $report['topics']));
+        }
+
         if ($report['technicians'] !== []) {
             $sheets[] = new ReportSheet(__('ui.reports.sheets.technicians'), [
                 __('ui.reports.technician'), __('ui.reports.tickets_count'), __('ui.reports.closed_count'),

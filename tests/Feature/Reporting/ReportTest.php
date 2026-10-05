@@ -135,6 +135,19 @@ it('counts SLA results, PM rounds and assets', function () {
             ->where('report.assets.warranty_expired', 1));
 });
 
+it('sums up the topics that come up most, with their kind of work', function () {
+    ($this->ticket)('2026-06-02 09:00', [], ['title' => 'อินเทอร์เน็ตใช้งานไม่ได้']);
+    ($this->ticket)('2026-06-03 09:00', [], ['title' => ' อินเทอร์เน็ตใช้งานไม่ได้ ']);
+    ($this->ticket)('2026-06-04 09:00', [], ['title' => 'เชื่อมต่อ Wi-Fi ไม่ได้']);
+    ($this->ticket)('2026-06-05 09:00', [], ['title' => 'แอร์ห้อง server ดัง']);
+    ($this->ticket)('2026-05-05 09:00', [], ['title' => 'เชื่อมต่อ Wi-Fi ไม่ได้']); // another month
+
+    $this->actingAs($this->admin)->get('/reports?from=2026-06-01&to=2026-06-30')->assertInertia(fn (Assert $page) => $page
+        ->where('report.topics.0', ['title' => 'อินเทอร์เน็ตใช้งานไม่ได้', 'tickets' => 2, 'closed' => 0, 'group' => 'เครือข่าย / อินเทอร์เน็ต'])
+        ->where('report.topics.1.tickets', 1)
+        ->where('report.topic_groups', [['name' => 'เครือข่าย / อินเทอร์เน็ต', 'tickets' => 3], ['name' => 'อื่นๆ (ระบุเอง)', 'tickets' => 1]]));
+});
+
 it('defaults to this month and tolerates bad dates', function () {
     $this->actingAs($this->admin)->get('/reports')
         ->assertInertia(fn (Assert $page) => $page->where('report.period', ['from' => '2026-06-01', 'to' => '2026-06-20']));
@@ -224,7 +237,7 @@ it('exports the report of the period as an Excel workbook', function () {
     $sheets = Excel::toCollection(null, $response->getFile()->getPathname())->map->toArray();
     $summary = collect($sheets[0])->mapWithKeys(fn (array $row) => [$row[1] => $row[2]]);
 
-    expect($sheets)->toHaveCount(4)
+    expect($sheets)->toHaveCount(5)
         ->and($sheets[0][0])->toBe(['หมวด', 'รายการ', 'ค่า'])
         ->and($summary['ตั้งแต่วันที่'])->toBe('2026-06-01')
         ->and($summary['เปิดใหม่'])->toEqual(1)
@@ -233,6 +246,9 @@ it('exports the report of the period as an Excel workbook', function () {
         ->and($summary['เบิกใช้สุทธิ (ชิ้น)'])->toEqual(1)
         ->and($summary['แบบประเมินที่ส่ง'])->toEqual(1)
         ->and($sheets[1])->toEqual([['ลูกค้า', 'ใบงาน'], ['Acme', 1]])
-        ->and($sheets[2][1][0])->toBe('Tech One')
-        ->and($sheets[3][1])->toEqual(['RAM', 'Memory', 1, 'pcs', 500]);
+        // The topics that come up most, with their kind of work.
+        ->and($sheets[2][0])->toBe(['หัวข้อ', 'ประเภทงาน', 'ใบงาน', 'ปิดแล้ว'])
+        ->and($sheets[2][1][2])->toEqual(1)
+        ->and($sheets[3][1][0])->toBe('Tech One')
+        ->and($sheets[4][1])->toEqual(['RAM', 'Memory', 1, 'pcs', 500]);
 });

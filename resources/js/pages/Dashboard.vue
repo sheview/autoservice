@@ -30,9 +30,10 @@ const props = defineProps<{
         year: number;
         years: number[];
         tickets: { monthly: { opened: number[]; closed: number[] }; yearly: { years: number[]; opened: number[]; closed: number[] } } | null;
+        // Acquired: assets (by quantity) and parts received; a series is null when the user does not see it.
         assets: {
-            monthly: { hardware: number[]; software: number[] };
-            yearly: { years: number[]; hardware: number[]; software: number[] };
+            monthly: { assets: number[] | null; parts: number[] | null };
+            yearly: { years: number[]; assets: number[] | null; parts: number[] | null };
         } | null;
     } | null;
     // The platform's own workspace: its customer companies (null inside a company).
@@ -147,11 +148,13 @@ const charts = computed(() => {
         assets: trends.assets && {
             title: `${t('dashboard.charts.assets')} · ${subtitle}`,
             categories,
-            series: (['hardware', 'software'] as const).map((type) => ({
-                key: type,
-                label: t(`asset_categories.asset_types.${type}`),
-                values: trends.assets![period.value][type],
-            })),
+            series: (['assets', 'parts'] as const)
+                .filter((kind) => trends.assets![period.value][kind] !== null)
+                .map((kind) => ({
+                    key: kind,
+                    label: t(`dashboard.charts.acquired_${kind}`),
+                    values: trends.assets![period.value][kind] as number[],
+                })),
         },
     };
 });

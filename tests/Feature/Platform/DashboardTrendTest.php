@@ -87,7 +87,7 @@ it('charts repairs within what the user may see', function () {
         ->assertInertia(fn (Assert $page) => $page->where('trends.tickets.monthly.opened', months([4 => 1])));
 });
 
-it('charts hardware and software apart, on the purchase date or else the registration date', function () {
+it('charts assets acquired (by quantity, on the purchase date or else the registration date) beside parts received', function () {
     $pcs = createAssetCategory();
     $licences = createAssetCategory(['asset_type' => AssetCategory::TYPE_SOFTWARE]);
     createAsset($pcs, ['purchased_at' => '2026-03-10']);
@@ -95,13 +95,20 @@ it('charts hardware and software apart, on the purchase date or else the registr
     createAsset($pcs, ['purchased_at' => '2024-07-01']);
     createAsset($licences, ['purchased_at' => '2026-05-01']);
     createAsset($licences); // no purchase date: registered today, 1 October 2026
+    createAsset(createAssetCategory(['name' => 'Cable']), ['purchased_at' => '2026-05-02', 'quantity' => 10, 'unit' => 'เส้น']);
+    createPart(['code' => 'FAN'], stock: 7); // received today
 
     $this->actingAs($this->admin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
-        ->where('trends.assets.monthly.hardware', months([3 => 2]))
-        ->where('trends.assets.monthly.software', months([5 => 1, 10 => 1]))
+        ->where('trends.assets.monthly.assets', months([3 => 2, 5 => 11, 10 => 1]))
+        ->where('trends.assets.monthly.parts', months([10 => 7]))
         ->where('trends.assets.yearly.years', [2022, 2023, 2024, 2025, 2026])
-        ->where('trends.assets.yearly.hardware', [0, 0, 1, 0, 2])
-        ->where('trends.assets.yearly.software', [0, 0, 0, 0, 2]));
+        ->where('trends.assets.yearly.assets', [0, 0, 1, 0, 14])
+        ->where('trends.assets.yearly.parts', [0, 0, 0, 0, 7]));
+
+    // Customer accounts never see the company's stock.
+    $customer = createCustomer();
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => $customer->id]))->get('/dashboard')
+        ->assertInertia(fn (Assert $page) => $page->where('trends.assets.monthly.parts', null));
 });
 
 it('leaves out the charts of modules that are off, and has none for the platform', function () {
@@ -112,6 +119,9 @@ it('leaves out the charts of modules that are off, and has none for the platform
         ->has('trends.assets.monthly'));
 
     Feature::for($this->tenant)->deactivate(Modules::feature('asset'));
+    $this->actingAs($this->admin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('trends.assets.monthly.assets', null)->has('trends.assets.monthly.parts', 12));
+    Feature::for($this->tenant)->deactivate(Modules::feature('inventory'));
     $this->actingAs($this->admin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('trends', null));
 
     $this->actingAs(createSuperadmin())->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('trends', null));
@@ -126,5 +136,5 @@ it('keeps each company to its own figures', function () {
 
     $this->actingAs($otherAdmin)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
         ->where('trends.tickets.monthly.opened', months([]))
-        ->where('trends.assets.monthly.hardware', months([])));
+        ->where('trends.assets.monthly.assets', months([])));
 });

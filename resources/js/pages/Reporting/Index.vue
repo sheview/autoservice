@@ -31,6 +31,9 @@ interface Report {
         trend_unit: 'day' | 'month';
     } | null;
     customers: { name: string; tickets: number }[];
+    // The topics (ticket titles) that come up most, with the kind of work.
+    topics: { title: string; group: string; tickets: number; closed: number }[];
+    topic_groups: { name: string; tickets: number }[];
     technicians: { name: string; tickets: number; closed: number; resolve_breached: number; answers: number; average: number | null }[];
     pm: {
         due: number;
@@ -237,6 +240,30 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
                                 <dd class="tabular-nums">{{ number(report.tickets.sla[clock].pending) }}</dd>
                             </div>
                         </dl>
+                    </div>
+                </div>
+
+                <div v-if="report.topics.length" class="grid gap-4 lg:grid-cols-3">
+                    <div class="rounded-md border p-4 lg:col-span-2">
+                        <p class="text-sm font-medium">{{ t('reports.topics_title') }}</p>
+                        <p class="mb-3 text-xs text-muted-foreground">{{ t('reports.topics_hint') }}</p>
+                        <div v-for="topic in report.topics" :key="topic.title" class="mb-1.5 flex items-center gap-2 text-sm">
+                            <span class="w-64 shrink-0 truncate" :title="topic.title">
+                                {{ topic.title }}
+                                <span class="block truncate text-xs text-muted-foreground">{{ topic.group }}</span>
+                            </span>
+                            <span class="h-2 flex-1 rounded bg-muted">
+                                <span class="block h-full rounded bg-primary" :style="{ width: share(topic.tickets, report.topics[0].tickets) }" />
+                            </span>
+                            <span class="w-10 text-right tabular-nums">{{ number(topic.tickets) }}</span>
+                        </div>
+                    </div>
+                    <div class="rounded-md border p-4">
+                        <p class="mb-3 text-sm font-medium">{{ t('reports.topic_groups') }}</p>
+                        <div v-for="group in report.topic_groups" :key="group.name" class="mb-1.5 flex items-center justify-between gap-2 text-sm">
+                            <span class="truncate">{{ group.name }}</span>
+                            <span class="tabular-nums">{{ number(group.tickets) }}</span>
+                        </div>
                     </div>
                 </div>
 

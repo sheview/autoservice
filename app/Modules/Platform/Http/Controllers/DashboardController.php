@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\AssetTrend;
 use App\Modules\Contract\Actions\SearchContracts;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\PartTrend;
 use App\Modules\Inventory\Actions\PartUsageReport;
 use App\Modules\Maintenance\Actions\PmDashboard;
 use App\Modules\Platform\Actions\PlatformDashboard;
@@ -45,6 +46,7 @@ class DashboardController extends Controller
         SurveyReport $surveys,
         TicketTrend $ticketTrend,
         AssetTrend $assetTrend,
+        PartTrend $partTrend,
         TenantContext $context,
         PlatformDashboard $platformDashboard,
     ): Response|RedirectResponse {
@@ -74,20 +76,27 @@ class DashboardController extends Controller
                 ...$platformDashboard->handle(),
                 'can' => ['manage' => $user->can('platform.tenants')],
             ] : null,
-            'trends' => function () use ($on, $user, $year, $thisYear, $ticketTrend, $assetTrend) {
+            'trends' => function () use ($on, $user, $staff, $year, $thisYear, $ticketTrend, $assetTrend, $partTrend) {
                 $tickets = $on('service', 'tickets.view') ? $ticketTrend->handle($user, $year) : null;
                 $assets = $on('asset', 'assets.view') ? $assetTrend->handle($user, $year) : null;
-                if ($tickets === null && $assets === null) {
+                // Parts received go beside the assets (stock is internal to the company).
+                $years = range($year - AssetTrend::YEARS + 1, $year);
+                $parts = $staff && $on('inventory', 'parts.view') ? $partTrend->handle($year, $years) : null;
+                if ($tickets === null && $assets === null && $parts === null) {
                     return null;
                 }
                 // Years to pick from: from the oldest data (or the last few years) up to this one.
-                $first = min(array_filter([$tickets['first_year'] ?? null, $assets['first_year'] ?? null, $thisYear - TicketTrend::YEARS + 1]));
+                $first = min(array_filter([$tickets['first_year'] ?? null, $assets['first_year'] ?? null, $parts['first_year'] ?? null, $thisYear - TicketTrend::YEARS + 1]));
 
                 return [
                     'year' => $year,
                     'years' => range($thisYear, max($first, self::FIRST_YEAR)),
                     'tickets' => $tickets,
-                    'assets' => $assets,
+                    // Acquired: assets (by quantity) and parts received, side by side; null = not seen.
+                    'assets' => $assets === null && $parts === null ? null : [
+                        'monthly' => ['assets' => $assets['monthly'] ?? null, 'parts' => $parts['monthly'] ?? null],
+                        'yearly' => ['years' => $years, 'assets' => $assets['yearly']['counts'] ?? null, 'parts' => $parts['yearly'] ?? null],
+                    ],
                 ];
             },
             'tickets' => $on('service', 'tickets.view') ? $tickets->handle($user) : null,

@@ -60,7 +60,8 @@ class BuildReport
 
         return [
             'period' => $period->toArray(),
-            'tickets' => $tickets ? collect($tickets)->except(['by_customer', 'by_assignee'])->all() : null,
+            'tickets' => $tickets ? collect($tickets)->except(['by_customer', 'by_assignee', 'by_title'])->all() : null,
+            ...$this->topics($tickets['by_title'] ?? []),
             'customers' => $this->customers($tickets['by_customer'] ?? []),
             'technicians' => $this->technicians($tickets['by_assignee'] ?? [], $surveys['by_assignee'] ?? []),
             'pm' => $on('maintenance') ? $this->pmReport->handle($period->from, $period->to) : null,
@@ -83,7 +84,8 @@ class BuildReport
 
         return [
             'period' => $period->toArray(),
-            'tickets' => $tickets ? collect($tickets)->except(['by_customer', 'by_assignee'])->all() : null,
+            'tickets' => $tickets ? collect($tickets)->except(['by_customer', 'by_assignee', 'by_title'])->all() : null,
+            ...$this->topics($tickets['by_title'] ?? []),
             'customers' => [],
             'technicians' => [],
             'pm' => $on('maintenance') ? $this->pmReport->handle($period->from, $period->to, $customerId) : null,
@@ -91,6 +93,34 @@ class BuildReport
             'assets' => null,
             'parts' => null,
             'surveys' => $surveys ? collect($surveys)->except('by_assignee')->all() : null,
+        ];
+    }
+
+    /** The topics that come up most: this many. */
+    public const TOP_TOPICS = 15;
+
+    /**
+     * The topics that come up most, each with the kind of work it belongs to (the groups of the
+     * ticket title list; a title typed by hand is "other"), and every ticket counted by kind of work.
+     *
+     * @param  list<array{title: string, tickets: int, closed: int}>  $titles  most first
+     * @return array{topics: list<array{title: string, group: string, tickets: int, closed: int}>, topic_groups: list<array{name: string, tickets: int}>}
+     */
+    private function topics(array $titles): array
+    {
+        $groups = [];
+        foreach ((array) __('ui.tickets.title_presets') as $group) {
+            foreach ($group['items'] ?? [] as $item) {
+                $groups[mb_strtolower($item)] = $group['label'];
+            }
+        }
+
+        $rows = collect($titles)->map(fn (array $row) => $row + ['group' => $groups[mb_strtolower($row['title'])] ?? __('ui.reports.topic_other')]);
+
+        return [
+            'topics' => $rows->take(self::TOP_TOPICS)->values()->all(),
+            'topic_groups' => $rows->groupBy('group')->map(fn ($same, string $name) => ['name' => $name, 'tickets' => $same->sum('tickets')])
+                ->sortByDesc('tickets')->values()->all(),
         ];
     }
 
