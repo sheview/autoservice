@@ -85,7 +85,7 @@ const versionState = (v: Version) =>
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="room.name" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="room.name" :description="[room.customer, room.site, room.location].filter(Boolean).join(' · ')" />
                 <div class="flex gap-2">

@@ -48,6 +48,7 @@ const props = defineProps<{
         waiting_for: { step: number; side: string; name: string | null } | null;
     };
     attachments: Attachment[];
+    permit: { link: string | null; qr: string | null; valid: boolean; expires_at: string | null; can_renew: boolean } | null;
     can: { edit: boolean; cancel: boolean; viewIds: boolean; copy: boolean; decide: boolean; own: boolean };
 }>();
 
@@ -87,6 +88,17 @@ const reveal = async (personId: number) => {
 
 const shownText = ref<number | null>(null);
 
+const copied = ref(false);
+const copyLink = async () => {
+    if (props.permit?.link) {
+        await navigator.clipboard.writeText(props.permit.link);
+        copied.value = true;
+    }
+};
+const renew = () => {
+    if (confirm(t('room_permit.renew_confirm'))) router.post(route('room-access.requests.permit.renew', props.request.ulid), {}, { preserveScroll: true });
+};
+
 // Deciding the step that waits for this user: approve at once; turn down / ask with a message.
 const decision = useForm({ decision: '', note: '' });
 const choice = ref<'reject' | 'ask' | null>(null);
@@ -106,7 +118,7 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="request.request_no" />
 
-        <div class="max-w-5xl space-y-6 p-4">
+        <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <div>
                     <div class="flex items-center gap-2">
@@ -170,6 +182,26 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
                 <p v-else-if="request.status === 'pending' && can.own" class="text-xs text-muted-foreground">
                     {{ t('room_requests.own_request_note') }}
                 </p>
+            </section>
+
+            <section v-if="permit" class="flex flex-wrap items-start gap-4 rounded-md border-2 border-green-300 bg-green-50/50 p-4 dark:border-green-800 dark:bg-green-950/30">
+                <div v-if="permit.qr" class="size-36 shrink-0 rounded bg-white p-1" v-html="permit.qr" />
+                <div class="min-w-0 flex-1 space-y-2">
+                    <h3 class="text-sm font-semibold">{{ t('room_permit.section') }}</h3>
+                    <p class="text-xs text-muted-foreground">{{ t('room_permit.hint') }}</p>
+                    <p v-if="permit.link" class="break-all font-mono text-xs">{{ permit.link }}</p>
+                    <p v-if="permit.expires_at" class="text-xs text-muted-foreground">{{ t('room_permit.expires', { at: dateTime(permit.expires_at) }) }}</p>
+                    <div class="flex flex-wrap gap-2">
+                        <Button v-if="permit.link" size="sm" variant="outline" @click="copyLink">{{ copied ? t('room_permit.copied') : t('room_permit.copy') }}</Button>
+                        <Button size="sm" variant="outline" as-child>
+                            <a :href="route('room-access.requests.permit.pdf', request.ulid)">{{ t('room_permit.pdf') }}</a>
+                        </Button>
+                        <Button size="sm" variant="outline" as-child>
+                            <a :href="route('room-access.requests.permit.print', request.ulid)" target="_blank">{{ t('room_permit.print') }}</a>
+                        </Button>
+                        <Button v-if="permit.can_renew" size="sm" variant="ghost" @click="renew">{{ t('room_permit.renew') }}</Button>
+                    </div>
+                </div>
             </section>
 
             <form v-if="cancelling" class="flex flex-wrap items-end gap-2 rounded-md border p-3" @submit.prevent="cancel">

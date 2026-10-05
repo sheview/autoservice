@@ -14,6 +14,8 @@ use Illuminate\Validation\ValidationException;
  */
 class CancelRoomAccessRequest
 {
+    public function __construct(private RevokeRoomAccessTokens $revokeTokens) {}
+
     public const CANCELLABLE = [RoomAccessRequest::STATUS_DRAFT, RoomAccessRequest::STATUS_PENDING, RoomAccessRequest::STATUS_APPROVED];
 
     public function handle(RoomAccessRequest $request, User $actor, ?string $reason = null): RoomAccessRequest
@@ -26,6 +28,8 @@ class CancelRoomAccessRequest
             $from = $request->status;
             $request->update(['status' => RoomAccessRequest::STATUS_CANCELLED]);
             RequestHistory::record($request, 'cancelled', $from, $actor, $reason);
+            // Its permit no longer shows as valid at the counter.
+            $this->revokeTokens->handle($request, $actor);
 
             return $request;
         });

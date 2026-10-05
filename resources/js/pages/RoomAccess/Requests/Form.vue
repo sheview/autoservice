@@ -52,10 +52,19 @@ const form = useForm({
     purpose: start?.purpose ?? '',
     ticket_id: start?.ticket?.id ?? (null as number | null),
     contract_id: start?.contract_id ?? (null as number | null),
-    people: (start?.people.length ? start.people.map((p) => ({ ...p, company: p.company ?? '', phone: p.phone ?? '', id_number: '' })) : [blankPerson()]) as Person[],
+    people: (start?.people.length
+        ? start.people.map((p) => ({ ...p, company: p.company ?? '', phone: p.phone ?? '', id_number: '' }))
+        : [blankPerson()]) as Person[],
     items: (start?.items ?? []).map((i) => ({ ...i, serial_number: i.serial_number ?? '' })) as Item[],
 });
 const room = computed(() => props.rooms.find((r) => r.id === form.server_room_id) ?? null);
+
+// --- purpose: one of the usual kinds of work, or typed when "other" ---
+const presets = computed(() => ((page.props.translations as Record<string, any>)?.room_requests?.purposes ?? []) as string[]);
+const OTHER = '__other';
+const purposeChoice = ref<string>(form.purpose === '' ? '' : presets.value.includes(form.purpose) ? form.purpose : OTHER);
+const purposeOther = ref(purposeChoice.value === OTHER ? form.purpose : '');
+watch([purposeChoice, purposeOther], ([choice, other]) => (form.purpose = choice === OTHER ? other : choice));
 
 // --- ticket: searched among the open ones the user may see ---
 const ticket = ref<Ticket | null>(start?.ticket ?? null);
@@ -65,7 +74,10 @@ let timer: ReturnType<typeof setTimeout> | undefined;
 watch(ticketQ, (q) => {
     clearTimeout(timer);
     timer = setTimeout(async () => {
-        const response = await fetch(route('room-access.requests.tickets', { q }), { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        const response = await fetch(route('room-access.requests.tickets', { q }), {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
         ticketOptions.value = response.ok ? await response.json() : [];
     }, 250);
 });
@@ -111,10 +123,15 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <form class="max-w-4xl space-y-8 p-4 pb-24" @submit.prevent="send(false)">
+        <form class="space-y-6 p-4 pb-24" @submit.prevent="send(false)">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="title" :description="t('room_requests.description')" />
-                <select v-if="!request && previous.length" :class="selectClass" class="max-w-xs" @change="copyFrom(($event.target as HTMLSelectElement).value)">
+                <select
+                    v-if="!request && previous.length"
+                    :class="selectClass"
+                    class="max-w-xs"
+                    @change="copyFrom(($event.target as HTMLSelectElement).value)"
+                >
                     <option value="">{{ t('room_requests.copy_from') }}</option>
                     <option v-for="p in previous" :key="p.ulid" :value="p.ulid">{{ p.label }}</option>
                 </select>
@@ -125,117 +142,162 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             </p>
             <InputError :message="errors.accept || errors.rules || errors.request" />
 
-            <!-- 1. Room and time -->
-            <section class="grid gap-4 sm:grid-cols-2">
-                <div class="grid content-start gap-2 sm:col-span-2">
-                    <Label for="room" required>{{ t('room_requests.room') }}</Label>
-                    <select id="room" v-model="form.server_room_id" :class="selectClass" required>
-                        <option :value="null" disabled>{{ t('room_requests.choose_room') }}</option>
-                        <option v-for="r in rooms" :key="r.id" :value="r.id">{{ r.customer }} · {{ r.name }}{{ r.location ? ` (${r.location})` : '' }}</option>
-                    </select>
-                    <InputError :message="form.errors.server_room_id" />
-                </div>
-                <div class="grid content-start gap-2">
-                    <Label for="start" required>{{ t('room_requests.planned_start') }}</Label>
-                    <Input id="start" v-model="form.planned_start" type="datetime-local" required />
-                    <InputError :message="form.errors.planned_start" />
-                </div>
-                <div class="grid content-start gap-2">
-                    <Label for="end" required>{{ t('room_requests.planned_end') }}</Label>
-                    <Input id="end" v-model="form.planned_end" type="datetime-local" required />
-                    <InputError :message="form.errors.planned_end" />
-                </div>
-            </section>
-
-            <!-- 2. People -->
-            <section class="space-y-3">
-                <h3 class="text-sm font-semibold">{{ t('room_requests.people') }} <span class="text-red-600">*</span></h3>
-                <p v-if="room?.requires_id_number" class="text-xs text-muted-foreground">{{ t('room_requests.id_hint') }}</p>
-                <datalist id="visitors">
-                    <option v-for="v in visitors" :key="v.name + v.company" :value="v.name">{{ v.company }}</option>
-                </datalist>
-                <div v-for="(person, i) in form.people" :key="i" class="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
-                    <Input v-model="person.name" list="visitors" :placeholder="t('room_requests.person_name')" required maxlength="255" @change="fillFromVisitor(person)" />
-                    <Input v-model="person.company" :placeholder="t('room_requests.person_company')" maxlength="255" />
-                    <Input v-model="person.phone" :placeholder="t('room_requests.person_phone')" maxlength="50" />
-                    <div v-if="room?.requires_id_number" class="grid gap-1">
-                        <Input v-model="person.id_number" :placeholder="t('room_requests.id_number')" maxlength="30" autocomplete="off" inputmode="numeric" />
-                        <span v-if="person.id_number_masked" class="text-xs text-muted-foreground">{{
-                            t('room_requests.id_number_kept', { masked: person.id_number_masked })
-                        }}</span>
-                    </div>
-                    <div class="sm:col-span-2">
-                        <Button v-if="form.people.length > 1" type="button" variant="ghost" size="sm" @click="form.people.splice(i, 1)">{{ t('common.delete') }}</Button>
-                    </div>
-                </div>
-                <InputError :message="errors.people || errors['people.0.name']" />
-                <Button type="button" variant="outline" size="sm" @click="form.people.push(blankPerson())">{{ t('room_requests.add_person') }}</Button>
-            </section>
-
-            <!-- 3. Purpose and links -->
-            <section class="space-y-4">
-                <div class="grid gap-2">
-                    <Label for="purpose" required>{{ t('room_requests.purpose') }}</Label>
-                    <textarea id="purpose" v-model="form.purpose" rows="3" required maxlength="2000" class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm" />
-                    <InputError :message="form.errors.purpose" />
-                </div>
-                <p class="text-xs text-muted-foreground">{{ t('room_requests.link_hint') }}</p>
-                <div class="grid gap-4 sm:grid-cols-2">
-                    <div v-if="serviceOn" class="grid content-start gap-2">
-                        <Label>{{ t('room_requests.ticket') }}</Label>
-                        <div v-if="ticket" class="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                            <span><span class="font-mono">{{ ticket.ticket_no }}</span> {{ ticket.title }}</span>
-                            <Button type="button" variant="ghost" size="sm" @click="pickTicket(null)">{{ t('common.delete') }}</Button>
+            <div class="grid gap-8 xl:grid-cols-2">
+                <div class="space-y-8">
+                    <!-- 1. Room and time -->
+                    <section class="grid gap-4 sm:grid-cols-2">
+                        <div class="grid content-start gap-2 sm:col-span-2">
+                            <Label for="room" required>{{ t('room_requests.room') }}</Label>
+                            <select id="room" v-model="form.server_room_id" :class="selectClass" required>
+                                <option :value="null" disabled>{{ t('room_requests.choose_room') }}</option>
+                                <option v-for="r in rooms" :key="r.id" :value="r.id">
+                                    {{ r.customer }} · {{ r.name }}{{ r.location ? ` (${r.location})` : '' }}
+                                </option>
+                            </select>
+                            <InputError :message="form.errors.server_room_id" />
                         </div>
-                        <template v-else>
-                            <Input v-model="ticketQ" type="search" :placeholder="t('room_requests.ticket_search')" />
-                            <ul v-if="ticketOptions.length" class="max-h-48 overflow-y-auto rounded-md border text-sm">
-                                <li v-for="option in ticketOptions" :key="option.id">
-                                    <button type="button" class="w-full px-3 py-2 text-left hover:bg-muted/50" @click="pickTicket(option)">
-                                        <span class="font-mono">{{ option.ticket_no }}</span> {{ option.title }}
-                                    </button>
-                                </li>
-                            </ul>
-                        </template>
-                        <InputError :message="form.errors.ticket_id" />
-                    </div>
-                    <div v-if="contracts.length" class="grid content-start gap-2">
-                        <Label for="contract">{{ t('room_requests.contract') }}</Label>
-                        <select id="contract" v-model="form.contract_id" :class="selectClass">
-                            <option :value="null">{{ t('room_requests.no_contract') }}</option>
-                            <option v-for="c in contracts" :key="c.id" :value="c.id">{{ c.label }}</option>
-                        </select>
-                        <InputError :message="form.errors.contract_id" />
-                    </div>
-                </div>
-            </section>
+                        <div class="grid content-start gap-2">
+                            <Label for="start" required>{{ t('room_requests.planned_start') }}</Label>
+                            <Input id="start" v-model="form.planned_start" type="datetime-local" required />
+                            <InputError :message="form.errors.planned_start" />
+                        </div>
+                        <div class="grid content-start gap-2">
+                            <Label for="end" required>{{ t('room_requests.planned_end') }}</Label>
+                            <Input id="end" v-model="form.planned_end" type="datetime-local" required />
+                            <InputError :message="form.errors.planned_end" />
+                        </div>
+                    </section>
 
-            <!-- 4. Equipment -->
-            <section class="space-y-3">
-                <h3 class="text-sm font-semibold">{{ t('room_requests.items') }}</h3>
-                <p v-if="!form.items.length" class="text-sm text-muted-foreground">{{ t('room_requests.no_items') }}</p>
-                <div v-for="(item, i) in form.items" :key="i" class="grid gap-2 sm:grid-cols-[2fr_1fr_5rem_auto_auto]">
-                    <Input v-model="item.name" :placeholder="t('room_requests.item_name')" required maxlength="255" />
-                    <Input v-model="item.serial_number" :placeholder="t('room_requests.item_serial')" class="font-mono" maxlength="100" />
-                    <Input v-model="item.quantity" type="number" min="1" :aria-label="t('room_requests.item_qty')" />
-                    <select v-model="item.direction" :class="selectClass">
-                        <option value="in">{{ t('room_requests.directions.in') }}</option>
-                        <option value="out">{{ t('room_requests.directions.out') }}</option>
-                    </select>
-                    <Button type="button" variant="ghost" size="sm" @click="form.items.splice(i, 1)">{{ t('common.delete') }}</Button>
+                    <!-- 2. People -->
+                    <section class="space-y-3">
+                        <h3 class="text-sm font-semibold">{{ t('room_requests.people') }} <span class="text-red-600">*</span></h3>
+                        <p v-if="room?.requires_id_number" class="text-xs text-muted-foreground">{{ t('room_requests.id_hint') }}</p>
+                        <datalist id="visitors">
+                            <option v-for="v in visitors" :key="v.name + v.company" :value="v.name">{{ v.company }}</option>
+                        </datalist>
+                        <div v-for="(person, i) in form.people" :key="i" class="grid gap-2 rounded-md border p-3 sm:grid-cols-2 2xl:grid-cols-4">
+                            <Input
+                                v-model="person.name"
+                                list="visitors"
+                                :placeholder="t('room_requests.person_name')"
+                                required
+                                maxlength="255"
+                                @change="fillFromVisitor(person)"
+                            />
+                            <Input v-model="person.company" :placeholder="t('room_requests.person_company')" maxlength="255" />
+                            <Input v-model="person.phone" :placeholder="t('room_requests.person_phone')" maxlength="50" />
+                            <div v-if="room?.requires_id_number" class="grid gap-1">
+                                <Input
+                                    v-model="person.id_number"
+                                    :placeholder="t('room_requests.id_number')"
+                                    maxlength="30"
+                                    autocomplete="off"
+                                    inputmode="numeric"
+                                />
+                                <span v-if="person.id_number_masked" class="text-xs text-muted-foreground">{{
+                                    t('room_requests.id_number_kept', { masked: person.id_number_masked })
+                                }}</span>
+                            </div>
+                            <div class="sm:col-span-2 2xl:col-span-4">
+                                <Button v-if="form.people.length > 1" type="button" variant="ghost" size="sm" @click="form.people.splice(i, 1)">{{
+                                    t('common.delete')
+                                }}</Button>
+                            </div>
+                        </div>
+                        <InputError :message="errors.people || errors['people.0.name']" />
+                        <Button type="button" variant="outline" size="sm" @click="form.people.push(blankPerson())">{{
+                            t('room_requests.add_person')
+                        }}</Button>
+                    </section>
                 </div>
-                <Button type="button" variant="outline" size="sm" @click="form.items.push({ name: '', serial_number: '', quantity: 1, direction: 'in' })">{{
-                    t('room_requests.add_item')
-                }}</Button>
-            </section>
+                <div class="space-y-8">
+                    <!-- 3. Purpose and links -->
+                    <section class="space-y-4">
+                        <div class="grid gap-2">
+                            <Label for="purpose" required>{{ t('room_requests.purpose') }}</Label>
+                            <select id="purpose" v-model="purposeChoice" :class="selectClass" required>
+                                <option value="" disabled>{{ t('room_requests.purpose_pick') }}</option>
+                                <option v-for="p in presets" :key="p" :value="p">{{ p }}</option>
+                                <option :value="OTHER">{{ t('room_requests.purpose_other') }}</option>
+                            </select>
+                            <textarea
+                                v-if="purposeChoice === OTHER"
+                                v-model="purposeOther"
+                                rows="3"
+                                required
+                                maxlength="2000"
+                                :placeholder="t('room_requests.purpose_other_placeholder')"
+                                class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                            />
+                            <InputError :message="form.errors.purpose" />
+                        </div>
+                        <p class="text-xs text-muted-foreground">{{ t('room_requests.link_hint') }}</p>
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div v-if="serviceOn" class="grid content-start gap-2">
+                                <Label>{{ t('room_requests.ticket') }}</Label>
+                                <div v-if="ticket" class="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                                    <span
+                                        ><span class="font-mono">{{ ticket.ticket_no }}</span> {{ ticket.title }}</span
+                                    >
+                                    <Button type="button" variant="ghost" size="sm" @click="pickTicket(null)">{{ t('common.delete') }}</Button>
+                                </div>
+                                <template v-else>
+                                    <Input v-model="ticketQ" type="search" :placeholder="t('room_requests.ticket_search')" />
+                                    <ul v-if="ticketOptions.length" class="max-h-48 overflow-y-auto rounded-md border text-sm">
+                                        <li v-for="option in ticketOptions" :key="option.id">
+                                            <button type="button" class="w-full px-3 py-2 text-left hover:bg-muted/50" @click="pickTicket(option)">
+                                                <span class="font-mono">{{ option.ticket_no }}</span> {{ option.title }}
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </template>
+                                <InputError :message="form.errors.ticket_id" />
+                            </div>
+                            <div v-if="contracts.length" class="grid content-start gap-2">
+                                <Label for="contract">{{ t('room_requests.contract') }}</Label>
+                                <select id="contract" v-model="form.contract_id" :class="selectClass">
+                                    <option :value="null">{{ t('room_requests.no_contract') }}</option>
+                                    <option v-for="c in contracts" :key="c.id" :value="c.id">{{ c.label }}</option>
+                                </select>
+                                <InputError :message="form.errors.contract_id" />
+                            </div>
+                        </div>
+                    </section>
 
-            <p class="text-xs text-muted-foreground">{{ t('room_requests.attachments_hint') }}</p>
+                    <!-- 4. Equipment -->
+                    <section class="space-y-3">
+                        <h3 class="text-sm font-semibold">{{ t('room_requests.items') }}</h3>
+                        <p v-if="!form.items.length" class="text-sm text-muted-foreground">{{ t('room_requests.no_items') }}</p>
+                        <div v-for="(item, i) in form.items" :key="i" class="grid gap-2 sm:grid-cols-[2fr_1fr_5rem_auto_auto]">
+                            <Input v-model="item.name" :placeholder="t('room_requests.item_name')" required maxlength="255" />
+                            <Input v-model="item.serial_number" :placeholder="t('room_requests.item_serial')" class="font-mono" maxlength="100" />
+                            <Input v-model="item.quantity" type="number" min="1" :aria-label="t('room_requests.item_qty')" />
+                            <select v-model="item.direction" :class="selectClass">
+                                <option value="in">{{ t('room_requests.directions.in') }}</option>
+                                <option value="out">{{ t('room_requests.directions.out') }}</option>
+                            </select>
+                            <Button type="button" variant="ghost" size="sm" @click="form.items.splice(i, 1)">{{ t('common.delete') }}</Button>
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            @click="form.items.push({ name: '', serial_number: '', quantity: 1, direction: 'in' })"
+                            >{{ t('room_requests.add_item') }}</Button
+                        >
+                    </section>
+
+                    <p class="text-xs text-muted-foreground">{{ t('room_requests.attachments_hint') }}</p>
+                </div>
+            </div>
 
             <div class="flex flex-wrap gap-3">
                 <Button type="button" :disabled="form.processing" @click="openRules">{{ t('room_requests.submit') }}</Button>
                 <Button variant="outline" :disabled="form.processing">{{ t('room_requests.save_draft') }}</Button>
                 <Button variant="ghost" as-child>
-                    <Link :href="request ? route('room-access.requests.show', request.ulid) : route('room-access.requests.index')">{{ t('common.cancel') }}</Link>
+                    <Link :href="request ? route('room-access.requests.show', request.ulid) : route('room-access.requests.index')">{{
+                        t('common.cancel')
+                    }}</Link>
                 </Button>
             </div>
         </form>

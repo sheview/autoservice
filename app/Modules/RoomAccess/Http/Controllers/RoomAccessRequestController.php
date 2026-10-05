@@ -11,6 +11,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\RoomAccess\Actions\CancelRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\DecideRoomAccessRequest;
+use App\Modules\RoomAccess\Actions\RoomPermitSheet;
 use App\Modules\RoomAccess\Actions\RoomRulesForRequest;
 use App\Modules\RoomAccess\Actions\SaveRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\SearchRoomAccessRequests;
@@ -143,6 +144,19 @@ class RoomAccessRequestController extends Controller
                     'name' => $step['approver_user_id'] ? User::query()->whereKey($step['approver_user_id'])->value('name') : null,
                 ],
             ],
+            // The permit (once approved): its QR link for the counter, PDF and print.
+            'permit' => in_array($roomRequest->status, RoomPermitController::PRINTABLE, true) ? (function () use ($roomRequest, $user) {
+                $sheet = app(RoomPermitSheet::class)->handle($roomRequest);
+
+                return [
+                    'link' => $sheet['link'],
+                    'qr' => $sheet['qr'],
+                    'valid' => $sheet['valid'],
+                    'expires_at' => $sheet['expires_at']?->toIso8601String(),
+                    'can_renew' => in_array($roomRequest->status, [RoomAccessRequest::STATUS_APPROVED, RoomAccessRequest::STATUS_INSIDE], true)
+                        && ((int) $roomRequest->requester_id === $user->id || $user->can('room-access.approve')),
+                ];
+            })() : null,
             'attachments' => Attachments::list($roomRequest, $roomRequest->attachmentCollection(),
                 fn (int $id) => route('room-access.requests.attachments.show', [$roomRequest, $id])),
             'can' => [

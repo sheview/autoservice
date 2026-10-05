@@ -5,6 +5,7 @@ namespace App\Modules\RoomAccess\Actions;
 use App\Modules\Identity\Models\User;
 use App\Modules\RoomAccess\Models\RoomAccessApproval;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
+use App\Modules\RoomAccess\Models\RoomAccessToken;
 use App\Modules\RoomAccess\Support\ApprovalFlow;
 use App\Modules\RoomAccess\Support\RequestHistory;
 use App\Modules\RoomAccess\Support\RoomAccessAlert;
@@ -25,6 +26,11 @@ use Illuminate\Validation\ValidationException;
 class DecideRoomAccessRequest
 {
     public const DECISIONS = ['approve', 'reject', 'ask'];
+
+    public function __construct(
+        private IssueRoomAccessToken $issueToken,
+        private RevokeRoomAccessTokens $revokeTokens,
+    ) {}
 
     public function handle(RoomAccessRequest $request, string $decision, User $actor, ?string $note = null): RoomAccessRequest
     {
@@ -66,6 +72,8 @@ class DecideRoomAccessRequest
                 $done = ApprovalFlow::current($request) === null;
                 if ($done) {
                     $request->fill(['status' => RoomAccessRequest::STATUS_APPROVED, 'approved_at' => now(), 'decision_note' => $note])->save();
+                    // The permit's link, for its QR and the guard's counter.
+                    $this->issueToken->handle($request, RoomAccessToken::PERMIT, $actor);
                 }
                 RequestHistory::record($request, $done ? 'approved' : 'step_approved', $from, $actor, $note);
             } else {
@@ -74,6 +82,7 @@ class DecideRoomAccessRequest
                     'decision_note' => $note,
                 ])->save();
                 RequestHistory::record($request, $decision === 'reject' ? 'rejected' : 'info_requested', $from, $actor, $note);
+                $this->revokeTokens->handle($request, $actor);
             }
 
             return $request;

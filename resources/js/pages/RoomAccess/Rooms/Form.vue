@@ -75,7 +75,7 @@ const check = 'size-4 rounded border-input';
     <AppLayout :breadcrumbs="breadcrumbs">
         <Head :title="title" />
 
-        <form class="max-w-4xl space-y-8 p-4" @submit.prevent="submit">
+        <form class="space-y-8 p-4" @submit.prevent="submit">
             <Heading :title="title" />
 
             <section class="grid gap-4 sm:grid-cols-2">
