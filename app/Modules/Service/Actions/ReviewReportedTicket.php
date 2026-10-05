@@ -42,6 +42,7 @@ class ReviewReportedTicket
             if ($decision === 'ask') {
                 $ticket->forceFill(['customer_message' => $message])->save();
                 $this->recordEvent->handle($ticket, TicketEvent::TYPE_COMMENT, $actor, ['body' => __('service.reported.asked', ['message' => $message])]);
+                app(NotifyCustomer::class)->handle($ticket, 'asked');
 
                 return $ticket;
             }
@@ -66,6 +67,7 @@ class ReviewReportedTicket
                 'to_status' => $to,
                 'body' => $message,
             ]);
+            app(NotifyCustomer::class)->handle($ticket, $decision === 'accept' ? 'accepted' : 'rejected');
 
             return $ticket;
         });

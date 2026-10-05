@@ -9,11 +9,14 @@ use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\TicketParts;
+use App\Modules\Labeling\Actions\QrSvg;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
+use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
 use App\Modules\Survey\Actions\SurveyOfTicket;
+use App\Modules\Tenancy\Support\CompanyProfile;
 use App\Modules\Tenancy\Support\TenantContext;
 
 /**
@@ -49,8 +52,20 @@ class TicketSheet
         $device = $asset ? ($this->assetDevices->handle([$asset['id']])[$asset['id']] ?? null) : null;
         $survey = $this->modules->enabled('survey') ? $this->surveyOfTicket->handle($ticket->id) : null;
 
+        $tenant = $this->context->tenant();
+        $logo = $tenant?->getFirstMedia(CompanyProfile::LOGO);
+
         return [
-            'company' => $this->context->tenant()?->name,
+            'company' => $tenant?->name,
+            'logo' => $logo ? 'data:'.$logo->mime_type.';base64,'.base64_encode(stream_get_contents($logo->stream())) : null,
+            // The customer's way to follow the job without signing in: scan, or type the number on the page.
+            'tracking' => $tenant && $ticket->tracking_token ? [
+                'qr' => app(QrSvg::class)->handle(PublicUrl::forTenant($tenant, '/track/'.$ticket->tracking_token)),
+                // Where to type the number: the company's own host, or the shared search page.
+                'search' => preg_replace('#^https?://#', '', config('tenancy.public_links') === 'subdomain'
+                    ? PublicUrl::forTenant($tenant, '/track')
+                    : PublicUrl::route('service.track')),
+            ] : null,
             'ticket' => [
                 ...$ticket->only(['ulid', 'ticket_no', 'title', 'description', 'status', 'priority', 'source', 'contact_name', 'contact_phone']),
                 'customer' => $customer['name'] ?? null,

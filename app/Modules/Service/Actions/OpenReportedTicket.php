@@ -71,7 +71,8 @@ class OpenReportedTicket
 
             $this->recordEvent->handle($ticket, TicketEvent::TYPE_CREATED, null, [
                 'to_status' => Ticket::STATUS_PENDING_REVIEW,
-                'body' => __('service.reported.by', ['name' => $data['name']]),
+                // Not the name here: it lives only in contact_name, which is blanked out later.
+                'body' => __('service.reported.by'),
             ]);
 
             foreach ($photos as $file) {
@@ -89,6 +90,8 @@ class OpenReportedTicket
                 'reporter' => $data['name'],
                 'contact' => collect([$data['phone'] ?? null, $data['email'] ?? null])->filter()->implode(' / '),
             ], route('service.tickets.show', $ticket));
+
+            app(NotifyCustomer::class)->handle($ticket, 'received');
 
             return ['ticket' => $ticket, 'created' => true];
         });

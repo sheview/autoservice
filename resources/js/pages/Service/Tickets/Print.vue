@@ -10,6 +10,9 @@ import { onBeforeUnmount, onMounted } from 'vue';
 // Same layout as resources/views/documents/ticket.blade.php (the PDF): change both together.
 const props = defineProps<{
     company: string | null;
+    logo: string | null;
+    // The customer's tracking QR (link with its token) and where to type the number instead.
+    tracking: { qr: string; search: string } | null;
     ticket: {
         ulid: string;
         ticket_no: string;
@@ -153,13 +156,23 @@ const blankRows = 2;
         <div class="flex justify-center p-6 print:block print:p-0">
             <article class="sheet bg-white text-[10pt] leading-snug text-black shadow print:shadow-none">
                 <header class="flex items-start justify-between gap-6 border-b-2 border-black pb-2">
-                    <div>
-                        <p class="text-[14pt] font-bold">{{ company }}</p>
-                        <p class="text-[12pt] font-semibold">{{ t('ticket_print.title') }}</p>
+                    <div class="flex items-start gap-3">
+                        <img v-if="logo" :src="logo" alt="" class="h-[16mm] max-w-[40mm] object-contain" />
+                        <div>
+                            <p class="text-[14pt] font-bold">{{ company }}</p>
+                            <p class="text-[12pt] font-semibold">{{ t('ticket_print.title') }}</p>
+                        </div>
                     </div>
-                    <div class="text-right">
-                        <p class="font-mono text-[13pt] font-bold">{{ ticket.ticket_no }}</p>
-                        <p>{{ t(`tickets.statuses.${ticket.status}`) }}</p>
+                    <div class="flex items-start gap-3 text-right">
+                        <div>
+                            <p class="font-mono text-[13pt] font-bold">{{ ticket.ticket_no }}</p>
+                            <p>{{ t(`tickets.statuses.${ticket.status}`) }}</p>
+                        </div>
+                        <!-- Track the job: at least 2.5 cm so it scans from small paper, in black and white -->
+                        <figure v-if="tracking" class="w-[28mm] text-center">
+                            <div class="size-[28mm] [&>svg]:size-full" v-html="tracking.qr" />
+                            <figcaption class="text-[7pt] leading-tight">{{ t('ticket_print.track_scan') }}<br />{{ tracking.search }}</figcaption>
+                        </figure>
                     </div>
                 </header>
 

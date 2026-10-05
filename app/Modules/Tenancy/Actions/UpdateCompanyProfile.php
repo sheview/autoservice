@@ -13,7 +13,7 @@ use Illuminate\Http\UploadedFile;
 class UpdateCompanyProfile
 {
     /**
-     * @param  array{service_phone?: string|null, service_email?: string|null, auto_approve_limit?: string|float|null}  $data  auto_approve_limit in baht
+     * @param  array{service_phone?: string|null, service_email?: string|null, auto_approve_limit?: string|float|null, reporter_retention_days?: int|null}  $data  auto_approve_limit in baht
      */
     public function handle(Tenant $tenant, array $data, ?UploadedFile $logo = null, bool $removeLogo = false): Tenant
     {
@@ -24,6 +24,9 @@ class UpdateCompanyProfile
         if (array_key_exists('auto_approve_limit', $data)) {
             $limit = Money::toSatang($data['auto_approve_limit']);
             $settings['checkout'] = [...($settings['checkout'] ?? []), 'auto_approve_limit' => $limit > 0 ? $limit : null];
+        }
+        if (array_key_exists('reporter_retention_days', $data)) {
+            $settings['reporter_retention_days'] = $data['reporter_retention_days'] !== null ? (int) $data['reporter_retention_days'] : null;
         }
         $tenant->settings = $settings;
         $tenant->save();

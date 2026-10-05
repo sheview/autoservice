@@ -79,8 +79,9 @@ class MoveTicket
                 'body' => filled($comment) ? $comment : null,
             ]);
 
-            // Ask whoever confirms the fix to check it.
+            // Ask whoever confirms the fix to check it, and tell the reporter (QR form) it is done.
             if ($action === 'resolve') {
+                app(NotifyCustomer::class)->handle($ticket, 'done');
                 $this->notify->handle($ticket, 'resolved', $actor);
                 app(SendAlert::class)->handle('ticket_resolved', [
                     'no' => $ticket->ticket_no,

@@ -29,13 +29,27 @@
 
     <div class="sheet">
         <div class="header">
-            <div>
+            <div style="display: flex; gap: 10px; align-items: flex-start">
+                @if ($logo)
+                    <img src="{{ $logo }}" alt="" style="height: 16mm; max-width: 40mm; object-fit: contain">
+                @endif
+                <div>
                 <div class="company">{{ $company }}</div>
                 <div class="doc-title">{{ __('ui.ticket_print.title') }}</div>
+                </div>
             </div>
-            <div>
-                <div class="doc-no">{{ $ticket['ticket_no'] }}</div>
-                <div class="muted" style="text-align: right">{{ __('ui.tickets.statuses.'.$ticket['status']) }}</div>
+            <div style="display: flex; gap: 10px; align-items: flex-start">
+                <div>
+                    <div class="doc-no">{{ $ticket['ticket_no'] }}</div>
+                    <div class="muted" style="text-align: right">{{ __('ui.tickets.statuses.'.$ticket['status']) }}</div>
+                </div>
+                @if ($tracking)
+                    {{-- At least 2.5 cm: it scans from small paper, printed in black and white. --}}
+                    <div style="width: 28mm; text-align: center">
+                        <div style="width: 28mm; height: 28mm">{!! $tracking['qr'] !!}</div>
+                        <div style="font-size: 7pt; line-height: 1.2">{{ __('ui.ticket_print.track_scan') }}<br>{{ $tracking['search'] }}</div>
+                    </div>
+                @endif
             </div>
         </div>
 

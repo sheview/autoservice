@@ -28,7 +28,7 @@ class CompanyProfile
     public const FIELDS = ['service_phone', 'service_email'];
 
     /**
-     * @return array{name: string, service_phone: string|null, service_email: string|null, logo_url: string|null, auto_approve_limit: string|null}
+     * @return array{name: string, service_phone: string|null, service_email: string|null, logo_url: string|null, auto_approve_limit: string|null, reporter_retention_days: int}
      */
     public static function of(Tenant $tenant): array
     {
@@ -42,6 +42,15 @@ class CompanyProfile
             'logo_url' => $logo ? route('tenancy.company.logo', ['v' => $logo->id]) : null,
             // Issue/loan requests of cheap parts skip approval (baht; null = off).
             'auto_approve_limit' => Money::toBaht($tenant->settings['checkout']['auto_approve_limit'] ?? null),
+            'reporter_retention_days' => self::reporterRetentionDays($tenant),
         ];
+    }
+
+    /** Days after a job ends that a QR reporter's name, phone and e-mail are kept (then blanked out). */
+    public const REPORTER_RETENTION_DAYS = 180;
+
+    public static function reporterRetentionDays(Tenant $tenant): int
+    {
+        return (int) ($tenant->settings['reporter_retention_days'] ?? self::REPORTER_RETENTION_DAYS);
     }
 }

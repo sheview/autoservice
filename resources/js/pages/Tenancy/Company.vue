@@ -12,7 +12,14 @@ import { ImageUp } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 const props = defineProps<{
-    company: { name: string; service_phone: string | null; service_email: string | null; logo_url: string | null; auto_approve_limit: string | null };
+    company: {
+        name: string;
+        service_phone: string | null;
+        service_email: string | null;
+        logo_url: string | null;
+        auto_approve_limit: string | null;
+        reporter_retention_days: number;
+    };
     logoMaxKb: number;
     // company.manage: without it the page is read only.
     can: { manage: boolean };
@@ -25,6 +32,7 @@ const form = useForm({
     service_phone: props.company.service_phone ?? '',
     service_email: props.company.service_email ?? '',
     auto_approve_limit: props.company.auto_approve_limit ?? '',
+    reporter_retention_days: props.company.reporter_retention_days,
     logo: null as File | null,
     remove_logo: false as boolean,
 });
@@ -141,6 +149,20 @@ const submit = () =>
                                 />
                                 <p class="text-xs text-muted-foreground">{{ t('company.auto_approve_hint') }}</p>
                                 <InputError :message="form.errors.auto_approve_limit" />
+                            </div>
+                            <div class="grid gap-2">
+                                <Label for="reporter_retention_days">{{ t('company.reporter_retention_days') }}</Label>
+                                <Input
+                                    id="reporter_retention_days"
+                                    v-model.number="form.reporter_retention_days"
+                                    type="number"
+                                    min="7"
+                                    max="3650"
+                                    class="w-48"
+                                    :disabled="!can.manage"
+                                />
+                                <p class="text-xs text-muted-foreground">{{ t('company.reporter_retention_hint') }}</p>
+                                <InputError :message="form.errors.reporter_retention_days" />
                             </div>
                         </div>
 
