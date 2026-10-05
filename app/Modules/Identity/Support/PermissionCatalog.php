@@ -47,8 +47,9 @@ class PermissionCatalog
         'labels' => ['view', 'print'],
         'customers' => ['view', 'create', 'update', 'delete'],
         'contracts' => ['view', 'create', 'update', 'delete'],
-        // issue = take parts (to a ticket, or on a part issue/loan form).
-        'parts' => ['view', 'create', 'update', 'delete', 'issue', 'import', 'export'],
+        // issue = take parts (to a ticket, or on a part issue/loan form); serials = part categories and
+        // which parts are followed piece by piece by serial number (admin only by default).
+        'parts' => ['view', 'create', 'update', 'delete', 'issue', 'import', 'export', 'serials'],
         // receive = mark an approved request ordered, then received.
         'purchase-requests' => ['view', 'create', 'update', 'approve', 'delete', 'receive'],
         'stock-movements' => ['view', 'create'],

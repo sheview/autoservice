@@ -65,6 +65,7 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::post('checkout-items/{item}/backorder', [CheckoutItemController::class, 'backorder'])->whereNumber('item')->name('items.backorder');
     Route::post('checkout-items/{item}/cancel', [CheckoutItemController::class, 'cancel'])->whereNumber('item')->name('items.cancel');
     Route::post('checkout-items/{item}/return', [CheckoutItemController::class, 'giveBack'])->whereNumber('item')->name('items.return');
+    Route::post('checkout-items/{item}/return-parts', [CheckoutItemController::class, 'returnParts'])->whereNumber('item')->name('items.return-parts');
 
     Route::post('assets/{asset}/attachments', [AssetAttachmentController::class, 'store'])->name('assets.attachments.store');
     Route::get('assets/{asset}/attachments/{attachment}', [AssetAttachmentController::class, 'show'])

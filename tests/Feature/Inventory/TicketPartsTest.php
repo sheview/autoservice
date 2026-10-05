@@ -23,7 +23,7 @@ it('lets the technician take parts for a ticket and shows them on the ticket', f
         ->assertInertia(fn (Assert $page) => $page->component('Service/Tickets/Show')
             ->where('parts.items', [])
             ->where('parts.canIssue', true)
-            ->where('parts.options.0', ['id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'qty_on_hand' => 5]));
+            ->where('parts.options.0', ['id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'qty_on_hand' => 5, 'track_serial' => false]));
 
     $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 2])->assertSessionHasNoErrors();
     $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasNoErrors();
@@ -36,7 +36,7 @@ it('lets the technician take parts for a ticket and shows them on the ticket', f
 
     $this->actingAs($this->tech)->get($this->url)
         ->assertInertia(fn (Assert $page) => $page
-            ->where('parts.items', [['part_id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'quantity' => 3, 'types' => ['issue']]])
+            ->where('parts.items', [['part_id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'quantity' => 3, 'types' => ['issue'], 'track_serial' => false, 'units' => []]])
             ->where('parts.options.0.qty_on_hand', 2));
 
     // the ledger links the movement to the ticket

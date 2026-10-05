@@ -41,7 +41,9 @@ class TicketPartController extends Controller
         $validated = $this->validated($request);
         $type = $validated['type'] ?? IssuableParts::TYPES[0];
 
-        $issuePart->handle($ticket->id, $validated['part_id'], $validated['quantity'], $request->user(), $validated['note'] ?? null, $type);
+        // Pieces of a part followed by serial number go to this job and into its device.
+        $issuePart->handle($ticket->id, $validated['part_id'], $validated['quantity'], $request->user(), $validated['note'] ?? null, $type,
+            $validated['unit_ids'] ?? [], ['asset_id' => $ticket->asset_id]);
 
         return back()->with('success', __("inventory.ticket_parts.taken.{$type}"));
     }
@@ -55,13 +57,13 @@ class TicketPartController extends Controller
 
         $validated = $this->validated($request);
 
-        $returnPart->handle($ticket->id, $validated['part_id'], $validated['quantity'], $request->user(), $validated['note'] ?? null);
+        $returnPart->handle($ticket->id, $validated['part_id'], $validated['quantity'], $request->user(), $validated['note'] ?? null, $validated['unit_ids'] ?? []);
 
         return back()->with('success', __('inventory.ticket_parts.returned'));
     }
 
     /**
-     * @return array{part_id: int, quantity: int, type?: string|null, note?: string|null}
+     * @return array{part_id: int, quantity: int, type?: string|null, note?: string|null, unit_ids?: list<int>}
      */
     private function validated(Request $request): array
     {
@@ -70,6 +72,9 @@ class TicketPartController extends Controller
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
             'type' => ['nullable', Rule::in(IssuableParts::TYPES)],
             'note' => ['nullable', 'string', 'max:1000'],
+            // A part followed by serial number: the pieces (as many as the quantity).
+            'unit_ids' => ['nullable', 'array', 'max:1000'],
+            'unit_ids.*' => ['integer'],
         ], attributes: __('inventory.fields'));
     }
 }

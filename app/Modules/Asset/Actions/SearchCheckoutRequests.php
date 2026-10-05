@@ -6,6 +6,8 @@ use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
+use App\Modules\Inventory\Actions\CheckoutItemIdsWithSerial;
+use App\Modules\Platform\Support\Modules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -74,7 +76,9 @@ class SearchCheckoutRequests
                 ->orWhere('borrower_name', 'ilike', "%{$search}%")
                 ->orWhere('requester_name', 'ilike', "%{$search}%")
                 ->orWhere('purpose', 'ilike', "%{$search}%")
-                ->orWhereHas('items', fn ($q) => $q->where('item_name', 'ilike', "%{$search}%")->orWhere('item_code', 'ilike', "%{$search}%"))))
+                ->orWhereHas('items', fn ($q) => $q->where('item_name', 'ilike', "%{$search}%")->orWhere('item_code', 'ilike', "%{$search}%")
+                    // Or a piece with that serial number went out on the line (Inventory module).
+                    ->when(app(Modules::class)->enabled('inventory'), fn ($q) => $q->orWhereIn('id', app(CheckoutItemIdsWithSerial::class)->handle($search))))))
             ->when($tab === 'approve', fn (Builder $q) => $q->where('status', CheckoutRequest::STATUS_PENDING))
             ->when($tab === 'fulfill', fn (Builder $q) => $q->whereIn('status', [CheckoutRequest::STATUS_APPROVED, CheckoutRequest::STATUS_PARTIAL])
                 ->whereHas('items', fn ($q) => $q->whereIn('status', [CheckoutItem::STATUS_APPROVED, CheckoutItem::STATUS_PARTIAL])))

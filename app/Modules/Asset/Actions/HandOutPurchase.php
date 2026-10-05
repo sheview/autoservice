@@ -25,7 +25,7 @@ class HandOutPurchase
 
     /**
      * @param  array{id: int, pr_no: string, requested_by: int|null, contract_id: int|null, checkout_request_id: int|null,
-     *     lines: list<array{item_type: string, id: int, qty: int}>}  $purchase  from PurchaseIssueLines
+     *     lines: list<array{item_type: string, id: int, qty: int, unit_ids?: list<int>}>}  $purchase  from PurchaseIssueLines
      */
     public function handle(array $purchase, User $actor): CheckoutRequest
     {
@@ -62,8 +62,9 @@ class HandOutPurchase
             if ($checkout->status !== CheckoutRequest::STATUS_APPROVED) {
                 throw ValidationException::withMessages(['hand_out' => __('asset.requests.nothing_to_hand_out')]);
             }
-            foreach ($checkout->items()->get() as $item) {
-                $this->fulfill->handle($item, $item->remaining(), $actor);
+            // The lines are made in the order of the purchase's; parts by serial go with the pieces it names.
+            foreach ($checkout->items()->orderBy('id')->get()->values() as $i => $item) {
+                $this->fulfill->handle($item, $item->remaining(), $actor, $purchase['lines'][$i]['unit_ids'] ?? []);
             }
 
             return $checkout->refresh();

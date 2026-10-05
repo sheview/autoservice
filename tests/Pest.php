@@ -10,6 +10,7 @@ use App\Modules\Identity\Actions\SyncRoleGrants;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\ReceivePartUnits;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Models\Part;
@@ -199,6 +200,21 @@ function createPart(array $attributes = [], int $stock = 0): Part
     }
 
     return $part;
+}
+
+/**
+ * A part followed by serial number (Inventory module), with one piece in stock per serial.
+ *
+ * @param  list<string>  $serials
+ */
+function createTrackedPart(array $attributes = [], array $serials = []): Part
+{
+    $part = createPart($attributes + ['track_serial' => true]);
+    if ($serials !== []) {
+        app(ReceivePartUnits::class)->handle($part, $serials, null);
+    }
+
+    return $part->fresh();
 }
 
 /**

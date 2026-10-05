@@ -39,6 +39,16 @@ return [
         'sign_receiver' => 'ผู้รับของ',
     ],
 
+    // Serial numbers of parts on the papers of an issue/loan request.
+    'serials' => [
+        'returned_note' => 'ขีดฆ่า = รับคืนเข้าคลังแล้ว',
+        'revision' => 'ฉบับแก้ไขครั้งที่ :n',
+        'returned_title' => 'รายการรับคืนหลังส่งมอบ',
+        'returned_line' => ':serial · รับคืน :date โดย :by · เหตุผล: :reason',
+        'returned_qty' => ':item × :qty · รับคืนแล้ว',
+        'brand_model' => ':brand :model',
+    ],
+
     // What was handed out on an issue/loan request (documents.delivery-note).
     'delivery' => [
         'title' => 'ใบส่งสินค้า',

@@ -1,11 +1,14 @@
 <?php
 
+use App\Modules\Inventory\Http\Controllers\PartCategoryController;
 use App\Modules\Inventory\Http\Controllers\PartController;
 use App\Modules\Inventory\Http\Controllers\PartImportController;
 use App\Modules\Inventory\Http\Controllers\PartPhotoController;
+use App\Modules\Inventory\Http\Controllers\PartUnitController;
 use App\Modules\Inventory\Http\Controllers\PurchaseReceiptController;
 use App\Modules\Inventory\Http\Controllers\PurchaseRequestController;
 use App\Modules\Inventory\Http\Controllers\StockMovementController;
+use App\Modules\Inventory\Http\Controllers\StockReceiptController;
 use Illuminate\Support\Facades\Route;
 
 // Parts used on a ticket are entered on the ticket page: see the Service module routes.
@@ -24,7 +27,25 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
 
     Route::post('parts/{part}/movements', [StockMovementController::class, 'store'])->name('parts.movements.store');
 
+    // Pieces of parts followed by serial number.
+    Route::get('parts/{part}/units/options', [PartUnitController::class, 'options'])->name('parts.units.options');
+    Route::get('parts/{part}/serials/start', [PartUnitController::class, 'start'])->name('parts.serials.start');
+    Route::post('parts/{part}/serials/start', [PartUnitController::class, 'storeStart'])->name('parts.serials.store-start');
+    Route::post('parts/{part}/serials/stop', [PartUnitController::class, 'stop'])->name('parts.serials.stop');
+    Route::get('part-units/{unit}/history', [PartUnitController::class, 'history'])->whereNumber('unit')->name('part-units.history');
+    Route::put('part-units/{unit}', [PartUnitController::class, 'update'])->whereNumber('unit')->name('part-units.update');
+
+    Route::get('part-categories', [PartCategoryController::class, 'index'])->name('part-categories.index');
+    Route::post('part-categories', [PartCategoryController::class, 'store'])->name('part-categories.store');
+    Route::put('part-categories/{category}', [PartCategoryController::class, 'update'])->whereNumber('category')->name('part-categories.update');
+    Route::delete('part-categories/{category}', [PartCategoryController::class, 'destroy'])->whereNumber('category')->name('part-categories.destroy');
+
     Route::get('stock-movements', [StockMovementController::class, 'index'])->name('movements.index');
+
+    // Receiving goods without a purchase request (by serial for tracked parts).
+    Route::get('stock-receipts/create', [StockReceiptController::class, 'create'])->name('stock-receipts.create');
+    Route::get('stock-receipts/parts', [StockReceiptController::class, 'parts'])->name('stock-receipts.parts');
+    Route::post('stock-receipts', [StockReceiptController::class, 'store'])->name('stock-receipts.store');
 
     // Purchase requests
     Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);

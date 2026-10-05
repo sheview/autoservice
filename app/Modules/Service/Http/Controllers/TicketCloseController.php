@@ -10,6 +10,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\QuickCloseTicket;
 use App\Modules\Service\Actions\RepairPresetList;
 use App\Modules\Service\Models\Ticket;
+use App\Modules\Service\Models\TicketRemovedPart;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -48,6 +49,7 @@ class TicketCloseController extends Controller
             'canIssueParts' => $this->modules->enabled('inventory') && $user->can('parts.issue'),
             'partOptions' => fn () => $search === '' || ! $this->modules->enabled('inventory') ? [] : array_values($parts->handle(null, $search)),
             'warrantyStatuses' => Ticket::WARRANTY_STATUSES,
+            'dispositions' => TicketRemovedPart::DISPOSITIONS,
             'limits' => ['photos' => self::MAX_PHOTOS, 'photo_kb' => self::PHOTO_KB],
         ]);
     }
@@ -67,6 +69,15 @@ class TicketCloseController extends Controller
             'parts' => ['array', 'max:30'],
             'parts.*.part_id' => ['required', 'integer'],
             'parts.*.qty' => ['required', 'integer', 'min:1', 'max:10000'],
+            // A part followed by serial number: the pieces used (scanned or chosen).
+            'parts.*.unit_ids' => ['array', 'max:10000'],
+            'parts.*.unit_ids.*' => ['integer'],
+            // Pieces taken out of the device: a note, not stock.
+            'removed' => ['array', 'max:20'],
+            'removed.*.item_name' => ['required', 'string', 'max:255'],
+            'removed.*.serial_number' => ['nullable', 'string', 'max:100'],
+            'removed.*.problem' => ['nullable', 'string', 'max:1000'],
+            'removed.*.disposition' => ['required', Rule::in(TicketRemovedPart::DISPOSITIONS)],
             'signer_name' => ['nullable', 'string', 'max:255'],
             'approver_name' => ['nullable', 'string', 'max:255'],
             // A PNG drawn on the screen, as a data URL, at most about 300 KB.

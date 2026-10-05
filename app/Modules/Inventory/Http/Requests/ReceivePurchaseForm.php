@@ -62,6 +62,8 @@ class ReceivePurchaseForm extends FormRequest
             'location' => ['nullable', 'string', 'max:255'],
             'part_id' => ['nullable', 'integer', Rule::exists('parts', 'id')->whereNull('deleted_at')],
             'part_code' => ['nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,30}$/'],
+            // A new part made from it followed by serial number (parts.serials only; else its default).
+            'track_serial' => ['nullable', 'boolean'],
             // Then hand everything registered over to whoever asked for it.
             'hand_out' => ['boolean'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
@@ -83,6 +85,9 @@ class ReceivePurchaseForm extends FormRequest
     public function receiptData(): array
     {
         $data = collect($this->validated())->except('hand_out')->all();
+        if (! $this->user()->can('parts.serials')) {
+            unset($data['track_serial']);
+        }
         $data['unit_price'] = Money::toSatang($data['unit_price'] ?? null);
 
         return $data;

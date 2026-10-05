@@ -37,6 +37,12 @@
         .footer { margin-top: 20px; font-size: 8.5pt; color: #666; display: flex; justify-content: space-between; }
         .pre { white-space: pre-line; }
         tr { page-break-inside: avoid; }
+        /* Serial numbers of the pieces of a line: wrap onto as many lines as needed, and a long list may run onto the next page. */
+        .sn-list { display: flex; flex-wrap: wrap; gap: 2px 4px; margin-top: 2px; }
+        .sn { font-family: monospace; font-size: 8.5pt; border: 1px solid #bbb; border-radius: 3px; padding: 0 3px; word-break: break-all; }
+        .sn-back { text-decoration: line-through; color: #777; }
+        tr.many-serials { page-break-inside: auto; }
+        .revision { display: inline-block; border: 1px solid #000; padding: 0 6px; font-size: 9pt; font-weight: 600; margin-top: 2px; }
     </style>
     @if (! empty($forBrowser))
         {{-- Printed from the browser instead of the PDF service: set the page here and open the print dialog. --}}

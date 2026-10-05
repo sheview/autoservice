@@ -14,8 +14,8 @@ class PartsForCheckout
 
     /**
      * @param  list<int>|null  $ids  these parts (deleted and inactive ones too); null = search
-     * @return array<int, array{id: int, code: string, name: string, part_number: string|null, unit: string,
-     *     qty_on_hand: int, unit_cost: int|null, is_active: bool}> keyed by id
+     * @return array<int, array{id: int, code: string, name: string, part_number: string|null, brand: string|null, unit: string,
+     *     qty_on_hand: int, unit_cost: int|null, is_active: bool, track_serial: bool}> keyed by id
      */
     public function handle(?array $ids = null, string $search = ''): array
     {
@@ -29,16 +29,19 @@ class PartsForCheckout
                 ->orderBy('name')
                 ->limit(self::LIMIT);
 
-        return $query->get(['id', 'code', 'name', 'part_number', 'unit', 'qty_on_hand', 'unit_cost', 'is_active'])
+        return $query->get(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'qty_on_hand', 'unit_cost', 'is_active', 'track_serial'])
             ->mapWithKeys(fn (Part $part) => [$part->id => [
                 'id' => $part->id,
                 'code' => $part->code,
                 'name' => $part->name,
                 'part_number' => $part->part_number,
+                'brand' => $part->brand,
                 'unit' => $part->unit,
                 'qty_on_hand' => (int) $part->qty_on_hand,
                 'unit_cost' => $part->unit_cost,
                 'is_active' => (bool) $part->is_active,
+                // Issued by choosing pieces (serial numbers), not by a quantity.
+                'track_serial' => (bool) $part->track_serial,
             ]])
             ->all();
     }

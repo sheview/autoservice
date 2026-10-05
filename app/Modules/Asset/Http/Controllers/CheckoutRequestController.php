@@ -26,6 +26,8 @@ use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Actions\FindPartUnits;
+use App\Modules\Inventory\Actions\IssuedPartSerials;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Inventory\Actions\PurchaseIssueLines;
 use App\Modules\Inventory\Actions\PurchaseRequestLabels;
@@ -75,6 +77,8 @@ class CheckoutRequestController extends Controller
                 'returns' => $can['return'] ? $lines->handle($user, ['tab' => 'returns', 'overdue' => true])->count() : null,
             ],
             'statuses' => CheckoutRequest::STATUSES,
+            // Pieces of parts whose serial number matches the search, with their history (Inventory module).
+            'serialHits' => $this->modules->enabled('inventory') && $user->can('parts.view') ? app(FindPartUnits::class)->handle($filters['search'] ?? '') : [],
             'can' => $can,
         ]);
     }
@@ -124,7 +128,10 @@ class CheckoutRequestController extends Controller
         $checkout->load(['items.asset:id,ulid', 'items.fulfillments']);
 
         $partIds = $checkout->items->where('item_type', CheckoutItem::TYPE_PART)->pluck('part_id')->all();
-        $onHand = $partIds === [] || ! $this->modules->enabled('inventory') ? [] : array_map(fn (array $p) => $p['qty_on_hand'], $parts->handle($partIds));
+        $partRows = $partIds === [] || ! $this->modules->enabled('inventory') ? [] : $parts->handle($partIds);
+        $onHand = array_map(fn (array $p) => $p['qty_on_hand'], $partRows);
+        // Pieces by serial number: whether each part goes by them, and those out on each line.
+        $serials = $partRows === [] ? [] : app(IssuedPartSerials::class)->handle($checkout->items->where('item_type', CheckoutItem::TYPE_PART)->pluck('id')->all());
         $purchases = $this->modules->enabled('inventory') ? app(PurchaseRequestLabels::class)->handle($checkout->items->pluck('purchase_request_id')->all()) : [];
 
         $row = RequestRow::of($checkout, [
@@ -137,6 +144,8 @@ class CheckoutRequestController extends Controller
             ...$item,
             'fulfillments' => $checkout->items->firstWhere('id', $item['id'])->fulfillments
                 ->map(fn (CheckoutFulfillment $f) => ['qty' => $f->qty, 'by' => $f->fulfilled_by_name, 'at' => $f->fulfilled_at?->toIso8601String()])->values(),
+            'track_serial' => $item['part_id'] ? (bool) ($partRows[$item['part_id']]['track_serial'] ?? false) : false,
+            'serials' => $serials[$item['id']] ?? null,
         ])->all();
 
         return Inertia::render('Asset/Requests/Show', [
@@ -497,13 +506,24 @@ class CheckoutRequestController extends Controller
     {
         $tenant = $context->tenant();
         $logo = $tenant?->getFirstMedia(CompanyProfile::LOGO);
+        $checkout->load('items');
+        $partLines = $checkout->items->where('item_type', CheckoutItem::TYPE_PART);
+        $inventory = $this->modules->enabled('inventory') && $partLines->isNotEmpty();
+        // The serials of the pieces as written when handed out, and the take-backs since (Inventory module).
+        $serials = $inventory ? app(IssuedPartSerials::class)->handle($partLines->pluck('id')->all()) : [];
 
         return [
             'company' => $tenant ? CompanyProfile::of($tenant) : null,
             // The PDF service cannot sign in to fetch the logo, so it travels inside the page.
             'logo' => $logo ? 'data:'.$logo->mime_type.';base64,'.base64_encode(stream_get_contents($logo->stream())) : null,
-            'request' => $checkout->load('items'),
+            'request' => $checkout,
             'items' => $checkout->items->whereNotIn('status', [CheckoutItem::STATUS_REJECTED, CheckoutItem::STATUS_CANCELLED])->values(),
+            'partSerials' => $serials,
+            // Brand and model of the parts, as they are now.
+            'partInfo' => $inventory ? app(PartsForCheckout::class)->handle($partLines->pluck('part_id')->unique()->values()->all()) : [],
+            // Each take-back after the hand-over makes a corrected issue of the papers.
+            'revision' => collect($serials)->sum('revisions') + $checkout->items->where('item_type', CheckoutItem::TYPE_PART)
+                ->filter(fn (CheckoutItem $item) => $item->qty_returned > 0 && ! isset($serials[$item->id]))->count(),
         ];
     }
 }

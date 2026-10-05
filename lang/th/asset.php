@@ -82,6 +82,7 @@ return [
             'items.*.qty' => 'จำนวน',
             'items.*.due_return_date' => 'กำหนดคืน',
             'reject_reason' => 'เหตุผล',
+            'return_reason' => 'เหตุผลที่รับคืน',
         ],
     ],
 

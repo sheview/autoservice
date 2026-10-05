@@ -17,7 +17,7 @@ class IssuableParts
     public const TYPES = StockMovement::OUT_TYPES;
 
     /**
-     * @return list<array{id: int, code: string, name: string, unit: string, qty_on_hand: int}>
+     * @return list<array{id: int, code: string, name: string, unit: string, qty_on_hand: int, track_serial: bool}>
      */
     public function handle(): array
     {
@@ -26,8 +26,8 @@ class IssuableParts
             ->where('qty_on_hand', '>', 0)
             ->orderBy('name')
             ->limit(self::LIMIT)
-            ->get(['id', 'code', 'name', 'unit', 'qty_on_hand'])
-            ->map(fn (Part $part) => $part->only(['id', 'code', 'name', 'unit', 'qty_on_hand']))
+            ->get(['id', 'code', 'name', 'unit', 'qty_on_hand', 'track_serial'])
+            ->map(fn (Part $part) => $part->only(['id', 'code', 'name', 'unit', 'qty_on_hand', 'track_serial']))
             ->all();
     }
 }

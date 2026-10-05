@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PartUnitPicker from '@/components/PartUnitPicker.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
 import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import RequestSteps from '@/components/RequestSteps.vue';
@@ -12,7 +13,7 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import type { CheckoutLineRow, CheckoutRequestRow } from '@/types/checkout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 /**
  * One issue/loan request: where it stands, its lines, and what the user may do now — approve
@@ -76,19 +77,33 @@ const rejectAll = () =>
     rejectForm.post(route('asset.requests.reject', props.request.ulid), { ...options, onSuccess: () => (rejecting.value = false) });
 
 // --- Lines ----------------------------------------------------------------------------------
-type Mode = 'fulfill' | 'cancel' | 'return';
+type Mode = 'fulfill' | 'cancel' | 'return' | 'return_parts';
 const open = reactive<{ id: number | null; mode: Mode | null }>({ id: null, mode: null });
-const lineForm = useForm({ qty: 1, reason: '', condition: '' });
+const lineForm = useForm({ qty: 1, reason: '', condition: '', unit_ids: [] as number[] });
+// A part followed by serial number goes by the pieces chosen: as many as handed out / taken back.
+watch(
+    () => lineForm.unit_ids,
+    (ids) => {
+        const line = props.request.items.find((l) => l.id === open.id);
+        if (line?.track_serial && (open.mode === 'fulfill' || open.mode === 'return_parts')) lineForm.qty = ids.length;
+    },
+);
 
 const toFulfill = (line: CheckoutLineRow) => ['approved', 'partial', 'backordered'].includes(line.status) && line.remaining > 0;
 const canReturn = (line: CheckoutLineRow) => line.item_type === 'asset' && line.outstanding > 0;
+const canReturnParts = (line: CheckoutLineRow) => line.item_type === 'part' && line.outstanding > 0;
 
 const openAction = (line: CheckoutLineRow, mode: Mode) => {
     lineForm.clearErrors();
     lineForm.reason = '';
     lineForm.condition = '';
+    lineForm.unit_ids = [];
     lineForm.qty =
-        mode === 'return' ? line.outstanding : line.on_hand !== null ? Math.max(1, Math.min(line.remaining, line.on_hand)) : line.remaining;
+        mode === 'return' || mode === 'return_parts'
+            ? line.outstanding
+            : line.on_hand !== null
+              ? Math.max(1, Math.min(line.remaining, line.on_hand))
+              : line.remaining;
     open.id = line.id;
     open.mode = mode;
 };
@@ -100,11 +115,15 @@ const closeAction = () => {
 const sendLine = (line: CheckoutLineRow) => {
     const done = { ...options, onSuccess: closeAction };
     if (open.mode === 'fulfill') {
-        lineForm.transform((d) => ({ qty: d.qty })).post(route('asset.items.fulfill', line.id), done);
+        lineForm.transform((d) => ({ qty: d.qty, unit_ids: line.track_serial ? d.unit_ids : [] })).post(route('asset.items.fulfill', line.id), done);
     } else if (open.mode === 'cancel') {
         lineForm.transform((d) => ({ reason: d.reason })).post(route('asset.items.cancel', line.id), done);
     } else if (open.mode === 'return') {
         lineForm.transform((d) => ({ qty: d.qty, condition: d.condition || null })).post(route('asset.items.return', line.id), done);
+    } else if (open.mode === 'return_parts') {
+        lineForm
+            .transform((d) => ({ qty: d.qty, reason: d.reason, unit_ids: line.track_serial ? d.unit_ids : [] }))
+            .post(route('asset.items.return-parts', line.id), done);
     }
 };
 
@@ -266,6 +285,19 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                         <div v-if="line.note" class="text-xs text-muted-foreground">{{ line.note }}</div>
                                         <div v-if="line.on_hand !== null" class="text-xs text-muted-foreground">
                                             {{ t('requests.on_hand', { qty: line.on_hand, unit: line.unit ?? '' }) }}
+                                            <span v-if="line.track_serial" class="ml-1 rounded bg-primary/10 px-1 font-mono text-primary">{{ t('parts.sn_badge') }}</span>
+                                        </div>
+                                        <div v-if="line.serials?.out.length" class="mt-1 flex flex-wrap gap-1">
+                                            <span
+                                                v-for="piece in line.serials.out"
+                                                :key="piece.unit_id + piece.at"
+                                                class="rounded border px-1.5 font-mono text-xs"
+                                                :class="{ 'text-muted-foreground line-through': line.serials.returned.some((r) => r.unit_id === piece.unit_id) }"
+                                                >{{ piece.serial }}</span
+                                            >
+                                        </div>
+                                        <div v-if="line.return_condition && line.item_type === 'part'" class="text-xs text-muted-foreground">
+                                            {{ t('requests.returned_reason', { reason: line.return_condition }) }}
                                         </div>
                                         <div v-if="line.reject_reason" class="text-xs text-red-700 dark:text-red-400">
                                             {{ t('requests.reject_reason') }}: {{ line.reject_reason }}
@@ -371,6 +403,14 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                             >
                                                 {{ t('requests.give_back') }}
                                             </Button>
+                                            <Button
+                                                v-if="can.return && canReturnParts(line)"
+                                                size="sm"
+                                                variant="outline"
+                                                @click="openAction(line, 'return_parts')"
+                                            >
+                                                {{ t('requests.take_back_parts') }}
+                                            </Button>
                                         </div>
                                     </td>
                                 </tr>
@@ -379,7 +419,23 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                 <tr v-if="open.id === line.id" class="bg-muted/20">
                                     <td colspan="8" class="px-3 py-3">
                                         <form class="flex flex-wrap items-end gap-3" @submit.prevent="sendLine(line)">
-                                            <div v-if="open.mode === 'fulfill' || open.mode === 'return'" class="grid gap-1">
+                                            <div
+                                                v-if="line.track_serial && line.part_id && (open.mode === 'fulfill' || open.mode === 'return_parts')"
+                                                class="w-full"
+                                            >
+                                                <PartUnitPicker
+                                                    v-model="lineForm.unit_ids"
+                                                    :part-id="line.part_id"
+                                                    :status="open.mode === 'fulfill' ? 'in_stock' : 'issued'"
+                                                    :checkout-item-id="open.mode === 'return_parts' ? line.id : null"
+                                                    :need="open.mode === 'fulfill' ? Math.min(line.remaining, line.on_hand ?? line.remaining) : line.outstanding"
+                                                />
+                                                <InputError :message="(lineForm.errors as Record<string, string>).unit_ids" />
+                                            </div>
+                                            <div
+                                                v-if="(open.mode === 'fulfill' || open.mode === 'return' || open.mode === 'return_parts') && !line.track_serial"
+                                                class="grid gap-1"
+                                            >
                                                 <label :for="`line-qty-${line.id}`" class="text-xs text-muted-foreground">
                                                     {{
                                                         open.mode === 'fulfill'
@@ -408,6 +464,12 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                                     t('requests.condition')
                                                 }}</label>
                                                 <Input :id="`line-condition-${line.id}`" v-model="lineForm.condition" class="h-9" />
+                                            </div>
+                                            <div v-if="open.mode === 'return_parts'" class="grid min-w-64 flex-1 gap-1">
+                                                <label :for="`line-back-${line.id}`" class="text-xs text-muted-foreground">
+                                                    {{ t('requests.take_back_reason') }} <span class="text-red-600">*</span>
+                                                </label>
+                                                <Input :id="`line-back-${line.id}`" v-model="lineForm.reason" class="h-9" required maxlength="1000" />
                                             </div>
                                             <div v-if="open.mode === 'cancel'" class="grid min-w-64 flex-1 gap-1">
                                                 <label :for="`line-reason-${line.id}`" class="text-xs text-muted-foreground">

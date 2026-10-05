@@ -37,6 +37,10 @@ class PartRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             // The MA contract (project) the part is kept for.
             'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
+            'part_category_id' => ['nullable', 'integer', Rule::exists('part_categories', 'id')->whereNull('deleted_at')],
+            // A new part only (an existing one is switched on its page), and only with parts.serials;
+            // otherwise a new part takes its category's setting.
+            'track_serial' => ['nullable', 'boolean'],
             'part_number' => ['nullable', 'string', 'max:100'],
             'brand' => ['nullable', 'string', 'max:100'],
             'unit' => ['required', 'string', 'max:30'],
@@ -61,6 +65,9 @@ class PartRequest extends FormRequest
     {
         $data = $this->validated();
         $data['unit_cost'] = Money::toSatang($data['unit_cost'] ?? null);
+        if ($this->route('part') instanceof Part || ! $this->user()->can('parts.serials')) {
+            unset($data['track_serial']);
+        }
 
         return $data;
     }

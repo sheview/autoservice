@@ -26,10 +26,13 @@ use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\AssetPartHistory;
 use App\Modules\Inventory\Actions\PurchaseRequestDetails;
 use App\Modules\Maintenance\Actions\PmHistoryForAsset;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
+use App\Modules\Service\Actions\RemovedPartsOfAsset;
+use App\Modules\Service\Actions\TicketLabels;
 use App\Modules\Service\Actions\TicketsForAsset;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
@@ -152,6 +155,24 @@ class AssetController extends Controller
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.created', ['code' => $asset->asset_code]));
     }
 
+    /**
+     * Parts put into the device and taken out of it on its jobs, newest first: pieces by serial
+     * (Inventory module) and the pieces technicians noted as removed (Service module).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function partHistory(Asset $asset): array
+    {
+        $rows = [
+            ...($this->modules->enabled('inventory') ? app(AssetPartHistory::class)->handle($asset->id) : []),
+            ...app(RemovedPartsOfAsset::class)->handle($asset->id),
+        ];
+        $tickets = app(TicketLabels::class)->handle(array_column($rows, 'ticket_id'));
+        usort($rows, fn (array $a, array $b) => strcmp($b['at'], $a['at']));
+
+        return array_map(fn (array $row) => $row + ['ticket' => $tickets[$row['ticket_id']] ?? null], $rows);
+    }
+
     public function show(
         Request $request,
         Asset $asset,
@@ -203,6 +224,7 @@ class AssetController extends Controller
             // null = the user cannot see tickets here (module off or no tickets.view)
             'tickets' => $serviceOn && $user->can('tickets.view') ? $ticketsForAsset->handle($asset->id) : null,
             // null = the user cannot see PM rounds here (module off or no pm-visits.view)
+            'partHistory' => $serviceOn && $user->can('tickets.view') && $user->customer_id === null ? $this->partHistory($asset) : null,
             'pmHistory' => $this->modules->enabled('maintenance') && $user->can('pm-visits.view') ? $pmHistoryForAsset->handle($asset->id) : null,
             'history' => $asset->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,

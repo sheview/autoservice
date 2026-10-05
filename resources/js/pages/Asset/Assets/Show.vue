@@ -92,6 +92,19 @@ const props = defineProps<{
     history: HistoryEntry[];
     contracts: AssetContract[] | null;
     tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
+    // Parts put in and taken out on its jobs (pieces by serial, and pieces noted as removed).
+    partHistory:
+        | {
+              kind: 'installed' | 'returned' | 'removed';
+              part: string;
+              serial: string | null;
+              problem?: string | null;
+              disposition?: string;
+              by: string | null;
+              at: string;
+              ticket: { ulid: string; ticket_no: string } | null;
+          }[]
+        | null;
     pmHistory: { visit_ulid: string; visit_no: string; visit_status: string; due_on: string; result: string; checked_at: string | null }[] | null;
     can: { create: boolean; update: boolean; delete: boolean; openTicket: boolean; printLabel: boolean };
 }>();
@@ -291,6 +304,29 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     </li>
                 </ul>
                 <p v-else class="text-sm text-muted-foreground">{{ t('tickets.no_asset_tickets') }}</p>
+            </section>
+
+            <section v-if="partHistory !== null" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('part_history.title') }}</h3>
+                <ul v-if="partHistory.length" class="divide-y rounded-md border text-sm">
+                    <li v-for="(entry, i) in partHistory" :key="i" class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
+                        <span>
+                            {{ t(`part_history.${entry.kind}`, { part: entry.part, serial: entry.serial ?? '-', date: dateTime(entry.at) }) }}
+                            <span v-if="entry.disposition" class="ml-1 text-xs text-muted-foreground">({{ t(`close.dispositions.${entry.disposition}`) }})</span>
+                            <span v-if="entry.problem" class="block text-xs text-muted-foreground">{{ entry.problem }}</span>
+                        </span>
+                        <span class="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Link
+                                v-if="entry.ticket"
+                                :href="route('service.tickets.show', entry.ticket.ulid)"
+                                class="font-mono text-primary underline-offset-4 hover:underline"
+                                >{{ entry.ticket.ticket_no }}</Link
+                            >
+                            {{ entry.by }}
+                        </span>
+                    </li>
+                </ul>
+                <p v-else class="text-sm text-muted-foreground">{{ t('part_history.none') }}</p>
             </section>
 
             <section v-if="pmHistory !== null" class="space-y-2">

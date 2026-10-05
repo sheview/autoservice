@@ -45,6 +45,13 @@ export interface CheckoutLineRow {
     purchase_request: { ulid: string; pr_no: string; status: string } | null;
     // The request page: each hand-out of this line.
     fulfillments?: { qty: number; by: string | null; at: string | null }[];
+    // The request page, parts: handed out by choosing pieces (serial numbers), and those out / taken back.
+    track_serial?: boolean;
+    serials?: {
+        out: { unit_id: number; serial: string; at: string }[];
+        returned: { unit_id: number; serial: string; reason: string | null; by: string | null; at: string }[];
+        revisions: number;
+    } | null;
     // The line tabs and the asset/part page panel.
     request?: CheckoutLineRequestRef;
 }

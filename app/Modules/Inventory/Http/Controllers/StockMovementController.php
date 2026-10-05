@@ -4,6 +4,7 @@ namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Inventory\Actions\RecordStockMovement;
+use App\Modules\Inventory\Actions\RecordTrackedMovement;
 use App\Modules\Inventory\Actions\SearchStockMovements;
 use App\Modules\Inventory\Http\Requests\StockMovementRequest;
 use App\Modules\Inventory\Models\Part;
@@ -47,11 +48,19 @@ class StockMovementController extends Controller
         ]);
     }
 
-    public function store(StockMovementRequest $request, Part $part, RecordStockMovement $recordMovement): RedirectResponse
+    public function store(StockMovementRequest $request, Part $part, RecordStockMovement $recordMovement, RecordTrackedMovement $recordTracked): RedirectResponse
     {
         $type = $request->validated('type');
 
-        $recordMovement->handle($part, $type, (int) $request->validated('quantity'), $request->user(), $request->details());
+        if ($request->tracked()) {
+            $result = $recordTracked->handle($part, $type, $request->details(), $request->user());
+            if ($result['elsewhere'] !== []) {
+                return back()->with('success', __("inventory.movements.recorded.{$type}"))
+                    ->with('warning', __('inventory.units.saved_with_warning', ['lines' => implode(' · ', $result['elsewhere'])]));
+            }
+        } else {
+            $recordMovement->handle($part, $type, (int) $request->validated('quantity'), $request->user(), $request->details());
+        }
 
         return back()->with('success', __("inventory.movements.recorded.{$type}"));
     }

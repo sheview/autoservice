@@ -58,6 +58,7 @@ return [
         ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock-movements.view', 'module' => 'inventory', 'staff' => true],
 
         ['group' => 'reports', 'title' => 'nav.reports', 'route' => 'reporting.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'reports.view', 'module' => 'reporting'],
+        ['group' => 'reports', 'title' => 'nav.parts_issued', 'route' => 'reporting.parts-issued.index', 'icon' => 'package', 'permission' => 'reports.view', 'module' => ['reporting', 'inventory'], 'staff' => true],
         ['group' => 'reports', 'title' => 'nav.people_summary', 'route' => 'reporting.people.index', 'icon' => 'user-search', 'permission' => 'summary-people.view', 'module' => 'reporting', 'staff' => true],
         ['group' => 'reports', 'title' => 'nav.project_summary', 'route' => 'reporting.projects.index', 'icon' => 'folder-kanban', 'permission' => 'summary-projects.view', 'module' => ['reporting', 'contract']],
         ['group' => 'reports', 'title' => 'nav.surveys', 'route' => 'survey.surveys.index', 'icon' => 'star', 'permission' => 'surveys.view', 'module' => 'survey'],

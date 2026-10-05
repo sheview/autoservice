@@ -7,16 +7,18 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\IssuePartToTicket;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Service\Models\Ticket;
+use App\Modules\Service\Models\TicketRemovedPart;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Finishing a job on a phone in one go: what was wrong and what fixed it, photos before and
- * after, the parts used (taken from stock against the ticket), the customer's signature when
- * their contract or customer asks for it, and where the technician was — then the job is done
- * (resolved), which tells whoever confirms it (and the company's alert channels) as usual.
- * All or nothing: a part short of stock stops everything before any stock moves.
+ * after, the parts used (taken from stock against the ticket; a part followed by serial number by
+ * the pieces chosen, which go into the job's device), the pieces taken out of the device (a note),
+ * the customer's signature when their contract or customer asks for it, and where the technician
+ * was — then the job is done (resolved), which tells whoever confirms it (and the company's alert
+ * channels) as usual. All or nothing: a part short of stock stops everything before any stock moves.
  */
 class QuickCloseTicket
 {
@@ -33,8 +35,9 @@ class QuickCloseTicket
 
     /**
      * @param  array{symptoms: list<string>, solutions: list<string>, note?: string|null, warranty_status?: string|null,
-     *     parts?: list<array{part_id: int, qty: int}>, signer_name?: string|null, signature?: string|null,
-     *     approver_name?: string|null, lat?: float|null, lng?: float|null}  $data  validated
+     *     parts?: list<array{part_id: int, qty: int, unit_ids?: list<int>}>, signer_name?: string|null, signature?: string|null,
+     *     approver_name?: string|null, lat?: float|null, lng?: float|null,
+     *     removed?: list<array{item_name: string, serial_number?: string|null, problem?: string|null, disposition: string}>}  $data  validated
      * @param  array{before?: list<UploadedFile>, after?: list<UploadedFile>}  $photos
      */
     public function handle(Ticket $ticket, User $actor, array $data, array $photos = []): Ticket
@@ -63,7 +66,21 @@ class QuickCloseTicket
             }
 
             foreach ($data['parts'] ?? [] as $line) {
-                $this->issuePart->handle($ticket->id, (int) $line['part_id'], (int) $line['qty'], $actor, __('service.quick_close.part_note'));
+                $this->issuePart->handle($ticket->id, (int) $line['part_id'], (int) $line['qty'], $actor, __('service.quick_close.part_note'),
+                    unitIds: $line['unit_ids'] ?? [], links: ['asset_id' => $ticket->asset_id]);
+            }
+
+            foreach ($data['removed'] ?? [] as $piece) {
+                TicketRemovedPart::create([
+                    'ticket_id' => $ticket->id,
+                    'asset_id' => $ticket->asset_id,
+                    'item_name' => $piece['item_name'],
+                    'serial_number' => filled($piece['serial_number'] ?? null) ? trim($piece['serial_number']) : null,
+                    'problem' => $piece['problem'] ?? null,
+                    'disposition' => $piece['disposition'],
+                    'user_id' => $actor->id,
+                    'user_name' => $actor->name,
+                ]);
             }
 
             $cause = collect([
@@ -99,9 +116,10 @@ class QuickCloseTicket
     }
 
     /**
-     * Every part asked for must be in stock, all of them, before any stock moves.
+     * Every part asked for must be in stock, all of them, before any stock moves; a part followed
+     * by serial number needs a piece chosen for each one used.
      *
-     * @param  list<array{part_id: int, qty: int}>  $lines
+     * @param  list<array{part_id: int, qty: int, unit_ids?: list<int>}>  $lines
      */
     private function checkStock(array $lines): void
     {
@@ -121,6 +139,13 @@ class QuickCloseTicket
 
         if ($short->isNotEmpty()) {
             throw ValidationException::withMessages(['parts' => $short->implode(' · ')]);
+        }
+
+        foreach ($lines as $line) {
+            $part = $parts[(int) $line['part_id']];
+            if ($part['track_serial'] && count(array_unique($line['unit_ids'] ?? [])) !== (int) $line['qty']) {
+                throw ValidationException::withMessages(['parts' => __('inventory.units.pick_count', ['name' => $part['name'], 'count' => $line['qty']])]);
+            }
         }
     }
 }

@@ -37,6 +37,7 @@ use App\Modules\Service\Http\Requests\OpenTicketRequest;
 use App\Modules\Service\Http\Requests\UpdateTicketRequest;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
+use App\Modules\Service\Models\TicketRemovedPart;
 use App\Modules\Service\Support\TicketSlaState;
 use App\Modules\Service\Support\TicketWorkflow;
 use App\Modules\Survey\Actions\SurveyOfTicket;
@@ -284,6 +285,9 @@ class TicketController extends Controller
                 // Loans and spares may come back after the job is closed.
                 'canReturn' => TicketPartController::allows($user, $ticket),
             ] : null,
+            // Pieces taken out of the customer's device on this job (a note, not stock).
+            'removedParts' => $user->customer_id === null ? TicketRemovedPart::query()->where('ticket_id', $ticket->id)->orderBy('id')->get()
+                ->map(fn (TicketRemovedPart $piece) => $piece->only(['id', 'item_name', 'serial_number', 'problem', 'disposition', 'user_name'])) : [],
             'survey' => $this->survey($ticket, $user, $surveyOfTicket, $qrSvg),
             'attachments' => $this->attachments($ticket),
             'can' => [

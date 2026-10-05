@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import PartUnitPicker from '@/components/PartUnitPicker.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { SharedData } from '@/types';
@@ -13,7 +14,22 @@ interface PartOption {
     name: string;
     unit: string;
     qty_on_hand: number;
+    track_serial: boolean;
 }
+
+// Types, not interfaces: form data must be plain records.
+type PartLine = {
+    part_id: number;
+    qty: number;
+    unit_ids: number[];
+};
+
+type RemovedPiece = {
+    item_name: string;
+    serial_number: string;
+    problem: string;
+    disposition: string;
+};
 
 const props = defineProps<{
     ticket: {
@@ -31,6 +47,7 @@ const props = defineProps<{
     canIssueParts: boolean;
     partOptions?: PartOption[];
     warrantyStatuses: string[];
+    dispositions: string[];
     limits: { photos: number; photo_kb: number };
 }>();
 
@@ -42,7 +59,8 @@ const form = useForm({
     solutions: [] as string[],
     note: '',
     warranty_status: null as string | null,
-    parts: [] as { part_id: number; qty: number }[],
+    parts: [] as PartLine[],
+    removed: [] as RemovedPiece[],
     signer_name: props.ticket.contact_name ?? '',
     approver_name: props.ticket.contact_name ?? '',
     signature: null as string | null,
@@ -118,12 +136,22 @@ watch(partSearch, (q) => {
 const addPart = (part: PartOption) => {
     chosen.value[part.id] = part;
     const line = form.parts.find((l) => l.part_id === part.id);
-    if (line) line.qty++;
-    else form.parts.push({ part_id: part.id, qty: 1 });
+    if (line && !part.track_serial) line.qty++;
+    else if (!line) form.parts.push({ part_id: part.id, qty: part.track_serial ? 0 : 1, unit_ids: [] });
     partSearch.value = '';
 };
-const short = (line: { part_id: number; qty: number }) => line.qty > (chosen.value[line.part_id]?.qty_on_hand ?? 0);
+const short = (line: PartLine) => line.qty > (chosen.value[line.part_id]?.qty_on_hand ?? 0);
 const anyShort = computed(() => form.parts.some(short));
+// A part followed by serial number counts the pieces chosen (scanned or ticked).
+const tracked = (line: PartLine) => chosen.value[line.part_id]?.track_serial ?? false;
+const setPieces = (line: PartLine, ids: number[]) => {
+    line.unit_ids = ids;
+    line.qty = ids.length;
+};
+const nonePicked = computed(() => form.parts.some((line) => tracked(line) && line.unit_ids.length === 0));
+
+// --- 3b. pieces taken out of the device (a note only, not stock) ---
+const addRemoved = () => form.removed.push({ item_name: '', serial_number: '', problem: '', disposition: props.dispositions[0] });
 
 // --- 4. signature on the screen ---
 const pad = ref<HTMLCanvasElement | null>(null);
@@ -294,9 +322,21 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                 </ul>
                 <p v-if="!form.parts.length" class="text-sm text-muted-foreground">{{ t('close.no_parts') }}</p>
                 <ul class="space-y-2">
+                    <template v-for="(line, i) in form.parts" :key="line.part_id">
+                    <li v-if="tracked(line)" class="space-y-2 rounded-xl border p-3">
+                        <div class="flex items-center gap-2">
+                            <span class="min-w-0 flex-1 text-sm font-medium">
+                                {{ chosen[line.part_id]?.name }}
+                                <span class="ml-1 rounded bg-primary/10 px-1 font-mono text-xs text-primary">{{ t('parts.sn_badge') }}</span>
+                            </span>
+                            <button type="button" class="size-12 rounded-xl border" :aria-label="t('common.delete')" @click="form.parts.splice(i, 1)">
+                                <Trash2 class="mx-auto size-4" />
+                            </button>
+                        </div>
+                        <PartUnitPicker :model-value="line.unit_ids" :part-id="line.part_id" @update:model-value="(ids) => setPieces(line, ids)" />
+                    </li>
                     <li
-                        v-for="(line, i) in form.parts"
-                        :key="line.part_id"
+                        v-else
                         class="flex items-center gap-2 rounded-xl border p-2"
                         :class="short(line) ? 'border-red-400 bg-red-50 dark:bg-red-950/40' : ''"
                     >
@@ -320,8 +360,41 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                             <Plus class="mx-auto size-4" />
                         </button>
                     </li>
+                    </template>
                 </ul>
                 <InputError :message="errors.parts" />
+            </section>
+
+            <!-- 3b. Pieces taken out of the device -->
+            <section class="space-y-3">
+                <h2 class="text-lg font-semibold">{{ t('close.step_removed') }}</h2>
+                <p class="text-sm text-muted-foreground">{{ t('close.removed_hint') }}</p>
+                <div v-for="(piece, i) in form.removed" :key="i" class="space-y-2 rounded-xl border p-3">
+                    <div class="flex items-center gap-2">
+                        <input v-model="piece.item_name" :class="input" :placeholder="t('close.removed_item')" required maxlength="255" />
+                        <button type="button" class="size-12 shrink-0 rounded-xl border" :aria-label="t('common.delete')" @click="form.removed.splice(i, 1)">
+                            <Trash2 class="mx-auto size-4" />
+                        </button>
+                    </div>
+                    <input v-model="piece.serial_number" :class="input" class="font-mono" :placeholder="t('close.removed_serial')" maxlength="100" />
+                    <input v-model="piece.problem" :class="input" :placeholder="t('close.removed_problem')" maxlength="1000" />
+                    <div class="flex flex-wrap gap-2">
+                        <button
+                            v-for="d in dispositions"
+                            :key="d"
+                            type="button"
+                            class="min-h-11 rounded-full border px-4 text-sm"
+                            :class="chipClass(piece.disposition === d)"
+                            @click="piece.disposition = d"
+                        >
+                            {{ t(`close.dispositions.${d}`) }}
+                        </button>
+                    </div>
+                </div>
+                <button type="button" class="flex min-h-12 items-center gap-2 text-sm font-medium text-primary" @click="addRemoved">
+                    <Plus class="size-4" />{{ t('close.removed_add') }}
+                </button>
+                <InputError :message="errors['removed.0.item_name'] || errors['removed.0.disposition']" />
             </section>
 
             <!-- 4. Signature / who took the job back -->
@@ -361,7 +434,7 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                 <div class="mx-auto max-w-xl">
                     <button
                         type="submit"
-                        :disabled="form.processing || !ticket.closable || anyShort || (signatureRequired && !form.signature)"
+                        :disabled="form.processing || !ticket.closable || anyShort || nonePicked || (signatureRequired && !form.signature)"
                         :class="[big, 'bg-primary text-primary-foreground shadow-lg disabled:opacity-50']"
                     >
                         <Check class="size-6" />{{ t('close.submit') }}

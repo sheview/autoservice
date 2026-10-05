@@ -48,7 +48,19 @@ class RegisterReceiptForm extends FormRequest
                         $fail(__('validation.unique', ['attribute' => __('inventory.purchase_requests.fields.part_code')]));
                     }
                 }],
+            'track_serial' => ['nullable', 'boolean'],
         ];
+    }
+
+    /** track_serial of a new part: only whoever holds parts.serials decides it. */
+    public function registerData(): array
+    {
+        $data = $this->validated();
+        if (! $this->user()->can('parts.serials')) {
+            unset($data['track_serial']);
+        }
+
+        return $data;
     }
 
     public function attributes(): array

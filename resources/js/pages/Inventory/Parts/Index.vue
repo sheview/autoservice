@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
+import SerialHits, { type SerialHit } from '@/components/SerialHits.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
@@ -24,6 +25,7 @@ interface PartRow {
     unit_cost: string | null;
     is_active: boolean;
     low: boolean;
+    track_serial: boolean;
 }
 
 interface Filters {
@@ -40,7 +42,8 @@ const props = defineProps<{
     filters: Filters;
     statuses: string[];
     stockLevels: string[];
-    can: { create: boolean; update: boolean; delete: boolean; import: boolean; export: boolean };
+    serialHits: SerialHit[];
+    can: { create: boolean; update: boolean; delete: boolean; import: boolean; export: boolean; categories: boolean; receive: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -86,6 +89,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('parts.title')" :description="t('parts.description')" />
                 <div class="flex flex-wrap gap-2">
+                    <Button v-if="can.receive" variant="outline" as-child>
+                        <Link :href="route('inventory.stock-receipts.create')">{{ t('stock_receipts.title') }}</Link>
+                    </Button>
+                    <Button v-if="can.categories" variant="outline" as-child>
+                        <Link :href="route('inventory.part-categories.index')">{{ t('parts.categories') }}</Link>
+                    </Button>
                     <Button v-if="can.export" variant="outline" as-child>
                         <a :href="exportUrl">{{ t('parts.export') }}</a>
                     </Button>
@@ -102,6 +111,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ page.props.flash.success }}
             </p>
             <InputError :message="(page.props.errors as Record<string, string>).part" />
+            <SerialHits :hits="serialHits" />
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('parts.search_placeholder')" />
@@ -146,7 +156,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 </Link>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="font-medium">{{ part.name }}</div>
+                                <div class="font-medium">
+                                    {{ part.name }}
+                                    <span v-if="part.track_serial" class="ml-1 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">{{
+                                        t('parts.sn_badge')
+                                    }}</span>
+                                </div>
                                 <div v-if="part.brand || part.part_number" class="text-xs text-muted-foreground">
                                     {{ [part.brand, part.part_number].filter(Boolean).join(' · ') }}
                                 </div>

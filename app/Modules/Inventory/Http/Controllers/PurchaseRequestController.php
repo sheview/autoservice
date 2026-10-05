@@ -128,7 +128,8 @@ class PurchaseRequestController extends Controller
                 'part' => $user->can('stock-movements.create'),
                 'newPart' => $user->can('parts.create'),
                 'categories' => $this->categoryOptions($modules),
-                'parts' => Part::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'unit']),
+                'parts' => Part::query()->where('is_active', true)->orderBy('code')->get(['id', 'code', 'name', 'unit', 'track_serial']),
+                'canSerials' => $user->can('parts.serials'),
             ] : null,
             // The project it is for: number and title.
             'contract' => $purchaseRequest->contract_id && $modules->enabled('contract')

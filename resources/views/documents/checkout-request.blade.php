@@ -21,6 +21,9 @@
             <div class="doc-title" style="text-align: right">{{ __('document.request.title') }}</div>
             <div class="doc-no">{{ $request->request_no }}</div>
             <div class="muted" style="text-align: right">{{ __('document.checkout.date', ['date' => $long($request->approved_at ?? $request->created_at)]) }}</div>
+            @if ($revision > 0)
+                <div style="text-align: right"><span class="revision">{{ __('document.serials.revision', ['n' => $revision]) }}</span></div>
+            @endif
         </div>
     </div>
 
@@ -51,10 +54,18 @@
             </thead>
             <tbody>
                 @foreach ($items as $i => $item)
-                    <tr>
+                    @php($pieces = $partSerials[$item->id] ?? null)
+                    @php($info = $item->part_id ? ($partInfo[$item->part_id] ?? null) : null)
+                    <tr class="{{ count($pieces['out'] ?? []) > 20 ? 'many-serials' : '' }}">
                         <td class="center">{{ $i + 1 }}</td>
                         <td style="font-family: monospace">{{ $item->item_code }}</td>
-                        <td>{{ $item->item_name }}</td>
+                        <td>
+                            {{ $item->item_name }}
+                            @if ($info && ($info['brand'] || $info['part_number']))
+                                <div class="muted" style="font-size: 9pt">{{ trim($info['brand'].' '.$info['part_number']) }}</div>
+                            @endif
+                            @include('documents.partials.part-serials', ['serials' => $pieces])
+                        </td>
                         <td>{{ __('document.request.kinds.'.$item->item_type.'_'.$item->checkout_type) }}</td>
                         <td class="right">{{ $item->qty_approved ?? $item->qty_requested }} {{ $item->unit }}</td>
                         <td class="right">{{ $item->qty_fulfilled }}</td>

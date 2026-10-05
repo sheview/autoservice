@@ -5,9 +5,11 @@ namespace App\Modules\Inventory\Actions;
 use App\Modules\Asset\Actions\RegisterPurchasedAsset;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\PurchaseReceipt;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Inventory\Support\PartSerials;
 use App\Modules\Inventory\Support\PurchaseWorkflow;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -19,7 +21,8 @@ use Illuminate\Validation\ValidationException;
  *   asset  spare assets in the chosen category (Asset module, RegisterPurchasedAsset): one per serial
  *          in a category counted by serial, else one holding the quantity
  *   part   received into stock of an existing part, or of a new part with the code given
- *          (or the next "PT-00001" code when none is given)
+ *          (or the next "PT-00001" code when none is given); a part followed by serial number
+ *          gets one piece per serial of the receipt, which must then be one per unit received
  *
  * Once everything asked for is registered the request is "registered" and can be handed out.
  * All or nothing.
@@ -31,11 +34,13 @@ class RegisterPurchaseReceipt
         private SavePart $savePart,
         private GeneratePartCode $generatePartCode,
         private RecordStockMovement $recordMovement,
+        private ReceivePartUnits $receiveUnits,
         private LogPurchaseEvent $logEvent,
     ) {}
 
     /**
-     * @param  array{as: string, category_id?: int|null, location?: string|null, part_id?: int|null, part_code?: string|null}  $data  validated
+     * @param  array{as: string, category_id?: int|null, location?: string|null, part_id?: int|null, part_code?: string|null,
+     *     track_serial?: bool|null}  $data  validated; track_serial for a new part (else its category's default, none)
      */
     public function handle(PurchaseReceipt $receipt, array $data, User $actor): PurchaseReceipt
     {
@@ -79,12 +84,20 @@ class RegisterPurchaseReceipt
                     'contract_id' => $request->contract_id,
                     'unit_cost' => $price,
                     'notes' => $note,
+                    'track_serial' => $data['track_serial'] ?? null,
                 ]);
-                $movement = $this->recordMovement->handle($part, StockMovement::TYPE_RECEIVE, $receipt->quantity, $actor, [
-                    'unit_cost' => $price,
-                    'reference' => $request->pr_no,
-                    'note' => $note,
-                ]);
+                $details = ['unit_cost' => $price, 'reference' => $request->pr_no, 'note' => $note];
+                if ($part->track_serial) {
+                    // One piece per serial read off the goods: as many serials as units received.
+                    PartSerials::check($part, $receipt->serials, $receipt->quantity);
+                    $movement = $this->receiveUnits->handle($part, $receipt->serials, $actor, $details + [
+                        'source' => PartUnit::SOURCE_PURCHASE,
+                        'purchase_receipt_id' => $receipt->id,
+                        'received_on' => $receipt->received_at->toDateString(),
+                    ]);
+                } else {
+                    $movement = $this->recordMovement->handle($part, StockMovement::TYPE_RECEIVE, $receipt->quantity, $actor, $details);
+                }
                 $receipt->fill(['registered_as' => PurchaseReceipt::AS_PART, 'part_id' => $part->id, 'stock_movement_id' => $movement->id]);
             }
 

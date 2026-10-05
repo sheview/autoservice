@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
+import SerialHits, { type SerialHit } from '@/components/SerialHits.vue';
 import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import RequestSteps from '@/components/RequestSteps.vue';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ const props = defineProps<{
     // null = the user has no such queue.
     counts: { approve: number | null; fulfill: number | null; backorders: number | null; returns: number | null };
     statuses: string[];
+    serialHits: SerialHit[];
     can: { view: boolean; create: boolean; forOthers: boolean; approve: boolean; fulfill: boolean; return: boolean };
 }>();
 
@@ -103,6 +105,8 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <p v-if="page.props.flash.error" class="rounded-md bg-red-50 px-4 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
                 {{ page.props.flash.error }}
             </p>
+
+            <SerialHits :hits="serialHits" />
 
             <nav v-if="tabs.length > 1" class="flex flex-wrap gap-1 border-b" :aria-label="t('requests.tabs_label')">
                 <button

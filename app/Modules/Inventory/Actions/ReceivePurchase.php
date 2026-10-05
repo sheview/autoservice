@@ -29,7 +29,7 @@ class ReceivePurchase
     /**
      * @param  array{quantity: int, brand?: string|null, model?: string|null, unit_price?: int|null,
      *     serials?: list<string>, note?: string|null, item_kind?: string|null, asset_category_id?: int|null,
-     *     location?: string|null, part_id?: int|null, part_code?: string|null}  $data  validated; unit_price in satang
+     *     location?: string|null, part_id?: int|null, part_code?: string|null, track_serial?: bool|null}  $data  validated; unit_price in satang
      */
     public function handle(PurchaseRequest $request, array $data, User $actor): PurchaseReceipt
     {
@@ -79,6 +79,7 @@ class ReceivePurchase
                     'location' => $data['location'] ?? null,
                     'part_id' => $data['part_id'] ?? null,
                     'part_code' => $data['part_code'] ?? null,
+                    'track_serial' => $data['track_serial'] ?? null,
                 ], $actor);
             }
 

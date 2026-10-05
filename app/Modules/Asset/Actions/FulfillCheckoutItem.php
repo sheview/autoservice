@@ -15,7 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Hands out (some of) an approved line. A part comes out of stock against the request's ticket
- * (its cost goes to the job); no more than is on hand. An asset is handed over (a single asset
+ * (its cost goes to the job); no more than is on hand. A part followed by serial number goes by
+ * the pieces chosen (in stock, as many as handed out), tied to this line and hand-over. An asset is handed over (a single asset
  * becomes "in use" by the borrower). What is still missing afterwards is backordered when the
  * stock cannot cover it, otherwise the line stays partly handed out.
  */
@@ -26,7 +27,10 @@ class FulfillCheckoutItem
         private PartsForCheckout $parts,
     ) {}
 
-    public function handle(CheckoutItem $item, int $qty, User $actor): CheckoutItem
+    /**
+     * @param  list<int>  $unitIds  the pieces handed out, for a part followed by serial number
+     */
+    public function handle(CheckoutItem $item, int $qty, User $actor, array $unitIds = []): CheckoutItem
     {
         $request = $item->request;
         if (! in_array($request->status, [CheckoutRequest::STATUS_APPROVED, CheckoutRequest::STATUS_PARTIAL], true)
@@ -37,14 +41,22 @@ class FulfillCheckoutItem
             throw ValidationException::withMessages(['qty' => __('asset.requests.qty_over_remaining', ['remaining' => $item->remaining()])]);
         }
 
-        return DB::transaction(function () use ($item, $request, $qty, $actor) {
-            $movementId = null;
+        return DB::transaction(function () use ($item, $request, $qty, $actor, $unitIds) {
+            $fulfillment = $item->fulfillments()->create([
+                'qty' => $qty,
+                'fulfilled_by' => $actor->id,
+                'fulfilled_by_name' => $actor->name,
+                'fulfilled_at' => now(),
+            ]);
 
             if ($item->item_type === CheckoutItem::TYPE_PART) {
                 // Refuses more than is on hand (the part row is locked meanwhile).
                 // A request of another company has no ticket here: the note names the request (and so them).
-                $movementId = $this->issuePart->handle($request->ticket_id ? (int) $request->ticket_id : null, (int) $item->part_id, $qty, $actor,
-                    __('asset.requests.issued_for', ['no' => $request->request_no]).($request->ticket_id ? '' : ' · '.$request->requester_name))->id;
+                $movement = $this->issuePart->handle($request->ticket_id ? (int) $request->ticket_id : null, (int) $item->part_id, $qty, $actor,
+                    __('asset.requests.issued_for', ['no' => $request->request_no]).($request->ticket_id ? '' : ' · '.$request->requester_name),
+                    unitIds: $unitIds,
+                    links: ['checkout_item_id' => $item->id, 'checkout_fulfillment_id' => $fulfillment->id, 'reference' => $request->request_no]);
+                $fulfillment->update(['stock_movement_id' => $movement->id]);
             } else {
                 $asset = Asset::query()->lockForUpdate()->find($item->asset_id);
                 if ($asset === null || ! in_array($asset->status, [Asset::STATUS_IN_USE, Asset::STATUS_SPARE], true)) {
@@ -54,14 +66,6 @@ class FulfillCheckoutItem
                     $asset->update(['status' => Asset::STATUS_IN_USE, 'used_by' => $request->borrower_name]);
                 }
             }
-
-            $item->fulfillments()->create([
-                'qty' => $qty,
-                'fulfilled_by' => $actor->id,
-                'fulfilled_by_name' => $actor->name,
-                'fulfilled_at' => now(),
-                'stock_movement_id' => $movementId,
-            ]);
 
             $item->qty_fulfilled += $qty;
             $item->status = match (true) {

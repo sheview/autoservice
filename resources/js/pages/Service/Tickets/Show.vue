@@ -2,6 +2,7 @@
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PartUnitPicker from '@/components/PartUnitPicker.vue';
 import SharedRequestList, { type SharedRequestRow } from '@/components/SharedRequestList.vue';
 import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
@@ -97,6 +98,9 @@ interface TicketPart {
     quantity: number;
     // How it left stock for this ticket: issue, loan, spare.
     types: string[];
+    // Followed by serial number: the pieces still on this ticket.
+    track_serial: boolean;
+    units: { id: number; serial_number: string }[];
 }
 
 interface PartOption {
@@ -105,6 +109,7 @@ interface PartOption {
     name: string;
     unit: string;
     qty_on_hand: number;
+    track_serial: boolean;
 }
 
 interface TicketSurvey {
@@ -128,6 +133,7 @@ const props = defineProps<{
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
     parts: { items: TicketPart[]; options: PartOption[]; types: string[]; canIssue: boolean; canReturn: boolean } | null;
+    removedParts: { id: number; item_name: string; serial_number: string | null; problem: string | null; disposition: string; user_name: string | null }[];
     survey: TicketSurvey | null;
     attachments: Attachment[];
     // IP management: null = not shown to this user.
@@ -247,14 +253,32 @@ const copyLink = async () => {
 };
 
 // --- spare parts (Inventory module) --------------------------------------------
-const issue = useForm({ part_id: null as number | null, quantity: 1, type: 'issue' });
+const issue = useForm({ part_id: null as number | null, quantity: 1, type: 'issue', unit_ids: [] as number[] });
+const issueTracked = computed(() => props.parts?.options.find((o) => o.id === issue.part_id)?.track_serial ?? false);
 const issuePart = () =>
-    issue.post(route('service.tickets.parts.store', props.ticket.ulid), {
-        preserveScroll: true,
-        onSuccess: () => issue.reset(),
-    });
+    issue
+        .transform((data) => (issueTracked.value ? { ...data, quantity: data.unit_ids.length } : { ...data, unit_ids: [] }))
+        .post(route('service.tickets.parts.store', props.ticket.ulid), {
+            preserveScroll: true,
+            onSuccess: () => issue.reset(),
+        });
+
+// A part followed by serial number comes back by its pieces, ticked here.
+const returning = ref<number | null>(null);
+const returnUnits = ref<number[]>([]);
+const returnPieces = (part: TicketPart) =>
+    router.post(
+        route('service.tickets.parts.return', props.ticket.ulid),
+        { part_id: part.part_id, quantity: returnUnits.value.length, unit_ids: returnUnits.value },
+        { preserveScroll: true, onSuccess: () => ((returning.value = null), (returnUnits.value = [])) },
+    );
 
 const returnPart = (part: TicketPart) => {
+    if (part.track_serial) {
+        returning.value = returning.value === part.part_id ? null : part.part_id;
+        returnUnits.value = [];
+        return;
+    }
     const answer = prompt(t('ticket_parts.confirm_return', { name: part.name, qty: part.quantity }), String(part.quantity));
     const quantity = Number(answer);
     if (answer === null || !Number.isInteger(quantity) || quantity < 1) {
@@ -540,6 +564,23 @@ const stepBar = computed(() => {
                                 >
                                     {{ t('ticket_parts.give_back') }}
                                 </button>
+                                <div v-if="part.units.length" class="flex w-full flex-wrap gap-1">
+                                    <span v-for="unit in part.units" :key="unit.id" class="rounded border px-1.5 font-mono text-xs">{{
+                                        unit.serial_number
+                                    }}</span>
+                                </div>
+                                <form
+                                    v-if="returning === part.part_id"
+                                    class="flex w-full flex-wrap items-center gap-2 rounded-md bg-muted/40 p-2"
+                                    @submit.prevent="returnPieces(part)"
+                                >
+                                    <span class="text-xs text-muted-foreground">{{ t('ticket_parts.pick_return') }}</span>
+                                    <label v-for="unit in part.units" :key="unit.id" class="flex items-center gap-1 font-mono text-xs">
+                                        <input v-model="returnUnits" type="checkbox" :value="unit.id" class="size-4 rounded border-input" />
+                                        {{ unit.serial_number }}
+                                    </label>
+                                    <Button size="sm" :disabled="!returnUnits.length">{{ t('ticket_parts.give_back') }}</Button>
+                                </form>
                             </li>
                         </ul>
                         <p v-else class="text-sm text-muted-foreground">{{ t('ticket_parts.none') }}</p>
@@ -567,7 +608,10 @@ const stepBar = computed(() => {
                                     <option v-for="type in parts.types" :key="type" :value="type">{{ t(`stock_movements.types.${type}`) }}</option>
                                 </select>
                             </div>
-                            <div class="grid w-24 gap-1">
+                            <div v-if="issueTracked && issue.part_id" class="w-full">
+                                <PartUnitPicker v-model="issue.unit_ids" :part-id="issue.part_id" />
+                            </div>
+                            <div v-else class="grid w-24 gap-1">
                                 <label for="part_quantity" class="text-xs text-muted-foreground">{{ t('ticket_parts.quantity') }}</label>
                                 <input
                                     id="part_quantity"
@@ -579,7 +623,7 @@ const stepBar = computed(() => {
                                     class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
                                 />
                             </div>
-                            <Button size="sm" class="h-9" :disabled="issue.processing || issue.part_id === null">{{
+                            <Button size="sm" class="h-9" :disabled="issue.processing || issue.part_id === null || (issueTracked && !issue.unit_ids.length)">{{
                                 t('ticket_parts.issue')
                             }}</Button>
                         </form>
@@ -588,10 +632,24 @@ const stepBar = computed(() => {
                             :message="
                                 issue.errors.part_id ??
                                 issue.errors.quantity ??
+                                (issue.errors as Record<string, string>).unit_ids ??
+                                (page.props.errors as Record<string, string>).unit_ids ??
                                 (page.props.errors as Record<string, string>).quantity ??
                                 (page.props.errors as Record<string, string>).part_id
                             "
                         />
+                    </section>
+
+                    <section v-if="removedParts.length" class="space-y-2">
+                        <h3 class="text-sm font-semibold">{{ t('close.step_removed') }}</h3>
+                        <ul class="divide-y rounded-md border text-sm">
+                            <li v-for="piece in removedParts" :key="piece.id" class="px-3 py-2">
+                                {{ piece.item_name }}
+                                <span v-if="piece.serial_number" class="ml-1 font-mono text-xs">SN {{ piece.serial_number }}</span>
+                                <span class="ml-1 rounded bg-muted px-1.5 text-xs">{{ t(`close.dispositions.${piece.disposition}`) }}</span>
+                                <span v-if="piece.problem" class="block text-xs text-muted-foreground">{{ piece.problem }}</span>
+                            </li>
+                        </ul>
                     </section>
 
                     <section class="space-y-3">

@@ -8,6 +8,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
+import { watch } from 'vue';
 
 interface PartForm {
     id: number;
@@ -21,10 +22,18 @@ interface PartForm {
     unit_cost: string | null;
     is_active: boolean;
     notes: string | null;
+    part_category_id: number | null;
+    track_serial: boolean;
 }
 
 // contracts: the MA contracts (projects) a part can be kept for; none = the field is hidden.
-const props = defineProps<{ part: PartForm | null; contracts: { id: number; label: string }[] }>();
+// categories: part categories (a new part starts tracked by serial as its category says).
+const props = defineProps<{
+    part: PartForm | null;
+    contracts: { id: number; label: string }[];
+    categories: { id: number; name: string; track_serial: boolean }[];
+    canSerials: boolean;
+}>();
 
 const title = props.part ? t('parts.edit') : t('parts.create');
 const breadcrumbs: BreadcrumbItem[] = [
@@ -43,7 +52,17 @@ const form = useForm({
     unit_cost: props.part?.unit_cost ?? '',
     is_active: props.part?.is_active ?? true,
     notes: props.part?.notes ?? '',
+    part_category_id: props.part?.part_category_id ?? (null as number | null),
+    track_serial: props.part?.track_serial ?? false,
 });
+
+// A new part takes its category's setting until it is changed here.
+watch(
+    () => form.part_category_id,
+    (id) => {
+        if (!props.part) form.track_serial = props.categories.find((c) => c.id === id)?.track_serial ?? false;
+    },
+);
 
 const submit = () => {
     if (props.part) {
@@ -89,6 +108,30 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                         </select>
                         <p class="text-xs text-muted-foreground">{{ t('parts.contract_hint') }}</p>
                         <InputError :message="form.errors.contract_id" />
+                    </div>
+
+                    <div class="grid content-start gap-2">
+                        <Label for="part_category_id">{{ t('parts.category') }}</Label>
+                        <select
+                            id="part_category_id"
+                            v-model="form.part_category_id"
+                            class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                        >
+                            <option :value="null">{{ t('parts.no_category') }}</option>
+                            <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                        </select>
+                        <InputError :message="form.errors.part_category_id" />
+                    </div>
+                    <div class="grid content-start gap-2 sm:col-span-2">
+                        <span class="text-sm font-medium">{{ t('parts.track_serial') }}</span>
+                        <label v-if="!part && canSerials" class="flex items-center gap-2 text-sm">
+                            <input v-model="form.track_serial" type="checkbox" class="size-4 rounded border-input" />
+                            {{ t('parts.track_serial_on') }}
+                        </label>
+                        <p v-else class="text-sm">
+                            {{ (part ? part.track_serial : form.track_serial) ? t('parts.track_serial_on') : t('parts.track_serial_off') }}
+                        </p>
+                        <p class="text-xs text-muted-foreground">{{ part ? t('parts.track_serial_on_page') : t('parts.track_serial_hint') }}</p>
                     </div>
 
                     <div class="grid content-start gap-2">

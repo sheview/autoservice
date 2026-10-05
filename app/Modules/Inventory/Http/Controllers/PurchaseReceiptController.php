@@ -60,7 +60,7 @@ class PurchaseReceiptController extends Controller
     {
         abort_unless($receipt->purchase_request_id === $purchaseRequest->id, 404);
 
-        $receipt = $register->handle($receipt, $form->validated(), $form->user());
+        $receipt = $register->handle($receipt, $form->registerData(), $form->user());
 
         return back()->with('success', __("inventory.purchase_requests.registered.{$receipt->registered_as}", [
             'qty' => $receipt->quantity, 'unit' => $purchaseRequest->unit,

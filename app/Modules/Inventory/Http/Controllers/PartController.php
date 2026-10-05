@@ -10,12 +10,18 @@ use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\DeletePart;
+use App\Modules\Inventory\Actions\FindPartUnits;
+use App\Modules\Inventory\Actions\PartCategoryOptions;
+use App\Modules\Inventory\Actions\PartUnitHistory;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Actions\SearchParts;
+use App\Modules\Inventory\Actions\SearchPartUnits;
 use App\Modules\Inventory\Actions\SearchStockMovements;
 use App\Modules\Inventory\Exports\PartsExport;
 use App\Modules\Inventory\Http\Requests\PartRequest;
 use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\PartCategory;
+use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
@@ -41,11 +47,13 @@ class PartController extends Controller
 
         return Inertia::render('Inventory/Parts/Index', [
             'parts' => $search->handle($filters)->paginate(20)->withQueryString()->through(fn (Part $part) => [
-                ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active']),
+                ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active', 'track_serial']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
             ]),
             'filters' => $filters,
+            // Pieces whose serial number matches the search, with their history on the page.
+            'serialHits' => app(FindPartUnits::class)->handle($filters['search']),
             'statuses' => SearchParts::STATUSES,
             'stockLevels' => SearchParts::STOCK_LEVELS,
             'can' => [
@@ -54,6 +62,8 @@ class PartController extends Controller
                 'delete' => $user->can('parts.delete'),
                 'import' => $user->can(PartImportController::PERMISSION),
                 'export' => $user->can(self::EXPORT_PERMISSION),
+                'categories' => $user->can(PartCategoryController::PERMISSION),
+                'receive' => $user->can('stock-movements.create'),
             ],
         ]);
     }
@@ -75,6 +85,8 @@ class PartController extends Controller
         return Inertia::render('Inventory/Parts/Form', [
             'part' => null,
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
+            'categories' => app(PartCategoryOptions::class)->handle(),
+            'canSerials' => request()->user()->can(PartCategoryController::PERMISSION),
         ]);
     }
 
@@ -85,7 +97,7 @@ class PartController extends Controller
         return redirect()->route('inventory.parts.show', $part)->with('success', __('inventory.parts.created'));
     }
 
-    public function show(Request $request, Part $part, Modules $modules, TicketLabels $ticketLabels, ItemRequestLines $requestLines): Response
+    public function show(Request $request, Part $part, Modules $modules, TicketLabels $ticketLabels, ItemRequestLines $requestLines, SearchPartUnits $search): Response
     {
         Gate::authorize('view', $part);
 
@@ -105,9 +117,10 @@ class PartController extends Controller
 
         return Inertia::render('Inventory/Parts/Show', [
             'part' => [
-                ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active', 'notes']),
+                ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active', 'notes', 'track_serial']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
+                'category' => $part->part_category_id ? PartCategory::query()->find($part->part_category_id)?->name : null,
                 // The MA contract (project) it is kept for.
                 'contract' => $part->contract_id && $modules->enabled('contract')
                     ? app(ContractLabels::class)->handle([$part->contract_id])[$part->contract_id] ?? null
@@ -116,14 +129,31 @@ class PartController extends Controller
             'checkouts' => $modules->enabled('asset') ? $this->checkouts($user, $part, $requestLines) : null,
             'photos' => PhotoSlots::list($part, fn (int $slot) => route('inventory.parts.photos.show', [$part, $slot])),
             'movements' => $movements,
+            // Pieces followed by serial number (also kept after tracking is turned off).
+            'units' => $this->units($request, $part, $search),
+            'unitFilters' => ['status' => $request->query('unit_status'), 'q' => $request->query('unit_q')],
             // Stock changes the user may enter here.
             'movementTypes' => array_values(array_filter(StockMovement::MANUAL_TYPES, fn (string $type) => $user->can(StockMovement::permissionFor($type)))),
             'can' => [
                 'update' => $user->can('update', $part),
                 'delete' => $user->can('delete', $part),
                 'viewTickets' => $user->can('tickets.view'),
+                'serials' => $user->can('update', $part) && $user->can(PartCategoryController::PERMISSION),
+                'correct' => $user->can('stock-movements.create'),
             ],
         ]);
+    }
+
+    /** The pieces of the part on its page, 20 at a time, filtered by status and serial; null when it never had any. */
+    private function units(Request $request, Part $part, SearchPartUnits $search): mixed
+    {
+        if (! $part->track_serial && ! $part->units()->exists()) {
+            return null;
+        }
+
+        return $search->handle($part->id, ['status' => $request->query('unit_status'), 'q' => $request->query('unit_q')])
+            ->paginate(20, pageName: 'units_page')->withQueryString()
+            ->through(fn (PartUnit $unit) => PartUnitHistory::row($unit));
     }
 
     public function edit(Part $part, Modules $modules): Response
@@ -132,10 +162,12 @@ class PartController extends Controller
 
         return Inertia::render('Inventory/Parts/Form', [
             'part' => [
-                ...$part->only(['id', 'code', 'name', 'contract_id', 'part_number', 'brand', 'unit', 'min_qty', 'is_active', 'notes']),
+                ...$part->only(['id', 'code', 'name', 'contract_id', 'part_category_id', 'part_number', 'brand', 'unit', 'min_qty', 'is_active', 'notes', 'track_serial']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
             ],
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($part->contract_id) : [],
+            'categories' => app(PartCategoryOptions::class)->handle(),
+            'canSerials' => request()->user()->can(PartCategoryController::PERMISSION),
         ]);
     }
 

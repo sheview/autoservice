@@ -70,6 +70,47 @@ return [
         'in_stock' => 'ลบไม่ได้ เพราะอะไหล่นี้ยังมีของคงเหลือในคลัง',
     ],
 
+    // Pieces of parts followed by serial number.
+    'units' => [
+        'pick_required' => 'อะไหล่ ":name" ติดตาม Serial Number ต้องเลือกชิ้น (SN) ที่ใช้',
+        'serials_required' => 'กรุณากรอก Serial Number',
+        'pick_count' => 'อะไหล่ ":name" ติดตาม Serial Number ต้องเลือกชิ้น (SN) ให้ครบ :count ชิ้น',
+        'return_over' => 'รับคืนได้ไม่เกินจำนวนที่ส่งออกไปและยังไม่ได้คืน (:count)',
+        'count_mismatch' => 'ต้องกรอก Serial Number :count รายการ (ตอนนี้กรอก :given)',
+        'too_long' => 'Serial Number ยาวได้ไม่เกิน :max ตัวอักษร',
+        'repeated' => 'Serial Number ซ้ำกันในรายการที่กรอก: :serials',
+        'taken' => 'Serial Number นี้มีอยู่แล้วในอะไหล่รายการนี้: :serials',
+        'seen_on_part' => 'SN :serial มีอยู่ในอะไหล่ :code ด้วย',
+        'seen_on_asset' => 'SN :serial เป็นของทรัพย์สิน :code ด้วย',
+        'saved_with_warning' => 'บันทึกแล้ว แต่พบ Serial Number ซ้ำกับรายการอื่นในบริษัท: :lines',
+        'not_in_stock' => 'มีชิ้นที่ไม่อยู่ในคลังแล้ว เลือกไม่ได้: :serials',
+        'not_issued' => 'มีชิ้นที่ไม่ได้ถูกส่งออกตามเอกสารนี้ รับคืนไม่ได้: :serials',
+        'not_removed' => 'มีชิ้นที่สถานะไม่ถูกต้อง: :serials',
+        'reason_required' => 'กรุณาระบุเหตุผล',
+        'unchanged' => 'ข้อมูลไม่ได้เปลี่ยน',
+        'already_tracked' => 'อะไหล่นี้ติดตาม Serial Number อยู่แล้ว',
+        'not_found_on_start' => 'ไม่พบชิ้นนี้ในคลังตอนเริ่มติดตาม Serial Number อีกครั้ง',
+        'corrected_from' => 'แก้จาก :serial',
+        'started' => 'เริ่มติดตาม Serial Number ของอะไหล่นี้แล้ว',
+        'stopped' => 'เลิกติดตาม Serial Number แล้ว (ข้อมูล SN เดิมยังเก็บไว้)',
+        'removed' => 'ตัดชิ้นที่เสียออกจากคลังแล้ว',
+        'corrected' => 'แก้ไขข้อมูลชิ้นแล้ว',
+        'received' => 'รับเข้าคลัง :count ชิ้นแล้ว',
+        'log' => [
+            'removed' => 'ตัดชิ้นเสียของอะไหล่ :code ออกจากคลัง: :serials',
+            'started' => 'เริ่มติดตาม Serial Number ของอะไหล่ :code',
+            'stopped' => 'เลิกติดตาม Serial Number ของอะไหล่ :code',
+            'corrected' => 'แก้ Serial Number ของอะไหล่ :code จาก :old เป็น :new',
+        ],
+    ],
+
+    'categories' => [
+        'created' => 'เพิ่มหมวดอะไหล่แล้ว',
+        'updated' => 'บันทึกหมวดอะไหล่แล้ว',
+        'deleted' => 'ลบหมวดอะไหล่แล้ว',
+        'taken' => 'มีหมวดชื่อนี้อยู่แล้ว',
+    ],
+
     'movements' => [
         'recorded' => [
             'receive' => 'บันทึกรับเข้าคลังเรียบร้อยแล้ว',
@@ -150,5 +191,13 @@ return [
         'reference' => 'เลขที่เอกสาร',
         'note' => 'หมายเหตุ',
         'part_id' => 'อะไหล่',
+        'part_category_id' => 'หมวดอะไหล่',
+        'track_serial' => 'ติดตาม Serial Number',
+        'serials' => 'Serial Number',
+        'serial_number' => 'Serial Number',
+        'unit_ids' => 'ชิ้น (SN)',
+        'warranty_until' => 'วันหมดประกัน',
+        'supplier' => 'ผู้ขาย / ที่มา',
+        'reason' => 'เหตุผล',
     ],
 ];

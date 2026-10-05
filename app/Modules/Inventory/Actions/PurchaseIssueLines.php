@@ -4,6 +4,8 @@ namespace App\Modules\Inventory\Actions;
 
 use App\Modules\Asset\Actions\FreeAssetUnits;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\PurchaseReceipt;
 use App\Modules\Inventory\Models\PurchaseReceiptAsset;
 use App\Modules\Inventory\Models\PurchaseRequest;
@@ -19,7 +21,8 @@ class PurchaseIssueLines
 {
     /**
      * @return array{id: int, ulid: string, pr_no: string, requested_by: int|null, contract_id: int|null, checkout_request_id: int|null,
-     *     lines: list<array{item_type: string, id: int, qty: int}>}|null
+     *     lines: list<array{item_type: string, id: int, qty: int, unit_ids?: list<int>}>}|null  unit_ids: the pieces of a part
+     *     followed by serial number (those of the delivery first, still in stock)
      */
     public function handle(string $ulid, User $user): ?array
     {
@@ -31,7 +34,7 @@ class PurchaseIssueLines
         $units = $request->receipts()->with('assets')->whereNotNull('registered_at')->get()
             ->flatMap(fn (PurchaseReceipt $receipt) => $receipt->registered_as === PurchaseReceipt::AS_ASSET
                 ? $receipt->assets->map(fn (PurchaseReceiptAsset $row) => ['item_type' => 'asset', 'id' => (int) $row->asset_id, 'qty' => $row->quantity])
-                : [['item_type' => 'part', 'id' => (int) $receipt->part_id, 'qty' => $receipt->quantity]]);
+                : [['item_type' => 'part', 'id' => (int) $receipt->part_id, 'qty' => $receipt->quantity, 'receipt_id' => $receipt->id]]);
 
         // Assets: each device as far as it is still free (whichever went out first). Parts are
         // all alike: what was handed out is taken from the earliest deliveries.
@@ -53,6 +56,18 @@ class PurchaseIssueLines
                 $lines[] = [...$unit, 'qty' => $qty];
                 $left -= $qty;
             }
+        }
+
+        // Parts followed by serial number go out by pieces: those this delivery brought, then any in stock.
+        $taken = [];
+        foreach ($lines as $i => $line) {
+            if ($line['item_type'] !== 'part' || ! Part::withTrashed()->whereKey($line['id'])->value('track_serial')) {
+                continue;
+            }
+            $ids = PartUnit::query()->where('part_id', $line['id'])->where('status', PartUnit::STATUS_IN_STOCK)->whereNotIn('id', $taken)
+                ->orderByRaw('coalesce(purchase_receipt_id = ?, false) desc', [$line['receipt_id']])->orderBy('id')->limit($line['qty'])->pluck('id')->all();
+            $taken = [...$taken, ...$ids];
+            $lines[$i]['unit_ids'] = $ids;
         }
 
         return [

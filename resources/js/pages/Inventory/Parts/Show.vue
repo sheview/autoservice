@@ -3,7 +3,10 @@ import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import ItemRequestsPanel from '@/components/ItemRequestsPanel.vue';
 import Pagination from '@/components/Pagination.vue';
+import PartUnitPicker from '@/components/PartUnitPicker.vue';
+import PartUnitsPanel from '@/components/PartUnitsPanel.vue';
 import PhotoSlots from '@/components/PhotoSlots.vue';
+import SerialInputs from '@/components/SerialInputs.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +16,9 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import type { ItemRequestsPanelData } from '@/types/checkout';
+import type { PartUnitRow } from '@/types/inventory';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { watch } from 'vue';
 
 interface PartDetail {
     id: number;
@@ -29,6 +34,8 @@ interface PartDetail {
     notes: string | null;
     low: boolean;
     contract: { id: number; contract_no: string; title: string } | null;
+    track_serial: boolean;
+    category: string | null;
 }
 
 interface MovementRow {
@@ -51,7 +58,10 @@ const props = defineProps<{
     checkouts: ItemRequestsPanelData | null;
     photos: { slot: number; action: string; url: string | null }[];
     movementTypes: string[];
-    can: { update: boolean; delete: boolean; viewTickets: boolean };
+    // Pieces by serial number; null when the part never had any.
+    units: Paginated<PartUnitRow> | null;
+    unitFilters: { status: string | null; q: string | null };
+    can: { update: boolean; delete: boolean; viewTickets: boolean; serials: boolean; correct: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -66,13 +76,37 @@ const form = useForm({
     unit_cost: '',
     reference: '',
     note: '',
+    // A part tracked by serial number: the serials received, or the pieces chosen.
+    serials: [] as string[],
+    unit_ids: [] as number[],
+    supplier: '',
+    warranty_until: '',
 });
+watch(
+    () => form.type,
+    () => (form.unit_ids = []),
+);
 
 const submit = () =>
-    form.post(route('inventory.parts.movements.store', props.part.id), {
-        preserveScroll: true,
-        onSuccess: () => form.reset('quantity', 'unit_cost', 'reference', 'note'),
-    });
+    form
+        .transform((data) => {
+            if (!props.part.track_serial) {
+                const { serials, unit_ids, supplier, warranty_until, ...rest } = data; // eslint-disable-line @typescript-eslint/no-unused-vars
+                return rest;
+            }
+            const { quantity, ...rest } = data; // eslint-disable-line @typescript-eslint/no-unused-vars
+            return data.type === 'receive' ? { ...rest, unit_ids: undefined } : { ...rest, serials: undefined };
+        })
+        .post(route('inventory.parts.movements.store', props.part.id), {
+            preserveScroll: true,
+            onSuccess: () => form.reset('quantity', 'unit_cost', 'reference', 'note', 'serials', 'unit_ids', 'supplier', 'warranty_until'),
+        });
+
+const stopTracking = () => {
+    if (confirm(t('parts.stop_confirm', { name: props.part.name }))) {
+        router.post(route('inventory.parts.serials.stop', props.part.id), {}, { preserveScroll: true });
+    }
+};
 
 const destroy = () => {
     if (confirm(t('common.confirm_delete', { name: props.part.name }))) {
@@ -96,7 +130,13 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <p class="font-mono text-sm text-muted-foreground">{{ part.code }}</p>
                     <Heading :title="part.name" :description="[part.brand, part.part_number].filter(Boolean).join(' · ')" />
                 </div>
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
+                    <template v-if="can.serials">
+                        <Button v-if="!part.track_serial" variant="outline" as-child>
+                            <Link :href="route('inventory.parts.serials.start', part.id)">{{ t('parts.start_tracking') }}</Link>
+                        </Button>
+                        <Button v-else variant="outline" @click="stopTracking">{{ t('parts.stop_tracking') }}</Button>
+                    </template>
                     <Button v-if="can.update" variant="outline" as-child>
                         <Link :href="route('inventory.parts.edit', part.id)">{{ t('common.edit') }}</Link>
                     </Button>
@@ -107,7 +147,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
             </p>
+            <p v-if="page.props.flash.warning" class="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                {{ page.props.flash.warning }}
+            </p>
             <InputError :message="(page.props.errors as Record<string, string>).part" />
+            <p v-if="part.track_serial" class="text-sm text-muted-foreground">
+                <span class="mr-1 rounded bg-primary/10 px-1.5 py-0.5 font-mono text-xs text-primary">{{ t('parts.sn_badge') }}</span>
+                {{ t('parts.tracked_note') }}
+            </p>
+            <p v-else-if="units" class="text-sm text-muted-foreground">{{ t('parts.untracked_with_units') }}</p>
 
             <PhotoSlots :photos="photos" :editable="can.update" />
 
@@ -146,6 +194,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <dt class="text-xs text-muted-foreground">{{ t('common.status') }}</dt>
                         <dd>{{ t(`parts.statuses.${part.is_active ? 'active' : 'inactive'}`) }}</dd>
                     </div>
+                    <div v-if="part.category">
+                        <dt class="text-xs text-muted-foreground">{{ t('parts.category') }}</dt>
+                        <dd>{{ part.category }}</dd>
+                    </div>
                     <div v-if="part.contract">
                         <dt class="text-xs text-muted-foreground">{{ t('parts.contract') }}</dt>
                         <dd>{{ part.contract.contract_no }} · {{ part.contract.title }}</dd>
@@ -162,10 +214,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <div class="grid content-start gap-2">
                             <Label for="type">{{ t('stock_movements.type') }}</Label>
                             <select id="type" v-model="form.type" :class="selectClass">
-                                <option v-for="type in movementTypes" :key="type" :value="type">{{ t(`stock_movements.types.${type}`) }}</option>
+                                <option v-for="type in movementTypes" :key="type" :value="type">
+                                    {{ part.track_serial && type === 'adjust' ? t('part_units.actions.remove') : t(`stock_movements.types.${type}`) }}
+                                </option>
                             </select>
                         </div>
-                        <div class="grid content-start gap-2">
+                        <div v-if="!part.track_serial" class="grid content-start gap-2">
                             <Label for="quantity">
                                 {{ form.type === 'adjust' ? t('stock_movements.counted_field') : t('stock_movements.quantity_field') }}
                             </Label>
@@ -177,6 +231,28 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         </div>
                     </div>
                     <InputError :message="form.errors.quantity ?? form.errors.unit_cost ?? form.errors.type" />
+
+                    <template v-if="part.track_serial">
+                        <template v-if="form.type === 'receive'">
+                            <SerialInputs v-model="form.serials" />
+                            <InputError :message="form.errors.serials" />
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <div class="grid content-start gap-2">
+                                    <Label for="supplier">{{ t('part_units.supplier') }}</Label>
+                                    <Input id="supplier" v-model="form.supplier" maxlength="255" />
+                                </div>
+                                <div class="grid content-start gap-2">
+                                    <Label for="warranty_until">{{ t('part_units.warranty_until') }}</Label>
+                                    <Input id="warranty_until" v-model="form.warranty_until" type="date" />
+                                    <InputError :message="form.errors.warranty_until" />
+                                </div>
+                            </div>
+                        </template>
+                        <template v-else>
+                            <PartUnitPicker v-model="form.unit_ids" :part-id="part.id" :status="form.type === 'return' ? 'issued' : 'in_stock'" />
+                            <InputError :message="form.errors.unit_ids ?? form.errors.serials" />
+                        </template>
+                    </template>
 
                     <div class="grid gap-4 sm:grid-cols-3">
                         <div class="grid content-start gap-2">
@@ -196,7 +272,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 v-model="form.note"
                                 maxlength="1000"
                                 :required="form.type === 'adjust'"
-                                :placeholder="form.type === 'adjust' ? t('stock_movements.adjust_note_hint') : ''"
+                                :placeholder="form.type === 'adjust' ? (part.track_serial ? t('part_units.remove_reason') : t('stock_movements.adjust_note_hint')) : ''"
                             />
                             <InputError :message="form.errors.note" />
                         </div>
@@ -205,6 +281,8 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <Button :disabled="form.processing">{{ t('stock_movements.submit') }}</Button>
                 </form>
             </div>
+
+            <PartUnitsPanel v-if="units" :part-id="part.id" :units="units" :filters="unitFilters" :can-correct="can.correct" />
 
             <section v-if="movements" class="space-y-3">
                 <div class="flex items-center justify-between">

@@ -2,6 +2,7 @@
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import SerialInputs from '@/components/SerialInputs.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
 import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import StepProgress from '@/components/StepProgress.vue';
@@ -35,7 +36,8 @@ const props = defineProps<{
         part: boolean;
         newPart: boolean;
         categories: { id: number; name: string }[];
-        parts: { id: number; code: string; name: string; unit: string }[];
+        parts: { id: number; code: string; name: string; unit: string; track_serial: boolean }[];
+        canSerials: boolean;
     } | null;
     attachments: Attachment[];
     actions: string[];
@@ -79,7 +81,18 @@ const receive = useForm({
     asset_category_id: props.request.asset_category_id,
     location: '',
     part_id: null as number | null,
+    track_serial: false,
     hand_out: props.can.handOut && props.request.requested_by !== null,
+});
+// A part followed by serial number (or a new one to be): one serial box per unit received.
+const receiveTracked = computed(() => {
+    if ((choosingKind.value ? receive.item_kind : props.request.item_kind) !== 'part') return false;
+    if (receive.part_id === null) return receive.track_serial;
+    return props.register?.parts.find((p) => p.id === receive.part_id)?.track_serial ?? false;
+});
+const serialBoxes = computed({
+    get: () => receive.serials.split('\n'),
+    set: (list: string[]) => (receive.serials = list.join('\n')),
 });
 const serialCount = computed(() => receive.serials.split(/\r?\n/).filter((line) => line.trim() !== '').length);
 const categoryName = computed(() => props.register?.categories.find((c) => c.id === props.request.asset_category_id)?.name ?? '-');
@@ -91,6 +104,7 @@ const submitReceive = () =>
             item_kind: choosingKind.value ? data.item_kind : null,
             asset_category_id: choosingKind.value && data.item_kind === 'asset' ? data.asset_category_id : null,
             part_id: data.item_kind === 'part' ? data.part_id : null,
+            track_serial: data.part_id === null && data.track_serial ? true : null,
         }))
         .post(route('inventory.purchase-requests.receipts.store', props.request.ulid), {
             preserveScroll: true,
@@ -121,6 +135,7 @@ const registerForm = useForm({
     location: '',
     part_id: null as number | null,
     part_code: '',
+    track_serial: false,
 });
 const openRegister = (receipt: PurchaseReceiptRow) => {
     registerForm.reset();
@@ -133,7 +148,7 @@ const submitRegister = (receipt: PurchaseReceiptRow) =>
             as: data.as,
             ...(data.as === 'asset'
                 ? { category_id: data.category_id, location: data.location || null }
-                : { part_id: data.part_id, part_code: data.part_id ? null : data.part_code }),
+                : { part_id: data.part_id, part_code: data.part_id ? null : data.part_code, track_serial: data.part_id ? null : data.track_serial }),
         }))
         .post(route('inventory.purchase-requests.receipts.register', [props.request.ulid, receipt.id]), {
             preserveScroll: true,
@@ -305,9 +320,13 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                             <select id="receive_part" v-model="receive.part_id" :class="selectClass">
                                 <option :value="null">{{ t('purchase_requests.register.part_auto') }}</option>
                                 <option v-for="part in register?.parts ?? []" :key="part.id" :value="part.id">
-                                    {{ part.code }} · {{ part.name }}
+                                    {{ part.code }} · {{ part.name }}{{ part.track_serial ? ` (${t('parts.sn_badge')})` : '' }}
                                 </option>
                             </select>
+                            <label v-if="receive.part_id === null && register?.canSerials" class="flex items-center gap-2 text-sm">
+                                <input v-model="receive.track_serial" type="checkbox" class="size-4 rounded border-input" />
+                                {{ t('purchase_requests.receive.new_part_tracked') }}
+                            </label>
                         </div>
                     </div>
                     <InputError :message="receive.errors.asset_category_id ?? (receive.errors as Record<string, string>).category_id" />
@@ -333,7 +352,11 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <Input id="receive_price" v-model="receive.unit_price" type="number" min="0" step="0.01" />
                         <InputError :message="receive.errors.unit_price" />
                     </div>
-                    <div class="grid content-start gap-1 sm:col-span-2">
+                    <div v-if="receiveTracked" class="grid content-start gap-1 sm:col-span-4">
+                        <SerialInputs id="receive_serials" v-model="serialBoxes" :count="Number(receive.quantity) || 0" />
+                        <InputError :message="receive.errors.serials" />
+                    </div>
+                    <div v-else class="grid content-start gap-1 sm:col-span-2">
                         <Label for="receive_serials">{{ t('purchase_requests.receive.serials') }}</Label>
                         <textarea id="receive_serials" v-model="receive.serials" rows="3" :class="`${textareaClass} font-mono`" />
                         <p class="text-xs text-muted-foreground">{{ t('purchase_requests.receive.serials_count', { count: serialCount }) }}</p>
@@ -492,7 +515,7 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                     <select :id="`part-${receipt.id}`" v-model="registerForm.part_id" :class="selectClass">
                                         <option v-if="register.newPart" :value="null">{{ t('purchase_requests.register.new_part') }}</option>
                                         <option v-for="part in register.parts" :key="part.id" :value="part.id">
-                                            {{ part.code }} · {{ part.name }}
+                                            {{ part.code }} · {{ part.name }}{{ part.track_serial ? ` (${t('parts.sn_badge')})` : '' }}
                                         </option>
                                     </select>
                                     <InputError :message="registerForm.errors.part_id" />
@@ -508,6 +531,10 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                     />
                                     <p class="text-xs text-muted-foreground">{{ t('purchase_requests.register.part_code_hint') }}</p>
                                     <InputError :message="registerForm.errors.part_code" />
+                                    <label v-if="register.canSerials" class="flex items-center gap-2 text-sm">
+                                        <input v-model="registerForm.track_serial" type="checkbox" class="size-4 rounded border-input" />
+                                        {{ t('purchase_requests.receive.new_part_tracked') }}
+                                    </label>
                                 </div>
                             </div>
                             <InputError :message="registerForm.errors.as ?? (registerForm.errors as Record<string, string>).serials" />
