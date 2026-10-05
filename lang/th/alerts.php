@@ -77,6 +77,10 @@ return [
 ผู้ยืม: :borrower
 กำหนดคืน: :note',
         ],
+        'ticket_reported' => [
+            'title' => 'ลูกค้าแจ้งปัญหาผ่าน QR :no (รอตรวจสอบ)',
+            'body' => "เครื่อง: :device\nลูกค้า: :customer\nอาการ: :symptoms\nผู้แจ้ง: :reporter\nติดต่อ: :contact",
+        ],
         'ticket_opened' => [
             'title' => 'แจ้งซ่อมใหม่ :no',
             'body' => "เรื่อง: :title\nความเร่งด่วน: :priority\nผู้ติดต่อ: :contact\nแจ้งโดย: :actor",

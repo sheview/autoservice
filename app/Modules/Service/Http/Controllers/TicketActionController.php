@@ -12,6 +12,7 @@ use App\Modules\Service\Actions\CommentOnTicket;
 use App\Modules\Service\Actions\LinkTicketIp;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\RenewTrackingToken;
+use App\Modules\Service\Actions\ReviewReportedTicket;
 use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Actions\SetTicketAppointment;
 use App\Modules\Service\Models\Ticket;
@@ -22,6 +23,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * What people do on an open ticket: assign, check the warranty, move along the workflow, comment.
@@ -87,6 +89,28 @@ class TicketActionController extends Controller
         $linkTicketIp->handle($ticket, $validated['ip'] ?? null);
 
         return back()->with('success', __('service.tickets.ip_saved'));
+    }
+
+    /** The helpdesk's answer to a problem a customer reported with a QR code (tickets.assign). */
+    public function review(Request $request, Ticket $ticket, ReviewReportedTicket $review): RedirectResponse
+    {
+        Gate::authorize('assign', $ticket);
+        $data = $request->validate([
+            'decision' => ['required', Rule::in(ReviewReportedTicket::DECISIONS)],
+            'message' => ['nullable', 'string', 'max:2000'],
+        ]);
+        $review->handle($ticket, $data['decision'], $data['message'] ?? null, $request->user());
+
+        return back()->with('success', __("service.reported.done_{$data['decision']}"));
+    }
+
+    /** A photo taken on the job (reported, before, after) or the customer's signature: who may see the ticket. */
+    public function media(Ticket $ticket, int $media): BinaryFileResponse
+    {
+        Gate::authorize('view', $ticket);
+        $file = $ticket->media()->whereKey($media)->whereIn('collection_name', [Ticket::PHOTOS, Ticket::SIGNATURE])->firstOrFail();
+
+        return response()->file($file->getPath(), ['Content-Type' => $file->mime_type, 'Cache-Control' => 'private, max-age=3600']);
     }
 
     /** A new tracking link for the customer (the old one stops working): who may update the ticket. */

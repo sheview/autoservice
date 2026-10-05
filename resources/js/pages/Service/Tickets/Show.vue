@@ -10,7 +10,9 @@ import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import TicketAppointment from '@/components/TicketAppointment.vue';
 import TicketForwardPanel, { type TicketForwards } from '@/components/TicketForwardPanel.vue';
 import TicketIpPanel from '@/components/TicketIpPanel.vue';
+import TicketPhotos from '@/components/TicketPhotos.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
+import TicketReviewPanel from '@/components/TicketReviewPanel.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import TicketTrackingLink from '@/components/TicketTrackingLink.vue';
 import { Button } from '@/components/ui/button';
@@ -137,6 +139,13 @@ const props = defineProps<{
     sharedRequests: SharedRequestRow[];
     forwards: TicketForwards | null;
     tracking: { url: string; can_renew: boolean } | null;
+    review: {
+        contracts: { contract_no: string; title: string; service_window: string }[];
+        warranty_expires_on: string | null;
+        contact_email: string | null;
+    } | null;
+    photos: { url: string; stage: string | null }[];
+    signature: { url: string; signer: string | null } | null;
     askOthersUrl: string | null;
     ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
     can: { update: boolean; comment: boolean; internalNotes: boolean; deleteAttachments: boolean; checkWarranty: boolean; report: boolean };
@@ -429,6 +438,8 @@ const stepBar = computed(() => {
 
                     <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
 
+                    <TicketReviewPanel v-if="review" :ticket-ulid="ticket.ulid" :review="review" />
+                    <TicketPhotos :photos="photos" :signature="signature" />
                     <TicketTrackingLink v-if="tracking" :ticket-ulid="ticket.ulid" :url="tracking.url" :can-renew="tracking.can_renew" />
                     <TicketAppointment :ticket-ulid="ticket.ulid" :appointment-at="ticket.appointment_at" :can-change="can.update" />
 

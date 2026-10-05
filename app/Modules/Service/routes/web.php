@@ -33,6 +33,8 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     // The symptom and fix chips of the company.
     Route::get('settings/repair-presets', [RepairPresetController::class, 'edit'])->name('presets.edit');
     Route::put('settings/repair-presets', [RepairPresetController::class, 'update'])->name('presets.update');
+    Route::post('tickets/{ticket}/review', [TicketActionController::class, 'review'])->name('tickets.review');
+    Route::get('tickets/{ticket}/media/{media}', [TicketActionController::class, 'media'])->whereNumber('media')->name('tickets.media');
     Route::post('tickets/{ticket}/tracking-token', [TicketActionController::class, 'trackingToken'])->name('tickets.tracking-token');
     Route::post('tickets/{ticket}/appointment', [TicketActionController::class, 'appointment'])->name('tickets.appointment');
     Route::post('tickets/{ticket}/forward', [TicketActionController::class, 'forward'])->name('tickets.forward');

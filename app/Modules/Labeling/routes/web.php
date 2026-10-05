@@ -2,6 +2,7 @@
 
 use App\Modules\Labeling\Http\Controllers\LabelController;
 use App\Modules\Labeling\Http\Controllers\QrController;
+use App\Modules\Labeling\Http\Controllers\QrPublicController;
 use App\Modules\Labeling\Http\Controllers\ScanController;
 use Illuminate\Support\Facades\Route;
 
@@ -17,9 +18,13 @@ Route::middleware(['auth', 'verified', 'module:asset'])->group(function () {
 });
 
 // An asset's QR page: staff signed in get the full page, anyone else the public one (QrController).
-Route::get('q/{code}', [QrController::class, 'onHost'])->where('code', '[A-Za-z0-9_-]{1,50}')->middleware('throttle:60,1')->name('labeling.qr');
+Route::get('q/{code}', [QrController::class, 'onHost'])->where('code', '[A-Za-z0-9_-]{1,50}')->middleware('throttle:qr-page')->name('labeling.qr');
 Route::get('t/{company}/q/{code}', [QrController::class, 'onPath'])->where(['company' => '[0-9]{1,10}', 'code' => '[A-Za-z0-9_-]{1,50}'])
-    ->middleware('throttle:60,1')->name('labeling.qr.path');
+    ->middleware('throttle:qr-page')->name('labeling.qr.path');
+// Reporting a problem from the public page (no sign-in).
+Route::post('q/{code}/report', [QrPublicController::class, 'reportOnHost'])->where('code', '[A-Za-z0-9_-]{1,50}')->middleware('throttle:qr-report')->name('labeling.qr.report');
+Route::post('t/{company}/q/{code}/report', [QrPublicController::class, 'reportOnPath'])->where(['company' => '[0-9]{1,10}', 'code' => '[A-Za-z0-9_-]{1,50}'])
+    ->middleware('throttle:qr-report')->name('labeling.qr.path.report');
 // "Staff sign in" on the public page: sign in, then back to the same device.
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('q/{code}/staff', [QrController::class, 'signInOnHost'])

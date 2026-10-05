@@ -167,6 +167,7 @@ class TicketController extends Controller
         SharedRequests $sharedRequests,
         ShareGateway $gateway,
         ForwardedTickets $forwardedTickets,
+        CoveringContracts $coveringContracts,
     ): Response {
         Gate::authorize('view', $ticket);
 
@@ -228,6 +229,22 @@ class TicketController extends Controller
                 ->keys()
                 ->values(),
             'needsComment' => TicketWorkflow::NEEDS_COMMENT,
+            // A customer's QR report waiting for the helpdesk: what decides it (MA contract, warranty).
+            'review' => $ticket->status === Ticket::STATUS_PENDING_REVIEW && $canAssign ? [
+                'contracts' => array_map(fn (array $c) => ['contract_no' => $c['contract_no'], 'title' => $c['title'], 'service_window' => $c['service_window']],
+                    $this->modules->enabled('contract') ? $coveringContracts->handle($ticket->customer_id, $ticket->asset_id) : []),
+                'warranty_expires_on' => $device['warranty_expires_at'] ?? null,
+                'contact_email' => $ticket->contact_email,
+            ] : null,
+            // Photos taken on the job (reported, before, after) and the customer's signature.
+            'photos' => $ticket->getMedia(Ticket::PHOTOS)->map(fn ($m) => [
+                'url' => route('service.tickets.media', [$ticket, $m->id]),
+                'stage' => $m->getCustomProperty('stage'),
+            ])->values(),
+            'signature' => ($sig = $ticket->getFirstMedia(Ticket::SIGNATURE)) ? [
+                'url' => route('service.tickets.media', [$ticket, $sig->id]),
+                'signer' => $sig->getCustomProperty('signer'),
+            ] : null,
             // The customer's tracking link (no sign-in), for staff to send; customer accounts see their tickets signed in.
             'tracking' => $user->customer_id === null && $ticket->tracking_token ? [
                 'url' => PublicUrl::forTenant($ticket->tenant, '/track/'.$ticket->tracking_token),

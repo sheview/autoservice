@@ -67,7 +67,8 @@ class SearchTickets
                 ->where('ticket_no', 'ilike', '%'.TicketNumber::stored($search).'%')
                 ->orWhere('title', 'ilike', "%{$search}%")
                 ->orWhere('contact_name', 'ilike', "%{$search}%")))
-            ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', Ticket::OPEN_STATUSES))
+            // Running jobs, and reports waiting for the helpdesk to look at them.
+            ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', [Ticket::STATUS_PENDING_REVIEW, ...Ticket::OPEN_STATUSES]))
             ->when(! in_array($status, ['open', 'all'], true), fn (Builder $q) => $q->where('status', $status))
             ->when($filters['priority'] ?? null, fn (Builder $q, $priority) => $q->where('priority', $priority))
             ->when($assignee === 'me', fn (Builder $q) => $q->where('assignee_id', $user->id))

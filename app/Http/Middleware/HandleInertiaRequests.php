@@ -63,6 +63,9 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
+                // A customer's report from a QR code: made (its number), or a job already running.
+                'reported' => fn () => $request->session()->get('reported'),
+                'already' => fn () => $request->session()->get('already'),
             ],
             // The company's subscription, for the warning popup and banner. Customer accounts are
             // not told about their MA company's contract with the platform.

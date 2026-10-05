@@ -62,6 +62,9 @@ class Ticket extends Model implements HasMedia
     /** Sent on by another company through a share (OpenForwardedTicket); never picked on a form. */
     public const SOURCE_PARTNER = 'partner';
 
+    /** Reported by a customer with an asset's QR code (OpenReportedTicket); never picked on a form. */
+    public const SOURCE_QR = 'qr';
+
     protected $fillable = [
         'ticket_no', 'customer_id', 'asset_id', 'ip_address_id', 'contract_id', 'branch_id', 'title', 'description',
         'priority', 'status', 'source', 'contact_name', 'contact_phone', 'contact_email', 'customer_message', 'closed_lat', 'closed_lng', 'reported_by', 'assignee_id', 'appointment_at',
