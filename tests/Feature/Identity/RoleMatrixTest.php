@@ -112,18 +112,28 @@ it('never leaves the company without an active admin', function () {
 });
 
 it('lists permissions in the order of the menu, without modules the company does not use, keeping their grants', function () {
-    expect(array_keys(PermissionCatalog::MENU))->toEqualCanonicalizing(array_values(array_diff(array_keys(PermissionCatalog::PERMISSIONS), ['platform'])));
+    expect(array_keys(PermissionCatalog::MENU))->toEqualCanonicalizing(array_values(array_diff(array_keys(PermissionCatalog::PERMISSIONS), ['platform', ...PermissionCatalog::NO_MENU])));
 
     $admin = userWithRole('admin_company');
     $this->actingAs($admin)->get('/roles')->assertInertia(fn (Assert $page) => $page
         ->where('resources.0.key', 'dashboard')
-        ->where('resources', fn ($rows) => collect($rows)->pluck('key')->contains('pm-visits')
+        ->where('resources', fn ($rows) => collect($rows)->pluck('key')->contains('room-access')
             && collect($rows)->firstWhere('key', 'room-access')['group'] === 'service'));
 
-    // PM switched off for the company: its permissions leave the matrix, grants stay.
-    Feature::for($this->tenant)->deactivate(Modules::feature('maintenance'));
+    // Room access switched off for the company: its permissions leave the matrix, grants stay.
+    Feature::for($this->tenant)->deactivate(Modules::feature('room_access'));
     $this->actingAs($admin)->get('/roles')->assertInertia(fn (Assert $page) => $page
-        ->where('resources', fn ($rows) => ! collect($rows)->pluck('key')->contains('pm-visits')));
+        ->where('resources', fn ($rows) => ! collect($rows)->pluck('key')->contains('room-access')));
     $technician = Role::findByName('technician');
-    expect(app(SyncRoleGrants::class)->grantsOf($technician))->toHaveKey('pm-visits.view');
+    expect(app(SyncRoleGrants::class)->grantsOf($technician))->toHaveKey('room-access.view');
+});
+
+it('leaves resources whose menu was removed off the matrix, keeping their grants', function () {
+    // The page sends back every grant it was given, so grants not shown survive a save.
+    $this->actingAs($this->admin)->get('/roles')->assertInertia(fn (Assert $page) => $page
+        ->where('resources', fn ($rows) => collect($rows)->pluck('key')->intersect(PermissionCatalog::NO_MENU)->isEmpty())
+        ->where("grants.{$this->technician->id}", fn ($grants) => $grants['pm-visits.view'] === 'own'));
+
+    $this->actingAs($this->admin)->put('/roles-matrix', ['matrix' => [$this->technician->id => ($this->grants)('technician')]])->assertSessionHasNoErrors();
+    expect(($this->grants)('technician'))->toHaveKeys(['pm-visits.view', 'pm-plans.view', 'pm-checklists.view']);
 });

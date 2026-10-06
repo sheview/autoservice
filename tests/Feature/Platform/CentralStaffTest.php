@@ -53,7 +53,7 @@ it('lets central staff enter any company and see every branch, with the menu of 
         ->where('auth.permissions', fn ($permissions) => collect($permissions)->contains('tickets.assign')
             && ! collect($permissions)->contains('users.view') && ! collect($permissions)->contains('platform.impersonate'))
         ->where('navigation', fn ($items) => collect($items)->pluck('title')->all() === [
-            'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'รอบ PM', 'แผน PM', 'Checklist PM', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
+            'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'เช็ค IP ว่าง', 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
             'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'รายงาน', 'อะไหล่ที่เปลี่ยน/ส่งออก', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ', 'คู่มือ', 'วันหยุด',
         ]));
 

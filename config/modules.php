@@ -40,9 +40,6 @@ return [
         // The user's own open tickets (the ticket list filtered to them).
         ['group' => 'service', 'title' => 'nav.my_work', 'route' => 'service.my-work', 'icon' => 'user-check', 'permission' => 'tickets.view', 'module' => 'service', 'staff' => true],
         ['group' => 'service', 'title' => 'nav.tickets', 'route' => 'service.tickets.index', 'icon' => 'wrench', 'permission' => 'tickets.view', 'module' => 'service'],
-        ['group' => 'service', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'calendar-check', 'permission' => 'pm-visits.view', 'module' => 'maintenance'],
-        ['group' => 'service', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'clipboard-list', 'permission' => 'pm-plans.view', 'module' => 'maintenance'],
-        ['group' => 'service', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.view', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'service', 'title' => 'nav.room_access', 'route' => 'room-access.requests.index', 'icon' => 'door-open', 'permission' => 'room-access.view', 'module' => 'room_access', 'staff' => true, 'company' => true],
         ['group' => 'service', 'title' => 'nav.ip_check', 'route' => 'asset.ip-check', 'icon' => 'network', 'permission' => 'ip-check.view', 'module' => 'asset', 'staff' => true],
 

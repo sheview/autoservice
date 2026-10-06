@@ -119,7 +119,7 @@ it('shows a customer account the PM rounds of its own customer only, read only',
 
     $this->actingAs($customerUser)->get('/dashboard')
         ->assertInertia(fn (Assert $page) => $page->where('navigation', fn ($items) => collect($items)->pluck('href')
-            ->filter(fn ($href) => str_contains($href, '/pm-'))->values()->all() === ['/pm-visits', '/pm-plans']));
+            ->filter(fn ($href) => str_contains($href, '/pm-'))->values()->all() === []));
 
     $this->actingAs($customerUser)->get('/pm-visits?status=all')
         ->assertInertia(fn (Assert $page) => $page->where('visits.total', 4)->where('customers', [])->where('assignees', []));

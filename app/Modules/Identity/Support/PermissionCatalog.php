@@ -77,14 +77,11 @@ class PermissionCatalog
      * Where each resource sits on the sidebar (config/modules.php "navigation"): its section
      * (lang ui.nav_groups; null = above the sections) and the module it belongs to (null = always
      * there). The roles matrix lists resources in this order, by section, and leaves out those of
-     * modules the company does not use. Every resource but "platform" is here.
+     * modules the company does not use. Every resource but "platform" and NO_MENU is here.
      */
     public const MENU = [
         'dashboard' => [null, null],
         'tickets' => ['service', 'service'],
-        'pm-visits' => ['service', 'maintenance'],
-        'pm-plans' => ['service', 'maintenance'],
-        'pm-checklists' => ['service', 'maintenance'],
         'room-access' => ['service', 'room_access'],
         'ip-check' => ['service', 'asset'],
         'assets' => ['assets', 'asset'],
@@ -109,6 +106,12 @@ class PermissionCatalog
         'alerts' => ['settings', null],
         'activity-log' => ['settings', null],
     ];
+
+    /**
+     * Resources whose menu was taken off the sidebar: left off the roles matrix too. Their
+     * permissions still exist and grants already held are kept (the pages still check them).
+     */
+    public const NO_MENU = ['pm-visits', 'pm-plans', 'pm-checklists'];
 
     public const SUPERADMIN = 'superadmin';
 
