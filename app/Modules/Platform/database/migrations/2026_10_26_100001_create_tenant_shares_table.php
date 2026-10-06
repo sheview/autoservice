@@ -21,8 +21,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('from_tenant_id')->constrained('tenants')->restrictOnDelete();
             $table->foreignId('to_tenant_id')->constrained('tenants')->restrictOnDelete();
-            $table->jsonb('abilities')->default('[]'); // e.g. ["parts.view", "assets.view"]
-            $table->jsonb('roles')->default('[]'); // role names of from_tenant (or central roles) that may use it
+            $table->json('abilities')->default('[]'); // e.g. ["parts.view", "assets.view"]
+            $table->json('roles')->default('[]'); // role names of from_tenant (or central roles) that may use it
             $table->string('status', 20); // pending | active | revoked
             $table->string('reason')->nullable();
             $table->date('expires_on')->nullable();

@@ -3,8 +3,8 @@
 namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Tenancy\Support\Counter;
 use App\Modules\Tenancy\Support\TenantContext;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Next number of an issue/loan request in the current tenant, per Buddhist year: "CR-2569-00001".
@@ -19,14 +19,7 @@ class GenerateRequestNumber
         $prefix = 'CR-'.(now()->year + 543);
 
         do {
-            $number = DB::selectOne(
-                'insert into asset_code_sequences (tenant_id, prefix, last_number, created_at, updated_at)
-                 values (?, ?, 1, now(), now())
-                 on conflict (tenant_id, prefix)
-                 do update set last_number = asset_code_sequences.last_number + 1, updated_at = now()
-                 returning last_number',
-                [$this->context->id(), $prefix],
-            )->last_number;
+            $number = Counter::next('asset_code_sequences', 'prefix', $prefix, $this->context->id());
 
             $no = sprintf('%s-%05d', $prefix, $number);
         } while (CheckoutRequest::withTrashed()->where('request_no', $no)->exists());

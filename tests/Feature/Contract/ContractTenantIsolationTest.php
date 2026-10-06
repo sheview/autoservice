@@ -1,8 +1,9 @@
 <?php
 
+use App\Modules\Contract\Models\Contract;
+use App\Modules\Contract\Models\Customer;
 use App\Modules\Document\Models\Media;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -54,10 +55,8 @@ it('rejects a customer or asset of another tenant', function () {
     expect($this->mine->contractAssets()->count())->toBe(0);
 });
 
-it('hides other tenants from raw queries (RLS)', function () {
-    expect(DB::table('customers')->pluck('name')->all())->toBe(['My customer'])
-        ->and(DB::table('contracts')->count())->toBe(1)
-        ->and(DB::table('contract_assets')->count())->toBe(0)
-        ->and(DB::table('media')->count())->toBe(0)
+it('hides other tenants from queries', function () {
+    expect(Customer::pluck('name')->all())->toBe(['My customer'])
+        ->and(Contract::count())->toBe(1)
         ->and(Media::count())->toBe(0);
 });

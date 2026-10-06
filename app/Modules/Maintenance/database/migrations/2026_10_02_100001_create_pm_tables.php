@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('name');
             $table->foreignId('asset_category_id')->nullable()->constrained()->restrictOnDelete();
             // [{key, label, type: check|text|number}] (dynamic per checklist)
-            $table->jsonb('items')->default('[]');
+            $table->json('items')->default('[]');
             $table->timestamps();
             $table->softDeletes();
 
@@ -94,9 +94,9 @@ return new class extends Migration
             $table->foreignId('asset_id')->constrained()->restrictOnDelete();
             $table->foreignId('pm_checklist_id')->nullable()->constrained()->nullOnDelete();
             // Copy of the checklist items, so later checklist edits do not change old results.
-            $table->jsonb('checklist')->default('[]');
+            $table->json('checklist')->default('[]');
             $table->string('result', 10); // pending | ok | issue | skipped
-            $table->jsonb('answers')->default('{}'); // checklist key => answer
+            $table->json('answers')->default('{}'); // checklist key => answer
             $table->text('note')->nullable();
             // Repair ticket opened from this item (Service module).
             $table->foreignId('ticket_id')->nullable()->constrained()->nullOnDelete();

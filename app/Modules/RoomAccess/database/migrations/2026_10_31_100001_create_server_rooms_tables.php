@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\LiveUnique;
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -39,9 +40,9 @@ return new class extends Migration
             // Each entrant accepts the rules through a link of their own (else the requester for the team).
             $table->boolean('entrants_accept_self')->default(false);
             // Nobody may enter: [{from: Y-m-d H:i, to: Y-m-d H:i, reason}]
-            $table->jsonb('freeze_periods')->default('[]');
+            $table->json('freeze_periods')->default('[]');
             // Guards / caretakers at the site who get the link of an approved request: [{name, phone, email}]
-            $table->jsonb('guard_contacts')->default('[]');
+            $table->json('guard_contacts')->default('[]');
             $table->boolean('is_active')->default(true);
             $table->text('notes')->nullable();
             $table->timestamps();
@@ -49,7 +50,7 @@ return new class extends Migration
 
             $table->index(['tenant_id', 'customer_id']);
         });
-        DB::statement('CREATE UNIQUE INDEX server_rooms_tenant_customer_name_unique ON server_rooms (tenant_id, customer_id, lower(name)) WHERE deleted_at IS NULL');
+        LiveUnique::add('server_rooms', ['tenant_id', 'customer_id', 'name'], 'server_rooms_tenant_customer_name_unique');
         DB::statement("ALTER TABLE server_rooms ADD CONSTRAINT server_rooms_missing_rules_check CHECK (missing_rules IN ('block', 'company_terms'))");
         DB::statement("ALTER TABLE server_rooms ADD CONSTRAINT server_rooms_accept_mode_check CHECK (accept_mode IN ('every_request', 'once_per_version'))");
         Rls::enable('server_rooms');
@@ -71,7 +72,7 @@ return new class extends Migration
             $table->foreignId('server_room_id')->constrained()->restrictOnDelete();
             $table->unsignedInteger('version');
             // The rules in short, one line each (5-8), as the accept popup shows them.
-            $table->jsonb('summary');
+            $table->json('summary');
             $table->date('effective_on');
             // Where the rules came from: who at the customer gave them, and when.
             $table->string('received_from')->nullable();

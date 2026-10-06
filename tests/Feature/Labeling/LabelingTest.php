@@ -5,7 +5,6 @@ use App\Modules\Labeling\Models\AssetLabelPrint;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Tenancy\Models\Branch;
-use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Pennant\Feature;
 
@@ -90,8 +89,8 @@ it('keeps labels and scans per tenant, and scanning works with labeling switched
     $this->actingAs($this->tech)->get("/labels/print?assets={$theirAsset->ulid}")->assertNotFound();
     $this->actingAs($this->tech)->post('/labels/print', ['assets' => [$theirAsset->ulid], 'template' => 'roll_50x30']);
 
-    asTenant($other, fn () => expect(DB::table('asset_label_prints')->count())->toBe(0));
-    expect(DB::table('asset_label_prints')->count())->toBe(1);
+    asTenant($other, fn () => expect(AssetLabelPrint::count())->toBe(0));
+    expect(AssetLabelPrint::count())->toBe(1);
 
     Feature::for($this->tech->tenant)->deactivate(Modules::feature('labeling'));
     $this->actingAs($this->tech)->get('/labels')->assertNotFound();

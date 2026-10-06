@@ -6,7 +6,9 @@ Multi-tenant, SaaS instance เดียว, ทีมพัฒนา 1-2 คน
 ## Stack (ห้ามเปลี่ยนโดยไม่ถาม)
 - Laravel 12, PHP 8.3
 - Inertia 2 + Vue 3 + TypeScript + Tailwind
-- PostgreSQL 16 (ใช้ JSONB, RLS, partition ได้เต็มที่)
+- MariaDB 10.11 (เพราะโฮสต์แบบแชร์ของ Plesk มีแค่ MariaDB) — ไม่มี RLS, partial index,
+  `ilike`, `FILTER`, `RETURNING`, `::cast` ของ PostgreSQL (โค้ดเดิมที่ใช้ PostgreSQL ยังรันบน
+  PostgreSQL ได้ในส่วนของ RLS แต่ test รันบน MariaDB เท่านั้น)
 - Redis: cache / session / queue
 - Horizon, Pennant, spatie/laravel-permission, spatie/laravel-activitylog,
   spatie/laravel-medialibrary, maatwebsite/excel
@@ -17,17 +19,18 @@ Multi-tenant, SaaS instance เดียว, ทีมพัฒนา 1-2 คน
 
 ### 1. Multi-tenant — สำคัญที่สุด
 - ทุกตารางที่เก็บข้อมูลลูกค้าต้องมี `tenant_id` (foreignId, not null, index)
-- ทุก Model ของตารางนั้นต้อง `use BelongsToTenant`
-- ทุก migration ที่สร้างตารางใหม่ ต้อง ENABLE ROW LEVEL SECURITY และสร้าง POLICY
-  โดยเรียก `Rls::enable('table')` (`App\Modules\Tenancy\Support\Rls`) ต่อจาก `Schema::create`
+- ทุก Model ของตารางนั้นต้อง `use BelongsToTenant` — **นี่คือชั้นกันข้อมูลข้ามบริษัทชั้นเดียว**
+  (MariaDB ไม่มี RLS): TenantScope กรองทุก query ของ model, `creating` เติม/ตรวจ `tenant_id`
+  (สร้างลงบริษัทอื่นไม่ได้) และ `updating` ห้ามย้าย `tenant_id`
+- validation `exists` / `unique` ถูกจำกัดให้เห็นแค่บริษัทปัจจุบันอัตโนมัติ (`TenantPresenceVerifier`)
+- ยังเรียก `Rls::enable('table')` ต่อจาก `Schema::create` ได้ตามเดิม (บน MariaDB ไม่ทำอะไร)
 - ห้ามใช้ `withoutGlobalScope()` นอก `app/Modules/Platform/CrossTenant/`
   และถ้าใช้ ต้องมี comment อธิบายเหตุผล
 - Queue job ทุกตัวต้อง `use InteractsWithTenant` เพื่อพา tenant context ไปด้วย
-- ห้ามเขียน raw SQL ที่ไม่มีเงื่อนไข tenant
+- **ห้ามเขียน raw SQL / `DB::table()` ที่ไม่มีเงื่อนไข `tenant_id`** — ไม่มี RLS คอยกันแล้ว
+  query แบบนี้เห็นข้อมูลทุกบริษัท
 - tenant ปัจจุบันอยู่ใน `TenantContext` (singleton) — เปลี่ยน tenant ชั่วคราวด้วย
-  `app(TenantContext::class)->run($tenant, fn () => ...)` ห้ามตั้ง `app.tenant_id` เอง
-- app ต่อฐานด้วย role `autoservice_app` ที่ไม่ใช่เจ้าของตาราง (RLS จึงมีผลเสมอ)
-  migration ต้องรันด้วย `php artisan migrate --database=pgsql_migrate` — รายละเอียดใน README
+  `app(TenantContext::class)->run($tenant, fn () => ...)`
 
 ### 2. โครงสร้างโมดูล
 โค้ดอยู่ใน `app/Modules/{Module}/` เท่านั้น ไม่ใช่ `app/Models` หรือ `app/Http/Controllers`
@@ -57,17 +60,23 @@ Inventory, Labeling, Document, Survey, Reporting, Platform
 - ทุกฟีเจอร์ต้องมี Pest feature test
 - ทุกโมดูลต้องมี test พิสูจน์ว่า tenant A เข้าถึงข้อมูล tenant B ไม่ได้
 - ต้องรัน `php artisan test` ผ่านก่อน commit ทุกครั้ง
-- test รันบน PostgreSQL ฐาน `autoservice_test` (ไม่ใช้ sqlite เพราะต้องทดสอบ RLS)
+- test รันบน MariaDB 10.11 ฐาน `autoservice_test` (ไม่ใช้ sqlite — ต้องเหมือน server จริง)
 
 ### 5. ฐานข้อมูล
 - PK เป็น bigint auto-increment
 - สิ่งที่ปรากฏใน URL สาธารณะ (asset, ticket) ต้องมีคอลัมน์ `ulid` แยก และใช้ ulid ใน URL
 - ทุกตารางหลักมี soft delete — ห้ามลบข้อมูลธุรกิจจริง
-- JSONB ใช้กับ dynamic attribute เท่านั้น
+- JSON ใช้กับ dynamic attribute เท่านั้น
   ฟิลด์ที่ต้องค้นหาหรือกรองบ่อย ให้ทำเป็นคอลัมน์จริง
 - เงินเก็บเป็น integer หน่วยสตางค์ ห้ามใช้ float
+- ข้อควรระวังของ MariaDB:
+  - unique ที่ไม่นับแถวที่ลบแล้ว ใช้ `LiveUnique::add(...)` (ไม่มี partial index)
+  - ชื่อ index/constraint ยาวไม่เกิน 64 ตัวอักษร (ตั้งชื่อเองถ้ายาว)
+  - เลขรันใช้ `Counter::next(...)`, การกันชนกันตอนออกเลขใช้ `Counter::lockTenant(...)`
+  - `sum()` คืนค่าเป็น string — cast เป็น `(int)` ก่อนส่งไปหน้าเว็บ
+  - collation `utf8mb4_unicode_ci` ไม่สนตัวพิมพ์อยู่แล้ว ใช้ `like` ได้เลย (ไม่มี `ilike`)
 - migration ของ spatie (permission, activitylog, medialibrary) ยังไม่ได้ publish
-  ให้ publish ในขั้นที่ใช้งาน พร้อมเพิ่ม `tenant_id` + RLS
+  ให้ publish ในขั้นที่ใช้งาน พร้อมเพิ่ม `tenant_id`
 
 ### 6. UI และภาษา
 - ข้อความ UI เป็นภาษาไทยทั้งหมด ผ่าน lang file ห้าม hardcode ในคอมโพเนนต์
@@ -85,9 +94,11 @@ Inventory, Labeling, Document, Survey, Reporting, Platform
 - PHP 8.3 อยู่ที่ `C:\php83\php.exe` — ห้ามใช้ `php` ของ XAMPP (8.0) กับโปรเจกต์นี้
 - Composer: `C:\php83\php.exe C:\ProgramData\ComposerSetup\bin\composer.phar ...`
   (ต้องใส่ `--ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix` เพราะ Horizon)
-- PostgreSQL 16 portable ที่ `C:\pgsql16` (user `postgres` / pass `postgres`, port 5432)
-  - start: `C:\pgsql16\bin\pg_ctl.exe -D C:\pgsql16\data -l C:\pgsql16\data\server.log start`
-  - stop:  `C:\pgsql16\bin\pg_ctl.exe -D C:\pgsql16\data stop`
+- MariaDB 10.11 portable ที่ `C:\mariadb11` (user `root` / pass `root`, port 3307)
+  — ไม่ใช่ MySQL ของ XAMPP (10.4 ที่ port 3306)
+  - start: `C:\mariadb11\bin\mariadbd.exe --defaults-file=C:\mariadb11\data\my.ini`
+  - stop:  `C:\mariadb11\bin\mariadb-admin.exe -u root -proot -P 3307 shutdown`
+- PostgreSQL 16 portable ที่ `C:\pgsql16` ยังอยู่ (ข้อมูลเก่าก่อนย้ายมา MariaDB)
 - ยังไม่มี Redis / Gotenberg / Mailpit — ตอนนี้ cache/session/queue ใช้ driver `database`
   Horizon รันบน Windows ไม่ได้ (ต้องใช้ pcntl) ใช้ `php artisan queue:listen` แทน
 
@@ -96,5 +107,5 @@ Inventory, Labeling, Document, Survey, Reporting, Platform
 C:\php83\php.exe artisan test     # ต้องผ่านก่อน commit
 C:\php83\php.exe vendor/bin/pint  # จัดรูปแบบโค้ด
 npm run dev                       # frontend
-docker compose up -d              # เมื่อมี Docker: postgres, redis, gotenberg, mailpit
+docker compose up -d              # เมื่อมี Docker: mariadb, redis, gotenberg, mailpit
 ```

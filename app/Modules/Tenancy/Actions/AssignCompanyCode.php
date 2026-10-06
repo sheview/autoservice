@@ -21,9 +21,9 @@ class AssignCompanyCode
         }
 
         DB::transaction(function () use ($tenant) {
-            // One at a time: the table lock makes two new companies wait for each other.
-            DB::statement('LOCK TABLE company_codes IN EXCLUSIVE MODE');
-            $number = (int) DB::table('company_codes')->max('number') + 1;
+            // One at a time: locking the highest number makes two new companies wait for each other
+            // (and the unique number refuses a second one that slipped through).
+            $number = (int) DB::table('company_codes')->lockForUpdate()->max('number') + 1;
             $code = str_pad((string) $number, self::MIN_DIGITS, '0', STR_PAD_LEFT);
 
             DB::table('company_codes')->insert(['number' => $number, 'code' => $code, 'tenant_id' => null, 'created_at' => now()]);

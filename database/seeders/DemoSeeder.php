@@ -22,8 +22,10 @@ use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
+use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Actions\SaveRepairReport;
 use App\Modules\Service\Jobs\SendTicketNotification;
 use App\Modules\Service\Models\Holiday;
 use App\Modules\Service\Models\Ticket;
@@ -401,7 +403,17 @@ class DemoSeeder extends Seeder
                 Carbon::setTestNow(now()->addMinutes(fake()->numberBetween(20, 180)));
                 match ($move) {
                     'assign' => $this->assignTicket->handle($ticket, $technician->id, $helpdesk),
-                    'start', 'resolve' => $this->moveTicket->handle($ticket, $move, $technician),
+                    // Starting needs the warranty checked, resolving needs the repair report.
+                    'start' => $this->moveTicket->handle(
+                        app(CheckTicketWarranty::class)->handle($ticket, $technician, fake()->randomElement(Ticket::WARRANTY_STATUSES), null),
+                        'start', $technician),
+                    'resolve' => $this->moveTicket->handle(
+                        app(SaveRepairReport::class)->handle($ticket, $technician, [
+                            'cause' => fake()->randomElement(['สายสัญญาณหลวม', 'อุปกรณ์เสื่อมตามอายุ', 'ตั้งค่าผิด', 'ไฟกระชาก']),
+                            'extra_cost' => null,
+                            'approver_name' => $this->name(),
+                        ]),
+                        'resolve', $technician),
                     'hold' => $this->moveTicket->handle($ticket, 'hold', $technician, 'รออะไหล่จากผู้จำหน่าย'),
                     'approve' => $this->moveTicket->handle($ticket, 'approve', $admin),
                     'cancel' => $this->moveTicket->handle($ticket, 'cancel', $helpdesk, 'ลูกค้าแจ้งซ้ำกับใบงานเดิม'),

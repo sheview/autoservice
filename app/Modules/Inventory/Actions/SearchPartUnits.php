@@ -24,7 +24,7 @@ class SearchPartUnits
             ->when(in_array($filters['status'] ?? null, PartUnit::STATUSES, true), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when($filters['ticket_id'] ?? null, fn (Builder $query, $id) => $query->where('ticket_id', $id))
             ->when($filters['checkout_item_id'] ?? null, fn (Builder $query, $id) => $query->where('checkout_item_id', $id))
-            ->when($q !== '', fn (Builder $query) => $query->where('serial_number', 'ilike', '%'.addcslashes($q, '%_\\').'%'))
+            ->when($q !== '', fn (Builder $query) => $query->where('serial_number', 'like', '%'.addcslashes($q, '%_\\').'%'))
             ->orderByDesc('id');
     }
 }

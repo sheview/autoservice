@@ -1,7 +1,7 @@
 # Governix - ITSM
 
 ระบบจัดการทรัพย์สินและงานบริการ MA แบบ multi-tenant
-Laravel 12 · Inertia 2 + Vue 3 + TypeScript · PostgreSQL 16
+Laravel 12 · Inertia 2 + Vue 3 + TypeScript · MariaDB 10.11
 
 กฎการพัฒนาทั้งหมดอยู่ใน [CLAUDE.md](CLAUDE.md)
 
@@ -12,18 +12,21 @@ composer install
 npm install && npm run build
 cp .env.example .env && php artisan key:generate
 
-# สร้าง role และฐานข้อมูล (รันด้วย superuser ของ PostgreSQL ครั้งเดียว)
-psql -U postgres -h 127.0.0.1 -f database/setup/pgsql-roles.sql
+# สร้างฐานข้อมูล (utf8mb4_unicode_ci) แล้วใส่ชื่อฐาน/ผู้ใช้/รหัสผ่านใน .env
+mariadb -u root -e "CREATE DATABASE autoservice CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE DATABASE autoservice_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-php artisan migrate --database=pgsql_migrate
+php artisan migrate
 php artisan test
 ```
+
+ต้องใช้ MariaDB **10.11** ขึ้นไป (หรือเวอร์ชันที่ `explicit_defaults_for_timestamp = ON`)
+ถ้าเป็น OFF คอลัมน์ timestamp ตัวแรกของตารางจะกลายเป็น "อัปเดตเป็นเวลาปัจจุบันเอง" แบบเงียบ ๆ
 
 ## ข้อมูลตัวอย่างและการรันบนเครื่อง dev
 
 ```bash
 # ล้างฐานแล้วใส่ข้อมูลตัวอย่าง (DemoSeeder ไม่ทำงานบน production)
-php artisan migrate:fresh --database=pgsql_migrate --seed
+php artisan migrate:fresh --seed
 
 php artisan serve          # แอป
 npm run dev                # frontend
@@ -44,9 +47,10 @@ docker compose up -d gotenberg  # สำหรับปุ่ม PDF (ถ้า�
 
 ## Deploy (production)
 
-ต้องมี: Linux, PHP 8.3 (ext: pdo_pgsql, pgsql, intl, mbstring, gd, zip, exif, fileinfo, pcntl, posix, redis),
-PostgreSQL 16, Redis, Gotenberg 8, Node 20+ (เฉพาะตอน build), SMTP สำหรับอีเมล
-และ DNS แบบ wildcard `*.autoservice.example.com` ชี้มาที่เซิร์ฟเวอร์ (แต่ละบริษัทเข้าทาง subdomain ของตัวเอง)
+ต้องมี: PHP 8.3 (ext: pdo_mysql, intl, mbstring, gd, zip, exif, fileinfo), MariaDB 10.11,
+Node 20+ (เฉพาะตอน build), SMTP สำหรับอีเมล
+และ DNS แบบ wildcard `*.<โดเมนของระบบ>` ชี้มาที่เซิร์ฟเวอร์ (แต่ละบริษัทเข้าทาง subdomain ของตัวเอง)
+ถ้ามี: Redis (cache/session/queue), Gotenberg 8 (PDF), pcntl/posix (Horizon)
 
 php.ini (และ `client_max_body_size` ของ nginx) ต้องรับไฟล์แนบได้ครบ: ไฟล์ละไม่เกิน 2 MB ครั้งละไม่เกิน 10 ไฟล์
 และรูปถ่ายไม่เกิน 10 MB
@@ -57,6 +61,16 @@ post_max_size = 32M
 max_file_uploads = 20
 ```
 
+### บน Plesk แบบโฮสต์แชร์ (ไม่มี SSH / Docker)
+
+- สร้างโดเมน → document root เป็น `<โดเมน>/public`, PHP 8.3
+- Git → deploy ลง `<โดเมน>` (ไม่ใช่ `<โดเมน>/public`)
+- Databases → สร้างฐาน MariaDB และผู้ใช้ แล้วใส่ใน `.env` (`DB_CONNECTION=mariadb`)
+- ไม่มี Redis: ใช้ `CACHE_STORE=database`, `SESSION_DRIVER=database`, `QUEUE_CONNECTION=database`
+- คำสั่ง `artisan` / `composer` รันผ่าน Laravel Toolkit ของ Plesk (หรือ Scheduled Tasks แบบรันครั้งเดียว)
+- Scheduled Tasks ทุกนาที: `php artisan schedule:run` และ `php artisan queue:work --stop-when-empty --max-time=55`
+- ไม่มี Gotenberg: ปุ่ม PDF จะแจ้งว่ายังไม่พร้อม ใช้หน้า "พิมพ์" ของเบราว์เซอร์แทน
+
 ### ครั้งแรก
 
 ```bash
@@ -64,11 +78,9 @@ composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 cp .env.example .env && php artisan key:generate
 # แก้ .env: APP_ENV=production, APP_DEBUG=false, APP_URL, TENANCY_CENTRAL_DOMAINS, SESSION_DOMAIN,
-#            redis (cache/session/queue), MAIL_*, GOTENBERG_URL และรหัสผ่านของสอง role ฐานข้อมูล
+#            DB_*, cache/session/queue, MAIL_*, GOTENBERG_URL (ถ้ามี)
 
-# ฐานข้อมูล (superuser ของ PostgreSQL ครั้งเดียว) — เปลี่ยนรหัสผ่านในไฟล์ก่อนรัน
-psql -U postgres -f database/setup/pgsql-roles.sql
-php artisan migrate --database=pgsql_migrate --force
+php artisan migrate --force
 php artisan storage:link
 
 # บริษัทแพลตฟอร์มและ superadmin คนแรก (ถามชื่อ อีเมล รหัสผ่าน)
@@ -84,7 +96,7 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 
 | บริการ | คำสั่ง |
 |---|---|
-| Queue worker | `php artisan horizon` (ใช้ supervisor/systemd ดูแล) |
+| Queue worker | `php artisan horizon` (ใช้ supervisor/systemd ดูแล) หรือ `queue:work` ตามด้านบนบน Plesk |
 | งานตามเวลา | cron `* * * * * cd /path && php artisan schedule:run >> /dev/null 2>&1` |
 | Gotenberg | `docker run -d -p 3000:3000 gotenberg/gotenberg:8` (หรือดู docker-compose.yml) |
 
@@ -93,10 +105,10 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```bash
 php artisan down
 git pull && composer install --no-dev --optimize-autoloader && npm ci && npm run build
-php artisan migrate --database=pgsql_migrate --force
+php artisan migrate --force
 php artisan platform:sync-permissions      # เพิ่มสิทธิ์ใหม่ (ไม่ลบสิ่งที่บริษัทปรับเอง)
 php artisan config:cache && php artisan route:cache && php artisan view:cache
-php artisan horizon:terminate && php artisan up
+php artisan up
 ```
 
 ### อายุการใช้งานของบริษัทลูกค้า
@@ -112,39 +124,18 @@ superadmin กำหนดวันเริ่มและวันสิ้น
 
 superadmin ยังเข้าไปในบริษัทที่หมดอายุและแก้ไขได้เสมอ ส่วน helpdesk/ช่างส่วนกลางดูได้อย่างเดียว
 
-## ฐานข้อมูล: สอง role และ Row Level Security
+## ฐานข้อมูล: การแยกข้อมูลระหว่างบริษัท
 
-การแยกข้อมูลระหว่าง tenant มีสองชั้น
+MariaDB ไม่มี Row Level Security การแยกข้อมูลระหว่าง tenant จึงอยู่ในโค้ดทั้งหมด
 
-1. **Eloquent global scope** (`BelongsToTenant`) เติม `where tenant_id = ?` ให้ทุก query ของ Model
-2. **PostgreSQL RLS** ที่ฐานข้อมูล ซึ่งยังกันได้แม้ query ไม่ผ่าน Eloquent (`DB::table`, raw SQL)
-
-RLS จะมีผลจริงได้ต้องตั้งค่าสามอย่างนี้ครบ
-
-| ต้องมี | เพราะ |
+| ชั้น | ทำอะไร |
 |---|---|
-| app ต่อฐานด้วย role ที่**ไม่ใช่ superuser และไม่มี `BYPASSRLS`** | superuser และ `BYPASSRLS` ข้าม policy ทุกตัว |
-| app ต่อด้วย role ที่**ไม่ใช่เจ้าของตาราง** | เจ้าของตารางสั่ง `ALTER TABLE ... DISABLE ROW LEVEL SECURITY` ได้ |
-| ทุกตาราง tenant ใช้ `ENABLE` + `FORCE ROW LEVEL SECURITY` | `FORCE` ทำให้ policy ใช้กับเจ้าของตารางด้วย (เช่น ตอนรัน migration) |
+| `BelongsToTenant` → `TenantScope` | เติม `where tenant_id = ?` ให้ทุก query ของ Model (ไม่มี tenant = ไม่มีแถว) |
+| `BelongsToTenant` ตอน `creating` / `updating` | เติม `tenant_id` จาก tenant ปัจจุบัน, ห้ามสร้างลงบริษัทอื่น, ห้ามย้ายแถวไปบริษัทอื่น |
+| `TenantPresenceVerifier` | validation `exists` / `unique` เห็นเฉพาะแถวของบริษัทปัจจุบัน |
+| ทุก raw SQL / `DB::table()` | **ต้องใส่ `tenant_id` เอง** — ไม่มีอะไรกันให้แล้ว |
 
-จึงมีสอง role (สร้างโดย [database/setup/pgsql-roles.sql](database/setup/pgsql-roles.sql))
-
-| role | connection | ใช้ทำอะไร | สิทธิ์ |
-|---|---|---|---|
-| `autoservice_owner` | `pgsql_migrate` | รัน migration เท่านั้น | เจ้าของ database และทุกตาราง |
-| `autoservice_app` | `pgsql` (default) | app, queue worker, test | `SELECT/INSERT/UPDATE/DELETE` ผ่าน default privileges |
-
-ผลที่ตามมา:
-
-- **migration ต้องรันด้วย `--database=pgsql_migrate` เสมอ** ถ้าลืม จะได้ error เรื่องสิทธิ์ `CREATE`
-- test สร้าง schema ด้วย role owner ครั้งเดียว (ดู `tests/TestCase.php`) แล้วรันทุก test ด้วย role app
-- ตารางใหม่ที่ owner สร้าง role app จะได้สิทธิ์อัตโนมัติ ไม่ต้อง `GRANT` เอง
-
-Policy อ่านค่าจาก setting `app.tenant_id` ของ session ฐานข้อมูล ซึ่ง `TenantContext::set()` เป็นคนตั้ง
-ถ้าไม่มี tenant ค่าจะเป็น `''` แล้ว policy จะไม่คืนแถวใดเลย
-
-บน production ให้เปลี่ยนรหัสผ่านของทั้งสอง role และใส่ใน `.env`
-(`DB_USERNAME/DB_PASSWORD` และ `DB_MIGRATE_USERNAME/DB_MIGRATE_PASSWORD`)
+`Rls::enable()` ใน migration ยังเรียกได้ (เปิด RLS ให้เมื่อรันบน PostgreSQL บน MariaDB ไม่ทำอะไร)
 
 ## Tenant ของ request
 

@@ -24,7 +24,8 @@ class TicketParts
             ->groupBy('part_id')
             ->selectRaw('part_id, -sum(quantity) as used')
             ->pluck('used', 'part_id')
-            ->filter(fn ($quantity) => (int) $quantity > 0);
+            ->map(fn ($quantity) => (int) $quantity)
+            ->filter(fn (int $quantity) => $quantity > 0);
 
         // How each part left stock for this ticket: used up, lent, put in as a spare (may be several).
         $types = StockMovement::query()

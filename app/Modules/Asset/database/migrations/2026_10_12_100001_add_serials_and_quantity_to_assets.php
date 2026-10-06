@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\LiveUnique;
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -38,12 +39,12 @@ return new class extends Migration
         });
 
         // A serial number belongs to one asset of the tenant (ignoring case); a removed one can be used again.
-        DB::statement('CREATE UNIQUE INDEX asset_serials_tenant_serial_unique ON asset_serials (tenant_id, lower(serial_number)) WHERE deleted_at IS NULL');
+        LiveUnique::add('asset_serials', ['tenant_id', 'serial_number'], 'asset_serials_tenant_serial_unique');
 
         // FORCE ROW LEVEL SECURITY applies to the table owner too, and no tenant is set while migrating:
         // lift it for the copy so every tenant's rows are seen, then put it back.
-        DB::statement('ALTER TABLE assets NO FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE asset_categories NO FORCE ROW LEVEL SECURITY');
+        Rls::noForce('assets');
+        Rls::noForce('asset_categories');
 
         DB::statement("UPDATE asset_categories SET requires_serial = true WHERE asset_type = 'hardware'");
         DB::statement(<<<'SQL'
@@ -53,8 +54,8 @@ return new class extends Migration
             WHERE deleted_at IS NULL AND trim(coalesce(serial_number, '')) <> ''
             SQL);
 
-        DB::statement('ALTER TABLE assets FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE asset_categories FORCE ROW LEVEL SECURITY');
+        Rls::force('assets');
+        Rls::force('asset_categories');
 
         Rls::enable('asset_serials');
     }

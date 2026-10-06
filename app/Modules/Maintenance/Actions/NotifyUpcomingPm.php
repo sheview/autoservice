@@ -40,7 +40,7 @@ class NotifyUpcomingPm
             ->with('plan:id,title')
             ->where('status', PmVisit::STATUS_SCHEDULED)
             ->whereNull('reminded_at')
-            ->whereRaw('coalesce(scheduled_on, due_on) <= ?::date', [$until])
+            ->whereRaw('coalesce(scheduled_on, due_on) <= ?', [$until])
             ->orderByRaw('coalesce(scheduled_on, due_on)')
             ->get();
 

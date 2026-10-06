@@ -33,6 +33,10 @@ class IdentityLookup
 
     private static function set(string $value): void
     {
+        // Without row level security (MariaDB) only the users' TenantScope is bypassed, by the caller.
+        if (! Rls::supported()) {
+            return;
+        }
         DB::select('select set_config(?, ?, false)', [Rls::IDENTITY_LOOKUP, $value]);
     }
 }

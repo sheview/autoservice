@@ -21,9 +21,11 @@ it('registers module migration folders with the migrator', function () {
     expect($paths)->toContain(str_replace('\\', '/', app_path('Modules/Tenancy/database/migrations')));
 });
 
-it('runs on PostgreSQL', function () {
-    expect(DB::connection()->getDriverName())->toBe('pgsql')
-        ->and(DB::selectOne('select version() as v')->v)->toStartWith('PostgreSQL 16');
+it('runs on MariaDB 10.11 with explicit timestamp defaults', function () {
+    expect(DB::connection()->getDriverName())->toBe('mariadb')
+        ->and(DB::selectOne('select version() as v')->v)->toStartWith('10.11')
+        // Otherwise the first NOT NULL timestamp of a table silently becomes "ON UPDATE now()".
+        ->and((int) DB::selectOne('select @@explicit_defaults_for_timestamp as v')->v)->toBe(1);
 });
 
 it('uses Bangkok timezone and Thai locale', function () {

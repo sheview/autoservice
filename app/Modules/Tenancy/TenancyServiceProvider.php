@@ -6,6 +6,7 @@ use App\Modules\Tenancy\Actions\AssignCompanyCode;
 use App\Modules\Tenancy\Concerns\InteractsWithTenant;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
+use App\Modules\Tenancy\Support\TenantPresenceVerifier;
 use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -23,6 +24,9 @@ class TenancyServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(TenantContext::class);
+
+        // "exists" / "unique" validation sees the current tenant's rows only.
+        $this->app->extend('validation.presence', fn ($verifier, $app) => new TenantPresenceVerifier($app['db']));
     }
 
     public function boot(): void

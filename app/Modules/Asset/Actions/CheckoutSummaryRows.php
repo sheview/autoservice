@@ -34,7 +34,7 @@ class CheckoutSummaryRows
             ->selectRaw("case when checkout_items.item_type = 'part' then 'issue' else checkout_items.checkout_type end as kind")
             ->selectRaw("case when checkout_items.status not in ({$finished})
                 or (checkout_items.checkout_type = 'loan' and checkout_items.qty_fulfilled > checkout_items.qty_returned) then 1 else 0 end as is_open", CheckoutItem::FINISHED)
-            ->selectRaw('coalesce(checkout_items.qty_approved, checkout_items.qty_requested) as quantity, null::bigint as amount')
+            ->selectRaw('coalesce(checkout_items.qty_approved, checkout_items.qty_requested) as quantity, null as amount')
             ->selectRaw('coalesce(checkout_requests.submitted_at, checkout_requests.created_at) as at')
             ->toBase();
     }

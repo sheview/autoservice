@@ -67,7 +67,7 @@ return new class extends Migration
             $table->unique(['tenant_id', 'request_no']);
             $table->index(['tenant_id', 'status', 'planned_start']);
             $table->index(['tenant_id', 'requester_id']);
-            $table->index(['tenant_id', 'server_room_id', 'planned_start']);
+            $table->index(['tenant_id', 'server_room_id', 'planned_start'], 'room_access_requests_room_start_index');
         });
         DB::statement("ALTER TABLE room_access_requests ADD CONSTRAINT room_access_requests_status_check CHECK (status IN ('draft', 'pending', 'approved', 'inside', 'exited', 'rejected', 'cancelled', 'overdue'))");
         DB::statement('ALTER TABLE room_access_requests ADD CONSTRAINT room_access_requests_times_check CHECK (planned_end > planned_start)');
@@ -118,7 +118,7 @@ return new class extends Migration
             // Accepted for the whole team (the requester answers for telling them).
             $table->boolean('on_behalf_of_team')->default(false);
             // The text shown then: customer and room, the rules' lines, the company's terms.
-            $table->jsonb('snapshot');
+            $table->json('snapshot');
             $table->string('ip', 45)->nullable();
             $table->text('user_agent')->nullable();
             $table->timestamp('accepted_at');
@@ -152,8 +152,10 @@ return new class extends Migration
             $table->string('phone', 50)->nullable();
             $table->timestamp('last_used_at');
             $table->timestamps();
+            // One row per person and company (none = ''), ignoring case through the collation.
+            $table->string('company_key')->storedAs("IFNULL(company, '')");
+            $table->unique(['tenant_id', 'owner_id', 'name', 'company_key'], 'room_visitors_owner_person_unique');
         });
-        DB::statement("CREATE UNIQUE INDEX room_visitors_owner_person_unique ON room_visitors (tenant_id, owner_id, lower(name), lower(coalesce(company, '')))");
         Rls::enable('room_visitors');
     }
 

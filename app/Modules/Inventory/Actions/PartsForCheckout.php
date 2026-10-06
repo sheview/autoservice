@@ -23,9 +23,9 @@ class PartsForCheckout
             ? Part::withTrashed()->whereKey($ids)
             : Part::query()->where('is_active', true)
                 ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
-                    ->where('code', 'ilike', "%{$search}%")
-                    ->orWhere('name', 'ilike', "%{$search}%")
-                    ->orWhere('part_number', 'ilike', "%{$search}%")))
+                    ->where('code', 'like', "%{$search}%")
+                    ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('part_number', 'like', "%{$search}%")))
                 ->orderBy('name')
                 ->limit(self::LIMIT);
 

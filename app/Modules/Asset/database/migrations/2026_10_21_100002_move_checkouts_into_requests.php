@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -24,7 +25,7 @@ return new class extends Migration
     {
         // Runs across every tenant: let the owner past row level security meanwhile.
         foreach (self::TABLES as $table) {
-            DB::statement("ALTER TABLE {$table} NO FORCE ROW LEVEL SECURITY");
+            Rls::noForce($table);
         }
 
         foreach (DB::table('asset_checkouts')->orderBy('id')->get() as $old) {
@@ -44,7 +45,7 @@ return new class extends Migration
         }
 
         foreach (self::TABLES as $table) {
-            DB::statement("ALTER TABLE {$table} FORCE ROW LEVEL SECURITY");
+            Rls::force($table);
         }
     }
 

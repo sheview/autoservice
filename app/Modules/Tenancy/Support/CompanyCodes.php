@@ -32,7 +32,7 @@ class CompanyCodes
 
         return Tenant::query()
             ->where('is_platform', false)
-            ->whereRaw('company_code ~ \'^[0-9]+$\' and company_code::int = ?', [(int) $typed])
+            ->whereRaw('company_code REGEXP \'^[0-9]+$\' and cast(company_code as unsigned) = ?', [(int) $typed])
             ->first();
     }
 

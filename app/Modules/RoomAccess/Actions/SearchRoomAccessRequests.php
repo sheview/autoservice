@@ -68,8 +68,8 @@ class SearchRoomAccessRequests
             ->with('room:id,ulid,name,customer_id')
             ->withCount('people')
             ->when($search !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
-                ->where('request_no', 'ilike', $like)->orWhere('purpose', 'ilike', $like)->orWhere('requester_name', 'ilike', $like)
-                ->orWhereHas('people', fn (Builder $p) => $p->where('name', 'ilike', $like))))
+                ->where('request_no', 'like', $like)->orWhere('purpose', 'like', $like)->orWhere('requester_name', 'like', $like)
+                ->orWhereHas('people', fn (Builder $p) => $p->where('name', 'like', $like))))
             ->when(($filters['status'] ?? 'open') === 'open', fn (Builder $q) => $q->whereIn('status', RoomAccessRequest::OPEN_STATUSES))
             ->when(in_array($filters['status'] ?? null, RoomAccessRequest::STATUSES, true), fn (Builder $q) => $q->where('status', $filters['status']))
             ->when($awaiting, fn (Builder $q) => $q->whereIn('id', self::awaitingIds($awaitingFor)))

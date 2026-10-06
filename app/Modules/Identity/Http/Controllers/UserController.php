@@ -48,9 +48,9 @@ class UserController extends Controller
             own: fn ($q) => $q->whereKey($viewer->id))
             ->with(['branch:id,name', 'roles:id,name,label'])
             ->when($filters['search'] !== '', fn ($q) => $q->where(fn ($q) => $q
-                ->where('name', 'ilike', "%{$filters['search']}%")
-                ->orWhere('email', 'ilike', "%{$filters['search']}%")
-                ->orWhere('employee_code', 'ilike', "%{$filters['search']}%")))
+                ->where('name', 'like', "%{$filters['search']}%")
+                ->orWhere('email', 'like', "%{$filters['search']}%")
+                ->orWhere('employee_code', 'like', "%{$filters['search']}%")))
             ->when($filters['branch_id'], fn ($q, $id) => $q->where('branch_id', $id))
             ->when($filters['role'], fn ($q, $role) => $q->role($role))
             ->when($filters['status'] === 'active', fn ($q) => $q->where('is_active', true))

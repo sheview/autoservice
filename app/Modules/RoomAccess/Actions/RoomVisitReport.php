@@ -39,9 +39,9 @@ class RoomVisitReport
                 ->when($filters['customer_id'] ?? null, fn (Builder $q, int $id) => $q->where('customer_id', $id))
                 ->when($filters['contract_id'] ?? null, fn (Builder $q, int $id) => $q->where('contract_id', $id))
                 ->when($search !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
-                    ->where('request_no', 'ilike', $like)->orWhere('purpose', 'ilike', $like)->orWhere('requester_name', 'ilike', $like)
-                    ->orWhere('work_summary', 'ilike', $like)
-                    ->orWhereHas('people', fn (Builder $p) => $p->where('name', 'ilike', $like)))))
+                    ->where('request_no', 'like', $like)->orWhere('purpose', 'like', $like)->orWhere('requester_name', 'like', $like)
+                    ->orWhere('work_summary', 'like', $like)
+                    ->orWhereHas('people', fn (Builder $p) => $p->where('name', 'like', $like)))))
             ->with(['request.room:id,name', 'request.people:id,request_id,name,company,position'])
             ->orderBy('entered_at', ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc')
             ->orderByDesc('id');

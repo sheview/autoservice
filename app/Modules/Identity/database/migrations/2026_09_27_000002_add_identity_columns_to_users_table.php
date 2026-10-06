@@ -3,7 +3,6 @@
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -17,7 +16,7 @@ return new class extends Migration
             $table->string('employee_code')->nullable()->after('email');
             $table->string('position')->nullable()->after('employee_code');
             $table->string('phone')->nullable()->after('position');
-            $table->jsonb('service_lines')->default('[]')->after('phone');
+            $table->json('service_lines')->default('[]')->after('phone');
             $table->boolean('is_active')->default(true)->after('service_lines');
             $table->softDeletes();
         });
@@ -29,8 +28,7 @@ return new class extends Migration
 
     public function down(): void
     {
-        DB::statement('DROP POLICY IF EXISTS tenant_isolation ON users');
-        DB::statement('ALTER TABLE users DISABLE ROW LEVEL SECURITY');
+        Rls::disable('users');
 
         Schema::table('users', function (Blueprint $table) {
             $table->dropConstrainedForeignId('branch_id');

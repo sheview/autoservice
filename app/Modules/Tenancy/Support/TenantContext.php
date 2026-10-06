@@ -10,8 +10,8 @@ use Spatie\Permission\PermissionRegistrar;
  * The tenant of the current request or job (singleton).
  *
  * Setting it also:
- *  - writes "app.tenant_id" on the database session, which is what the RLS policies read
- *    (cleared = '' so that no tenant row is visible)
+ *  - on PostgreSQL, writes "app.tenant_id" on the database session, which is what the RLS
+ *    policies read (cleared = '' so that no tenant row is visible)
  *  - switches spatie/laravel-permission to this tenant (team id, permission cache key)
  */
 class TenantContext
@@ -27,10 +27,12 @@ class TenantContext
         $this->tenant = $tenant instanceof Tenant ? $tenant : null;
         $this->id = $tenant instanceof Tenant ? $tenant->getKey() : $tenant;
 
-        DB::select('select set_config(?, ?, false)', [
-            Rls::SETTING,
-            $this->id === null ? '' : (string) $this->id,
-        ]);
+        if (Rls::supported()) {
+            DB::select('select set_config(?, ?, false)', [
+                Rls::SETTING,
+                $this->id === null ? '' : (string) $this->id,
+            ]);
+        }
 
         $this->switchPermissions();
     }

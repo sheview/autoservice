@@ -2,7 +2,6 @@
 
 use App\Modules\Document\Models\Media;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -116,7 +115,6 @@ it('keeps photos per tenant', function () {
     $this->actingAs($this->admin)->delete("/assets/{$theirAsset->ulid}/photos/0")->assertNotFound();
     $this->actingAs($this->admin)->post("/parts/{$theirPart->id}/photos/0", ($this->photo)())->assertNotFound();
 
-    expect(DB::table('media')->count())->toBe(1)
-        ->and(Media::count())->toBe(1);
+    expect(Media::count())->toBe(1);
     asTenant($other, fn () => expect(Media::sole()->name)->toBe('theirs'));
 });

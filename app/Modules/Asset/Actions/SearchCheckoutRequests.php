@@ -72,11 +72,11 @@ class SearchCheckoutRequests
         })
             ->with('items')
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('request_no', 'ilike', "%{$search}%")
-                ->orWhere('borrower_name', 'ilike', "%{$search}%")
-                ->orWhere('requester_name', 'ilike', "%{$search}%")
-                ->orWhere('purpose', 'ilike', "%{$search}%")
-                ->orWhereHas('items', fn ($q) => $q->where('item_name', 'ilike', "%{$search}%")->orWhere('item_code', 'ilike', "%{$search}%")
+                ->where('request_no', 'like', "%{$search}%")
+                ->orWhere('borrower_name', 'like', "%{$search}%")
+                ->orWhere('requester_name', 'like', "%{$search}%")
+                ->orWhere('purpose', 'like', "%{$search}%")
+                ->orWhereHas('items', fn ($q) => $q->where('item_name', 'like', "%{$search}%")->orWhere('item_code', 'like', "%{$search}%")
                     // Or a piece with that serial number went out on the line (Inventory module).
                     ->when(app(Modules::class)->enabled('inventory'), fn ($q) => $q->orWhereIn('id', app(CheckoutItemIdsWithSerial::class)->handle($search))))))
             ->when($tab === 'approve', fn (Builder $q) => $q->where('status', CheckoutRequest::STATUS_PENDING))
@@ -90,7 +90,7 @@ class SearchCheckoutRequests
             ->when($filters['borrower_name'] ?? null, fn (Builder $q, $name) => $q->whereNull('borrower_user_id')->where('borrower_name', $name))
             ->when($filters['contract_id'] ?? null, fn (Builder $q, $id) => $q->where('contract_id', $id))
             ->when($sort === 'needed_by',
-                fn (Builder $q) => $q->orderByRaw("needed_by {$direction} nulls last"),
+                fn (Builder $q) => $q->orderByRaw("needed_by is null, needed_by {$direction}"),
                 fn (Builder $q) => $q->orderBy($sort, $direction))
             ->orderByDesc('id');
     }

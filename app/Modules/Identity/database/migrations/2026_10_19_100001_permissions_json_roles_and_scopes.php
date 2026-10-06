@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -95,7 +96,7 @@ return new class extends Migration
 
         // This runs across every tenant: let the owner past row level security meanwhile.
         foreach (self::RLS_TABLES as $table) {
-            DB::statement("ALTER TABLE {$table} NO FORCE ROW LEVEL SECURITY");
+            Rls::noForce($table);
         }
 
         $now = now();
@@ -137,7 +138,7 @@ return new class extends Migration
         DB::table('roles')->where('name', 'customer')->update(['name' => 'customer_it', 'label' => 'เจ้าหน้าที่ไอทีของลูกค้า']);
 
         foreach (self::RLS_TABLES as $table) {
-            DB::statement("ALTER TABLE {$table} FORCE ROW LEVEL SECURITY");
+            Rls::force($table);
         }
     }
 

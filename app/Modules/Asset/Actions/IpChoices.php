@@ -29,7 +29,7 @@ class IpChoices
         $choices = IpAddress::query()
             ->with('subnet')
             ->whereHas('subnet.network', $owner)
-            ->where(fn ($q) => $q->where('ip', 'like', "{$search}%")->orWhere('hostname', 'ilike', "%{$search}%"))
+            ->where(fn ($q) => $q->where('ip', 'like', "{$search}%")->orWhere('hostname', 'like', "%{$search}%"))
             ->orderBy('ip_int')
             ->limit($limit)
             ->get()

@@ -2,7 +2,7 @@
 
 use App\Modules\Service\Models\Holiday;
 use App\Modules\Service\Models\Ticket;
-use Illuminate\Support\Facades\DB;
+use App\Modules\Service\Models\TicketEvent;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -76,9 +76,9 @@ it('keeps tickets, holidays and their numbers per tenant', function () {
     $this->actingAs($this->admin)->post("/tickets/{$mine->ulid}/assign", ['assignee_id' => $theirUser->id])
         ->assertSessionHasErrors('assignee_id');
 
-    // and raw queries only see this tenant (RLS)
-    expect(DB::table('tickets')->pluck('id')->all())->toBe([$mine->id])
-        ->and(DB::table('ticket_events')->where('ticket_id', $theirs->id)->count())->toBe(0)
-        ->and(DB::table('holidays')->pluck('name')->all())->toBe(['Mine'])
+    // and queries only see this tenant
+    expect(Ticket::pluck('id')->all())->toBe([$mine->id])
+        ->and(TicketEvent::where('ticket_id', $theirs->id)->count())->toBe(0)
+        ->and(Holiday::pluck('name')->all())->toBe(['Mine'])
         ->and(Ticket::count())->toBe(1);
 });

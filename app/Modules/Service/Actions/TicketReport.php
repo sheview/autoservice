@@ -39,7 +39,7 @@ class TicketReport
 
         $resolveSeconds = $query()
             ->whereBetween('resolved_at', [$from, $to])
-            ->selectRaw('avg(extract(epoch from (resolved_at - created_at))) as seconds')
+            ->selectRaw('avg(timestampdiff(second, created_at, resolved_at)) as seconds')
             ->value('seconds');
 
         $states = $tickets->mapWithKeys(fn (Ticket $ticket) => [$ticket->id => TicketSlaState::of($ticket)]);

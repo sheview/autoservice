@@ -11,14 +11,14 @@ use Illuminate\Support\Carbon;
  */
 class SummaryTotals
 {
-    public const SELECT = "count(*) filter (where kind = 'issue') as issues,
-        count(*) filter (where kind = 'issue' and is_open = 1) as issues_open,
-        count(*) filter (where kind = 'loan') as loans,
-        count(*) filter (where kind = 'loan' and is_open = 1) as loans_open,
-        count(*) filter (where kind = 'purchase') as purchases,
-        count(*) filter (where kind = 'purchase' and is_open = 1) as purchases_open,
-        coalesce(sum(amount) filter (where kind = 'purchase'), 0) as purchase_amount,
-        count(*) filter (where is_open = 1) as open_count,
+    public const SELECT = "count(case when kind = 'issue' then 1 end) as issues,
+        count(case when kind = 'issue' and is_open = 1 then 1 end) as issues_open,
+        count(case when kind = 'loan' then 1 end) as loans,
+        count(case when kind = 'loan' and is_open = 1 then 1 end) as loans_open,
+        count(case when kind = 'purchase' then 1 end) as purchases,
+        count(case when kind = 'purchase' and is_open = 1 then 1 end) as purchases_open,
+        coalesce(sum(case when kind = 'purchase' then amount end), 0) as purchase_amount,
+        count(case when is_open = 1 then 1 end) as open_count,
         count(*) as total,
         max(at) as last_at";
 

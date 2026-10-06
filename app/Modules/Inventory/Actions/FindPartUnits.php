@@ -23,7 +23,7 @@ class FindPartUnits
         }
 
         return PartUnit::query()->with('part:id,code,name')
-            ->where('serial_number', 'ilike', '%'.addcslashes($search, '%_\\').'%')
+            ->where('serial_number', 'like', '%'.addcslashes($search, '%_\\').'%')
             ->orderByRaw('lower(serial_number) = ? desc', [mb_strtolower($search)])->orderByDesc('id')
             ->limit(self::LIMIT)->get()
             ->map(fn (PartUnit $unit) => [...PartUnitHistory::row($unit), 'part' => $unit->part?->only(['id', 'code', 'name'])])

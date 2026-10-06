@@ -25,7 +25,7 @@ class SearchTickets
     public const DUE_SOON_HOURS = 4;
 
     /** Priority order for sorting, most urgent first. */
-    private const PRIORITY_ORDER = "array_position(array['critical','high','medium','low']::varchar[], priority)";
+    private const PRIORITY_ORDER = "field(priority, 'critical', 'high', 'medium', 'low')";
 
     /**
      * @return array{search: string, status: string, priority: string|null, assignee: string|null,
@@ -64,9 +64,9 @@ class SearchTickets
 
         return self::visibleTo(Ticket::query(), $user)
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('ticket_no', 'ilike', '%'.TicketNumber::stored($search).'%')
-                ->orWhere('title', 'ilike', "%{$search}%")
-                ->orWhere('contact_name', 'ilike', "%{$search}%")))
+                ->where('ticket_no', 'like', '%'.TicketNumber::stored($search).'%')
+                ->orWhere('title', 'like', "%{$search}%")
+                ->orWhere('contact_name', 'like', "%{$search}%")))
             // Running jobs, and reports waiting for the helpdesk to look at them.
             ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', [Ticket::STATUS_PENDING_REVIEW, ...Ticket::OPEN_STATUSES]))
             ->when(! in_array($status, ['open', 'all'], true), fn (Builder $q) => $q->where('status', $status))

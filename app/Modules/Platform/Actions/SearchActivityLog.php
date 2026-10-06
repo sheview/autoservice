@@ -41,10 +41,10 @@ class SearchActivityLog
 
         return Activity::query()
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('description', 'ilike', "%{$search}%")
-                ->orWhere('event', 'ilike', "%{$search}%")
-                ->orWhereRaw("properties->'actor'->>'name' ilike ?", ["%{$search}%"])
-                ->orWhereRaw('properties::text ilike ?', ["%{$search}%"])))
+                ->where('description', 'like', "%{$search}%")
+                ->orWhere('event', 'like', "%{$search}%")
+                ->orWhereRaw("json_unquote(json_extract(properties, '$.actor.name')) collate utf8mb4_unicode_ci like ?", ["%{$search}%"])
+                ->orWhereRaw('properties like ?', ["%{$search}%"])))
             ->when($filters['subject'] ?? null, fn (Builder $q, $subject) => $q->where('subject_type', $subject))
             ->when($filters['from'] ?? null, fn (Builder $q, $from) => $q->where('created_at', '>=', Carbon::parse($from)->startOfDay()))
             ->when($filters['to'] ?? null, fn (Builder $q, $to) => $q->where('created_at', '<=', Carbon::parse($to)->endOfDay()))

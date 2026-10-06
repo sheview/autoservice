@@ -19,7 +19,7 @@ class AssetTrend
     /** The yearly chart shows this many years, ending with the chosen one. */
     public const YEARS = 5;
 
-    private const ACQUIRED_ON = 'coalesce(assets.purchased_at, assets.created_at::date)';
+    private const ACQUIRED_ON = 'coalesce(assets.purchased_at, date(assets.created_at))';
 
     /**
      * @return array{monthly: list<int>, yearly: array{years: list<int>, counts: list<int>}, first_year: int|null}
@@ -35,7 +35,7 @@ class AssetTrend
         $series = function (string $part, CarbonImmutable $from, array $keys) use ($visible, $yearStart): array {
             $rows = $visible()
                 ->whereRaw(self::ACQUIRED_ON.' between ? and ?', [$from->toDateString(), $yearStart->endOfYear()->toDateString()])
-                ->selectRaw('extract('.$part.' from '.self::ACQUIRED_ON.')::int as k, sum(assets.quantity) as total')
+                ->selectRaw('extract('.$part.' from '.self::ACQUIRED_ON.') as k, sum(assets.quantity) as total')
                 ->groupBy('k')
                 ->toBase()
                 ->pluck('total', 'k');

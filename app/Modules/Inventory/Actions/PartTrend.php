@@ -21,7 +21,7 @@ class PartTrend
             $rows = StockMovement::query()
                 ->where('type', StockMovement::TYPE_RECEIVE)
                 ->whereBetween('created_at', [$from, CarbonImmutable::create($year)->endOfYear()])
-                ->selectRaw("extract({$part} from created_at)::int as k, sum(quantity) as total")
+                ->selectRaw("extract({$part} from created_at) as k, sum(quantity) as total")
                 ->groupBy('k')
                 ->toBase()
                 ->pluck('total', 'k');

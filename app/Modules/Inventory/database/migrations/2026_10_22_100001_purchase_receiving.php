@@ -40,7 +40,7 @@ return new class extends Migration
             $table->string('model', 100)->nullable();
             $table->bigInteger('unit_price')->nullable(); // paid, satang
             // Serial numbers read off the goods, as many as were written down.
-            $table->jsonb('serials')->default('[]');
+            $table->json('serials')->default('[]');
             $table->text('note')->nullable();
             $table->foreignId('received_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('received_by_name')->nullable();
@@ -90,9 +90,9 @@ return new class extends Migration
     private function backfill(): void
     {
         // Runs across every tenant: let the owner past row level security meanwhile.
-        DB::statement('ALTER TABLE purchase_requests NO FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE purchase_request_events NO FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE purchase_receipts NO FORCE ROW LEVEL SECURITY');
+        Rls::noForce('purchase_requests');
+        Rls::noForce('purchase_request_events');
+        Rls::noForce('purchase_receipts');
 
         DB::table('purchase_requests')->where('status', 'received')->update(['qty_received' => DB::raw('quantity')]);
 
@@ -126,8 +126,8 @@ return new class extends Migration
             DB::table('purchase_request_events')->insert($rows);
         }
 
-        DB::statement('ALTER TABLE purchase_requests FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE purchase_request_events FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE purchase_receipts FORCE ROW LEVEL SECURITY');
+        Rls::force('purchase_requests');
+        Rls::force('purchase_request_events');
+        Rls::force('purchase_receipts');
     }
 };

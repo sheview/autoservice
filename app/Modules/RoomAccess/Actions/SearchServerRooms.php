@@ -25,7 +25,7 @@ class SearchServerRooms
             ->with('currentRules')
             ->withCount('ruleVersions')
             ->when(($filters['search'] ?? '') !== '', fn (Builder $q) => $q->where(fn (Builder $w) => $w
-                ->where('name', 'ilike', $like)->orWhere('location', 'ilike', $like)))
+                ->where('name', 'like', $like)->orWhere('location', 'like', $like)))
             ->when($filters['customer_id'] ?? null, fn (Builder $q, int $id) => $q->where('customer_id', $id))
             ->when(($filters['rules'] ?? null) === 'missing', fn (Builder $q) => $q->whereDoesntHave('ruleVersions'))
             ->when(($filters['rules'] ?? null) === 'set', fn (Builder $q) => $q->whereHas('ruleVersions'))

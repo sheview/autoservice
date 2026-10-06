@@ -60,8 +60,8 @@ class SearchPmVisits
                 'items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_ISSUE),
             ])
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('visit_no', 'ilike', "%{$search}%")
-                ->orWhereHas('plan', fn ($q) => $q->where('title', 'ilike', "%{$search}%"))))
+                ->where('visit_no', 'like', "%{$search}%")
+                ->orWhereHas('plan', fn ($q) => $q->where('title', 'like', "%{$search}%"))))
             ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', PmVisit::OPEN_STATUSES))
             ->when($status === 'overdue', fn (Builder $q) => $q->whereIn('status', PmVisit::OPEN_STATUSES)->where('due_on', '<', $today))
             ->when(in_array($status, PmVisit::STATUSES, true), fn (Builder $q) => $q->where('status', $status))

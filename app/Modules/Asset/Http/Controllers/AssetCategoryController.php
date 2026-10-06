@@ -32,8 +32,8 @@ class AssetCategoryController extends Controller
         $categories = AssetCategory::query()
             ->withCount('assets')
             ->when($filters['search'] !== '', fn ($q) => $q->where(fn ($q) => $q
-                ->where('name', 'ilike', "%{$filters['search']}%")
-                ->orWhere('code_prefix', 'ilike', "%{$filters['search']}%")))
+                ->where('name', 'like', "%{$filters['search']}%")
+                ->orWhere('code_prefix', 'like', "%{$filters['search']}%")))
             ->when($filters['service_line'], fn ($q, $line) => $q->where('service_line', $line))
             ->when($filters['asset_type'], fn ($q, $type) => $q->where('asset_type', $type))
             ->orderBy($filters['sort'], $filters['direction'])

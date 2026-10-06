@@ -42,10 +42,10 @@ class SearchParts
 
         return Part::query()
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('code', 'ilike', "%{$search}%")
-                ->orWhere('name', 'ilike', "%{$search}%")
-                ->orWhere('part_number', 'ilike', "%{$search}%")
-                ->orWhere('brand', 'ilike', "%{$search}%")
+                ->where('code', 'like', "%{$search}%")
+                ->orWhere('name', 'like', "%{$search}%")
+                ->orWhere('part_number', 'like', "%{$search}%")
+                ->orWhere('brand', 'like', "%{$search}%")
                 // Or a piece with that serial number.
                 ->orWhereIn('id', app(PartIdsWithSerial::class)->handle($search))))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('is_active', $status === 'active'))

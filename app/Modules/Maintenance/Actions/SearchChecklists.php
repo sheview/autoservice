@@ -39,7 +39,7 @@ class SearchChecklists
         $category = (string) ($filters['category'] ?? '');
 
         return PmChecklist::query()
-            ->when($search !== '', fn (Builder $q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->when($search !== '', fn (Builder $q) => $q->where('name', 'like', "%{$search}%"))
             ->when($category === 'general', fn (Builder $q) => $q->whereNull('asset_category_id'))
             ->when(ctype_digit($category), fn (Builder $q) => $q->where('asset_category_id', (int) $category))
             ->orderBy($filters['sort'] ?? 'name', $filters['direction'] ?? 'asc')

@@ -4,10 +4,11 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
-use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Tests\Fixtures\RecordVisibleBranches;
 
 beforeEach(function () {
@@ -19,7 +20,6 @@ beforeEach(function () {
 
     Route::middleware('web')->get('/_test/branches', fn () => [
         'eloquent' => Branch::orderBy('name')->pluck('name'),
-        'raw' => DB::table('branches')->orderBy('name')->pluck('name'),
     ]);
 
     RecordVisibleBranches::$seen = null;
@@ -36,43 +36,58 @@ it('(a) shows a user of tenant A only the branches of tenant A', function () {
     expect(asTenant($this->tenantA, fn () => Branch::all()->pluck('name')->all()))->toBe(['Alpha HQ']);
 });
 
-// --- (b) RLS -----------------------------------------------------------------
+// --- (b) Without row level security ---------------------------------------------
+// MariaDB has none: the TenantScope of every model, the tenant-aware "exists"/"unique" rules and
+// BelongsToTenant's write checks keep tenants apart. A raw query sees every tenant, so it must
+// always carry the tenant condition itself.
 
-it('(b) limits raw queries that bypass Eloquent to the current tenant', function () {
+it('(b) lets raw queries see every tenant, so they must carry the tenant condition', function () {
     asTenant($this->tenantA, function () {
-        expect(DB::table('branches')->pluck('name')->all())->toBe(['Alpha HQ'])
-            ->and(DB::select('select name from branches'))->toHaveCount(1);
+        expect(DB::table('branches')->count())->toBe(2)
+            ->and(DB::table('branches')->where('tenant_id', $this->tenantA->id)->pluck('name')->all())->toBe(['Alpha HQ']);
     });
-
-    $user = asTenant($this->tenantA, fn () => User::factory()->create());
-    expect($this->actingAs($user)->get('/_test/branches')->json('raw'))->toBe(['Alpha HQ']);
 });
 
-it('shows no tenant rows at all when no tenant is set', function () {
+it('shows no tenant rows at all through models when no tenant is set', function () {
     app(TenantContext::class)->forget();
 
-    expect(DB::table('branches')->count())->toBe(0)
-        ->and(DB::selectOne('select count(*) as c from branches')->c)->toBe(0)
-        ->and(Branch::count())->toBe(0);
+    expect(Branch::count())->toBe(0);
+});
+
+it('keeps "exists" and "unique" validation to the current tenant', function () {
+    $bravo = asTenant($this->tenantB, fn () => Branch::where('code', 'B1')->value('id'));
+    $alpha = asTenant($this->tenantA, fn () => Branch::where('code', 'A1')->value('id'));
+
+    asTenant($this->tenantA, function () use ($alpha, $bravo) {
+        $exists = fn ($id) => Validator::make(['id' => $id], ['id' => [Rule::exists('branches', 'id')]])->passes();
+        $unique = fn ($code) => Validator::make(['code' => $code], ['code' => [Rule::unique('branches', 'code')]])->passes();
+
+        expect($exists($alpha))->toBeTrue()
+            ->and($exists($bravo))->toBeFalse()
+            // another company's code is free here; our own is taken
+            ->and($unique('B1'))->toBeTrue()
+            ->and($unique('A1'))->toBeFalse();
+    });
+
+    app(TenantContext::class)->forget();
+    expect(Validator::make(['id' => $alpha], ['id' => [Rule::exists('branches', 'id')]])->passes())->toBeFalse();
 });
 
 it('rejects writing a row into another tenant', function () {
     app(TenantContext::class)->set($this->tenantA);
 
-    DB::table('branches')->insert([
-        'tenant_id' => $this->tenantB->id, 'code' => 'X', 'name' => 'Sneaky',
-        'created_at' => now(), 'updated_at' => now(),
-    ]);
-})->throws(QueryException::class, 'row-level security');
+    $branch = new Branch(['code' => 'X', 'name' => 'Sneaky']);
+    $branch->tenant_id = $this->tenantB->id;
+    $branch->save();
+})->throws(LogicException::class, 'another tenant');
 
-it('connects as a role that row level security applies to', function () {
-    $role = DB::selectOne('select rolname, rolsuper, rolbypassrls from pg_roles where rolname = current_user');
-    $owner = DB::selectOne("select tableowner from pg_tables where tablename = 'branches'")->tableowner;
+it('never moves a row to another tenant', function () {
+    app(TenantContext::class)->set($this->tenantA);
 
-    expect($role->rolsuper)->toBeFalse()
-        ->and($role->rolbypassrls)->toBeFalse()
-        ->and($owner)->not->toBe($role->rolname);
-});
+    $branch = Branch::where('code', 'A1')->first();
+    $branch->tenant_id = $this->tenantB->id;
+    $branch->save();
+})->throws(LogicException::class, 'never moves');
 
 // --- (c) Queue ---------------------------------------------------------------
 
@@ -90,11 +105,10 @@ it('(c) runs a queued job with the tenant it was dispatched from', function () {
     expect(RecordVisibleBranches::$seen)->toBe([
         'tenant' => $this->tenantA->id,
         'eloquent' => ['Alpha HQ'],
-        'raw' => ['Alpha HQ'],
     ]);
     // ...and goes back to no tenant after the job.
     expect(app(TenantContext::class)->id())->toBeNull()
-        ->and(DB::table('branches')->count())->toBe(0);
+        ->and(Branch::count())->toBe(0);
 });
 
 it('keeps the caller tenant after a sync job of another tenant', function () {
@@ -105,7 +119,7 @@ it('keeps the caller tenant after a sync job of another tenant', function () {
         RecordVisibleBranches::dispatch();
     });
 
-    expect(RecordVisibleBranches::$seen['raw'])->toBe(['Alpha HQ'])
+    expect(RecordVisibleBranches::$seen['eloquent'])->toBe(['Alpha HQ'])
         ->and(app(TenantContext::class)->id())->toBe($this->tenantB->id);
 });
 
@@ -126,7 +140,7 @@ it('refuses to create a tenant model without a tenant', function () {
 // --- ResolveTenant -------------------------------------------------------------
 
 it('resolves the tenant from the subdomain', function () {
-    expect($this->get('http://bravo.localhost/_test/branches')->assertOk()->json('raw'))->toBe(['Bravo HQ']);
+    expect($this->get('http://bravo.localhost/_test/branches')->assertOk()->json('eloquent'))->toBe(['Bravo HQ']);
 });
 
 it('returns 404 for an unknown subdomain', function () {
@@ -146,5 +160,5 @@ it('forbids a suspended tenant', function () {
 });
 
 it('shows a guest on the central domain no tenant rows', function () {
-    expect($this->get('/_test/branches')->assertOk()->json())->toBe(['eloquent' => [], 'raw' => []]);
+    expect($this->get('/_test/branches')->assertOk()->json())->toBe(['eloquent' => []]);
 });

@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\LiveUnique;
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -32,7 +33,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
         });
-        DB::statement('CREATE UNIQUE INDEX part_categories_tenant_name_unique ON part_categories (tenant_id, lower(name)) WHERE deleted_at IS NULL');
+        LiveUnique::add('part_categories', ['tenant_id', 'name'], 'part_categories_tenant_name_unique');
         Rls::enable('part_categories');
 
         Schema::table('parts', function (Blueprint $table) {
@@ -67,8 +68,8 @@ return new class extends Migration
             $table->index(['tenant_id', 'asset_id']);
         });
         // One serial per part of the tenant (ignoring case and spaces around it).
-        DB::statement('CREATE UNIQUE INDEX part_units_tenant_part_serial_unique ON part_units (tenant_id, part_id, lower(serial_number)) WHERE deleted_at IS NULL');
-        DB::statement('CREATE INDEX part_units_tenant_serial_index ON part_units (tenant_id, lower(serial_number))');
+        LiveUnique::add('part_units', ['tenant_id', 'part_id', 'serial_number'], 'part_units_tenant_part_serial_unique');
+        DB::statement('CREATE INDEX part_units_tenant_serial_index ON part_units (tenant_id, serial_number)');
         DB::statement("ALTER TABLE part_units ADD CONSTRAINT part_units_status_check CHECK (status IN ('in_stock', 'issued', 'removed'))");
         Rls::enable('part_units');
 

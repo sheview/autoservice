@@ -34,7 +34,7 @@ class StockReceiptController extends Controller
         $q = addcslashes(trim((string) $request->query('q', '')), '%_\\');
 
         return response()->json(Part::query()->where('is_active', true)
-            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->where('code', 'ilike', "%{$q}%")->orWhere('name', 'ilike', "%{$q}%")))
+            ->when($q !== '', fn ($query) => $query->where(fn ($w) => $w->where('code', 'like', "%{$q}%")->orWhere('name', 'like', "%{$q}%")))
             ->orderBy('code')->limit(30)->get()->map(fn (Part $part) => $this->option($part)));
     }
 

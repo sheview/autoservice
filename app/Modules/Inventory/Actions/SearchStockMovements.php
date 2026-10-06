@@ -42,9 +42,9 @@ class SearchStockMovements
         return self::visibleTo(StockMovement::query(), $user)
             ->with('part:id,code,name,unit,deleted_at')
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('reference', 'ilike', "%{$search}%")
-                ->orWhere('user_name', 'ilike', "%{$search}%")
-                ->orWhereHas('part', fn ($q) => $q->where('code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%"))))
+                ->where('reference', 'like', "%{$search}%")
+                ->orWhere('user_name', 'like', "%{$search}%")
+                ->orWhereHas('part', fn ($q) => $q->where('code', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%"))))
             ->when($filters['type'] ?? null, fn (Builder $q, $type) => $q->where('type', $type))
             ->when($filters['part_id'] ?? null, fn (Builder $q, $id) => $q->where('part_id', $id))
             ->orderBy($filters['sort'] ?? 'created_at', $direction)

@@ -24,8 +24,8 @@ class TicketsForCheckout
             ->when($ids !== null, fn ($q) => $q->whereKey($ids), fn ($q) => $q
                 ->whereIn('status', Ticket::OPEN_STATUSES)
                 ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
-                    ->where('ticket_no', 'ilike', '%'.TicketNumber::stored($search).'%')
-                    ->orWhere('title', 'ilike', "%{$search}%")))
+                    ->where('ticket_no', 'like', '%'.TicketNumber::stored($search).'%')
+                    ->orWhere('title', 'like', "%{$search}%")))
                 ->latest('id')
                 ->limit(self::LIMIT))
             ->get(['id', 'ulid', 'ticket_no', 'title', 'customer_id'])

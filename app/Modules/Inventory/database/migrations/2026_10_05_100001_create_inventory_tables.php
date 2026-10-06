@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\LiveUnique;
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
@@ -34,7 +35,7 @@ return new class extends Migration
         });
 
         // Code is what people type and search, so it is unique per tenant (ignoring case).
-        DB::statement('CREATE UNIQUE INDEX parts_tenant_code_unique ON parts (tenant_id, lower(code)) WHERE deleted_at IS NULL');
+        LiveUnique::add('parts', ['tenant_id', 'code'], 'parts_tenant_code_unique');
         DB::statement('ALTER TABLE parts ADD CONSTRAINT parts_qty_on_hand_check CHECK (qty_on_hand >= 0)');
         Rls::enable('parts');
 

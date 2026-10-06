@@ -34,7 +34,7 @@ class NotifyExpiringContracts
             ->where('status', Contract::STATUS_ACTIVE)
             ->whereNull('expiry_notified_at')
             ->where('ends_on', '>=', $today)
-            ->whereRaw('ends_on - notify_days_before <= ?::date', [$today])
+            ->whereRaw('date_sub(ends_on, interval notify_days_before day) <= ?', [$today])
             ->orderBy('ends_on')
             ->get();
 

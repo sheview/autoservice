@@ -18,7 +18,7 @@ class PartIdsWithSerial
         $search = trim($search);
 
         return mb_strlen($search) < 2 ? [] : PartUnit::query()
-            ->where('serial_number', 'ilike', '%'.addcslashes($search, '%_\\').'%')
+            ->where('serial_number', 'like', '%'.addcslashes($search, '%_\\').'%')
             ->distinct()->pluck('part_id')->map(fn ($id) => (int) $id)->all();
     }
 }

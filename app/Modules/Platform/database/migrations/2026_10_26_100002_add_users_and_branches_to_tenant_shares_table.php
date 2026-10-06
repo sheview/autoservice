@@ -13,8 +13,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('tenant_shares', function (Blueprint $table) {
-            $table->jsonb('user_ids')->default('[]')->after('roles');
-            $table->jsonb('branch_ids')->default('[]')->after('user_ids');
+            $table->json('user_ids')->default('[]')->after('roles');
+            $table->json('branch_ids')->default('[]')->after('user_ids');
         });
     }
 

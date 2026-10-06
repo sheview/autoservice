@@ -70,10 +70,10 @@ class SummarizePeople
             ->when($scope === PermissionCatalog::SCOPE_OWN, fn ($q) => $q->where('user_id', $viewer->id))
             ->unless(in_array($scope, [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH, PermissionCatalog::SCOPE_OWN], true),
                 fn ($q) => $q->whereRaw('false'))
-            ->when($search !== '', fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->when($search !== '', fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->when($filters['kind'] ?? null, fn ($q, $kind) => $q->where('kind', $kind))
             ->groupByRaw('user_id, case when user_id is null then name end')
-            ->when(($filters['show'] ?? 'all') === 'open', fn ($q) => $q->havingRaw('count(*) filter (where is_open = 1) > 0'))
+            ->when(($filters['show'] ?? 'all') === 'open', fn ($q) => $q->havingRaw('count(case when is_open = 1 then 1 end) > 0'))
             ->orderBy($filters['sort'] ?? 'last_at', $filters['direction'] ?? 'desc')
             ->orderBy('name')
             ->paginate(20)

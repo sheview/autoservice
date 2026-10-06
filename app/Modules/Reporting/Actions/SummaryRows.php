@@ -39,8 +39,8 @@ class SummaryRows
 
         if ($parts === []) {
             // Neither module on: the same columns, no rows.
-            return DB::query()->selectRaw('null::bigint as user_id, null::text as name, null::bigint as contract_id, null::text as kind,
-                0 as is_open, 0 as quantity, null::bigint as amount, null::timestamp as at')->whereRaw('false');
+            return DB::query()->selectRaw('null as user_id, null as name, null as contract_id, null as kind,
+                0 as is_open, 0 as quantity, null as amount, null as at')->whereRaw('false');
         }
 
         return collect($parts)->slice(1)->reduce(fn (Builder $union, Builder $part) => $union->unionAll($part), $parts[0]);

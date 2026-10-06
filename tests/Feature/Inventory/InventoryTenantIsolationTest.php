@@ -3,7 +3,6 @@
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Service\Actions\AssignTicket;
-use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -51,11 +50,10 @@ it('cannot book a part of another tenant on a ticket, nor a part on their ticket
     asTenant($this->other, fn () => expect(Part::first()->qty_on_hand)->toBe(9));
 });
 
-it('hides other tenants from raw queries (RLS)', function () {
-    expect(DB::table('parts')->pluck('name')->all())->toBe(['My memory'])
-        ->and(DB::table('stock_movements')->pluck('balance_after')->all())->toBe([4])
-        ->and(StockMovement::count())->toBe(1);
+it('hides other tenants from queries', function () {
+    expect(Part::pluck('name')->all())->toBe(['My memory'])
+        ->and(StockMovement::pluck('balance_after')->all())->toBe([4]);
 
     // even an update that names their row changes nothing
-    expect(DB::table('parts')->where('id', $this->theirs->id)->update(['qty_on_hand' => 0]))->toBe(0);
+    expect(Part::whereKey($this->theirs->id)->update(['qty_on_hand' => 0]))->toBe(0);
 });

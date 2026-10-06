@@ -1,9 +1,9 @@
 <?php
 
+use App\Modules\Tenancy\Support\LiveUnique;
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 // Customers of the MA company (the tenant): the other party of a contract and the owner of assets.
@@ -27,7 +27,7 @@ return new class extends Migration
         });
 
         // Code is used in Excel import/export, so it is unique per tenant (ignoring case).
-        DB::statement('CREATE UNIQUE INDEX customers_tenant_code_unique ON customers (tenant_id, lower(code)) WHERE deleted_at IS NULL');
+        LiveUnique::add('customers', ['tenant_id', 'code'], 'customers_tenant_code_unique');
         Rls::enable('customers');
     }
 

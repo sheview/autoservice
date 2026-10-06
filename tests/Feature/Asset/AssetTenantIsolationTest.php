@@ -1,9 +1,8 @@
 <?php
 
 use App\Modules\Asset\Models\Asset;
+use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Tenancy\Models\Branch;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -56,24 +55,16 @@ it('rejects a category or branch of another tenant', function () {
     ])->assertSessionHasErrors(['category_id', 'branch_id']);
 });
 
-it('hides other tenants from raw queries (RLS)', function () {
-    expect(DB::table('assets')->pluck('name')->all())->toBe(['My PC'])
-        ->and(DB::table('asset_categories')->pluck('name')->all())->toBe(['Mine'])
-        ->and(DB::table('asset_code_sequences')->count())->toBe(1);
+it('hides other tenants from queries', function () {
+    expect(Asset::pluck('name')->all())->toBe(['My PC'])
+        ->and(AssetCategory::pluck('name')->all())->toBe(['Mine']);
 });
 
 it('rejects writing an asset into another tenant', function () {
-    DB::table('assets')->insert([
-        'ulid' => (string) str()->ulid(),
-        'tenant_id' => $this->other->id,
-        'category_id' => $this->theirCategory->id,
-        'asset_code' => 'X-1',
-        'name' => 'Sneaky',
-        'status' => 'in_use',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-})->throws(QueryException::class, 'row-level security');
+    $asset = new Asset(['category_id' => $this->theirCategory->id, 'asset_code' => 'X-1', 'name' => 'Sneaky', 'status' => 'in_use']);
+    $asset->tenant_id = $this->other->id;
+    $asset->save();
+})->throws(LogicException::class, 'another tenant');
 
 it('does not export assets of another tenant', function () {
     $response = $this->actingAs($this->admin)->get('/assets/export')->assertOk();

@@ -43,7 +43,7 @@ class SearchPmPlans
                 'visits as completed_count' => fn ($q) => $q->where('status', PmVisit::STATUS_COMPLETED),
                 'visits as overdue_count' => fn ($q) => $q->whereIn('status', PmVisit::OPEN_STATUSES)->where('due_on', '<', today()->toDateString()),
             ])
-            ->when($search !== '', fn (Builder $q) => $q->where('title', 'ilike', "%{$search}%"))
+            ->when($search !== '', fn (Builder $q) => $q->where('title', 'like', "%{$search}%"))
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->orderBy($filters['sort'] ?? 'ends_on', $filters['direction'] ?? 'asc')
             ->orderBy('id');

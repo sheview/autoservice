@@ -19,7 +19,7 @@ class CheckoutItemIdsWithSerial
 
         return mb_strlen($search) < 2 ? [] : PartUnitEvent::query()
             ->where('action', PartUnitEvent::ACTION_ISSUE)->whereNotNull('checkout_item_id')
-            ->where('serial_number', 'ilike', '%'.addcslashes($search, '%_\\').'%')
+            ->where('serial_number', 'like', '%'.addcslashes($search, '%_\\').'%')
             ->distinct()->pluck('checkout_item_id')->map(fn ($id) => (int) $id)->all();
     }
 }

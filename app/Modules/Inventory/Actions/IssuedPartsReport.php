@@ -32,9 +32,9 @@ class IssuedPartsReport
             ->whereBetween('created_at', [$from, $to])
             ->when(($filters['ticket_ids'] ?? null) !== null, fn (Builder $query) => $query->whereIn('ticket_id', $filters['ticket_ids']))
             ->when($q !== '', fn (Builder $query) => $query->where(fn (Builder $w) => $w
-                ->whereHas('part', fn (Builder $part) => $part->where('code', 'ilike', $like)->orWhere('name', 'ilike', $like))
+                ->whereHas('part', fn (Builder $part) => $part->where('code', 'like', $like)->orWhere('name', 'like', $like))
                 ->orWhereIn('id', PartUnitEvent::query()->select('stock_movement_id')->where('action', PartUnitEvent::ACTION_ISSUE)
-                    ->where('serial_number', 'ilike', $like))))
+                    ->where('serial_number', 'like', $like))))
             ->orderByDesc('created_at')->orderByDesc('id');
 
         $rows = fn ($movements) => $this->rows($movements);

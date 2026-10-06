@@ -56,15 +56,15 @@ class SearchPurchaseRequests
             ->when($filters['requested_by'] ?? null, fn (Builder $q, $id) => $q->where('requested_by', $id))
             ->when($filters['contract_id'] ?? null, fn (Builder $q, $id) => $q->where('contract_id', $id))
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('pr_no', 'ilike', "%{$search}%")
-                ->orWhere('item_name', 'ilike', "%{$search}%")
-                ->orWhere('description', 'ilike', "%{$search}%")
-                ->orWhere('requested_by_name', 'ilike', "%{$search}%")))
+                ->where('pr_no', 'like', "%{$search}%")
+                ->orWhere('item_name', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('requested_by_name', 'like', "%{$search}%")))
             ->when($queue !== null, fn (Builder $q) => self::inQueue($q, $queue))
             ->when($status === 'open', fn (Builder $q) => $q->whereIn('status', PurchaseRequest::OPEN_STATUSES))
             ->when(in_array($status, PurchaseRequest::STATUSES, true), fn (Builder $q) => $q->where('status', $status))
             ->when(($filters['sort'] ?? 'created_at') === 'needed_by',
-                fn (Builder $q) => $q->orderByRaw('needed_by '.($filters['direction'] === 'asc' ? 'asc' : 'desc').' nulls last'),
+                fn (Builder $q) => $q->orderByRaw('needed_by is null, needed_by '.($filters['direction'] === 'asc' ? 'asc' : 'desc')),
                 fn (Builder $q) => $q->orderBy($filters['sort'] ?? 'created_at', $filters['direction'] ?? 'desc'))
             ->orderByDesc('id');
     }

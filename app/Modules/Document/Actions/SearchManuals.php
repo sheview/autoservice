@@ -37,9 +37,9 @@ class SearchManuals
         return Manual::query()
             ->withCount(['media as files_count' => fn ($q) => $q->where('collection_name', (new Manual)->attachmentCollection())])
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('title', 'ilike', "%{$search}%")
-                ->orWhere('description', 'ilike', "%{$search}%")
-                ->orWhere('category', 'ilike', "%{$search}%")))
+                ->where('title', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%")
+                ->orWhere('category', 'like', "%{$search}%")))
             ->when($filters['category'] ?? null, fn (Builder $q, $category) => $q->where('category', $category))
             ->orderBy($filters['sort'] ?? 'updated_at', $filters['direction'] ?? 'desc')
             ->orderBy('id');

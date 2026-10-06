@@ -47,9 +47,9 @@ class SearchContracts
         return Contract::query()
             ->when($user, fn (Builder $q, User $user) => ContractScope::contracts($q, $user))
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('contract_no', 'ilike', "%{$search}%")
-                ->orWhere('title', 'ilike', "%{$search}%")
-                ->orWhereHas('customer', fn ($q) => $q->where('name', 'ilike', "%{$search}%")->orWhere('code', 'ilike', "%{$search}%"))))
+                ->where('contract_no', 'like', "%{$search}%")
+                ->orWhere('title', 'like', "%{$search}%")
+                ->orWhereHas('customer', fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('code', 'like', "%{$search}%"))))
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['service_window'] ?? null, fn (Builder $q, $window) => $q->where('service_window', $window))
             ->when($filters['phase'] ?? null, fn (Builder $q, $phase) => match ($phase) {
@@ -57,9 +57,9 @@ class SearchContracts
                 'upcoming' => $active($q)->where('starts_on', '>', $today),
                 'expired' => $active($q)->where('ends_on', '<', $today),
                 'expiring' => $active($q)->where('starts_on', '<=', $today)->where('ends_on', '>=', $today)
-                    ->whereRaw('ends_on - notify_days_before <= ?::date', [$today]),
+                    ->whereRaw('date_sub(ends_on, interval notify_days_before day) <= ?', [$today]),
                 'active' => $active($q)->where('starts_on', '<=', $today)
-                    ->whereRaw('ends_on - notify_days_before > ?::date', [$today]),
+                    ->whereRaw('date_sub(ends_on, interval notify_days_before day) > ?', [$today]),
             })
             ->orderBy($filters['sort'] ?? 'ends_on', $filters['direction'] ?? 'asc')
             ->orderBy('id');

@@ -7,7 +7,6 @@ use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Records what a queued job can see, for the tenancy tests.
@@ -23,7 +22,6 @@ class RecordVisibleBranches implements ShouldQueue
         static::$seen = [
             'tenant' => $this->tenant()?->id,
             'eloquent' => Branch::orderBy('name')->pluck('name')->all(),
-            'raw' => DB::table('branches')->orderBy('name')->pluck('name')->all(),
         ];
     }
 }

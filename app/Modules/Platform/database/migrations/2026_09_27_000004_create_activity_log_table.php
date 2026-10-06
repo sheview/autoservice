@@ -19,7 +19,7 @@ return new class extends Migration
             $table->nullableMorphs('subject', 'subject');
             $table->string('event')->nullable();
             $table->nullableMorphs('causer', 'causer');
-            $table->jsonb('properties')->nullable();
+            $table->json('properties')->nullable();
             $table->uuid('batch_uuid')->nullable();
             $table->timestamps();
         });

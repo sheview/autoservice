@@ -4,7 +4,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Platform\CrossTenant\IdentityLookup;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 
@@ -67,12 +67,12 @@ it('really changes the password on reset (not silently blocked by RLS)', functio
     expect(Hash::check('new-password-123', $user->fresh()->password))->toBeTrue();
 });
 
-it('hides users of every tenant when no tenant is set, except during identity lookup', function () {
-    User::factory()->count(2)->create();
+it('hides users of every tenant when no tenant is set, except to the login lookup', function () {
+    $user = User::factory()->create(['email' => 'somchai@example.com']);
     app(TenantContext::class)->forget();
 
-    expect(DB::table('users')->count())->toBe(0)
-        ->and(IdentityLookup::run(fn () => DB::table('users')->count()))->toBe(2)
-        // the lookup switch is off again afterwards
-        ->and(DB::table('users')->count())->toBe(0);
+    expect(User::count())->toBe(0)
+        // the login finds the user before any tenant is known (IdentityLookup)
+        ->and(Auth::getProvider()->retrieveByCredentials(['email' => 'somchai@example.com'])?->is($user))->toBeTrue()
+        ->and(User::count())->toBe(0);
 });

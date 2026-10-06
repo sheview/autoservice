@@ -27,7 +27,7 @@ class TicketKpi
     {
         $from = CarbonImmutable::create($year, 1, 1, 0, 0, 0, config('app.timezone'));
         $to = $from->addYear();
-        $monthOf = fn (string $column) => "extract(month from {$column} at time zone '".config('app.timezone')."')::int";
+        $monthOf = fn (string $column) => "extract(month from {$column})";
 
         $opened = Ticket::query()
             ->whereBetween('created_at', [$from, $to])
@@ -44,9 +44,9 @@ class TicketKpi
             ->when($userIds !== null, fn ($q) => $q->whereIn('assignee_id', $userIds))
             ->select(DB::raw(($byMonth ? $monthOf('resolved_at') : 'assignee_id').' as k'))
             ->selectRaw('count(*) as resolved')
-            ->selectRaw('count(*) filter (where resolve_due_at is not null and resolved_at <= resolve_due_at) as on_time')
-            ->selectRaw('count(*) filter (where resolve_due_at is not null) as with_due')
-            ->selectRaw('avg(extract(epoch from resolved_at - created_at) / 3600) as avg_hours')
+            ->selectRaw('count(case when resolve_due_at is not null and resolved_at <= resolve_due_at then 1 end) as on_time')
+            ->selectRaw('count(case when resolve_due_at is not null then 1 end) as with_due')
+            ->selectRaw('avg(timestampdiff(second, created_at, resolved_at) / 3600) as avg_hours')
             ->groupBy('k')
             ->get()
             ->keyBy('k');

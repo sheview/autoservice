@@ -5,6 +5,7 @@ use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmPlan;
 use App\Modules\Maintenance\Models\PmVisit;
+use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Platform\Support\Modules;
 use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -52,12 +53,12 @@ it('keeps checklists, plans, rounds and their numbers per tenant', function () {
     $this->actingAs($admin)->post('/pm-plans', ['contract_id' => $theirContract->id, 'title' => 'x', 'interval_months' => 3])
         ->assertSessionHasErrors('contract_id');
 
-    // and raw queries only see this tenant (RLS)
-    expect(DB::table('pm_plans')->pluck('id')->all())->toBe([$mine->id])
-        ->and(DB::table('pm_visits')->where('pm_plan_id', $theirPlan->id)->count())->toBe(0)
-        ->and(DB::table('pm_visit_items')->where('pm_visit_id', $theirVisit->id)->count())->toBe(0)
-        ->and(DB::table('pm_checklists')->count())->toBe(1)
-        ->and(DB::table('pm_number_sequences')->count())->toBe(1)
+    // and queries only see this tenant
+    expect(PmPlan::pluck('id')->all())->toBe([$mine->id])
+        ->and(PmVisit::where('pm_plan_id', $theirPlan->id)->count())->toBe(0)
+        ->and(PmVisitItem::where('pm_visit_id', $theirVisit->id)->count())->toBe(0)
+        ->and(PmChecklist::count())->toBe(1)
+        ->and(DB::table('pm_number_sequences')->where('tenant_id', $this->tenant->id)->count())->toBe(1)
         ->and(PmPlan::count())->toBe(1)
         ->and(PmVisit::where('pm_plan_id', $mine->id)->count())->toBe(2);
 });

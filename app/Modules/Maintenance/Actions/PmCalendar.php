@@ -41,7 +41,7 @@ class PmCalendar
         return SearchPmVisits::visibleTo(PmVisit::query(), $user)
             ->with('plan:id,title')
             ->where('status', '!=', PmVisit::STATUS_CANCELLED)
-            ->whereRaw('coalesce(scheduled_on, due_on) between ?::date and ?::date', [$first->toDateString(), $first->endOfMonth()->toDateString()])
+            ->whereRaw('coalesce(scheduled_on, due_on) between ? and ?', [$first->toDateString(), $first->endOfMonth()->toDateString()])
             ->when($filters['customer_id'] ?? null, fn ($q, $id) => $q->where('customer_id', $id))
             ->when($assignee === 'me', fn ($q) => $q->where('assignee_id', $user->id))
             ->when($assignee === 'none', fn ($q) => $q->whereNull('assignee_id'))

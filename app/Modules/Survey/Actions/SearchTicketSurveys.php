@@ -48,10 +48,10 @@ class SearchTicketSurveys
 
         return self::visibleTo(TicketSurvey::query(), $user)
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('ticket_no', 'ilike', "%{$search}%")
-                ->orWhere('ticket_title', 'ilike', "%{$search}%")
-                ->orWhere('comment', 'ilike', "%{$search}%")
-                ->orWhere('answered_name', 'ilike', "%{$search}%")))
+                ->where('ticket_no', 'like', "%{$search}%")
+                ->orWhere('ticket_title', 'like', "%{$search}%")
+                ->orWhere('comment', 'like', "%{$search}%")
+                ->orWhere('answered_name', 'like', "%{$search}%")))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $status === 'answered'
                 ? $q->whereNotNull('answered_at')
                 : $q->whereNull('answered_at'))
@@ -59,7 +59,7 @@ class SearchTicketSurveys
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['assignee_id'] ?? null, fn (Builder $q, $id) => $q->where('assignee_id', $id))
             // Unanswered surveys have no score or answer time: keep them at the end either way.
-            ->orderByRaw(($filters['sort'] ?? 'created_at').' '.$direction.' nulls last')
+            ->orderByRaw(($filters['sort'] ?? 'created_at').' is null, '.($filters['sort'] ?? 'created_at').' '.$direction)
             ->orderBy('id', $direction);
     }
 

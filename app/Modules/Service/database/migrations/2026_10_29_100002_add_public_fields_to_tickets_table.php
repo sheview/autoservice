@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -28,11 +29,11 @@ return new class extends Migration
         });
 
         // Every ticket there is gets its link. Runs across tenants: past row level security meanwhile.
-        DB::statement('ALTER TABLE tickets NO FORCE ROW LEVEL SECURITY');
+        Rls::noForce('tickets');
         foreach (DB::table('tickets')->whereNull('tracking_token')->pluck('id') as $id) {
             DB::table('tickets')->where('id', $id)->update(['tracking_token' => Str::random(40)]);
         }
-        DB::statement('ALTER TABLE tickets FORCE ROW LEVEL SECURITY');
+        Rls::force('tickets');
     }
 
     public function down(): void

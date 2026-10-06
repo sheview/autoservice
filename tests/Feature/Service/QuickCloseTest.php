@@ -47,7 +47,7 @@ it('closes a job in one go: report, photos, parts from stock, place, then resolv
         ->and((float) $ticket->closed_lat)->toBe(13.7563)
         ->and($ticket->getMedia(Ticket::PHOTOS)->map(fn ($m) => $m->getCustomProperty('stage'))->sort()->values()->all())->toBe(['after', 'after', 'before'])
         ->and(Part::find($this->part->id)->qty_on_hand)->toBe(1)
-        ->and(StockMovement::where('ticket_id', $ticket->id)->sum('quantity'))->toBe(-2);
+        ->and((int) StockMovement::where('ticket_id', $ticket->id)->sum('quantity'))->toBe(-2);
 });
 
 it('moves no stock and closes nothing when a part is short', function () {

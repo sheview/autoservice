@@ -27,7 +27,7 @@ return new class extends Migration
             $table->bigInteger('purchase_price')->nullable(); // satang
             $table->date('warranty_expires_at')->nullable();
             // Values of the category's spec_fields, keyed by field key.
-            $table->jsonb('specs')->default('{}');
+            $table->json('specs')->default('{}');
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();

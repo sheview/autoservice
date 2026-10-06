@@ -27,12 +27,12 @@ return new class extends Migration
         Rls::enable('purchase_receipt_assets');
 
         // Runs across every tenant: let the owner past row level security meanwhile.
-        DB::statement('ALTER TABLE purchase_receipts NO FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE purchase_receipt_assets NO FORCE ROW LEVEL SECURITY');
+        Rls::noForce('purchase_receipts');
+        Rls::noForce('purchase_receipt_assets');
         DB::statement('INSERT INTO purchase_receipt_assets (tenant_id, purchase_receipt_id, asset_id, quantity, created_at, updated_at)
             SELECT tenant_id, id, asset_id, quantity, registered_at, registered_at FROM purchase_receipts WHERE asset_id IS NOT NULL');
-        DB::statement('ALTER TABLE purchase_receipts FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE purchase_receipt_assets FORCE ROW LEVEL SECURITY');
+        Rls::force('purchase_receipts');
+        Rls::force('purchase_receipt_assets');
 
         Schema::table('purchase_receipts', function (Blueprint $table) {
             $table->dropConstrainedForeignId('asset_id');
@@ -44,9 +44,9 @@ return new class extends Migration
         Schema::table('purchase_receipts', function (Blueprint $table) {
             $table->foreignId('asset_id')->nullable()->after('registered_as')->constrained()->nullOnDelete();
         });
-        DB::statement('ALTER TABLE purchase_receipts NO FORCE ROW LEVEL SECURITY');
+        Rls::noForce('purchase_receipts');
         DB::statement('UPDATE purchase_receipts r SET asset_id = (SELECT min(a.asset_id) FROM purchase_receipt_assets a WHERE a.purchase_receipt_id = r.id)');
-        DB::statement('ALTER TABLE purchase_receipts FORCE ROW LEVEL SECURITY');
+        Rls::force('purchase_receipts');
         Schema::dropIfExists('purchase_receipt_assets');
     }
 };

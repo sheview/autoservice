@@ -8,6 +8,7 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\DB;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -44,14 +45,16 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * The app connects as a non-owner role that cannot create tables, so the test schema
-     * is built once with the owner connection. RefreshDatabase then only wraps each test
-     * in a transaction on the app connection.
+     * The test schema is built once; RefreshDatabase then only wraps each test in a
+     * transaction. On PostgreSQL the app connects as a non-owner role that cannot create
+     * tables, so the schema is built with the owner connection.
      */
     protected function setUpTraits()
     {
         if ($this->usesDatabase() && ! RefreshDatabaseState::$migrated) {
-            $this->artisan('migrate:fresh', ['--database' => 'pgsql_migrate', '--drop-types' => true]);
+            $this->artisan('migrate:fresh', DB::connection()->getDriverName() === 'pgsql'
+                ? ['--database' => 'pgsql_migrate', '--drop-types' => true]
+                : []);
             $this->app[Kernel::class]->setArtisan(null);
 
             RefreshDatabaseState::$migrated = true;

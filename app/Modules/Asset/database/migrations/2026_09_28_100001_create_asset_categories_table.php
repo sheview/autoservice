@@ -1,9 +1,9 @@
 <?php
 
+use App\Modules\Tenancy\Support\LiveUnique;
 use App\Modules\Tenancy\Support\Rls;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -18,12 +18,12 @@ return new class extends Migration
             $table->string('code_prefix', 10);
             $table->string('service_line')->nullable();
             // Extra fields (specs) of assets in this category: [{key, label, type, options, required}]
-            $table->jsonb('spec_fields')->default('[]');
+            $table->json('spec_fields')->default('[]');
             $table->timestamps();
             $table->softDeletes();
         });
 
-        DB::statement('CREATE UNIQUE INDEX asset_categories_tenant_name_unique ON asset_categories (tenant_id, lower(name)) WHERE deleted_at IS NULL');
+        LiveUnique::add('asset_categories', ['tenant_id', 'name'], 'asset_categories_tenant_name_unique');
         Rls::enable('asset_categories');
 
         // Last running number of each code prefix (see GenerateAssetCode).

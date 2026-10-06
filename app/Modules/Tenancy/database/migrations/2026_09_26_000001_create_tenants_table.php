@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('subdomain')->unique();
             $table->string('status')->default('active');
             $table->string('plan')->default('standard');
-            $table->jsonb('settings')->default('{}');
+            $table->json('settings')->default('{}');
             $table->timestamps();
             $table->softDeletes();
         });

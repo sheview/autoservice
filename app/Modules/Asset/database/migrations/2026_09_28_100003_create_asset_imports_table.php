@@ -21,7 +21,7 @@ return new class extends Migration
             $table->unsignedInteger('updated_rows')->default(0);
             $table->unsignedInteger('failed_rows')->default(0);
             // [{row, messages: [..]}]
-            $table->jsonb('errors')->default('[]');
+            $table->json('errors')->default('[]');
             $table->timestamp('finished_at')->nullable();
             $table->timestamps();
             $table->softDeletes();

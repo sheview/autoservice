@@ -290,8 +290,8 @@ class CheckoutRequestController extends Controller
         $assets = SearchAssets::askableBy(Asset::query(), $request->user())
             ->whereIn('status', [Asset::STATUS_IN_USE, Asset::STATUS_SPARE])
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
-                ->where('asset_code', 'ilike', "%{$search}%")->orWhere('name', 'ilike', "%{$search}%")
-                ->orWhere('serial_number', 'ilike', "%{$search}%")->orWhere('model', 'ilike', "%{$search}%")))
+                ->where('asset_code', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%")
+                ->orWhere('serial_number', 'like', "%{$search}%")->orWhere('model', 'like', "%{$search}%")))
             ->orderBy('name')->limit(30)->get();
         $heldBy = $held->handle($assets->pluck('id')->all());
 

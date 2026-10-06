@@ -24,7 +24,7 @@ return new class extends Migration
             $table->string('unit', 30);
             $table->bigInteger('unit_price')->nullable(); // estimate, satang
             // Product pages to buy from: a list of URLs.
-            $table->jsonb('links')->default('[]');
+            $table->json('links')->default('[]');
             $table->text('reason')->nullable();
             $table->date('needed_by')->nullable();
 

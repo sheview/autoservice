@@ -19,7 +19,7 @@ return new class extends Migration
             $table->string('title');
             $table->string('category', 100)->nullable();
             $table->text('description')->nullable();
-            $table->jsonb('links')->default('[]'); // [{label, url}]
+            $table->json('links')->default('[]'); // [{label, url}]
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->string('created_by_name')->nullable();
             $table->timestamps();

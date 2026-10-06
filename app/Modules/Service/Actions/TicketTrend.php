@@ -32,7 +32,7 @@ class TicketTrend
         $series = function (string $column, string $part, CarbonImmutable $from, array $keys) use ($visible, $yearStart): array {
             $counts = $visible()
                 ->whereBetween($column, [$from, $yearStart->endOfYear()])
-                ->selectRaw("extract({$part} from {$column})::int as k, count(*) as total")
+                ->selectRaw("extract({$part} from {$column}) as k, count(*) as total")
                 ->groupBy('k')
                 ->pluck('total', 'k');
 

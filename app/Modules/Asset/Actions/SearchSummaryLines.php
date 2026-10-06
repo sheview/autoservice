@@ -37,11 +37,11 @@ class SearchSummaryLines
             ->when($filters['borrower_name'] ?? null, fn (Builder $q, $name) => $q->whereNull('checkout_requests.borrower_user_id')->where('checkout_requests.borrower_name', $name))
             ->when($filters['contract_id'] ?? null, fn (Builder $q, $id) => $q->where('checkout_requests.contract_id', $id))
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('checkout_items.item_name', 'ilike', "%{$search}%")
-                ->orWhere('checkout_items.item_code', 'ilike', "%{$search}%")
-                ->orWhere('checkout_requests.request_no', 'ilike', "%{$search}%")
-                ->orWhere('checkout_requests.borrower_name', 'ilike', "%{$search}%")
-                ->orWhere('checkout_requests.purpose', 'ilike', "%{$search}%")))
+                ->where('checkout_items.item_name', 'like', "%{$search}%")
+                ->orWhere('checkout_items.item_code', 'like', "%{$search}%")
+                ->orWhere('checkout_requests.request_no', 'like', "%{$search}%")
+                ->orWhere('checkout_requests.borrower_name', 'like', "%{$search}%")
+                ->orWhere('checkout_requests.purpose', 'like', "%{$search}%")))
             ->when(($filters['status'] ?? 'all') === 'open', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->whereNotIn('checkout_items.status', CheckoutItem::FINISHED)
                 ->orWhere(fn ($q) => $q->where('checkout_items.checkout_type', CheckoutItem::LOAN)

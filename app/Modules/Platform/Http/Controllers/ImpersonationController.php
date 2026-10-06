@@ -24,8 +24,8 @@ class ImpersonationController extends Controller
         $tenants = Tenant::query()
             ->where('is_platform', false)
             ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
-                ->where('name', 'ilike', "%{$search}%")
-                ->orWhere('subdomain', 'ilike', "%{$search}%")))
+                ->where('name', 'like', "%{$search}%")
+                ->orWhere('subdomain', 'like', "%{$search}%")))
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString()

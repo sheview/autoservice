@@ -35,20 +35,20 @@ return new class extends Migration
         Rls::enable('room_access_visits');
 
         Schema::table('room_access_requests', function (Blueprint $table) {
-            $table->jsonb('recurrence')->nullable()->after('planned_end');
+            $table->json('recurrence')->nullable()->after('planned_end');
             $table->timestamp('reminded_at')->nullable();
             $table->timestamp('overstay_alerted_at')->nullable();
             $table->timestamp('approval_alerted_at')->nullable();
         });
 
         // Visits already recorded on the requests themselves.
-        DB::statement('ALTER TABLE room_access_requests NO FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE room_access_visits NO FORCE ROW LEVEL SECURITY');
+        Rls::noForce('room_access_requests');
+        Rls::noForce('room_access_visits');
         DB::statement('INSERT INTO room_access_visits (tenant_id, request_id, entered_at, entered_by_name, exited_at, exited_by_name, created_at, updated_at)
             SELECT tenant_id, id, entered_at, entered_by_name, exited_at, exited_by_name, entered_at, coalesce(exited_at, entered_at)
             FROM room_access_requests WHERE entered_at IS NOT NULL');
-        DB::statement('ALTER TABLE room_access_requests FORCE ROW LEVEL SECURITY');
-        DB::statement('ALTER TABLE room_access_visits FORCE ROW LEVEL SECURITY');
+        Rls::force('room_access_requests');
+        Rls::force('room_access_visits');
     }
 
     public function down(): void

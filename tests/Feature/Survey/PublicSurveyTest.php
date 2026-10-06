@@ -5,7 +5,6 @@ use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Survey\Models\TicketSurvey;
 use App\Modules\Tenancy\Models\Tenant;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Pennant\Feature;
@@ -95,7 +94,6 @@ it('keeps surveys per tenant', function () {
     // but nothing of theirs shows up here
     $this->actingAs(userWithRole('admin_company'))->get('/surveys')->assertInertia(fn (Assert $page) => $page
         ->where('surveys.total', 1)->where('surveys.data.0.ticket_title', 'Printer jam')->where('summary.answered', 0));
-    expect(DB::table('ticket_surveys')->pluck('ticket_title')->all())->toBe(['Printer jam'])
-        ->and(TicketSurvey::count())->toBe(1)
-        ->and(DB::table('ticket_surveys')->where('id', $theirs->id)->update(['score' => 1]))->toBe(0);
+    expect(TicketSurvey::pluck('ticket_title')->all())->toBe(['Printer jam'])
+        ->and(TicketSurvey::whereKey($theirs->id)->update(['score' => 1]))->toBe(0);
 });

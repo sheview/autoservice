@@ -34,20 +34,20 @@ class SearchCheckoutLines
             ->whereIn('checkout_items.request_id', SearchCheckoutRequests::visibleTo(CheckoutRequest::query(), $user, $returns ? 'asset-checkouts.return' : 'asset-checkouts.fulfill')->select('id'))
             ->with('request')
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
-                ->where('checkout_items.item_name', 'ilike', "%{$search}%")
-                ->orWhere('checkout_items.item_code', 'ilike', "%{$search}%")
-                ->orWhere('checkout_requests.request_no', 'ilike', "%{$search}%")
-                ->orWhere('checkout_requests.borrower_name', 'ilike', "%{$search}%")))
+                ->where('checkout_items.item_name', 'like', "%{$search}%")
+                ->orWhere('checkout_items.item_code', 'like', "%{$search}%")
+                ->orWhere('checkout_requests.request_no', 'like', "%{$search}%")
+                ->orWhere('checkout_requests.borrower_name', 'like', "%{$search}%")))
             ->when(! $returns, fn (Builder $q) => $q
                 ->whereIn('checkout_requests.status', CheckoutRequest::OPEN_STATUSES)
                 ->whereIn('checkout_items.status', [CheckoutItem::STATUS_BACKORDERED, CheckoutItem::STATUS_PARTIAL])
-                ->orderByRaw("checkout_requests.needed_by {$direction} nulls last"))
+                ->orderByRaw("checkout_requests.needed_by is null, checkout_requests.needed_by {$direction}"))
             ->when($returns, fn (Builder $q) => $q
                 ->where('checkout_items.item_type', CheckoutItem::TYPE_ASSET)
                 ->where('checkout_items.checkout_type', CheckoutItem::LOAN)
                 ->whereColumn('checkout_items.qty_fulfilled', '>', 'checkout_items.qty_returned')
                 ->when($filters['overdue'] ?? false, fn ($q) => $q->where('checkout_items.due_return_date', '<', today()->toDateString()))
-                ->orderByRaw("checkout_items.due_return_date {$direction} nulls last"))
+                ->orderByRaw("checkout_items.due_return_date is null, checkout_items.due_return_date {$direction}"))
             ->orderBy('checkout_items.id');
     }
 }
