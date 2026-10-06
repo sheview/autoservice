@@ -41,7 +41,10 @@ class TicketSheet
      * @return array{company: string|null, ticket: array<string, mixed>, notes: list<array<string, mixed>>,
      *     parts: list<array<string, mixed>>|null, rating: array{score: int|null, comment: string|null}|null}
      */
-    public function handle(Ticket $ticket, User $user): array
+    /**
+     * @param  User|null  $user  null = printed through a ticket link (no account): the parts used are shown
+     */
+    public function handle(Ticket $ticket, ?User $user): array
     {
         $names = $this->userNames->handle([$ticket->assignee_id, $ticket->reported_by]);
         $customer = $ticket->customer_id && $this->modules->enabled('contract')
@@ -111,7 +114,13 @@ class TicketSheet
                     'at' => $event->created_at->toIso8601String(),
                 ])->all(),
             // Null = leave the parts table out (no stock module, or the user does not see stock).
-            'parts' => $this->modules->enabled('inventory') && $user->can('parts.view') ? $this->ticketParts->handle($ticket->id) : null,
+            'parts' => $this->modules->enabled('inventory') && ($user === null || $user->can('parts.view')) ? $this->ticketParts->handle($ticket->id) : null,
+            // The customer's signature on the screen (inside the page, as the PDF service cannot sign in).
+            'signature' => ($sig = $ticket->getFirstMedia(Ticket::SIGNATURE)) ? [
+                'image' => 'data:image/png;base64,'.base64_encode(stream_get_contents($sig->stream())),
+                'signer' => $sig->getCustomProperty('signer'),
+                'signed_at' => $sig->getCustomProperty('signed_at'),
+            ] : null,
             // The score boxes for the customer to tick; already ticked when the survey was answered.
             'rating' => $this->modules->enabled('survey') ? [
                 'score' => $survey !== null && $survey['answered'] ? $survey['score'] : null,

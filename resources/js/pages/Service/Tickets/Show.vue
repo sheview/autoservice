@@ -11,6 +11,7 @@ import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import TicketAppointment from '@/components/TicketAppointment.vue';
 import TicketForwardPanel, { type TicketForwards } from '@/components/TicketForwardPanel.vue';
 import TicketIpPanel from '@/components/TicketIpPanel.vue';
+import TicketFieldLinks from '@/components/TicketFieldLinks.vue';
 import TicketPhotos from '@/components/TicketPhotos.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketReviewPanel from '@/components/TicketReviewPanel.vue';
@@ -133,6 +134,8 @@ const props = defineProps<{
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
     parts: { items: TicketPart[]; options: PartOption[]; types: string[]; canIssue: boolean; canReturn: boolean } | null;
+    // Links for working without an account; null = the user may not manage them.
+    fieldLinks: InstanceType<typeof TicketFieldLinks>['$props']['links'] | null;
     removedParts: { id: number; item_name: string; serial_number: string | null; problem: string | null; disposition: string; user_name: string | null }[];
     survey: TicketSurvey | null;
     attachments: Attachment[];
@@ -463,6 +466,7 @@ const stepBar = computed(() => {
                     <TicketIpPanel v-if="ip" :ticket-ulid="ticket.ulid" :ip="ip" :choices="ipChoices" />
 
                     <TicketReviewPanel v-if="review" :ticket-ulid="ticket.ulid" :review="review" />
+                    <TicketFieldLinks v-if="fieldLinks" :ticket-ulid="ticket.ulid" :links="fieldLinks" />
                     <TicketPhotos :photos="photos" :signature="signature" />
                     <TicketTrackingLink v-if="tracking" :ticket-ulid="ticket.ulid" :url="tracking.url" :can-renew="tracking.can_renew" />
                     <TicketAppointment :ticket-ulid="ticket.ulid" :appointment-at="ticket.appointment_at" :can-change="can.update" />

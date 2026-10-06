@@ -11,10 +11,11 @@ use App\Modules\RoomAccess\Models\RoomAccessToken;
  */
 class RequestByPermitToken
 {
-    public function handle(string $token): ?RoomAccessToken
+    /** @param  string  $purpose  the permit link, or the guards' link */
+    public function handle(string $token, string $purpose = RoomAccessToken::PERMIT): ?RoomAccessToken
     {
         // Same work for a malformed token as for an unknown one.
-        $row = RoomAccessToken::query()->where('purpose', RoomAccessToken::PERMIT)
+        $row = RoomAccessToken::query()->where('purpose', $purpose)
             ->where('token', RoomAccessToken::looksValid($token) ? $token : '-')->first();
         if ($row === null) {
             return null;

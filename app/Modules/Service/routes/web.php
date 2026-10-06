@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Service\Http\Controllers\FieldLinkController;
 use App\Modules\Service\Http\Controllers\HolidayController;
 use App\Modules\Service\Http\Controllers\MyWorkController;
 use App\Modules\Service\Http\Controllers\RepairPresetController;
@@ -7,6 +8,7 @@ use App\Modules\Service\Http\Controllers\TicketActionController;
 use App\Modules\Service\Http\Controllers\TicketAttachmentController;
 use App\Modules\Service\Http\Controllers\TicketCloseController;
 use App\Modules\Service\Http\Controllers\TicketController;
+use App\Modules\Service\Http\Controllers\TicketFieldLinkController;
 use App\Modules\Service\Http\Controllers\TicketPartController;
 use App\Modules\Service\Http\Controllers\TicketPrintController;
 use App\Modules\Service\Http\Controllers\TicketSurveyController;
@@ -36,6 +38,10 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     Route::post('tickets/{ticket}/review', [TicketActionController::class, 'review'])->name('tickets.review');
     Route::get('tickets/{ticket}/media/{media}', [TicketActionController::class, 'media'])->whereNumber('media')->name('tickets.media');
     Route::post('tickets/{ticket}/tracking-token', [TicketActionController::class, 'trackingToken'])->name('tickets.tracking-token');
+    // Links to work on the job without an account (outside technicians, the customer's sign-off).
+    Route::post('tickets/{ticket}/field-links', [TicketFieldLinkController::class, 'store'])->name('tickets.field-links.store');
+    Route::post('tickets/{ticket}/field-links/{link}/revoke', [TicketFieldLinkController::class, 'revoke'])->whereNumber('link')->name('tickets.field-links.revoke');
+    Route::post('tickets/{ticket}/field-review', [TicketFieldLinkController::class, 'review'])->name('tickets.field-review');
     Route::post('tickets/{ticket}/appointment', [TicketActionController::class, 'appointment'])->name('tickets.appointment');
     Route::post('tickets/{ticket}/forward', [TicketActionController::class, 'forward'])->name('tickets.forward');
     Route::post('tickets/{ticket}/move', [TicketActionController::class, 'move'])->name('tickets.move');
@@ -59,6 +65,14 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
 
     Route::resource('holidays', HolidayController::class)->only(['index', 'store', 'destroy']);
 });
+
+// A ticket's link for an outside technician or the customer, without signing in.
+Route::get('job/{token}', [FieldLinkController::class, 'showOnHost'])->middleware('throttle:track-link')->name('service.field-link');
+Route::get('t/{code}/job/{token}', [FieldLinkController::class, 'showOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.field-link.path');
+Route::post('job/{token}', [FieldLinkController::class, 'submitOnHost'])->middleware('throttle:track-link')->name('service.field-link.submit');
+Route::post('t/{code}/job/{token}', [FieldLinkController::class, 'submitOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.field-link.submit.path');
+Route::get('job/{token}/print', [FieldLinkController::class, 'printOnHost'])->middleware('throttle:track-link')->name('service.field-link.print');
+Route::get('t/{code}/job/{token}/print', [FieldLinkController::class, 'printOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.field-link.print.path');
 
 // Track my repair: public, no sign-in (TrackController finds the company); limited against guessing.
 Route::get('track', TrackController::class)->middleware('throttle:track')->name('service.track');

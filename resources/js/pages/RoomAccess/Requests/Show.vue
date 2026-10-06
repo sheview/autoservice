@@ -31,6 +31,7 @@ const props = defineProps<{
         requester_name: string | null;
         purpose: string;
         decision_note: string | null;
+        work_summary: string | null;
         planned_start: string;
         planned_end: string;
         submitted_at: string | null;
@@ -44,12 +45,28 @@ const props = defineProps<{
         events: { id: number; action: string; from_status: string | null; to_status: string; actor_name: string | null; note: string | null; at: string }[];
         id_numbers_purged: boolean;
         approved_at: string | null;
+        entered_at: string | null;
+        entered_by_name: string | null;
+        exited_at: string | null;
+        exited_by_name: string | null;
+        items_confirmed_at: string | null;
+        items_confirmed_by_name: string | null;
+        overstaying: boolean;
+        accept_on_enter: boolean;
         approvals: { step: number; side: string; decision: string; note: string | null; actor_name: string | null; round: number; decided_at: string }[];
         waiting_for: { step: number; side: string; name: string | null } | null;
     };
     attachments: Attachment[];
-    permit: { link: string | null; qr: string | null; valid: boolean; expires_at: string | null; can_renew: boolean } | null;
-    can: { edit: boolean; cancel: boolean; viewIds: boolean; copy: boolean; decide: boolean; own: boolean };
+    permit: {
+        link: string | null;
+        qr: string | null;
+        valid: boolean;
+        expires_at: string | null;
+        can_renew: boolean;
+        guard_link: string | null;
+        guard_enabled: boolean;
+    } | null;
+    can: { edit: boolean; cancel: boolean; viewIds: boolean; copy: boolean; decide: boolean; own: boolean; record: boolean; finish: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -95,6 +112,23 @@ const copyLink = async () => {
         copied.value = true;
     }
 };
+// The visit: going in (accepting the rules again when the room asks), out, and the summary afterwards.
+const enterAccept = ref(false);
+const enter = () => router.post(route('room-access.requests.enter', props.request.ulid), { accept: enterAccept.value }, { preserveScroll: true });
+const exit = () => router.post(route('room-access.requests.exit', props.request.ulid), {}, { preserveScroll: true });
+const finishForm = useForm({ work_summary: '', items_confirmed: false });
+const finish = () => finishForm.post(route('room-access.requests.finish', props.request.ulid), { preserveScroll: true });
+const guardCopied = ref(false);
+const copyGuard = async () => {
+    if (props.permit?.guard_link) {
+        await navigator.clipboard.writeText(props.permit.guard_link);
+        guardCopied.value = true;
+    }
+};
+const renewGuard = () => {
+    if (confirm(t('room_permit.renew_confirm'))) router.post(route('room-access.requests.guard-link', props.request.ulid), {}, { preserveScroll: true });
+};
+
 const renew = () => {
     if (confirm(t('room_permit.renew_confirm'))) router.post(route('room-access.requests.permit.renew', props.request.ulid), {}, { preserveScroll: true });
 };
@@ -201,6 +235,62 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
                         </Button>
                         <Button v-if="permit.can_renew" size="sm" variant="ghost" @click="renew">{{ t('room_permit.renew') }}</Button>
                     </div>
+                </div>
+            </section>
+
+            <section v-if="['approved', 'inside', 'exited'].includes(request.status)" class="space-y-3 rounded-md border p-4">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h3 class="text-sm font-semibold">{{ t('room_requests.visit_title') }}</h3>
+                    <span v-if="request.overstaying" class="rounded bg-red-100 px-1.5 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-200">{{
+                        t('room_requests.overstaying')
+                    }}</span>
+                </div>
+                <p v-if="request.entered_at" class="text-sm">{{ t('room_requests.entered_at', { at: dateTime(request.entered_at), by: request.entered_by_name ?? '-' }) }}</p>
+                <p v-if="request.exited_at" class="text-sm">{{ t('room_requests.exited_at', { at: dateTime(request.exited_at), by: request.exited_by_name ?? '-' }) }}</p>
+                <InputError :message="errors.visit || errors.accept" />
+                <div v-if="can.record && request.status === 'approved'" class="space-y-2">
+                    <label v-if="request.accept_on_enter" class="flex items-center gap-2 text-sm">
+                        <input v-model="enterAccept" type="checkbox" class="size-4 rounded border-input" />{{ t('room_requests.enter_accept') }}
+                    </label>
+                    <Button @click="enter">{{ t('room_requests.enter') }}</Button>
+                </div>
+                <Button v-if="can.record && request.status === 'inside'" @click="exit">{{ t('room_requests.exit') }}</Button>
+
+                <template v-if="request.status === 'exited'">
+                    <div v-if="request.work_summary" class="space-y-1 rounded-md bg-muted/40 p-3 text-sm">
+                        <div class="text-xs text-muted-foreground">{{ t('room_requests.work_summary') }}</div>
+                        <p class="whitespace-pre-line">{{ request.work_summary }}</p>
+                        <p v-if="request.items_confirmed_at" class="text-xs text-muted-foreground">
+                            {{ t('room_requests.items_confirmed_by', { name: request.items_confirmed_by_name ?? '-', at: dateTime(request.items_confirmed_at) }) }}
+                        </p>
+                    </div>
+                    <form v-else-if="can.finish" class="space-y-2" @submit.prevent="finish">
+                        <h4 class="text-sm font-medium">{{ t('room_requests.finish_title') }}</h4>
+                        <textarea
+                            v-model="finishForm.work_summary"
+                            rows="4"
+                            required
+                            maxlength="5000"
+                            :placeholder="t('room_requests.work_summary')"
+                            class="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                        />
+                        <InputError :message="finishForm.errors.work_summary" />
+                        <label v-if="request.items.length" class="flex items-center gap-2 text-sm">
+                            <input v-model="finishForm.items_confirmed" type="checkbox" class="size-4 rounded border-input" />{{ t('room_requests.items_confirmed') }}
+                        </label>
+                        <InputError :message="(finishForm.errors as Record<string, string>).items_confirmed" />
+                        <Button :disabled="finishForm.processing">{{ t('room_requests.finish') }}</Button>
+                    </form>
+                </template>
+            </section>
+
+            <section v-if="permit?.guard_link" class="space-y-2 rounded-md border p-4">
+                <h3 class="text-sm font-semibold">{{ t('room_requests.guard_link_title') }}</h3>
+                <p class="text-xs text-muted-foreground">{{ t('room_requests.guard_link_hint') }}</p>
+                <p class="break-all font-mono text-xs">{{ permit.guard_link }}</p>
+                <div class="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" @click="copyGuard">{{ guardCopied ? t('room_permit.copied') : t('room_permit.copy') }}</Button>
+                    <Button size="sm" variant="ghost" @click="renewGuard">{{ t('room_requests.guard_link_renew') }}</Button>
                 </div>
             </section>
 

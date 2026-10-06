@@ -73,6 +73,11 @@ class MoveTicket
 
             $ticket->save();
 
+            // Moving the job on means what came back through its links was looked at.
+            if (in_array($action, ['resolve', 'approve'], true)) {
+                app(ReviewFieldReports::class)->handle($ticket, $actor);
+            }
+
             $this->recordEvent->handle($ticket, TicketEvent::TYPE_STATUS, $actor, [
                 'from_status' => $from,
                 'to_status' => $ticket->status,

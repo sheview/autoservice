@@ -34,7 +34,7 @@ class ServerRoom extends Model
 
     protected $fillable = [
         'customer_id', 'site_id', 'name', 'location', 'requires_id_number', 'missing_rules', 'accept_mode', 'accept_on_enter',
-        'entrants_accept_self', 'freeze_periods', 'guard_contacts', 'is_active', 'notes',
+        'entrants_accept_self', 'guard_link', 'freeze_periods', 'guard_contacts', 'is_active', 'notes',
     ];
 
     protected $attributes = [
@@ -43,6 +43,7 @@ class ServerRoom extends Model
         'accept_mode' => self::ACCEPT_EVERY_REQUEST,
         'accept_on_enter' => false,
         'entrants_accept_self' => false,
+        'guard_link' => false,
         'freeze_periods' => '[]',
         'guard_contacts' => '[]',
         'is_active' => true,
@@ -54,6 +55,7 @@ class ServerRoom extends Model
             'requires_id_number' => 'boolean',
             'accept_on_enter' => 'boolean',
             'entrants_accept_self' => 'boolean',
+            'guard_link' => 'boolean',
             'freeze_periods' => 'array',
             'guard_contacts' => 'array',
             'is_active' => 'boolean',

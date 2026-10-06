@@ -164,7 +164,7 @@ class ServerRoomController extends Controller
     {
         return $room->only([
             'ulid', 'customer_id', 'site_id', 'name', 'location', 'requires_id_number', 'missing_rules', 'accept_mode', 'accept_on_enter',
-            'entrants_accept_self', 'freeze_periods', 'guard_contacts', 'is_active', 'notes',
+            'entrants_accept_self', 'guard_link', 'freeze_periods', 'guard_contacts', 'is_active', 'notes',
         ]);
     }
 
@@ -203,6 +203,7 @@ class ServerRoomController extends Controller
             'accept_mode' => ['required', Rule::in(ServerRoom::ACCEPT_MODES)],
             'accept_on_enter' => ['boolean'],
             'entrants_accept_self' => ['boolean'],
+            'guard_link' => ['boolean'],
             'freeze_periods' => ['array', 'max:50'],
             'freeze_periods.*.from' => ['required', 'date'],
             'freeze_periods.*.to' => ['required', 'date', 'after:freeze_periods.*.from'],

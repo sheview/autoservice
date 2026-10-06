@@ -13,6 +13,10 @@ const props = defineProps<{
     logo: string | null;
     // The customer's tracking QR (link with its token) and where to type the number instead.
     tracking: { qr: string; search: string } | null;
+    // The customer's signature on the screen (through the ticket's link or the close form).
+    signature?: { image: string; signer: string | null; signed_at: string | null } | null;
+    // Opened through a ticket link, without an account: no way into the system from here.
+    publicView?: boolean;
     ticket: {
         ulid: string;
         ticket_no: string;
@@ -116,10 +120,13 @@ const requestSigns = [
     { role: t('ticket_print.reporter_sign'), name: ticket.contact_name },
     { role: t('ticket_print.approver_sign'), name: ticket.report.approver_name },
 ];
+// Back to the link page (opened without an account).
+const goBack = () => window.history.back();
+
 const doneSigns = [
     { caption: t('ticket_print.done_caption'), role: t('ticket_print.technician'), name: ticket.assignee },
-    { caption: t('ticket_print.checked_caption'), role: t('ticket_print.customer_sign'), name: ticket.contact_name },
-];
+    { caption: t('ticket_print.checked_caption'), role: t('ticket_print.customer_sign'), name: props.signature?.signer ?? ticket.contact_name, image: props.signature?.image },
+] as { caption: string; role: string; name: string | null; image?: string }[];
 
 // The five levels, best first, as on the paper form.
 const levels = [5, 4, 3, 2, 1];
@@ -135,7 +142,11 @@ const blankRows = 2;
         <!-- Toolbar (not printed) -->
         <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b bg-background px-4 py-3 print:hidden">
             <Button variant="outline" as-child>
-                <Link :href="route('service.tickets.show', ticket.ulid)">
+                <button v-if="publicView" type="button" @click="goBack">
+                    <ArrowLeft class="h-4 w-4" />
+                    {{ t('common.back') }}
+                </button>
+                <Link v-else :href="route('service.tickets.show', ticket.ulid)">
                     <ArrowLeft class="h-4 w-4" />
                     {{ t('common.back') }}
                 </Link>
@@ -144,7 +155,7 @@ const blankRows = 2;
                 <Printer class="h-4 w-4" />
                 {{ t('ticket_print.print_now') }}
             </Button>
-            <Button variant="outline" as-child>
+            <Button v-if="!publicView" variant="outline" as-child>
                 <a :href="route('service.tickets.pdf', ticket.ulid)" target="_blank" rel="noopener">
                     <FileDown class="h-4 w-4" />
                     {{ t('ticket_print.pdf') }}
@@ -298,6 +309,7 @@ const blankRows = 2;
                 <section class="signatures mt-3 grid grid-cols-2 gap-10 text-center">
                     <div v-for="sign in doneSigns" :key="sign.role">
                         <p class="font-semibold">{{ sign.caption }}</p>
+                        <img v-if="sign.image" :src="sign.image" alt="" class="mx-auto -mb-6 h-[16mm] object-contain" />
                         <p class="flex h-[26px] items-end gap-1.5">
                             <span>{{ t('ticket_print.sign') }}</span>
                             <span class="flex-1 border-b border-dotted border-black" />

@@ -38,7 +38,8 @@ class DecideRoomAccessRequest
             throw ValidationException::withMessages(['note' => __("room_access.approvals.note_required_{$decision}")]);
         }
 
-        $request = DB::transaction(function () use ($request, $decision, $actor, $note) {
+        $guardLink = null;
+        $request = DB::transaction(function () use ($request, $decision, $actor, $note, &$guardLink) {
             $request = RoomAccessRequest::query()->lockForUpdate()->findOrFail($request->id);
             if ($request->status !== RoomAccessRequest::STATUS_PENDING) {
                 throw ValidationException::withMessages(['decision' => __('room_access.approvals.not_pending')]);
@@ -74,6 +75,10 @@ class DecideRoomAccessRequest
                     $request->fill(['status' => RoomAccessRequest::STATUS_APPROVED, 'approved_at' => now(), 'decision_note' => $note])->save();
                     // The permit's link, for its QR and the guard's counter.
                     $this->issueToken->handle($request, RoomAccessToken::PERMIT, $actor);
+                    // The guards' link to record entering and leaving, when the room gives them one.
+                    if ($request->room?->guard_link) {
+                        $guardLink = $this->issueToken->handle($request, RoomAccessToken::GUARD, $actor);
+                    }
                 }
                 RequestHistory::record($request, $done ? 'approved' : 'step_approved', $from, $actor, $note);
             } else {
@@ -87,6 +92,10 @@ class DecideRoomAccessRequest
 
             return $request;
         });
+
+        if ($guardLink !== null) {
+            app(SendGuardLink::class)->handle($request, $guardLink);
+        }
 
         RoomAccessAlert::send(match (true) {
             $request->status === RoomAccessRequest::STATUS_APPROVED => 'room_access_approved',

@@ -2,8 +2,10 @@
 
 use App\Modules\RoomAccess\Http\Controllers\RoomAccessAttachmentController;
 use App\Modules\RoomAccess\Http\Controllers\RoomAccessRequestController;
+use App\Modules\RoomAccess\Http\Controllers\RoomGuardController;
 use App\Modules\RoomAccess\Http\Controllers\RoomPermitController;
 use App\Modules\RoomAccess\Http\Controllers\RoomRuleController;
+use App\Modules\RoomAccess\Http\Controllers\RoomVisitController;
 use App\Modules\RoomAccess\Http\Controllers\ServerRoomController;
 use Illuminate\Support\Facades\Route;
 
@@ -26,6 +28,11 @@ Route::middleware(['auth', 'verified', 'module:room_access'])->prefix('room-acce
     Route::get('requests/{roomRequest}/permit', [RoomPermitController::class, 'pdf'])->name('requests.permit.pdf');
     Route::get('requests/{roomRequest}/permit/print', [RoomPermitController::class, 'print'])->name('requests.permit.print');
     Route::post('requests/{roomRequest}/permit/renew', [RoomPermitController::class, 'renew'])->name('requests.permit.renew');
+    // The visit: going in, coming out, the work summary afterwards, and the guards' link.
+    Route::post('requests/{roomRequest}/enter', [RoomVisitController::class, 'enter'])->name('requests.enter');
+    Route::post('requests/{roomRequest}/exit', [RoomVisitController::class, 'exit'])->name('requests.exit');
+    Route::post('requests/{roomRequest}/finish', [RoomVisitController::class, 'finish'])->name('requests.finish');
+    Route::post('requests/{roomRequest}/guard-link', [RoomVisitController::class, 'renewGuardLink'])->name('requests.guard-link');
     Route::post('requests/{roomRequest}/people/{person}/id', [RoomAccessRequestController::class, 'revealId'])->whereNumber('person')->name('requests.reveal-id');
     Route::post('requests/{roomRequest}/attachments', [RoomAccessAttachmentController::class, 'store'])->name('requests.attachments.store');
     Route::get('requests/{roomRequest}/attachments/{attachment}', [RoomAccessAttachmentController::class, 'show'])->whereNumber('attachment')->name('requests.attachments.show');
@@ -36,3 +43,9 @@ Route::middleware(['auth', 'verified', 'module:room_access'])->prefix('room-acce
 // company by its code on the shared one.
 Route::get('room-permit/{token}', [RoomPermitController::class, 'onHost'])->middleware('throttle:track-link')->name('room-access.permit.public');
 Route::get('t/{code}/room-permit/{token}', [RoomPermitController::class, 'onPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('room-access.permit.public.path');
+
+// The guards' link: record the team going in and coming out, without signing in.
+Route::get('room-guard/{token}', [RoomGuardController::class, 'showOnHost'])->middleware('throttle:track-link')->name('room-access.guard');
+Route::get('t/{code}/room-guard/{token}', [RoomGuardController::class, 'showOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('room-access.guard.path');
+Route::post('room-guard/{token}/{action}', [RoomGuardController::class, 'recordOnHost'])->whereIn('action', ['enter', 'exit'])->middleware('throttle:track-link')->name('room-access.guard.record');
+Route::post('t/{code}/room-guard/{token}/{action}', [RoomGuardController::class, 'recordOnPath'])->where('code', '[0-9]{1,10}')->whereIn('action', ['enter', 'exit'])->middleware('throttle:track-link')->name('room-access.guard.record.path');

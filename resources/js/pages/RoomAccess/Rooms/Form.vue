@@ -24,6 +24,7 @@ interface RoomForm {
     accept_mode: string;
     accept_on_enter: boolean;
     entrants_accept_self: boolean;
+    guard_link: boolean;
     freeze_periods: Freeze[];
     guard_contacts: Guard[];
     is_active: boolean;
@@ -56,6 +57,7 @@ const form = useForm({
     accept_mode: props.room?.accept_mode ?? 'every_request',
     accept_on_enter: props.room?.accept_on_enter ?? false,
     entrants_accept_self: props.room?.entrants_accept_self ?? false,
+    guard_link: props.room?.guard_link ?? false,
     freeze_periods: (props.room?.freeze_periods ?? []).map((f) => ({ ...f, reason: f.reason ?? '' })) as Freeze[],
     guard_contacts: (props.room?.guard_contacts ?? []).map((g) => ({ name: g.name, phone: g.phone ?? '', email: g.email ?? '' })) as Guard[],
     is_active: props.room?.is_active ?? true,
@@ -170,6 +172,10 @@ const check = 'size-4 rounded border-input';
                     <Input v-model="guard.email" type="email" :placeholder="t('server_rooms.guard_email')" maxlength="255" />
                     <Button type="button" variant="ghost" size="sm" @click="form.guard_contacts.splice(i, 1)">{{ t('common.delete') }}</Button>
                 </div>
+                <label class="flex items-start gap-2 text-sm">
+                    <input v-model="form.guard_link" type="checkbox" :class="check" class="mt-0.5" />
+                    <span>{{ t('server_rooms.guard_link') }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.guard_link_hint') }}</span></span>
+                </label>
                 <Button type="button" variant="outline" size="sm" @click="form.guard_contacts.push({ name: '', phone: '', email: '' })">{{
                     t('server_rooms.add_guard')
                 }}</Button>

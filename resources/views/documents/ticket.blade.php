@@ -177,10 +177,13 @@
         <div class="signatures">
             @foreach ([
                 [__('ui.ticket_print.done_caption'), __('document.ticket.technician_sign'), $ticket['assignee']],
-                [__('ui.ticket_print.checked_caption'), __('document.ticket.customer_sign'), $ticket['contact_name']],
+                [__('ui.ticket_print.checked_caption'), __('document.ticket.customer_sign'), ($signature ?? null) ? ($signature['signer'] ?? $ticket['contact_name']) : $ticket['contact_name']],
             ] as [$caption, $role, $name])
                 <div>
                     <div class="caption">{{ $caption }}</div>
+                    @if ($role === __('document.ticket.customer_sign') && ($signature ?? null))
+                        <img src="{{ $signature['image'] }}" alt="" style="height: 16mm; margin-bottom: -18px">
+                    @endif
                     <div class="sign-row"><span>{{ __('ui.ticket_print.sign') }}</span><span class="sign-line"></span><span>{{ $role }}</span></div>
                     <div>( {{ $name ?? $blank }} )</div>
                     <div class="muted">{{ __('document.sign_date') }}</div>

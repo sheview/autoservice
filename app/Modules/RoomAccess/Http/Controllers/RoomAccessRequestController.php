@@ -9,6 +9,7 @@ use App\Modules\Contract\Actions\CustomerLabelNames;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\RoomAccess\Actions\CancelRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\DecideRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\RoomPermitSheet;
@@ -22,13 +23,16 @@ use App\Modules\RoomAccess\Models\RoomAccessEvent;
 use App\Modules\RoomAccess\Models\RoomAccessItem;
 use App\Modules\RoomAccess\Models\RoomAccessPerson;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
+use App\Modules\RoomAccess\Models\RoomAccessToken;
 use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Models\RoomRuleVersion;
 use App\Modules\RoomAccess\Models\RoomVisitor;
 use App\Modules\RoomAccess\Models\ServerRoom;
 use App\Modules\RoomAccess\Support\ApprovalFlow;
 use App\Modules\RoomAccess\Support\IdNumber;
+use App\Modules\RoomAccess\Support\RoomVisit;
 use App\Modules\Service\Actions\TicketsForCheckout;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -133,6 +137,14 @@ class RoomAccessRequestController extends Controller
                 ])->values(),
                 'id_numbers_purged' => $roomRequest->id_numbers_purged_at !== null,
                 'approved_at' => $roomRequest->approved_at?->toIso8601String(),
+                'entered_at' => $roomRequest->entered_at?->toIso8601String(),
+                'entered_by_name' => $roomRequest->entered_by_name,
+                'exited_at' => $roomRequest->exited_at?->toIso8601String(),
+                'exited_by_name' => $roomRequest->exited_by_name,
+                'items_confirmed_at' => $roomRequest->items_confirmed_at?->toIso8601String(),
+                'items_confirmed_by_name' => $roomRequest->items_confirmed_by_name,
+                'overstaying' => RoomVisit::overstaying($roomRequest),
+                'accept_on_enter' => (bool) $room?->accept_on_enter,
                 'approvals' => $roomRequest->approvals->map(fn (RoomAccessApproval $a) => [
                     ...$a->only(['step', 'side', 'decision', 'note', 'actor_name', 'round']),
                     'decided_at' => $a->decided_at->toIso8601String(),
@@ -148,7 +160,14 @@ class RoomAccessRequestController extends Controller
             'permit' => in_array($roomRequest->status, RoomPermitController::PRINTABLE, true) ? (function () use ($roomRequest, $user) {
                 $sheet = app(RoomPermitSheet::class)->handle($roomRequest);
 
+                $guard = $roomRequest->room?->guard_link ? RoomAccessToken::query()->where('request_id', $roomRequest->id)
+                    ->where('purpose', RoomAccessToken::GUARD)->whereNull('revoked_at')->latest('id')->first() : null;
+
                 return [
+                    // The guards' link, for whoever sends it on (the requester and approvers).
+                    'guard_link' => $guard && ((int) $roomRequest->requester_id === $user->id || $user->can('room-access.approve'))
+                        ? PublicUrl::forTenant(app(TenantContext::class)->tenant(), '/room-guard/'.$guard->token) : null,
+                    'guard_enabled' => (bool) $roomRequest->room?->guard_link,
                     'link' => $sheet['link'],
                     'qr' => $sheet['qr'],
                     'valid' => $sheet['valid'],
@@ -166,6 +185,8 @@ class RoomAccessRequestController extends Controller
                 'copy' => $user->can('create', RoomAccessRequest::class),
                 'decide' => ApprovalFlow::canDecide($user, $roomRequest),
                 'own' => (int) $roomRequest->requester_id === $user->id,
+                'record' => RoomVisit::canRecord($user, $roomRequest),
+                'finish' => $roomRequest->status === RoomAccessRequest::STATUS_EXITED && (int) $roomRequest->requester_id === $user->id,
             ],
         ]);
     }

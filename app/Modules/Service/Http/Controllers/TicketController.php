@@ -37,6 +37,7 @@ use App\Modules\Service\Http\Requests\OpenTicketRequest;
 use App\Modules\Service\Http\Requests\UpdateTicketRequest;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
+use App\Modules\Service\Models\TicketFieldLink;
 use App\Modules\Service\Models\TicketRemovedPart;
 use App\Modules\Service\Support\TicketSlaState;
 use App\Modules\Service\Support\TicketWorkflow;
@@ -285,6 +286,17 @@ class TicketController extends Controller
                 // Loans and spares may come back after the job is closed.
                 'canReturn' => TicketPartController::allows($user, $ticket),
             ] : null,
+            // Links for working on the job without an account (outside technicians, the customer's sign-off).
+            'fieldLinks' => $user->can('update', $ticket) ? TicketFieldLink::query()->where('ticket_id', $ticket->id)->latest('id')->get()
+                ->map(fn (TicketFieldLink $link) => [
+                    ...$link->only(['id', 'mode', 'holder_name', 'holder_company', 'holder_phone', 'created_by_name', 'revoked_by_name', 'reviewed_by_name']),
+                    'url' => PublicUrl::forTenant($ticket->tenant, '/job/'.$link->token),
+                    'usable' => $link->setRelation('ticket', $ticket)->usable(),
+                    'expires_at' => $link->expires_at->toIso8601String(),
+                    'revoked_at' => $link->revoked_at?->toIso8601String(),
+                    'submitted_at' => $link->submitted_at?->toIso8601String(),
+                    'reviewed_at' => $link->reviewed_at?->toIso8601String(),
+                ])->values() : null,
             // Pieces taken out of the customer's device on this job (a note, not stock).
             'removedParts' => $user->customer_id === null ? TicketRemovedPart::query()->where('ticket_id', $ticket->id)->orderBy('id')->get()
                 ->map(fn (TicketRemovedPart $piece) => $piece->only(['id', 'item_name', 'serial_number', 'problem', 'disposition', 'user_name'])) : [],

@@ -23,7 +23,8 @@ class AlertSettings
         // Sent by the hourly check (checkouts:notify-delays), with the thresholds below.
         'checkout_delays' => ['checkout_approval_overdue', 'checkout_backorder_overdue', 'checkout_return_overdue'],
         // ticket_reported: a customer reported a problem with an asset's QR code (waits for the helpdesk).
-        'repair' => ['ticket_reported', 'ticket_opened', 'ticket_resolved', 'asset_in_repair'],
+        // ticket_field_reported: an outside technician / the customer sent something back through a ticket link.
+        'repair' => ['ticket_reported', 'ticket_opened', 'ticket_field_reported', 'ticket_resolved', 'asset_in_repair'],
         'purchase' => ['purchase_requested', 'purchase_approved', 'purchase_rejected', 'purchase_ordered', 'purchase_received', 'purchase_cancelled'],
         // Requests to enter customers' server rooms (RoomAccess module).
         'room_access' => ['room_access_requested', 'room_access_approved', 'room_access_rejected', 'room_access_info_requested'],

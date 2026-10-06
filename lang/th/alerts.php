@@ -85,6 +85,10 @@ return [
             'title' => 'แจ้งซ่อมใหม่ :no',
             'body' => "เรื่อง: :title\nความเร่งด่วน: :priority\nผู้ติดต่อ: :contact\nแจ้งโดย: :actor",
         ],
+        'ticket_field_reported' => [
+            'title' => 'ช่างนอก/ลูกค้าส่งข้อมูลใบงาน :no ผ่านลิงก์',
+            'body' => "เรื่อง: :title\nโดย: :actor\nรอ Helpdesk ตรวจและปิดงาน",
+        ],
         'ticket_resolved' => [
             'title' => 'ซ่อมเสร็จแล้ว :no',
             'body' => "เรื่อง: :title\nโดย: :actor",

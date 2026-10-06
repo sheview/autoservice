@@ -53,7 +53,7 @@ class RoomAccessRequest extends Model implements HasMedia
     protected $fillable = [
         'request_no', 'status', 'round', 'approved_at', 'server_room_id', 'customer_id', 'requester_id', 'requester_name', 'planned_start', 'planned_end',
         'purpose', 'ticket_id', 'contract_id', 'rule_version_id', 'decision_note', 'submitted_at', 'entered_at', 'exited_at',
-        'work_summary', 'items_confirmed_at', 'id_numbers_purged_at',
+        'work_summary', 'items_confirmed_at', 'id_numbers_purged_at', 'entered_by_name', 'exited_by_name', 'items_confirmed_by_name',
     ];
 
     protected $attributes = ['status' => self::STATUS_DRAFT];
