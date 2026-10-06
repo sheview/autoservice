@@ -1,4 +1,4 @@
-# AutoService
+# Governix - ITSM
 
 ระบบจัดการทรัพย์สินและงานบริการ สำหรับบริษัทที่รับงาน MA (Network / PC / Data Center)
 Multi-tenant, SaaS instance เดียว, ทีมพัฒนา 1-2 คน

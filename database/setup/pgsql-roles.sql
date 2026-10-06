@@ -1,4 +1,4 @@
--- Creates the two database roles and the databases AutoService needs.
+-- Creates the two database roles and the databases Governix - ITSM needs.
 -- Run once as a PostgreSQL superuser:
 --   psql -U postgres -h 127.0.0.1 -f database/setup/pgsql-roles.sql
 --

@@ -1,4 +1,4 @@
-# AutoService
+# Governix - ITSM
 
 ระบบจัดการทรัพย์สินและงานบริการ MA แบบ multi-tenant
 Laravel 12 · Inertia 2 + Vue 3 + TypeScript · PostgreSQL 16
