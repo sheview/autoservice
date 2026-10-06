@@ -15,6 +15,7 @@ use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\RoomAccessToken;
 use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Support\IdNumber;
+use App\Modules\RoomAccess\Support\RoomSchedule;
 use App\Modules\Service\Actions\TicketLabels;
 use App\Modules\Tenancy\Support\CompanyProfile;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -56,6 +57,8 @@ class RoomPermitSheet
                 ...$request->only(['request_no', 'status', 'requester_name', 'purpose']),
                 'planned_start' => $request->planned_start,
                 'planned_end' => $request->planned_end,
+                // A standing request: the days and hours it may be used within that period.
+                'schedule' => RoomSchedule::describe($request) ?: null,
                 'entered_at' => $request->entered_at,
                 'exited_at' => $request->exited_at,
             ],

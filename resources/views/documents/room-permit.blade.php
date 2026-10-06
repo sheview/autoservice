@@ -38,7 +38,7 @@
             <div class="fact"><span class="label">{{ __('document.room_permit.room') }}</span><span class="value">{{ $room['name'] }}</span></div>
             <div class="fact"><span class="label">{{ __('document.room_permit.location') }}</span><span class="value">{{ $room['location'] }}</span></div>
             <div class="fact" style="grid-column: span 2"><span class="label">{{ __('document.room_permit.period') }}</span>
-                <span class="value">{{ $long($request['planned_start']) }} – {{ $long($request['planned_end']) }}</span></div>
+                <span class="value">{{ $long($request['planned_start']) }} – {{ $long($request['planned_end']) }}@if ($request['schedule'] ?? null) ({{ __('ui.room_requests.schedule_every', ['schedule' => $request['schedule']]) }})@endif</span></div>
             <div class="fact"><span class="label">{{ __('document.room_permit.requester') }}</span><span class="value">{{ $request['requester_name'] }}</span></div>
             <div class="fact"><span class="label">{{ __('document.room_permit.approved_by') }}</span>
                 <span class="value">{{ $approval ? $approval['name'].' · '.$long($approval['at']) : '' }}</span></div>

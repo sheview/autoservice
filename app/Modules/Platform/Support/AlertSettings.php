@@ -27,7 +27,9 @@ class AlertSettings
         'repair' => ['ticket_reported', 'ticket_opened', 'ticket_field_reported', 'ticket_resolved', 'asset_in_repair'],
         'purchase' => ['purchase_requested', 'purchase_approved', 'purchase_rejected', 'purchase_ordered', 'purchase_received', 'purchase_cancelled'],
         // Requests to enter customers' server rooms (RoomAccess module).
-        'room_access' => ['room_access_requested', 'room_access_approved', 'room_access_rejected', 'room_access_info_requested'],
+        // starting_soon / overstay / approval_overdue: sent by the 15-minute check (room-access:notify).
+        'room_access' => ['room_access_requested', 'room_access_approved', 'room_access_rejected', 'room_access_info_requested',
+            'room_access_starting_soon', 'room_access_overstay', 'room_access_approval_overdue'],
     ];
 
     public const MAX_RECIPIENTS = 10;

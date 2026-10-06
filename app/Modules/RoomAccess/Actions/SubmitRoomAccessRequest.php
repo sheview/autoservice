@@ -10,6 +10,7 @@ use App\Modules\RoomAccess\Models\RoomVisitor;
 use App\Modules\RoomAccess\Models\ServerRoom;
 use App\Modules\RoomAccess\Support\RequestHistory;
 use App\Modules\RoomAccess\Support\RoomAccessAlert;
+use App\Modules\RoomAccess\Support\RoomSchedule;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -102,7 +103,8 @@ class SubmitRoomAccessRequest
         foreach ($room->freeze_periods ?? [] as $period) {
             $from = CarbonImmutable::parse($period['from']);
             $to = CarbonImmutable::parse($period['to']);
-            if ($request->planned_start->lt($to) && $request->planned_end->gt($from)) {
+            // A standing request: any of its days in the period.
+            if (RoomSchedule::overlaps($request, $from, $to)) {
                 throw ValidationException::withMessages(['planned_start' => __('room_access.requests.frozen', [
                     'from' => $from->format('d/m/Y H:i'), 'to' => $to->format('d/m/Y H:i'), 'reason' => $period['reason'] ?? '-',
                 ])]);

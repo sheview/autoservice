@@ -3,6 +3,7 @@
 namespace App\Modules\RoomAccess\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Contract\Actions\ContractDetails;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Contract\Actions\CustomerLabelNames;
@@ -12,6 +13,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\RoomAccess\Actions\CancelRoomAccessRequest;
 use App\Modules\RoomAccess\Actions\DecideRoomAccessRequest;
+use App\Modules\RoomAccess\Actions\RoomClashes;
 use App\Modules\RoomAccess\Actions\RoomPermitSheet;
 use App\Modules\RoomAccess\Actions\RoomRulesForRequest;
 use App\Modules\RoomAccess\Actions\SaveRoomAccessRequest;
@@ -24,15 +26,18 @@ use App\Modules\RoomAccess\Models\RoomAccessItem;
 use App\Modules\RoomAccess\Models\RoomAccessPerson;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\RoomAccessToken;
+use App\Modules\RoomAccess\Models\RoomAccessVisit;
 use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Models\RoomRuleVersion;
 use App\Modules\RoomAccess\Models\RoomVisitor;
 use App\Modules\RoomAccess\Models\ServerRoom;
 use App\Modules\RoomAccess\Support\ApprovalFlow;
 use App\Modules\RoomAccess\Support\IdNumber;
+use App\Modules\RoomAccess\Support\RoomSchedule;
 use App\Modules\RoomAccess\Support\RoomVisit;
 use App\Modules\Service\Actions\TicketsForCheckout;
 use App\Modules\Tenancy\Support\TenantContext;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -107,7 +112,7 @@ class RoomAccessRequestController extends Controller
     {
         Gate::authorize('view', $roomRequest);
         $user = $request->user();
-        $roomRequest->load(['room', 'people', 'items', 'acceptances', 'events', 'approvals']);
+        $roomRequest->load(['room', 'people', 'items', 'acceptances', 'events', 'approvals', 'visits']);
         $step = $roomRequest->status === RoomAccessRequest::STATUS_PENDING ? ApprovalFlow::current($roomRequest) : null;
         $room = $roomRequest->room;
 
@@ -116,6 +121,13 @@ class RoomAccessRequestController extends Controller
                 ...$roomRequest->only(['ulid', 'request_no', 'status', 'requester_name', 'purpose', 'decision_note', 'work_summary']),
                 'planned_start' => $roomRequest->planned_start->toIso8601String(),
                 'planned_end' => $roomRequest->planned_end->toIso8601String(),
+                // A standing request: its days and hours, and each time it was used.
+                'schedule' => RoomSchedule::describe($roomRequest) ?: null,
+                'visits' => $roomRequest->visits->map(fn (RoomAccessVisit $v) => [
+                    ...$v->only(['id', 'entered_by_name', 'exited_by_name']),
+                    'entered_at' => $v->entered_at->toIso8601String(),
+                    'exited_at' => $v->exited_at?->toIso8601String(),
+                ])->values(),
                 'submitted_at' => $roomRequest->submitted_at?->toIso8601String(),
                 'room' => ['ulid' => $room?->ulid, 'name' => $room?->name, 'location' => $room?->location, 'requires_id_number' => (bool) $room?->requires_id_number],
                 'customer' => app(CustomerLabelNames::class)->handle()[$roomRequest->customer_id] ?? '-',
@@ -176,6 +188,9 @@ class RoomAccessRequestController extends Controller
                         && ((int) $roomRequest->requester_id === $user->id || $user->can('room-access.approve')),
                 ];
             })() : null,
+            // Other bookings of the room at the same time, freezes and holidays (while still to happen).
+            'clashes' => in_array($roomRequest->status, [RoomAccessRequest::STATUS_DRAFT, RoomAccessRequest::STATUS_PENDING, RoomAccessRequest::STATUS_APPROVED], true)
+                ? app(RoomClashes::class)->handle($roomRequest, $user) : null,
             'attachments' => Attachments::list($roomRequest, $roomRequest->attachmentCollection(),
                 fn (int $id) => route('room-access.requests.attachments.show', [$roomRequest, $id])),
             'can' => [
@@ -307,6 +322,39 @@ class RoomAccessRequestController extends Controller
         return response()->json(['id_number' => $entrant->id_number]);
     }
 
+    /**
+     * What to look out for at the times on the form (other requests for the room, freeze periods,
+     * holidays): warnings shown while filling it in. ?request={ulid} leaves that request out.
+     */
+    public function clashes(Request $request, RoomClashes $clashes): JsonResponse
+    {
+        Gate::authorize('create', RoomAccessRequest::class);
+        $data = $request->validate([
+            'server_room_id' => ['required', 'integer'],
+            'planned_start' => ['required', 'date'],
+            'planned_end' => ['required', 'date', 'after:planned_start'],
+            'recurrence' => ['nullable', 'array'],
+            'recurrence.weekdays' => ['required_with:recurrence', 'array', 'min:1'],
+            'recurrence.weekdays.*' => ['integer', 'between:1,7'],
+            'recurrence.start_time' => ['required_with:recurrence', 'date_format:H:i'],
+            'recurrence.end_time' => ['required_with:recurrence', 'date_format:H:i', 'after:recurrence.start_time'],
+            'request' => ['nullable', 'string'],
+        ]);
+        $room = ServerRoom::query()->findOrFail($data['server_room_id']);
+        $existing = filled($data['request'] ?? null) ? RoomAccessRequest::query()->where('ulid', $data['request'])->first() : null;
+        $probe = $existing ?? new RoomAccessRequest;
+        $rule = $data['recurrence'] ?? null;
+        $probe->forceFill([
+            'server_room_id' => $room->id,
+            'planned_start' => $rule ? substr($data['planned_start'], 0, 10).' '.$rule['start_time'] : $data['planned_start'],
+            'planned_end' => $rule ? substr($data['planned_end'], 0, 10).' '.$rule['end_time'] : $data['planned_end'],
+            'recurrence' => $rule ? ['weekdays' => array_map('intval', $rule['weekdays']), 'start_time' => $rule['start_time'], 'end_time' => $rule['end_time']] : null,
+        ]);
+        abort_if(CarbonImmutable::parse($probe->planned_start)->diffInDays($probe->planned_end) > RoomSchedule::MAX_DAYS + 1, 422);
+
+        return response()->json($clashes->handle($probe, $request->user()));
+    }
+
     /** Open tickets the user may see, for linking the request (Service module). */
     public function tickets(Request $request): JsonResponse
     {
@@ -335,6 +383,11 @@ class RoomAccessRequestController extends Controller
         return [
             'rooms' => $this->roomOptions(),
             'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
+            // Each contract's period, for a standing request "for the contract period".
+            'contractPeriods' => $this->modules->enabled('contract')
+                ? collect(app(ContractDetails::class)->handle(array_column(app(ContractOptions::class)->handle(), 'id')))
+                    ->map(fn (array $c) => ['starts_on' => $c['starts_on'], 'ends_on' => $c['ends_on']])->all()
+                : [],
             // People this requester has taken in before (only theirs; never ID numbers).
             'visitors' => RoomVisitor::query()->where('owner_id', $user->id)->orderByDesc('last_used_at')->limit(200)
                 ->get(['name', 'company', 'phone'])->map(fn (RoomVisitor $v) => $v->only(['name', 'company', 'phone']))->values(),
@@ -353,6 +406,7 @@ class RoomAccessRequestController extends Controller
             'planned_start' => $request->planned_start->format('Y-m-d\TH:i'),
             'planned_end' => $request->planned_end->format('Y-m-d\TH:i'),
             'purpose' => $request->purpose,
+            'recurrence' => $request->recurrence,
             'ticket' => $this->ticketLabel(request()->user(), $request->ticket_id),
             'contract_id' => $request->contract_id,
             'people' => $request->people->map(fn (RoomAccessPerson $p) => [

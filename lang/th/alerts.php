@@ -128,6 +128,18 @@ return [
 โดย: :actor
 ข้อมูลที่ต้องการ: :note',
         ],
+        'room_access_starting_soon' => [
+            'title' => 'ใกล้ถึงเวลาเข้าห้อง Server :no',
+            'body' => "ห้อง: :room (:customer)\nเวลาเข้า: :note\nผู้ขอ: :requester (ผู้เข้า :people คน)\nวัตถุประสงค์: :purpose",
+        ],
+        'room_access_overstay' => [
+            'title' => 'ยังอยู่ในห้อง Server เกินเวลา :no',
+            'body' => "ห้อง: :room (:customer)\nวันเวลาที่ขอ: :when\nผู้ขอ: :requester\nบันทึกเข้าโดย: :actor\n:note",
+        ],
+        'room_access_approval_overdue' => [
+            'title' => 'คำขอเข้าห้อง Server รออนุมัติเกิน :note ชั่วโมง :no',
+            'body' => "ลูกค้า: :customer\nห้อง: :room\nวันเวลา: :when\nผู้ขอ: :requester",
+        ],
         'purchase_requested' => [
             'title' => 'ใบขอซื้อใหม่ :no',
             'body' => "ผู้ขอ: :requester\nรายการ: :item\nจำนวน: :qty\nโครงการ: :project\nต้องการใช้ภายใน: :needed_by",

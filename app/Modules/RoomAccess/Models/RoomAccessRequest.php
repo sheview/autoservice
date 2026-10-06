@@ -54,6 +54,7 @@ class RoomAccessRequest extends Model implements HasMedia
         'request_no', 'status', 'round', 'approved_at', 'server_room_id', 'customer_id', 'requester_id', 'requester_name', 'planned_start', 'planned_end',
         'purpose', 'ticket_id', 'contract_id', 'rule_version_id', 'decision_note', 'submitted_at', 'entered_at', 'exited_at',
         'work_summary', 'items_confirmed_at', 'id_numbers_purged_at', 'entered_by_name', 'exited_by_name', 'items_confirmed_by_name',
+        'recurrence', 'reminded_at', 'overstay_alerted_at', 'approval_alerted_at',
     ];
 
     protected $attributes = ['status' => self::STATUS_DRAFT];
@@ -70,6 +71,10 @@ class RoomAccessRequest extends Model implements HasMedia
             'exited_at' => 'datetime',
             'items_confirmed_at' => 'datetime',
             'id_numbers_purged_at' => 'datetime',
+            'recurrence' => 'array',
+            'reminded_at' => 'datetime',
+            'overstay_alerted_at' => 'datetime',
+            'approval_alerted_at' => 'datetime',
         ];
     }
 
@@ -111,6 +116,18 @@ class RoomAccessRequest extends Model implements HasMedia
     public function events(): HasMany
     {
         return $this->hasMany(RoomAccessEvent::class, 'request_id')->orderBy('created_at')->orderBy('id');
+    }
+
+    /** Each time the team went in and came out (one per day used, on a standing request). */
+    public function visits(): HasMany
+    {
+        return $this->hasMany(RoomAccessVisit::class, 'request_id')->orderBy('entered_at')->orderBy('id');
+    }
+
+    /** A standing request: approved once, used on the chosen weekdays of its period (RoomSchedule). */
+    public function isRecurring(): bool
+    {
+        return ! empty($this->recurrence);
     }
 
     public function attachmentsTakeImages(): bool

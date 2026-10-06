@@ -12,7 +12,7 @@ import { CircleCheck, CircleX, DoorOpen } from 'lucide-vue-next';
 defineProps<{
     permit: {
         company: { name: string } | null;
-        request: { request_no: string; status: string; requester_name: string | null; purpose: string; planned_start: string; planned_end: string; entered_at: string | null; exited_at: string | null };
+        request: { request_no: string; status: string; requester_name: string | null; purpose: string; planned_start: string; planned_end: string; schedule?: string | null; entered_at: string | null; exited_at: string | null };
         valid: boolean;
         room: { name: string | null; location: string | null; site: string | null };
         customer: string;
@@ -62,7 +62,10 @@ defineProps<{
                     </div>
                     <div>
                         <dt class="text-xs text-muted-foreground">{{ t('room_permit.period') }}</dt>
-                        <dd class="font-semibold">{{ dateTime(permit.request.planned_start) }} – {{ dateTime(permit.request.planned_end) }}</dd>
+                        <dd class="font-semibold">
+                            {{ dateTime(permit.request.planned_start) }} – {{ dateTime(permit.request.planned_end) }}
+                            <span v-if="permit.request.schedule" class="block">{{ t('room_requests.schedule_every', { schedule: permit.request.schedule }) }}</span>
+                        </dd>
                     </div>
                     <div>
                         <dt class="text-xs text-muted-foreground">{{ t('room_permit.requester') }}</dt>

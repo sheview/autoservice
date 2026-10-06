@@ -4,6 +4,7 @@ use App\Modules\RoomAccess\Http\Controllers\RoomAccessAttachmentController;
 use App\Modules\RoomAccess\Http\Controllers\RoomAccessRequestController;
 use App\Modules\RoomAccess\Http\Controllers\RoomGuardController;
 use App\Modules\RoomAccess\Http\Controllers\RoomPermitController;
+use App\Modules\RoomAccess\Http\Controllers\RoomReportController;
 use App\Modules\RoomAccess\Http\Controllers\RoomRuleController;
 use App\Modules\RoomAccess\Http\Controllers\RoomVisitController;
 use App\Modules\RoomAccess\Http\Controllers\ServerRoomController;
@@ -17,6 +18,14 @@ Route::middleware(['auth', 'verified', 'module:room_access'])->prefix('room-acce
     Route::get('rooms/{room}/rules/{version}/file', [RoomRuleController::class, 'file'])->whereNumber('version')->name('rooms.rules.file');
 
     // Requests to enter a room. Before the resource, so these are not taken as a request.
+    // The rooms' month calendar, and the report of who went in and out.
+    Route::get('calendar', [RoomReportController::class, 'calendar'])->name('calendar');
+    Route::get('report', [RoomReportController::class, 'index'])->name('report');
+    Route::get('report/export', [RoomReportController::class, 'export'])->name('report.export');
+    Route::get('report/print', [RoomReportController::class, 'print'])->name('report.print');
+    Route::get('report/pdf', [RoomReportController::class, 'pdf'])->name('report.pdf');
+
+    Route::get('requests/clashes', [RoomAccessRequestController::class, 'clashes'])->name('requests.clashes');
     Route::get('requests/tickets', [RoomAccessRequestController::class, 'tickets'])->name('requests.tickets');
     Route::get('requests/rooms/{room}/rules', [RoomAccessRequestController::class, 'rules'])->name('requests.rules');
     Route::get('requests/rooms/{room}/rules/{version}/file', [RoomAccessRequestController::class, 'rulesFile'])->whereNumber('version')->name('requests.rules-file');

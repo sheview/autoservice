@@ -8,7 +8,8 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Approved requests nobody went in on before the planned end become "overdue" (no longer usable;
- * their links stop), in the current company.
+ * their links stop), in the current company. A standing request used on some day of its period
+ * ends as "exited" instead (the requester then sums up the work).
  */
 class MarkOverdueRoomRequests
 {
@@ -20,8 +21,11 @@ class MarkOverdueRoomRequests
         RoomAccessRequest::query()->where('status', RoomAccessRequest::STATUS_APPROVED)->where('planned_end', '<', now())
             ->get()->each(function (RoomAccessRequest $request) use (&$count) {
                 DB::transaction(function () use ($request) {
-                    $request->update(['status' => RoomAccessRequest::STATUS_OVERDUE]);
-                    RequestHistory::record($request, 'overdue', RoomAccessRequest::STATUS_APPROVED, null, null, __('ui.common.system'));
+                    // A standing request used at least once has simply come to its end.
+                    $used = $request->isRecurring() && $request->visits()->exists();
+                    $status = $used ? RoomAccessRequest::STATUS_EXITED : RoomAccessRequest::STATUS_OVERDUE;
+                    $request->update(['status' => $status]);
+                    RequestHistory::record($request, $used ? 'period_ended' : 'overdue', RoomAccessRequest::STATUS_APPROVED, null, null, __('ui.common.system'));
                     $this->revokeTokens->handle($request);
                 });
                 $count++;

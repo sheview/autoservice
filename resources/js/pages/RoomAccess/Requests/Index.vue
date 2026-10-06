@@ -61,9 +61,17 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('room_requests.title')" :description="t('room_requests.description')" />
-                <Button v-if="can.create" as-child>
-                    <Link :href="route('room-access.requests.create')">{{ t('room_requests.create') }}</Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <Link :href="route('room-access.calendar')">{{ t('room_requests.calendar') }}</Link>
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <Link :href="route('room-access.report')">{{ t('room_requests.report') }}</Link>
+                    </Button>
+                    <Button v-if="can.create" as-child>
+                        <Link :href="route('room-access.requests.create')">{{ t('room_requests.create') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

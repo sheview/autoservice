@@ -70,7 +70,7 @@ class RoomGuardController extends Controller
                 'permit' => [
                     ...collect($permit)->only(['company', 'valid', 'room', 'customer', 'people', 'items'])->all(),
                     'request' => [
-                        ...collect($permit['request'])->only(['request_no', 'status', 'requester_name', 'purpose'])->all(),
+                        ...collect($permit['request'])->only(['request_no', 'status', 'requester_name', 'purpose', 'schedule'])->all(),
                         'planned_start' => $permit['request']['planned_start']->toIso8601String(),
                         'planned_end' => $permit['request']['planned_end']->toIso8601String(),
                         'entered_at' => $permit['request']['entered_at']?->toIso8601String(),

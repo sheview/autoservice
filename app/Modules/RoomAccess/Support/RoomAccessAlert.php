@@ -21,7 +21,8 @@ class RoomAccessAlert
             'no' => $request->request_no,
             'customer' => app(CustomerLabelNames::class)->handle()[$request->customer_id] ?? '-',
             'room' => $request->room?->name,
-            'when' => $request->planned_start->format('d/m/Y H:i').' - '.$request->planned_end->format('d/m/Y H:i'),
+            'when' => $request->planned_start->format('d/m/Y H:i').' - '.$request->planned_end->format('d/m/Y H:i')
+                .($request->isRecurring() ? ' ('.__('ui.room_requests.schedule_every', ['schedule' => RoomSchedule::describe($request)]).')' : ''),
             'requester' => $request->requester_name,
             'people' => $request->people()->count(),
             'purpose' => $request->purpose,

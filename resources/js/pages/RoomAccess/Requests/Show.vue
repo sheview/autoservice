@@ -34,6 +34,8 @@ const props = defineProps<{
         work_summary: string | null;
         planned_start: string;
         planned_end: string;
+        schedule: string | null;
+        visits: { id: number; entered_at: string; exited_at: string | null; entered_by_name: string | null; exited_by_name: string | null }[];
         submitted_at: string | null;
         room: { ulid: string | null; name: string | null; location: string | null; requires_id_number: boolean };
         customer: string;
@@ -57,6 +59,11 @@ const props = defineProps<{
         waiting_for: { step: number; side: string; name: string | null } | null;
     };
     attachments: Attachment[];
+    clashes: {
+        requests: { ulid: string | null; request_no: string | null; requester_name: string | null; status: string; planned_start: string; planned_end: string; schedule: string | null }[];
+        freezes: { from: string; to: string; reason: string | null }[];
+        holidays: { date: string; name: string }[];
+    } | null;
     permit: {
         link: string | null;
         qr: string | null;
@@ -75,6 +82,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: props.request.request_no, href: route('room-access.requests.show', props.request.ulid) },
 ];
 const errors = computed(() => page.props.errors as Record<string, string>);
+const hasClashes = computed(() => !!props.clashes && props.clashes.requests.length + props.clashes.freezes.length + props.clashes.holidays.length > 0);
 
 // Sending a draft: the rules popup first.
 const dialog = ref(false);
@@ -183,6 +191,35 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
                 {{ t('room_requests.decision_note') }}: {{ request.decision_note }}
             </p>
 
+            <div
+                v-if="hasClashes && clashes"
+                class="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+            >
+                <p class="font-semibold">{{ t('room_requests.clash_title') }}</p>
+                <p v-for="(f, i) in clashes.freezes" :key="'f' + i" class="text-red-700 dark:text-red-300">
+                    {{ t('room_requests.clash_freeze', { from: dateTime(f.from), to: dateTime(f.to), reason: f.reason ?? '-' }) }}
+                </p>
+                <p v-for="(r, i) in clashes.requests" :key="'r' + i">
+                    <template v-if="r.request_no">
+                        <Link v-if="r.ulid" :href="route('room-access.requests.show', r.ulid)" class="underline">{{
+                            t('room_requests.clash_request', {
+                                no: r.request_no,
+                                who: r.requester_name ?? '-',
+                                status: t(`room_requests.statuses.${r.status}`),
+                                when: `${dateTime(r.planned_start)} – ${dateTime(r.planned_end)}` + (r.schedule ? ` (${r.schedule})` : ''),
+                            })
+                        }}</Link>
+                    </template>
+                    <template v-else>{{
+                        t('room_requests.clash_hidden', {
+                            when: `${dateTime(r.planned_start)} – ${dateTime(r.planned_end)}` + (r.schedule ? ` (${r.schedule})` : ''),
+                            status: t(`room_requests.statuses.${r.status}`),
+                        })
+                    }}</template>
+                </p>
+                <p v-for="h in clashes.holidays" :key="h.date">{{ t('room_requests.clash_holiday', { date: h.date, name: h.name }) }}</p>
+            </div>
+
             <section v-if="request.status === 'pending' || request.approvals.length" class="space-y-3 rounded-md border p-4">
                 <h3 class="text-sm font-semibold">{{ t('room_requests.approval_title') }}</h3>
                 <p v-if="request.waiting_for" class="text-sm">
@@ -245,8 +282,21 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
                         t('room_requests.overstaying')
                     }}</span>
                 </div>
-                <p v-if="request.entered_at" class="text-sm">{{ t('room_requests.entered_at', { at: dateTime(request.entered_at), by: request.entered_by_name ?? '-' }) }}</p>
-                <p v-if="request.exited_at" class="text-sm">{{ t('room_requests.exited_at', { at: dateTime(request.exited_at), by: request.exited_by_name ?? '-' }) }}</p>
+                <template v-if="!request.schedule">
+                    <p v-if="request.entered_at" class="text-sm">{{ t('room_requests.entered_at', { at: dateTime(request.entered_at), by: request.entered_by_name ?? '-' }) }}</p>
+                    <p v-if="request.exited_at" class="text-sm">{{ t('room_requests.exited_at', { at: dateTime(request.exited_at), by: request.exited_by_name ?? '-' }) }}</p>
+                </template>
+                <!-- A standing request: each day it was used. -->
+                <template v-else>
+                    <p class="text-sm">{{ t('room_requests.schedule') }}: {{ t('room_requests.schedule_every', { schedule: request.schedule }) }}</p>
+                    <p v-if="!request.visits.length" class="text-sm text-muted-foreground">{{ t('room_requests.visits_none') }}</p>
+                    <ul v-else class="max-h-64 space-y-1 overflow-y-auto text-sm">
+                        <li v-for="v in [...request.visits].reverse()" :key="v.id">
+                            {{ t('room_requests.visit_line', { in: dateTime(v.entered_at), out: v.exited_at ? dateTime(v.exited_at) : t('room_requests.still_inside') }) }}
+                            <span class="text-xs text-muted-foreground">· {{ v.entered_by_name }}<template v-if="v.exited_by_name"> / {{ v.exited_by_name }}</template></span>
+                        </li>
+                    </ul>
+                </template>
                 <InputError :message="errors.visit || errors.accept" />
                 <div v-if="can.record && request.status === 'approved'" class="space-y-2">
                     <label v-if="request.accept_on_enter" class="flex items-center gap-2 text-sm">
@@ -302,7 +352,10 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
             <dl class="grid gap-x-6 gap-y-3 rounded-md border p-4 text-sm sm:grid-cols-2">
                 <div>
                     <dt class="text-xs text-muted-foreground">{{ t('room_requests.when') }}</dt>
-                    <dd>{{ dateTime(request.planned_start) }} – {{ dateTime(request.planned_end) }}</dd>
+                    <dd>
+                        {{ dateTime(request.planned_start) }} – {{ dateTime(request.planned_end) }}
+                        <span v-if="request.schedule" class="block font-medium">{{ t('room_requests.schedule_every', { schedule: request.schedule }) }}</span>
+                    </dd>
                 </div>
                 <div>
                     <dt class="text-xs text-muted-foreground">{{ t('room_requests.requester') }}</dt>

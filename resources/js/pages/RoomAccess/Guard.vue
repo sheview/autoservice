@@ -21,7 +21,7 @@ const props = defineProps<{
             customer: string;
             people: { name: string; company: string | null }[];
             items: { name: string; serial_number: string | null; quantity: number; direction: string }[];
-            request: { request_no: string; status: string; requester_name: string | null; purpose: string; planned_start: string; planned_end: string; entered_at: string | null; exited_at: string | null };
+            request: { request_no: string; status: string; requester_name: string | null; purpose: string; planned_start: string; planned_end: string; schedule?: string | null; entered_at: string | null; exited_at: string | null };
         };
         rules: { summary: string[]; company_terms: string[]; version: number | null } | null;
         usable: boolean;
@@ -75,6 +75,9 @@ const errors = computed(() => shared.props.errors as Record<string, string>);
                         <div class="text-xl font-bold">{{ page.permit.valid ? t('room_permit.valid') : t('room_permit.invalid') }}</div>
                         <div class="text-sm">{{ page.permit.customer }} · {{ page.permit.room.name }} · <span class="font-mono">{{ page.permit.request.request_no }}</span></div>
                         <div class="text-sm">{{ dateTime(page.permit.request.planned_start) }} – {{ dateTime(page.permit.request.planned_end) }}</div>
+                        <div v-if="page.permit.request.schedule" class="text-sm font-medium">
+                            {{ t('room_requests.schedule_every', { schedule: page.permit.request.schedule }) }}
+                        </div>
                     </div>
                 </div>
 

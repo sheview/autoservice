@@ -5,6 +5,7 @@ namespace App\Modules\RoomAccess\Support;
 use App\Modules\Identity\Models\User;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\ServerRoomManager;
+use Carbon\CarbonImmutable;
 
 /**
  * Who may record entering and leaving a room for a request when signed in: the requester, and our
@@ -25,9 +26,18 @@ class RoomVisit
             || ServerRoomManager::query()->where('server_room_id', $request->server_room_id)->where('user_id', $user->id)->exists();
     }
 
-    /** Inside after the planned end: shown as overstaying (leaving is still recorded). */
+    /** Inside after the planned end (of the day's hours, on a standing request): overstaying (leaving is still recorded). */
     public static function overstaying(RoomAccessRequest $request): bool
     {
-        return $request->status === RoomAccessRequest::STATUS_INSIDE && $request->planned_end->isPast();
+        return $request->status === RoomAccessRequest::STATUS_INSIDE && self::visitEnd($request)->isPast();
+    }
+
+    /** When the team inside now should be out: the planned end, or the end of the hours of the day they went in. */
+    public static function visitEnd(RoomAccessRequest $request): CarbonImmutable
+    {
+        $slot = $request->isRecurring() && $request->entered_at
+            ? RoomSchedule::slotAt($request, $request->entered_at, self::EARLY_MINUTES) : null;
+
+        return $slot[1] ?? CarbonImmutable::parse($request->planned_end);
     }
 }

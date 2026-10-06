@@ -21,7 +21,8 @@ class SaveRoomAccessRequest
     public function __construct(private GenerateRoomRequestNumber $generateNumber) {}
 
     /**
-     * @param  array{server_room_id: int, planned_start: string, planned_end: string, purpose: string, ticket_id?: int|null,
+     * @param  array{server_room_id: int, planned_start: string, planned_end: string, purpose: string,
+     *     recurrence?: array{weekdays: list<int>, start_time: string, end_time: string}|null, ticket_id?: int|null,
      *     contract_id?: int|null, people: list<array{id?: int|null, name: string, company?: string|null, phone?: string|null, id_number?: string|null}>,
      *     items?: list<array{name: string, serial_number?: string|null, quantity?: int|null, direction?: string|null}>}  $data  validated
      */
@@ -35,11 +36,18 @@ class SaveRoomAccessRequest
                 'requester_id' => $actor->id,
                 'requester_name' => $actor->name,
             ]);
+            // A standing request runs from its first day's hours to its last day's.
+            $recurrence = $data['recurrence'] ?? null;
             $request->fill([
                 'server_room_id' => $room->id,
                 'customer_id' => $room->customer_id,
-                'planned_start' => $data['planned_start'],
-                'planned_end' => $data['planned_end'],
+                'planned_start' => $recurrence ? substr($data['planned_start'], 0, 10).' '.$recurrence['start_time'] : $data['planned_start'],
+                'planned_end' => $recurrence ? substr($data['planned_end'], 0, 10).' '.$recurrence['end_time'] : $data['planned_end'],
+                'recurrence' => $recurrence ? [
+                    'weekdays' => collect($recurrence['weekdays'])->map(fn ($d) => (int) $d)->unique()->sort()->values()->all(),
+                    'start_time' => $recurrence['start_time'],
+                    'end_time' => $recurrence['end_time'],
+                ] : null,
                 'purpose' => $data['purpose'],
                 'ticket_id' => $data['ticket_id'] ?? null,
                 'contract_id' => $data['contract_id'] ?? null,

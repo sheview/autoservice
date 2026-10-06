@@ -7,13 +7,14 @@ use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Models\ServerRoom;
 use App\Modules\RoomAccess\Support\RequestHistory;
+use App\Modules\RoomAccess\Support\RoomSchedule;
 use App\Modules\RoomAccess\Support\RoomVisit;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Records that the team went in (an approved request, from an hour before the planned start until
- * the planned end): by a signed-in user, or by a guard through the request's guard link (named).
+ * the planned end; on a standing request, on its days from an hour before its hours start): by a signed-in user, or by a guard through the request's guard link (named).
  * When the room asks for the rules to be accepted again on entering, that acceptance is kept as
  * evidence too (by the user, or confirmed by the guard for the team).
  */
@@ -36,6 +37,10 @@ class RecordRoomEntry
             }
             if ($request->planned_end->isPast()) {
                 throw ValidationException::withMessages(['visit' => __('room_access.visit.too_late')]);
+            }
+            // A standing request: only on its days, within its hours.
+            if ($request->isRecurring() && RoomSchedule::slotAt($request, now(), RoomVisit::EARLY_MINUTES) === null) {
+                throw ValidationException::withMessages(['visit' => __('room_access.visit.outside_schedule', ['schedule' => RoomSchedule::describe($request)])]);
             }
 
             $room = ServerRoom::withTrashed()->findOrFail($request->server_room_id);
@@ -61,7 +66,9 @@ class RecordRoomEntry
             }
 
             $by = $actor?->name ?? __('room_access.visit.by_guard', ['name' => $guardName]);
-            $request->fill(['status' => RoomAccessRequest::STATUS_INSIDE, 'entered_at' => now(), 'entered_by_name' => $by])->save();
+            $request->fill(['status' => RoomAccessRequest::STATUS_INSIDE, 'entered_at' => now(), 'entered_by_name' => $by,
+                'exited_at' => null, 'exited_by_name' => null])->save();
+            $request->visits()->create(['entered_at' => now(), 'entered_by_name' => $by]);
             RequestHistory::record($request, 'entered', RoomAccessRequest::STATUS_APPROVED, $actor, $actor ? null : $by, $by);
 
             return $request;

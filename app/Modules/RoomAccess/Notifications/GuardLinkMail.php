@@ -3,6 +3,7 @@
 namespace App\Modules\RoomAccess\Notifications;
 
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
+use App\Modules\RoomAccess\Support\RoomSchedule;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -26,7 +27,8 @@ class GuardLinkMail extends Notification
             'no' => $request->request_no,
             'room' => $request->room?->name ?? '-',
             'company' => $this->company,
-            'when' => $request->planned_start->format('d/m/Y H:i').' - '.$request->planned_end->format('d/m/Y H:i'),
+            'when' => $request->planned_start->format('d/m/Y H:i').' - '.$request->planned_end->format('d/m/Y H:i')
+                .($request->isRecurring() ? ' ('.__('ui.room_requests.schedule_every', ['schedule' => RoomSchedule::describe($request)]).')' : ''),
             'people' => $request->people->pluck('name')->implode(', '),
         ];
 
