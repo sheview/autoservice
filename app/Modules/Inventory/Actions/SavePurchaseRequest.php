@@ -25,7 +25,7 @@ class SavePurchaseRequest
     /**
      * @param  array{item_name: string, contract_id?: int|null, description?: string|null, quantity: int, unit: string, unit_price?: int|null,
      *     links?: list<string>, reason?: string|null, needed_by?: string|null, checkout_request_id?: int|null,
-     *     item_kind?: string|null, asset_category_id?: int|null}  $data  validated; unit_price in satang
+     *     item_kind?: string|null, asset_category_id?: int|null, batch?: string|null}  $data  validated; unit_price in satang
      * @param  list<UploadedFile>  $files
      */
     public function handle(?PurchaseRequest $request, array $data, User $actor, array $files = []): PurchaseRequest
@@ -47,6 +47,8 @@ class SavePurchaseRequest
                     'requested_by' => $actor->id,
                     'requested_by_name' => $actor->name,
                     'checkout_request_id' => $data['checkout_request_id'] ?? null,
+                    // Asked for together with other items on one form (OpenPurchaseRequests).
+                    'batch' => $data['batch'] ?? null,
                 ]);
                 $this->logEvent->handle($request, 'create', null, $actor);
                 PurchaseAlert::send('purchase_requested', $request, $actor->name);

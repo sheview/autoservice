@@ -14,7 +14,10 @@ use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Document\Http\Concerns\ServesAttachments;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Actions\MovePurchaseBatch;
 use App\Modules\Inventory\Actions\MovePurchaseRequest;
+use App\Modules\Inventory\Actions\OpenPurchaseRequests;
+use App\Modules\Inventory\Actions\PurchaseBatchOf;
 use App\Modules\Inventory\Actions\SavePurchaseRequest;
 use App\Modules\Inventory\Actions\SearchPurchaseRequests;
 use App\Modules\Inventory\Http\Requests\PurchaseRequestRequest;
@@ -95,11 +98,15 @@ class PurchaseRequestController extends Controller
         ]);
     }
 
-    public function store(PurchaseRequestRequest $request, SavePurchaseRequest $save): RedirectResponse
+    /** One item, or several asked for together (one request each, in one batch). */
+    public function store(PurchaseRequestRequest $request, OpenPurchaseRequests $open): RedirectResponse
     {
-        $pr = $save->handle(null, $request->requestData(), $request->user(), $request->attachments());
+        $opened = $open->handle($request->shared(), $request->items(), $request->user(), $request->attachments());
+        $pr = $opened[0];
 
-        return redirect()->route('inventory.purchase-requests.show', $pr)->with('success', __('inventory.purchase_requests.created', ['no' => $pr->pr_no]));
+        return redirect()->route('inventory.purchase-requests.show', $pr)->with('success', count($opened) > 1
+            ? __('inventory.purchase_requests.created_batch', ['count' => count($opened), 'from' => $pr->pr_no, 'to' => end($opened)->pr_no])
+            : __('inventory.purchase_requests.created', ['no' => $pr->pr_no]));
     }
 
     public function show(Request $request, PurchaseRequest $purchaseRequest, Modules $modules): Response
@@ -139,6 +146,8 @@ class PurchaseRequestController extends Controller
             // Moves the user may make now.
             'actions' => collect(array_keys(PurchaseWorkflow::ACTIONS))->filter(fn (string $action) => PurchaseWorkflow::allows($purchaseRequest, $action) && $user->can('move', [$purchaseRequest, $action]))->values(),
             'needsNote' => PurchaseWorkflow::NEEDS_NOTE,
+            // The other items asked for on the same form, and how many of them the user may decide now.
+            'batch' => $this->batch($purchaseRequest, $user),
             'can' => [
                 'update' => $user->can('update', $purchaseRequest),
                 'attach' => $this->canAttach($request, $purchaseRequest),
@@ -185,6 +194,25 @@ class PurchaseRequestController extends Controller
         return back()->with('success', __('inventory.purchase_requests.moved.'.$data['action'], ['no' => $purchaseRequest->pr_no]));
     }
 
+    /** Approve or turn down, in one go, the requests of the batch this one belongs to that the user may decide. */
+    public function moveBatch(Request $request, PurchaseRequest $purchaseRequest, PurchaseBatchOf $batchOf, MovePurchaseBatch $move): RedirectResponse
+    {
+        Gate::authorize('view', $purchaseRequest);
+        $data = $request->validate([
+            'action' => ['required', Rule::in(MovePurchaseBatch::ACTIONS)],
+            'note' => ['nullable', 'string', 'max:2000'],
+        ], attributes: __('inventory.purchase_requests.fields'));
+        $user = $request->user();
+
+        abort_unless($user->can(PurchaseWorkflow::ACTIONS[$data['action']]['permission']), 403);
+
+        // Those of the batch the user may decide now (none left: MovePurchaseBatch says so).
+        $mine = $batchOf->handle($purchaseRequest)->filter(fn (PurchaseRequest $pr) => $user->can('move', [$pr, $data['action']]));
+        $count = $move->handle($mine, $data['action'], $user, $data['note'] ?? null);
+
+        return back()->with('success', __('inventory.purchase_requests.moved_batch.'.$data['action'], ['count' => $count]));
+    }
+
     /** The request as an A4 page for the browser to print. */
     public function print(PurchaseRequest $purchaseRequest, TenantContext $context): View
     {
@@ -226,6 +254,26 @@ class PurchaseRequestController extends Controller
     }
 
     /** @return list<array{id: int, name: string}> asset categories (Asset module), for "goes into the system as" */
+    /**
+     * @return array{items: list<array<string, mixed>>, decidable: array<string, int>}|null
+     */
+    private function batch(PurchaseRequest $pr, User $user): ?array
+    {
+        if ($pr->batch === null) {
+            return null;
+        }
+        $items = app(PurchaseBatchOf::class)->handle($pr);
+
+        return [
+            'items' => $items->map(fn (PurchaseRequest $item) => [
+                ...$item->only(['ulid', 'pr_no', 'item_name', 'quantity', 'unit', 'status']),
+                'current' => $item->is($pr),
+            ])->values()->all(),
+            'decidable' => collect(MovePurchaseBatch::ACTIONS)->mapWithKeys(fn (string $action) => [$action => $items
+                ->filter(fn (PurchaseRequest $item) => PurchaseWorkflow::allows($item, $action) && $user->can('move', [$item, $action]))->count()])->all(),
+        ];
+    }
+
     private function categoryOptions(Modules $modules): array
     {
         return $modules->enabled('asset')

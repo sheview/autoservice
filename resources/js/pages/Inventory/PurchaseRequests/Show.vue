@@ -2,9 +2,9 @@
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import SerialInputs from '@/components/SerialInputs.vue';
 import PurchaseStatusBadge from '@/components/PurchaseStatusBadge.vue';
 import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
+import SerialInputs from '@/components/SerialInputs.vue';
 import StepProgress from '@/components/StepProgress.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,11 @@ const props = defineProps<{
     attachments: Attachment[];
     actions: string[];
     needsNote: string[];
+    // The items asked for on the same form (one request each), and how many the user may approve / turn down now.
+    batch: {
+        items: { ulid: string; pr_no: string; item_name: string; quantity: number; unit: string; status: string; current: boolean }[];
+        decidable: { approve: number; reject: number };
+    } | null;
     can: { update: boolean; attach: boolean; receive: boolean; register: boolean; handOut: boolean };
 }>();
 
@@ -53,13 +58,20 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 // --- moves: the note box opens for the chosen move; a rejection needs it --------
 const pending = ref<string | null>(null);
+// The move is for the whole batch (every request of it the user may decide), not this request only.
+const wholeBatch = ref(false);
+const choose = (action: string, batch = false) => {
+    wholeBatch.value = batch;
+    pending.value = pending.value === action && !batch ? null : action;
+};
 const move = useForm({ action: '', note: '' });
 const confirm = () => {
     move.action = pending.value ?? '';
-    move.post(route('inventory.purchase-requests.move', props.request.ulid), {
+    move.post(route(wholeBatch.value ? 'inventory.purchase-requests.move-batch' : 'inventory.purchase-requests.move', props.request.ulid), {
         preserveScroll: true,
         onSuccess: () => {
             pending.value = null;
+            wholeBatch.value = false;
             move.reset();
         },
     });
@@ -222,22 +234,49 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 {{ page.props.flash.error }}
             </p>
 
+            <!-- The other items asked for on the same form -->
+            <section v-if="batch" class="space-y-2 rounded-md border p-4">
+                <h3 class="text-sm font-semibold">{{ t('purchase_requests.batch.title', { count: batch.items.length }) }}</h3>
+                <ul class="divide-y text-sm">
+                    <li v-for="item in batch.items" :key="item.ulid" class="flex flex-wrap items-center gap-3 py-2">
+                        <span v-if="item.current" class="font-mono font-semibold">{{ item.pr_no }}</span>
+                        <Link
+                            v-else
+                            :href="route('inventory.purchase-requests.show', item.ulid)"
+                            class="font-mono text-primary underline-offset-4 hover:underline"
+                            >{{ item.pr_no }}</Link
+                        >
+                        <span class="min-w-0 flex-1">{{ item.item_name }} × {{ item.quantity }} {{ item.unit }}</span>
+                        <PurchaseStatusBadge :status="item.status" />
+                    </li>
+                </ul>
+            </section>
+
             <!-- What the user may do now -->
-            <div v-if="actions.length" class="space-y-3 rounded-md border p-4">
+            <div v-if="actions.length || batch?.decidable.approve || batch?.decidable.reject" class="space-y-3 rounded-md border p-4">
                 <div class="flex flex-wrap gap-2">
-                    <Button
-                        v-for="action in actions"
-                        :key="action"
-                        size="sm"
-                        :variant="actionVariant(action)"
-                        @click="pending = pending === action ? null : action"
-                    >
+                    <Button v-for="action in actions" :key="action" size="sm" :variant="actionVariant(action)" @click="choose(action)">
                         {{ t(`purchase_requests.actions.${action}`) }}
                     </Button>
+                    <template v-if="batch && batch.decidable.approve > 1">
+                        <Button size="sm" @click="choose('approve', true)">
+                            {{ t('purchase_requests.batch.approve', { count: batch.decidable.approve }) }}
+                        </Button>
+                    </template>
+                    <template v-if="batch && batch.decidable.reject > 1">
+                        <Button size="sm" variant="outline" @click="choose('reject', true)">
+                            {{ t('purchase_requests.batch.reject', { count: batch.decidable.reject }) }}
+                        </Button>
+                    </template>
                 </div>
                 <form v-if="pending" class="space-y-2" @submit.prevent="confirm">
                     <label for="note" class="text-sm font-medium"
-                        >{{ t(`purchase_requests.actions.${pending}`) }} — {{ t(`purchase_requests.notes.${pending}`) }}</label
+                        >{{
+                            wholeBatch
+                                ? t(`purchase_requests.batch.${pending}`, { count: batch?.decidable[pending as 'approve' | 'reject'] ?? 0 })
+                                : t(`purchase_requests.actions.${pending}`)
+                        }}
+                        — {{ t(`purchase_requests.notes.${pending}`) }}</label
                     >
                     <textarea id="note" v-model="move.note" rows="2" :required="needsNote.includes(pending)" :class="textareaClass" />
                     <InputError :message="move.errors.note ?? move.errors.action" />

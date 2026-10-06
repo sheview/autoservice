@@ -11,7 +11,7 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
 import type { PurchaseRequestRow } from '@/types/purchase';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { Link2, Plus, X } from 'lucide-vue-next';
+import { Link2, Plus, Trash2, X } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 const props = defineProps<{
@@ -34,6 +34,17 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title, href: props.request ? route('inventory.purchase-requests.edit', props.request.ulid) : route('inventory.purchase-requests.create') },
 ];
 
+type ExtraItem = {
+    item_name: string;
+    quantity: number;
+    unit: string;
+    unit_price: string | number;
+    description: string;
+    links: string[];
+    item_kind: 'asset' | 'part' | null;
+    asset_category_id: number | null;
+};
+
 const form = useForm({
     item_name: props.request?.item_name ?? props.item,
     contract_id: props.request?.contract_id ?? (null as number | null),
@@ -48,7 +59,31 @@ const form = useForm({
     item_kind: (props.request?.item_kind ?? null) as 'asset' | 'part' | null,
     asset_category_id: props.request?.asset_category_id ?? (null as number | null),
     attachments: [] as File[],
+    // More items asked for on the same form (a new request only): each becomes its own request in one batch.
+    extra_items: [] as ExtraItem[],
 });
+
+// Up to 20 items on one form (the first one plus 19 more).
+const maxExtra = 19;
+const canAddItems = computed(() => !props.request && !props.source);
+const addItem = () =>
+    form.extra_items.length < maxExtra &&
+    form.extra_items.push({
+        item_name: '',
+        quantity: 1,
+        unit: t('purchase_requests.unit_default'),
+        unit_price: '',
+        description: '',
+        links: [''],
+        item_kind: null,
+        asset_category_id: null,
+    });
+const removeItem = (index: number) => form.extra_items.splice(index, 1);
+const addExtraLink = (item: ExtraItem) => item.links.length < props.maxLinks && item.links.push('');
+const removeExtraLink = (item: ExtraItem, index: number) => {
+    item.links.splice(index, 1);
+    if (item.links.length === 0) item.links.push('');
+};
 
 const total = computed(() => {
     const price = Number(form.unit_price);
@@ -66,10 +101,15 @@ const removeLink = (index: number) => {
 const submit = () => {
     // Empty link boxes are not sent; an edit with files is a POST that says PUT.
     // The issue/loan request it was asked from is set only when it is opened.
-    const transformed = form.transform(({ checkout_request_id, ...data }) => ({
+    const transformed = form.transform(({ checkout_request_id, extra_items, ...data }) => ({
         ...data,
         links: data.links.map((link) => link.trim()).filter(Boolean),
-        ...(props.request ? { _method: 'put' } : { checkout_request_id }),
+        ...(props.request
+            ? { _method: 'put' }
+            : {
+                  checkout_request_id,
+                  extra_items: extra_items.map((item) => ({ ...item, links: item.links.map((link) => link.trim()).filter(Boolean) })),
+              }),
     }));
     if (props.request) {
         transformed.post(route('inventory.purchase-requests.update', props.request.ulid));
@@ -80,6 +120,7 @@ const submit = () => {
 
 const errors = computed(() => form.errors as Record<string, string>);
 const linkError = (index: number) => errors.value[`links.${index}`];
+const itemError = (index: number, field: string) => errors.value[`extra_items.${index}.${field}`];
 const today = new Date().toLocaleDateString('sv-SE');
 const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm';
 </script>
@@ -213,6 +254,108 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <Plus class="h-4 w-4" />
                         {{ t('purchase_requests.add_link') }}
                     </Button>
+                </section>
+
+                <!-- More items on the same form: each goes to the approver as its own request, decided together. -->
+                <section v-if="canAddItems" class="space-y-4">
+                    <div v-for="(item, index) in form.extra_items" :key="index" class="space-y-4 rounded-md border p-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold">{{ t('purchase_requests.item_n', { n: index + 2 }) }}</h3>
+                            <Button type="button" variant="ghost" size="sm" @click="removeItem(index)">
+                                <Trash2 class="h-4 w-4" />
+                                {{ t('purchase_requests.remove_item') }}
+                            </Button>
+                        </div>
+                        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <div class="grid content-start gap-2 sm:col-span-2">
+                                <Label :for="`extra_${index}_name`">{{ t('purchase_requests.item_name') }}<span class="text-red-600"> *</span></Label>
+                                <Input :id="`extra_${index}_name`" v-model="item.item_name" required />
+                                <InputError :message="itemError(index, 'item_name')" />
+                            </div>
+                            <div class="grid content-start gap-2">
+                                <Label :for="`extra_${index}_qty`">{{ t('purchase_requests.quantity') }}<span class="text-red-600"> *</span></Label>
+                                <Input :id="`extra_${index}_qty`" v-model.number="item.quantity" type="number" min="1" step="1" required />
+                                <InputError :message="itemError(index, 'quantity')" />
+                            </div>
+                            <div class="grid content-start gap-2">
+                                <Label :for="`extra_${index}_unit`">{{ t('purchase_requests.unit') }}<span class="text-red-600"> *</span></Label>
+                                <Input :id="`extra_${index}_unit`" v-model="item.unit" required maxlength="30" />
+                                <InputError :message="itemError(index, 'unit')" />
+                            </div>
+                            <div class="grid content-start gap-2 sm:col-span-2">
+                                <Label :for="`extra_${index}_desc`">{{ t('purchase_requests.description_field') }}</Label>
+                                <Input :id="`extra_${index}_desc`" v-model="item.description" />
+                                <InputError :message="itemError(index, 'description')" />
+                            </div>
+                            <div class="grid content-start gap-2">
+                                <Label :for="`extra_${index}_price`">{{ t('purchase_requests.unit_price') }}</Label>
+                                <Input :id="`extra_${index}_price`" v-model="item.unit_price" type="number" min="0" step="0.01" />
+                                <InputError :message="itemError(index, 'unit_price')" />
+                            </div>
+                            <div class="grid content-start gap-2">
+                                <Label :for="`extra_${index}_kind`">{{ t('purchase_requests.kind.label') }}</Label>
+                                <select
+                                    :id="`extra_${index}_kind`"
+                                    v-model="item.item_kind"
+                                    class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                                >
+                                    <option :value="null">{{ t('purchase_requests.kind.none') }}</option>
+                                    <option v-if="categories.length" value="asset">{{ t('purchase_requests.kind.asset') }}</option>
+                                    <option value="part">{{ t('purchase_requests.kind.part') }}</option>
+                                </select>
+                                <select
+                                    v-if="item.item_kind === 'asset'"
+                                    v-model="item.asset_category_id"
+                                    required
+                                    :aria-label="t('purchase_requests.kind.category')"
+                                    class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                                >
+                                    <option :value="null" disabled>{{ t('purchase_requests.kind.choose_category') }}</option>
+                                    <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                                </select>
+                                <InputError :message="itemError(index, 'asset_category_id')" />
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <Label>{{ t('purchase_requests.links') }}<span class="text-red-600"> *</span></Label>
+                            <div v-for="(link, linkIndex) in item.links" :key="linkIndex" class="space-y-1">
+                                <div class="flex items-center gap-2">
+                                    <Link2 class="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <Input
+                                        v-model="item.links[linkIndex]"
+                                        type="url"
+                                        inputmode="url"
+                                        :required="linkIndex === 0"
+                                        :placeholder="t('purchase_requests.link_placeholder')"
+                                        :aria-label="`${t('purchase_requests.links')} ${linkIndex + 1}`"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        :aria-label="t('purchase_requests.remove_link')"
+                                        @click="removeExtraLink(item, linkIndex)"
+                                    >
+                                        <X class="h-4 w-4" />
+                                    </Button>
+                                </div>
+                                <InputError :message="itemError(index, `links.${linkIndex}`)" />
+                            </div>
+                            <InputError :message="itemError(index, 'links')" />
+                            <Button type="button" variant="outline" size="sm" :disabled="item.links.length >= maxLinks" @click="addExtraLink(item)">
+                                <Plus class="h-4 w-4" />
+                                {{ t('purchase_requests.add_link') }}
+                            </Button>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <Button type="button" variant="outline" :disabled="form.extra_items.length >= maxExtra" @click="addItem">
+                            <Plus class="h-4 w-4" />
+                            {{ t('purchase_requests.add_item') }}
+                        </Button>
+                        <p class="text-xs text-muted-foreground">{{ t('purchase_requests.add_item_hint') }}</p>
+                    </div>
+                    <InputError :message="errors.extra_items" />
                 </section>
 
                 <div class="grid content-start gap-2">

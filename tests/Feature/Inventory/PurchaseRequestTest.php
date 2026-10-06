@@ -178,3 +178,72 @@ it('lets buyers with purchase-requests.receive order and receive an approved req
     $this->actingAs($helpdesk)->post("/purchase-requests/{$pr->ulid}/move", ['action' => 'order'])->assertSessionHasNoErrors();
     expect($pr->fresh()->status)->toBe('ordered');
 });
+
+it('asks for several items on one form: one request each, sharing the reason, date and quotation, in one batch', function () {
+    $this->actingAs($this->staff)->post('/purchase-requests', [
+        ...$this->payload,
+        'attachments' => [UploadedFile::fake()->createWithContent('quote.pdf', "%PDF-1.4\n%%EOF")],
+        'extra_items' => [
+            ['item_name' => 'Mouse', 'quantity' => 2, 'unit' => 'ตัว', 'unit_price' => '350', 'links' => ['https://shop.example.com/mouse', ''], 'item_kind' => 'part'],
+            ['item_name' => 'Keyboard', 'quantity' => 1, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/keyboard']],
+        ],
+    ])->assertSessionHasNoErrors()->assertSessionHas('success');
+
+    $requests = PurchaseRequest::orderBy('id')->get();
+    expect($requests->pluck('item_name')->all())->toBe(['Notebook for accounting', 'Mouse', 'Keyboard'])
+        ->and($requests->pluck('pr_no')->all())->toBe(['PR-2569-00001', 'PR-2569-00002', 'PR-2569-00003'])
+        ->and($requests->pluck('batch')->unique()->count())->toBe(1)
+        ->and($requests->first()->batch)->not->toBeNull()
+        ->and($requests->pluck('reason')->unique()->all())->toBe(['New staff'])
+        ->and($requests[1]->only(['unit_price', 'links', 'item_kind']))->toBe(['unit_price' => 35000, 'links' => ['https://shop.example.com/mouse'], 'item_kind' => 'part'])
+        ->and($requests->map(fn ($pr) => $pr->getMedia('attachments')->count())->all())->toBe([1, 1, 1]);
+
+    $this->actingAs($this->staff)->get("/purchase-requests/{$requests[1]->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('batch.items', fn ($items) => collect($items)->pluck('pr_no')->all() === ['PR-2569-00001', 'PR-2569-00002', 'PR-2569-00003']
+            && collect($items)->firstWhere('current', true)['item_name'] === 'Mouse')
+        // the requester may not decide on them
+        ->where('batch.decidable', ['approve' => 0, 'reject' => 0]));
+});
+
+it('checks every extra item, and asks for one alone without a batch', function () {
+    $this->actingAs($this->staff)->post('/purchase-requests', [...$this->payload, 'extra_items' => [
+        ['item_name' => '', 'quantity' => 0, 'unit' => 'ตัว', 'links' => ['javascript:alert(1)']],
+    ]])->assertSessionHasErrors(['extra_items.0.item_name', 'extra_items.0.quantity', 'extra_items.0.links.0']);
+    expect(PurchaseRequest::count())->toBe(0);
+
+    $this->actingAs($this->staff)->post('/purchase-requests', $this->payload)->assertSessionHasNoErrors();
+    $pr = PurchaseRequest::sole();
+    expect($pr->batch)->toBeNull();
+    $this->actingAs($this->staff)->get("/purchase-requests/{$pr->ulid}")->assertInertia(fn (Assert $page) => $page->where('batch', null));
+
+    // An edit changes that one request only.
+    $this->actingAs($this->staff)->put("/purchase-requests/{$pr->ulid}", [...$this->payload, 'extra_items' => [['item_name' => 'x']]])
+        ->assertSessionHasErrors('extra_items');
+});
+
+it('lets the approver approve or turn down a whole batch in one go', function () {
+    $this->actingAs($this->staff)->post('/purchase-requests', [...$this->payload, 'extra_items' => [
+        ['item_name' => 'Mouse', 'quantity' => 2, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/mouse']],
+        ['item_name' => 'Keyboard', 'quantity' => 1, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/keyboard']],
+    ]])->assertSessionHasNoErrors();
+    [$first, $second, $third] = PurchaseRequest::orderBy('id')->get()->all();
+
+    // One turned down on its own first; the batch decision leaves it as it is.
+    $this->actingAs($this->admin)->post("/purchase-requests/{$third->ulid}/move", ['action' => 'reject', 'note' => 'Have spares'])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->get("/purchase-requests/{$first->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('batch.decidable', ['approve' => 2, 'reject' => 2]));
+
+    $this->actingAs($this->staff)->post("/purchase-requests/{$first->ulid}/move-batch", ['action' => 'approve'])->assertForbidden();
+    $this->actingAs($this->admin)->post("/purchase-requests/{$first->ulid}/move-batch", ['action' => 'reject'])->assertSessionHasErrors('note');
+    $this->actingAs($this->admin)->post("/purchase-requests/{$first->ulid}/move-batch", ['action' => 'approve'])->assertSessionHasNoErrors();
+
+    expect(PurchaseRequest::orderBy('id')->pluck('status')->all())->toBe(['approved', 'approved', 'rejected'])
+        ->and($second->fresh()->decided_by_name)->toBe('Admin Boss');
+
+    // Nothing left to decide.
+    $this->actingAs($this->admin)->post("/purchase-requests/{$first->ulid}/move-batch", ['action' => 'approve'])->assertSessionHasErrors('action');
+
+    // Another company never reaches the batch.
+    $other = userWithRole('admin_company', [], createTenant('other'));
+    $this->actingAs($other)->post("/purchase-requests/{$first->ulid}/move-batch", ['action' => 'approve'])->assertNotFound();
+});

@@ -50,6 +50,7 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     // Purchase requests
     Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);
     Route::post('purchase-requests/{purchase_request}/move', [PurchaseRequestController::class, 'move'])->name('purchase-requests.move');
+    Route::post('purchase-requests/{purchase_request}/move-batch', [PurchaseRequestController::class, 'moveBatch'])->name('purchase-requests.move-batch');
     // Deliveries (some or all of it, several times) and registering what came as assets / parts.
     Route::post('purchase-requests/{purchase_request}/receipts', [PurchaseReceiptController::class, 'store'])->name('purchase-requests.receipts.store');
     Route::post('purchase-requests/{purchase_request}/hand-out', [PurchaseReceiptController::class, 'handOut'])->name('purchase-requests.hand-out');
