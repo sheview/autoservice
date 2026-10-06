@@ -161,6 +161,12 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <Link :href="route('asset.requests.edit', request.ulid)">{{ t('common.edit') }}</Link>
                     </Button>
                     <Button v-if="can.submit" @click="post('submit')">{{ t('requests.send') }}</Button>
+                    <Button
+                        v-if="can.fulfill && request.items.some(toFulfill)"
+                        @click="post('fulfill-all', t('requests.confirm_fulfill_all', { no: request.request_no }))"
+                    >
+                        {{ t('requests.fulfill_all') }}
+                    </Button>
                     <Button v-if="can.close" variant="outline" @click="post('close', t('requests.confirm_close', { no: request.request_no }))">
                         {{ t('requests.close') }}
                     </Button>
@@ -285,14 +291,20 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                         <div v-if="line.note" class="text-xs text-muted-foreground">{{ line.note }}</div>
                                         <div v-if="line.on_hand !== null" class="text-xs text-muted-foreground">
                                             {{ t('requests.on_hand', { qty: line.on_hand, unit: line.unit ?? '' }) }}
-                                            <span v-if="line.track_serial" class="ml-1 rounded bg-primary/10 px-1 font-mono text-primary">{{ t('parts.sn_badge') }}</span>
+                                            <span v-if="line.track_serial" class="ml-1 rounded bg-primary/10 px-1 font-mono text-primary">{{
+                                                t('parts.sn_badge')
+                                            }}</span>
                                         </div>
                                         <div v-if="line.serials?.out.length" class="mt-1 flex flex-wrap gap-1">
                                             <span
                                                 v-for="piece in line.serials.out"
                                                 :key="piece.unit_id + piece.at"
                                                 class="rounded border px-1.5 font-mono text-xs"
-                                                :class="{ 'text-muted-foreground line-through': line.serials.returned.some((r) => r.unit_id === piece.unit_id) }"
+                                                :class="{
+                                                    'text-muted-foreground line-through': line.serials.returned.some(
+                                                        (r) => r.unit_id === piece.unit_id,
+                                                    ),
+                                                }"
                                                 >{{ piece.serial }}</span
                                             >
                                         </div>
@@ -428,12 +440,19 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                                     :part-id="line.part_id"
                                                     :status="open.mode === 'fulfill' ? 'in_stock' : 'issued'"
                                                     :checkout-item-id="open.mode === 'return_parts' ? line.id : null"
-                                                    :need="open.mode === 'fulfill' ? Math.min(line.remaining, line.on_hand ?? line.remaining) : line.outstanding"
+                                                    :need="
+                                                        open.mode === 'fulfill'
+                                                            ? Math.min(line.remaining, line.on_hand ?? line.remaining)
+                                                            : line.outstanding
+                                                    "
                                                 />
                                                 <InputError :message="(lineForm.errors as Record<string, string>).unit_ids" />
                                             </div>
                                             <div
-                                                v-if="(open.mode === 'fulfill' || open.mode === 'return' || open.mode === 'return_parts') && !line.track_serial"
+                                                v-if="
+                                                    (open.mode === 'fulfill' || open.mode === 'return' || open.mode === 'return_parts') &&
+                                                    !line.track_serial
+                                                "
                                                 class="grid gap-1"
                                             >
                                                 <label :for="`line-qty-${line.id}`" class="text-xs text-muted-foreground">

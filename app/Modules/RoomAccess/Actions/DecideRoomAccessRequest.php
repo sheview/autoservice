@@ -18,8 +18,9 @@ use Illuminate\Validation\ValidationException;
  *
  *   approve  the step is done; the last step approves the request
  *   reject   the request is turned down, with why
- *   ask      sent back to the requester as a draft, with what is missing (they send it again,
- *            accepting the rules again, and the approval starts over)
+ *   ask      sent back to the requester as a draft, with what is missing (they send it again;
+ *            under the same rules they need not accept again and the approval goes on from this
+ *            step, see SubmitRoomAccessRequest)
  *
  * Never the requester's own request, never a step out of turn (ApprovalFlow).
  */

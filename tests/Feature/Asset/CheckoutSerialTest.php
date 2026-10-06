@@ -149,3 +149,11 @@ it('never hands out a piece of another company', function () {
     ($this->fulfill)($line, ['qty' => 1, 'unit_ids' => [$theirs]])->assertSessionHasErrors('unit_ids');
     expect(asTenant($other, fn () => PartUnit::find($theirs)->status))->toBe('in_stock');
 });
+
+it('leaves a part followed by serial number to its own form on "hand out all"', function () {
+    $request = ($this->approved)(2);
+
+    $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasErrors('request');
+    expect($request->items->first()->fresh()->qty_fulfilled)->toBe(0)
+        ->and($request->fresh()->status)->toBe('approved');
+});

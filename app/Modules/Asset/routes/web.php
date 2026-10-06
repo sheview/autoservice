@@ -61,6 +61,7 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     // What was handed out, as a delivery note.
     Route::get('checkout-requests/{checkout}/delivery-note', [CheckoutRequestController::class, 'deliveryNote'])->name('requests.delivery-note');
     Route::get('checkout-requests/{checkout}/delivery-note/print', [CheckoutRequestController::class, 'deliveryNotePrint'])->name('requests.delivery-note.print');
+    Route::post('checkout-requests/{checkout}/fulfill-all', [CheckoutRequestController::class, 'fulfillAll'])->name('requests.fulfill-all');
     Route::post('checkout-items/{item}/fulfill', [CheckoutItemController::class, 'fulfill'])->whereNumber('item')->name('items.fulfill');
     Route::post('checkout-items/{item}/backorder', [CheckoutItemController::class, 'backorder'])->whereNumber('item')->name('items.backorder');
     Route::post('checkout-items/{item}/cancel', [CheckoutItemController::class, 'cancel'])->whereNumber('item')->name('items.cancel');

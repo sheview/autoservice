@@ -289,13 +289,21 @@ class RoomAccessRequestController extends Controller
         return back()->with('success', __("room_access.approvals.done_{$data['decision']}"));
     }
 
-    /** The rules of one room for the accept popup (only the room asked about). */
+    /**
+     * The rules of one room for the accept popup (only the room asked about). With ?request= (a
+     * draft of the user's being sent again) a version that request accepted already is said so.
+     */
     public function rules(Request $request, ServerRoom $room, RoomRulesForRequest $rules): JsonResponse
     {
         Gate::authorize('create', RoomAccessRequest::class);
         abort_unless($room->is_active, 404);
 
-        return response()->json($rules->handle($room, $request->user()));
+        $draft = $request->filled('request') ? RoomAccessRequest::query()->where('ulid', $request->string('request'))->first() : null;
+        if ($draft !== null && ! $request->user()->can('update', $draft)) {
+            $draft = null;
+        }
+
+        return response()->json($rules->handle($room, $request->user(), $draft));
     }
 
     /** The full rules document of a room's version, for whoever asks to enter it. */

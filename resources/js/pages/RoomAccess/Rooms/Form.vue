@@ -54,7 +54,7 @@ const form = useForm({
     location: props.room?.location ?? '',
     requires_id_number: props.room?.requires_id_number ?? false,
     missing_rules: props.room?.missing_rules ?? 'block',
-    accept_mode: props.room?.accept_mode ?? 'every_request',
+    accept_mode: props.room?.accept_mode ?? 'once_per_version',
     accept_on_enter: props.room?.accept_on_enter ?? false,
     entrants_accept_self: props.room?.entrants_accept_self ?? false,
     guard_link: props.room?.guard_link ?? false,
@@ -108,7 +108,10 @@ const check = 'size-4 rounded border-input';
                 </div>
                 <label class="flex items-start gap-2 text-sm sm:col-span-2">
                     <input v-model="form.requires_id_number" type="checkbox" :class="check" class="mt-0.5" />
-                    <span>{{ t('server_rooms.requires_id_number') }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.requires_id_hint') }}</span></span>
+                    <span
+                        >{{ t('server_rooms.requires_id_number')
+                        }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.requires_id_hint') }}</span></span
+                    >
                 </label>
                 <label class="flex items-center gap-2 text-sm">
                     <input v-model="form.is_active" type="checkbox" :class="check" />{{ t('server_rooms.is_active') }}
@@ -140,7 +143,10 @@ const check = 'size-4 rounded border-input';
                 </label>
                 <label class="flex items-start gap-2 text-sm">
                     <input v-model="form.entrants_accept_self" type="checkbox" :class="check" class="mt-0.5" />
-                    <span>{{ t('server_rooms.entrants_accept_self') }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.entrants_accept_self_off') }}</span></span>
+                    <span
+                        >{{ t('server_rooms.entrants_accept_self')
+                        }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.entrants_accept_self_off') }}</span></span
+                    >
                 </label>
             </section>
 
@@ -174,7 +180,10 @@ const check = 'size-4 rounded border-input';
                 </div>
                 <label class="flex items-start gap-2 text-sm">
                     <input v-model="form.guard_link" type="checkbox" :class="check" class="mt-0.5" />
-                    <span>{{ t('server_rooms.guard_link') }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.guard_link_hint') }}</span></span>
+                    <span
+                        >{{ t('server_rooms.guard_link')
+                        }}<span class="block text-xs text-muted-foreground">{{ t('server_rooms.guard_link_hint') }}</span></span
+                    >
                 </label>
                 <Button type="button" variant="outline" size="sm" @click="form.guard_contacts.push({ name: '', phone: '', email: '' })">{{
                     t('server_rooms.add_guard')

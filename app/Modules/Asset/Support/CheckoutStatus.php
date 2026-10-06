@@ -31,6 +31,16 @@ class CheckoutStatus
         return $request;
     }
 
+    /**
+     * Whether the request is done with and so closed on its own: closable, and nothing lent is
+     * still out (a loan stays open, and on the list, until it is back).
+     */
+    public static function settled(CheckoutRequest $request): bool
+    {
+        return self::closable($request) && $request->items()->get()
+            ->doesntContain(fn (CheckoutItem $item) => $item->checkout_type === CheckoutItem::LOAN && $item->outstanding() > 0);
+    }
+
     /** Whether the request may be closed: no line still waits for a decision or a hand-out. */
     public static function closable(CheckoutRequest $request): bool
     {

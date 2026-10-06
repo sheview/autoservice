@@ -39,7 +39,7 @@ class MyWork
                 ->orWhereBetween('appointment_at', [$from, $to->endOfDay()])
                 ->orWhereBetween('resolve_due_at', [$from, $to->endOfDay()]))
             ->get()
-            ->map(function (Ticket $ticket) use ($day, $time, $today) {
+            ->map(function (Ticket $ticket) use ($day, $time, $today, $user) {
                 $at = $ticket->appointment_at ?? $ticket->resolve_due_at ?? $ticket->created_at;
                 $open = in_array($ticket->status, Ticket::OPEN_STATUSES, true);
 
@@ -55,6 +55,9 @@ class MyWork
                     'open' => $open,
                     'overdue' => $open && $at->lt($today),
                     'href' => route('service.tickets.show', $ticket),
+                    // Straight to the one-page close while the job can still be closed there.
+                    'close_href' => in_array($ticket->status, QuickCloseTicket::CLOSABLE, true) && $user->can('resolve', $ticket)
+                        ? route('service.tickets.close', $ticket) : null,
                 ];
             });
 

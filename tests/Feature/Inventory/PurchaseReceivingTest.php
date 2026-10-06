@@ -129,7 +129,7 @@ it('receives and hands over to whoever asked in one go, with the papers to print
 
     $checkout = CheckoutRequest::sole();
     expect($checkout->only(['status', 'borrower_user_id', 'contract_id', 'auto_approved']))->toBe([
-        'status' => 'fulfilled', 'borrower_user_id' => $this->staff->id, 'contract_id' => $pr->contract_id, 'auto_approved' => true,
+        'status' => 'closed', 'borrower_user_id' => $this->staff->id, 'contract_id' => $pr->contract_id, 'auto_approved' => true,
     ])
         // one line per device, each handed out
         ->and($checkout->items()->get(['qty_fulfilled', 'purchase_request_id'])->toArray())->toBe([

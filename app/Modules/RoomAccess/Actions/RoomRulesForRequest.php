@@ -4,6 +4,7 @@ namespace App\Modules\RoomAccess\Actions;
 
 use App\Modules\Contract\Actions\CustomerLabelNames;
 use App\Modules\Identity\Models\User;
+use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
 use App\Modules\RoomAccess\Models\RoomRuleVersion;
 use App\Modules\RoomAccess\Models\ServerRoom;
@@ -14,7 +15,8 @@ use App\Modules\Tenancy\Support\TenantContext;
  * What the accept popup shows for one room, and only that room: the customer's rules in effect
  * (version, lines, link to the full document) followed by the company's own terms. Without rules
  * the room is blocked, or (as the room says) the company's terms are shown with a warning. With
- * "once per version" a user who has accepted this version before need not again.
+ * "once per version" a user who has accepted this version before need not again; a request sent
+ * back for more information that already accepted this version need not either, whatever the mode.
  */
 class RoomRulesForRequest
 {
@@ -25,7 +27,7 @@ class RoomRulesForRequest
      *     summary: list<string>, company_terms: list<string>, file_url: string|null, missing: bool, blocked: bool,
      *     accepted_before: string|null, team_note: bool}
      */
-    public function handle(ServerRoom $room, ?User $user = null): array
+    public function handle(ServerRoom $room, ?User $user = null, ?RoomAccessRequest $request = null): array
     {
         $rules = $room->currentRules()->first();
         $missing = $rules === null;
@@ -33,6 +35,10 @@ class RoomRulesForRequest
         if ($rules !== null && $user !== null && $room->accept_mode === ServerRoom::ACCEPT_ONCE_PER_VERSION) {
             $acceptedBefore = RoomRuleAcceptance::query()->where('user_id', $user->id)->where('rule_version_id', $rules->id)
                 ->orderByDesc('accepted_at')->value('accepted_at');
+        }
+        if ($rules !== null && $acceptedBefore === null && $request?->exists) {
+            $acceptedBefore = RoomRuleAcceptance::query()->where('request_id', $request->id)->where('rule_version_id', $rules->id)
+                ->where('context', RoomRuleAcceptance::CONTEXT_SUBMIT)->orderByDesc('accepted_at')->value('accepted_at');
         }
 
         return [

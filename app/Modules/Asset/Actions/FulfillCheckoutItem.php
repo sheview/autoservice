@@ -18,13 +18,15 @@ use Illuminate\Validation\ValidationException;
  * (its cost goes to the job); no more than is on hand. A part followed by serial number goes by
  * the pieces chosen (in stock, as many as handed out), tied to this line and hand-over. An asset is handed over (a single asset
  * becomes "in use" by the borrower). What is still missing afterwards is backordered when the
- * stock cannot cover it, otherwise the line stays partly handed out.
+ * stock cannot cover it, otherwise the line stays partly handed out. When that was the last thing
+ * to hand out and nothing is lent, the request is closed (a loan closes once all of it is back).
  */
 class FulfillCheckoutItem
 {
     public function __construct(
         private IssuePartToTicket $issuePart,
         private PartsForCheckout $parts,
+        private CloseCheckoutRequest $close,
     ) {}
 
     /**
@@ -76,6 +78,10 @@ class FulfillCheckoutItem
             $item->save();
 
             CheckoutStatus::refresh($request);
+            if (CheckoutStatus::settled($request)) {
+                // The last line handed out and nothing lent: nothing is left to do, so it is closed.
+                $this->close->handle($request, $actor);
+            }
             if ($item->purchase_request_id !== null) {
                 // Bought for this line: the purchase request counts it as handed out.
                 PurchasedItemHandedOut::dispatch((int) $item->purchase_request_id, $qty, $actor->id);

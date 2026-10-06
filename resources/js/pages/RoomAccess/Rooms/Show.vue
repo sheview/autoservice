@@ -9,6 +9,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { TriangleAlert } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 interface Version {
@@ -77,8 +78,7 @@ const publish = () =>
 const destroy = () => {
     if (confirm(t('server_rooms.delete_confirm', { name: props.room.name }))) router.delete(route('room-access.rooms.destroy', props.room.ulid));
 };
-const versionState = (v: Version) =>
-    v.version === props.currentVersion ? 'in_effect' : !v.in_effect ? 'upcoming' : 'superseded';
+const versionState = (v: Version) => (v.version === props.currentVersion ? 'in_effect' : !v.in_effect ? 'upcoming' : 'superseded');
 </script>
 
 <template>
@@ -98,6 +98,15 @@ const versionState = (v: Version) =>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
+            </p>
+
+            <!-- No rules in effect yet: say what that does to requests, right where they are added. -->
+            <p
+                v-if="currentVersion === null"
+                class="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+            >
+                <TriangleAlert class="mt-0.5 size-4 shrink-0" />
+                {{ t(`server_rooms.no_rules_banner.${room.missing_rules}`) }}
             </p>
 
             <dl class="grid gap-x-6 gap-y-3 rounded-md border p-4 text-sm sm:grid-cols-2">
@@ -132,7 +141,9 @@ const versionState = (v: Version) =>
                 <div>
                     <dt class="text-xs text-muted-foreground">{{ t('server_rooms.guards') }}</dt>
                     <dd v-if="!room.guard_contacts.length">-</dd>
-                    <dd v-for="(guard, i) in room.guard_contacts" :key="i">{{ [guard.name, guard.phone, guard.email].filter(Boolean).join(' · ') }}</dd>
+                    <dd v-for="(guard, i) in room.guard_contacts" :key="i">
+                        {{ [guard.name, guard.phone, guard.email].filter(Boolean).join(' · ') }}
+                    </dd>
                 </div>
                 <div class="sm:col-span-2">
                     <dt class="text-xs text-muted-foreground">{{ t('server_rooms.freeze') }}</dt>
@@ -155,7 +166,9 @@ const versionState = (v: Version) =>
                 <form v-if="adding" class="space-y-3 rounded-md border bg-muted/30 p-4" @submit.prevent="publish">
                     <div class="flex items-center justify-between">
                         <span class="text-sm font-medium">{{ t('server_rooms.summary') }}</span>
-                        <Button v-if="versions.length" type="button" variant="ghost" size="sm" @click="copyCurrent">{{ t('server_rooms.copy_current') }}</Button>
+                        <Button v-if="versions.length" type="button" variant="ghost" size="sm" @click="copyCurrent">{{
+                            t('server_rooms.copy_current')
+                        }}</Button>
                     </div>
                     <div v-for="(_, i) in form.summary" :key="i" class="flex gap-2">
                         <span class="w-8 pt-2 text-right text-xs text-muted-foreground">{{ i + 1 }}.</span>
@@ -175,7 +188,12 @@ const versionState = (v: Version) =>
                         </div>
                         <div class="grid gap-1">
                             <Label for="received_from">{{ t('server_rooms.received_from') }}</Label>
-                            <Input id="received_from" v-model="form.received_from" maxlength="255" :placeholder="t('server_rooms.received_from_placeholder')" />
+                            <Input
+                                id="received_from"
+                                v-model="form.received_from"
+                                maxlength="255"
+                                :placeholder="t('server_rooms.received_from_placeholder')"
+                            />
                         </div>
                         <div class="grid gap-1">
                             <Label for="received_on">{{ t('server_rooms.received_on') }}</Label>
@@ -184,7 +202,13 @@ const versionState = (v: Version) =>
                     </div>
                     <div class="grid gap-1">
                         <Label for="rules_file">{{ t('server_rooms.file') }}</Label>
-                        <input id="rules_file" type="file" accept="application/pdf" class="text-sm" @change="form.file = ($event.target as HTMLInputElement).files?.[0] ?? null" />
+                        <input
+                            id="rules_file"
+                            type="file"
+                            accept="application/pdf"
+                            class="text-sm"
+                            @change="form.file = ($event.target as HTMLInputElement).files?.[0] ?? null"
+                        />
                         <InputError :message="form.errors.file" />
                     </div>
                     <div class="grid gap-1">
@@ -198,7 +222,12 @@ const versionState = (v: Version) =>
                 </form>
 
                 <p v-if="!versions.length" class="text-sm text-amber-700">{{ t('server_rooms.no_versions') }}</p>
-                <article v-for="v in versions" :key="v.id" class="space-y-2 rounded-md border p-4 text-sm" :class="{ 'opacity-70': versionState(v) === 'superseded' }">
+                <article
+                    v-for="v in versions"
+                    :key="v.id"
+                    class="space-y-2 rounded-md border p-4 text-sm"
+                    :class="{ 'opacity-70': versionState(v) === 'superseded' }"
+                >
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="font-semibold">{{ t('server_rooms.version', { version: v.version }) }}</span>
                         <span
@@ -208,17 +237,25 @@ const versionState = (v: Version) =>
                                 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200': versionState(v) === 'upcoming',
                                 'bg-muted': versionState(v) === 'superseded',
                             }"
-                            >{{ versionState(v) === 'upcoming' ? t('server_rooms.upcoming', { date: v.effective_on }) : t(`server_rooms.${versionState(v)}`) }}</span
+                            >{{
+                                versionState(v) === 'upcoming'
+                                    ? t('server_rooms.upcoming', { date: v.effective_on })
+                                    : t(`server_rooms.${versionState(v)}`)
+                            }}</span
                         >
                         <span class="text-xs text-muted-foreground">{{ t('server_rooms.effective_on') }} {{ v.effective_on }}</span>
-                        <a v-if="v.file" :href="v.file" target="_blank" class="ml-auto text-xs text-primary hover:underline">{{ t('server_rooms.open_file') }}</a>
+                        <a v-if="v.file" :href="v.file" target="_blank" class="ml-auto text-xs text-primary hover:underline">{{
+                            t('server_rooms.open_file')
+                        }}</a>
                     </div>
                     <ol class="list-decimal space-y-0.5 pl-6">
                         <li v-for="(line, i) in v.summary" :key="i">{{ line }}</li>
                     </ol>
                     <p class="text-xs text-muted-foreground">
                         {{ t('server_rooms.recorded_by', { name: v.created_by_name ?? '-', date: dateTime(v.created_at) }) }}
-                        <template v-if="v.received_from"> · {{ t('server_rooms.received', { from: v.received_from, date: v.received_on ?? '-' }) }}</template>
+                        <template v-if="v.received_from">
+                            · {{ t('server_rooms.received', { from: v.received_from, date: v.received_on ?? '-' }) }}</template
+                        >
                     </p>
                     <p v-if="v.note" class="text-xs">{{ v.note }}</p>
                 </article>

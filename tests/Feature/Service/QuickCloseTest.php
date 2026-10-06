@@ -108,3 +108,16 @@ it('lets the company admin keep its symptom and fix chips', function () {
     $other = createTenant('other');
     expect(asTenant($other, fn () => RepairPreset::count()))->toBe(0);
 });
+
+it('links to the one-page close from the ticket page and my work while the job can be closed there', function () {
+    $closeUrl = route('service.tickets.close', $this->ticket);
+
+    $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('can.quickClose', true));
+    $this->actingAs($this->tech)->get('/my-work')
+        ->assertInertia(fn (Assert $page) => $page->where('todo', fn ($items) => collect($items)->firstWhere('key', "ticket-{$this->ticket->id}")['close_href'] === $closeUrl));
+    ($this->close)([])->assertSessionHasNoErrors();
+
+    $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('can.quickClose', false));
+});

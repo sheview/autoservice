@@ -9,9 +9,9 @@ import StarRating from '@/components/StarRating.vue';
 import StepProgress, { type Step } from '@/components/StepProgress.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import TicketAppointment from '@/components/TicketAppointment.vue';
+import TicketFieldLinks from '@/components/TicketFieldLinks.vue';
 import TicketForwardPanel, { type TicketForwards } from '@/components/TicketForwardPanel.vue';
 import TicketIpPanel from '@/components/TicketIpPanel.vue';
-import TicketFieldLinks from '@/components/TicketFieldLinks.vue';
 import TicketPhotos from '@/components/TicketPhotos.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketReviewPanel from '@/components/TicketReviewPanel.vue';
@@ -23,7 +23,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Printer } from 'lucide-vue-next';
+import { CircleCheck, Printer } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface TicketDetail {
@@ -136,7 +136,14 @@ const props = defineProps<{
     parts: { items: TicketPart[]; options: PartOption[]; types: string[]; canIssue: boolean; canReturn: boolean } | null;
     // Links for working without an account; null = the user may not manage them.
     fieldLinks: InstanceType<typeof TicketFieldLinks>['$props']['links'] | null;
-    removedParts: { id: number; item_name: string; serial_number: string | null; problem: string | null; disposition: string; user_name: string | null }[];
+    removedParts: {
+        id: number;
+        item_name: string;
+        serial_number: string | null;
+        problem: string | null;
+        disposition: string;
+        user_name: string | null;
+    }[];
     survey: TicketSurvey | null;
     attachments: Attachment[];
     // IP management: null = not shown to this user.
@@ -157,7 +164,15 @@ const props = defineProps<{
     signature: { url: string; signer: string | null } | null;
     askOthersUrl: string | null;
     ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
-    can: { update: boolean; comment: boolean; internalNotes: boolean; deleteAttachments: boolean; checkWarranty: boolean; report: boolean };
+    can: {
+        update: boolean;
+        comment: boolean;
+        internalNotes: boolean;
+        deleteAttachments: boolean;
+        checkWarranty: boolean;
+        report: boolean;
+        quickClose: boolean;
+    };
 }>();
 
 const page = usePage<SharedData>();
@@ -389,8 +404,18 @@ const stepBar = computed(() => {
             <InputError :message="move.errors.action ?? move.errors.comment" />
 
             <!-- Workflow -->
-            <div v-if="actions.length || assignees || (can.checkWarranty && !ticket.warranty.status)" class="space-y-3 rounded-md border p-4">
+            <div
+                v-if="actions.length || assignees || can.quickClose || (can.checkWarranty && !ticket.warranty.status)"
+                class="space-y-3 rounded-md border p-4"
+            >
                 <div class="flex flex-wrap items-center gap-2">
+                    <!-- Warranty, report, parts, photos, signature and resolve on one page. -->
+                    <Button v-if="can.quickClose" size="sm" as-child>
+                        <Link :href="route('service.tickets.close', ticket.ulid)">
+                            <CircleCheck class="h-4 w-4" />
+                            {{ t('close.open') }}
+                        </Link>
+                    </Button>
                     <Button
                         v-for="action in actions"
                         :key="action"
@@ -627,9 +652,12 @@ const stepBar = computed(() => {
                                     class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
                                 />
                             </div>
-                            <Button size="sm" class="h-9" :disabled="issue.processing || issue.part_id === null || (issueTracked && !issue.unit_ids.length)">{{
-                                t('ticket_parts.issue')
-                            }}</Button>
+                            <Button
+                                size="sm"
+                                class="h-9"
+                                :disabled="issue.processing || issue.part_id === null || (issueTracked && !issue.unit_ids.length)"
+                                >{{ t('ticket_parts.issue') }}</Button
+                            >
                         </form>
                         <p v-else-if="parts.canIssue" class="text-sm text-muted-foreground">{{ t('ticket_parts.no_stock') }}</p>
                         <InputError

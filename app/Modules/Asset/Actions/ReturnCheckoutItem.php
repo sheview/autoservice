@@ -4,6 +4,8 @@ namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\CheckoutItem;
+use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Asset\Support\CheckoutStatus;
 use App\Modules\Asset\Support\RequestAlert;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -11,11 +13,12 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Takes back (some of) an asset handed out on a line, with its condition. A single asset that is
- * back, with nothing else of it out, is spare again. Parts are used up and do not come back.
+ * back, with nothing else of it out, is spare again. Parts are used up and do not come back. The
+ * last of a loan back closes a request with nothing else to do.
  */
 class ReturnCheckoutItem
 {
-    public function __construct(private AssetHeldQuantities $held) {}
+    public function __construct(private AssetHeldQuantities $held, private CloseCheckoutRequest $close) {}
 
     public function handle(CheckoutItem $item, User $actor, int $qty, ?string $condition = null): CheckoutItem
     {
@@ -48,6 +51,11 @@ class ReturnCheckoutItem
                 ->log("รับคืน {$item->item_name} × {$qty}");
 
             RequestAlert::send('checkout_returned', $request, $actor->name, $condition, $item);
+
+            // The last of a loan back, with everything handed out: the request is done with.
+            if ($request->status === CheckoutRequest::STATUS_FULFILLED && CheckoutStatus::settled($request)) {
+                $this->close->handle($request, $actor);
+            }
 
             return $item;
         });

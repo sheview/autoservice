@@ -95,23 +95,50 @@ it('waits for a step of the customer side, which nobody here can skip', function
     expect($request->fresh()->status)->toBe('pending');
 });
 
-it('turns a request down with why, or sends it back for more, after which it is sent again from the start', function () {
+it('turns a request down with why, or sends it back for more, after which it is sent again without accepting again', function () {
     $request = ($this->pending)();
     ($this->decide)($request, 'ask', $this->desk)->assertSessionHasErrors('note');
     ($this->decide)($request, 'ask', $this->desk, 'แนบใบสั่งงานของลูกค้าด้วย')->assertSessionHasNoErrors();
 
     expect($request->fresh()->only(['status', 'decision_note']))->toBe(['status' => 'draft', 'decision_note' => 'แนบใบสั่งงานของลูกค้าด้วย']);
 
-    // Sent again: the rules are accepted again and the approval starts over.
-    $this->actingAs($this->tech)->post("/room-access/requests/{$request->ulid}/submit", [])->assertSessionHasErrors('accept');
-    $this->actingAs($this->tech)->post("/room-access/requests/{$request->ulid}/submit", ['accept' => true, 'version_id' => $this->v1->id])->assertSessionHasNoErrors();
-    expect($request->fresh()->only(['status', 'round']))->toBe(['status' => 'pending', 'round' => 2])
-        ->and(RoomRuleAcceptance::where('request_id', $request->id)->count())->toBe(2);
+    // Sent again under the same rules: this request accepted them already, and the round goes on.
+    $this->actingAs($this->tech)->getJson("/room-access/requests/rooms/{$this->room->ulid}/rules?request={$request->ulid}")
+        ->assertOk()->assertJsonPath('accepted_before', fn ($at) => $at !== null);
+    $this->actingAs($this->tech)->post("/room-access/requests/{$request->ulid}/submit", [])->assertSessionHasNoErrors();
+    expect($request->fresh()->only(['status', 'round']))->toBe(['status' => 'pending', 'round' => 1])
+        ->and(RoomRuleAcceptance::where('request_id', $request->id)->count())->toBe(1);
 
     ($this->decide)($request, 'reject', $this->desk)->assertSessionHasErrors('note');
     ($this->decide)($request, 'reject', $this->desk, 'ช่วงนั้นลูกค้าปิดปรับปรุง')->assertSessionHasNoErrors();
     expect($request->fresh()->only(['status', 'decision_note']))->toBe(['status' => 'rejected', 'decision_note' => 'ช่วงนั้นลูกค้าปิดปรับปรุง'])
         ->and($request->events()->pluck('action')->all())->toBe(['created', 'submitted', 'info_requested', 'submitted', 'rejected']);
+});
+
+it('goes on from the step that asked for more, keeping the steps already approved', function () {
+    RoomApprovalStep::create(['server_room_id' => $this->room->id, 'position' => 1, 'side' => 'company', 'approver_user_id' => $this->desk2->id]);
+    RoomApprovalStep::create(['server_room_id' => $this->room->id, 'position' => 2, 'side' => 'company', 'approver_user_id' => $this->desk->id]);
+    $request = ($this->pending)();
+    ($this->decide)($request, 'approve', $this->desk2)->assertSessionHasNoErrors();
+    ($this->decide)($request, 'ask', $this->desk, 'ระบุอุปกรณ์ที่นำเข้า')->assertSessionHasNoErrors();
+
+    $this->actingAs($this->tech)->post("/room-access/requests/{$request->ulid}/submit", [])->assertSessionHasNoErrors();
+
+    // Step 1 stands: step 2 decides now and approves the request.
+    ($this->decide)($request, 'approve', $this->desk2)->assertForbidden();
+    ($this->decide)($request, 'approve', $this->desk)->assertSessionHasNoErrors();
+    expect($request->fresh()->status)->toBe('approved');
+});
+
+it('starts the approval over, accepting again, when the rules changed while the request was back', function () {
+    $request = ($this->pending)();
+    ($this->decide)($request, 'ask', $this->desk, 'แนบใบสั่งงานของลูกค้าด้วย')->assertSessionHasNoErrors();
+    $v2 = app(PublishRoomRules::class)->handle($this->room, ['summary' => ['ห้ามถ่ายรูป'], 'effective_on' => '2026-11-02'], null, $this->admin);
+
+    $this->actingAs($this->tech)->post("/room-access/requests/{$request->ulid}/submit", [])->assertSessionHasErrors('accept');
+    $this->actingAs($this->tech)->post("/room-access/requests/{$request->ulid}/submit", ['accept' => true, 'version_id' => $v2->id])->assertSessionHasNoErrors();
+    expect($request->fresh()->only(['status', 'round']))->toBe(['status' => 'pending', 'round' => 2])
+        ->and(RoomRuleAcceptance::where('request_id', $request->id)->count())->toBe(2);
 });
 
 it('tells the approvers and the requester where the company set its alerts', function () {

@@ -165,7 +165,7 @@ it('asks another company for parts for a ticket, which that company approves and
     $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}")->assertInertia(fn (Assert $page) => $page
         ->where('sharedRequests.0.company', 'Beta')
         ->where('sharedRequests.0.request_no', $request->request_no)
-        ->where('sharedRequests.0.status', 'fulfilled')
+        ->where('sharedRequests.0.status', 'closed')
         ->where('sharedRequests.0.items.0.qty_fulfilled', 2));
     expect(CrossTenantLink::first()->only(['source_id', 'target_id']))->toBe(['source_id' => $ticket->id, 'target_id' => $request->id]);
 });

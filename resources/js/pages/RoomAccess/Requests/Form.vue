@@ -16,7 +16,15 @@ type Item = { name: string; serial_number: string; quantity: number; direction: 
 type Ticket = { id: number; ulid: string; ticket_no: string; title: string };
 type Recurrence = { weekdays: number[]; start_time: string; end_time: string };
 type Clashes = {
-    requests: { ulid: string | null; request_no: string | null; requester_name: string | null; status: string; planned_start: string; planned_end: string; schedule: string | null }[];
+    requests: {
+        ulid: string | null;
+        request_no: string | null;
+        requester_name: string | null;
+        status: string;
+        planned_start: string;
+        planned_end: string;
+        schedule: string | null;
+    }[];
     freezes: { from: string; to: string; reason: string | null }[];
     holidays: { date: string; name: string }[];
 };
@@ -86,7 +94,11 @@ const useContractPeriod = () => {
 /** What is sent: the period and, for a standing request, its days and hours. */
 const timing = () =>
     recurring.value
-        ? { planned_start: `${dateFrom.value}T${rule.value.start_time}`, planned_end: `${dateTo.value}T${rule.value.end_time}`, recurrence: rule.value }
+        ? {
+              planned_start: `${dateFrom.value}T${rule.value.start_time}`,
+              planned_end: `${dateTo.value}T${rule.value.end_time}`,
+              recurrence: rule.value,
+          }
         : { planned_start: form.planned_start, planned_end: form.planned_end, recurrence: null };
 
 // --- warnings for the times chosen: other bookings of the room, freezes, holidays ---
@@ -98,24 +110,39 @@ watch(
         clearTimeout(clashTimer);
         clashTimer = setTimeout(async () => {
             const when = timing();
-            if (!form.server_room_id || !when.planned_start || !when.planned_end || when.planned_start.startsWith('T') || when.planned_end.startsWith('T')) {
+            if (
+                !form.server_room_id ||
+                !when.planned_start ||
+                !when.planned_end ||
+                when.planned_start.startsWith('T') ||
+                when.planned_end.startsWith('T')
+            ) {
                 clashes.value = null;
                 return;
             }
-            const params = new URLSearchParams({ server_room_id: String(form.server_room_id), planned_start: when.planned_start, planned_end: when.planned_end });
+            const params = new URLSearchParams({
+                server_room_id: String(form.server_room_id),
+                planned_start: when.planned_start,
+                planned_end: when.planned_end,
+            });
             if (props.request) params.set('request', props.request.ulid);
             if (when.recurrence) {
                 when.recurrence.weekdays.forEach((d) => params.append('recurrence[weekdays][]', String(d)));
                 params.set('recurrence[start_time]', when.recurrence.start_time);
                 params.set('recurrence[end_time]', when.recurrence.end_time);
             }
-            const response = await fetch(`${route('room-access.requests.clashes')}?${params}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+            const response = await fetch(`${route('room-access.requests.clashes')}?${params}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
             clashes.value = response.ok ? await response.json() : null;
         }, 400);
     },
     { immediate: true },
 );
-const hasClashes = computed(() => !!clashes.value && (clashes.value.requests.length + clashes.value.freezes.length + clashes.value.holidays.length) > 0);
+const hasClashes = computed(
+    () => !!clashes.value && clashes.value.requests.length + clashes.value.freezes.length + clashes.value.holidays.length > 0,
+);
 const fmt = (iso: string) => new Date(iso).toLocaleString('th-TH-u-ca-gregory', { dateStyle: 'short', timeStyle: 'short' });
 const when = (from: string, to: string) => `${fmt(from)} – ${fmt(to)}`;
 const room = computed(() => props.rooms.find((r) => r.id === form.server_room_id) ?? null);
@@ -255,7 +282,9 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                                         :key="i"
                                         type="button"
                                         class="h-9 min-w-11 rounded-md border px-2 text-sm"
-                                        :class="rule.weekdays.includes(i + 1) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted/50'"
+                                        :class="
+                                            rule.weekdays.includes(i + 1) ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted/50'
+                                        "
                                         :aria-pressed="rule.weekdays.includes(i + 1)"
                                         @click="toggleDay(i + 1)"
                                     >
@@ -274,12 +303,14 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                                 <InputError :message="errors['recurrence.end_time'] || errors['recurrence.start_time']" />
                             </div>
                             <div v-if="contractPeriod" class="sm:col-span-2">
-                                <Button type="button" variant="outline" size="sm" @click="useContractPeriod">{{ t('room_requests.from_contract') }}</Button>
+                                <Button type="button" variant="outline" size="sm" @click="useContractPeriod">{{
+                                    t('room_requests.from_contract')
+                                }}</Button>
                             </div>
                         </template>
                         <div
                             v-if="hasClashes && clashes"
-                            class="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 sm:col-span-2 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                            class="space-y-1 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200 sm:col-span-2"
                         >
                             <p class="font-semibold">{{ t('room_requests.clash_title') }}</p>
                             <p v-for="(f, i) in clashes.freezes" :key="'f' + i" class="text-red-700 dark:text-red-300">
@@ -440,6 +471,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
         <RoomRulesDialog
             :room-ulid="room?.ulid ?? null"
+            :request-ulid="request?.ulid ?? null"
             :open="dialog"
             :processing="form.processing"
             @accept="(versionId) => send(true, versionId)"

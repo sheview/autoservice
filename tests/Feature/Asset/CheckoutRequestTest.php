@@ -218,8 +218,7 @@ it('hands out an asset to the borrower and takes it back with its condition', fu
 
     $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasErrors('qty');
 
-    // every line finished: it may be closed
-    $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/close")->assertSessionHasNoErrors();
+    // the loan back, every line finished: closed on its own
     expect($request->fresh()->status)->toBe('closed')
         ->and($request->fresh()->closed_at)->not->toBeNull();
 });
@@ -415,4 +414,19 @@ it('records an asset registered as already handed out as a request handed out', 
     // it comes back like any loan
     $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasNoErrors();
     expect($asset->fresh()->status)->toBe(Asset::STATUS_SPARE);
+});
+
+it('hands out every line still to hand out in one go, and closes when all is out', function () {
+    $request = ($this->approved)([($this->asset)($this->notebook), ($this->asset)($this->cables, ['qty' => 2])]);
+
+    $this->actingAs($this->staff)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertForbidden();
+    $this->actingAs($this->desk)->get("/checkout-requests/{$request->ulid}")->assertInertia(fn (Assert $page) => $page->where('can.fulfill', true));
+    $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasNoErrors();
+
+    expect($request->items()->orderBy('id')->get()->map(fn ($line) => [$line->status, $line->qty_fulfilled])->all())->toBe([['fulfilled', 1], ['fulfilled', 2]])
+        // nothing lent: done with, so closed
+        ->and($request->fresh()->status)->toBe('closed');
+
+    // nothing left to hand out
+    $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasErrors('request');
 });

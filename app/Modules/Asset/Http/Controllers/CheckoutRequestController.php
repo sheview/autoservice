@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\ApproveCheckoutRequest;
 use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Actions\CancelCheckoutRequest;
 use App\Modules\Asset\Actions\CloseCheckoutRequest;
+use App\Modules\Asset\Actions\FulfillCheckoutRequest;
 use App\Modules\Asset\Actions\RejectCheckoutRequest;
 use App\Modules\Asset\Actions\SaveCheckoutRequest;
 use App\Modules\Asset\Actions\SearchAssets;
@@ -261,6 +262,15 @@ class CheckoutRequestController extends Controller
         $cancel->handle($checkout, $request->user());
 
         return back()->with('success', __('asset.requests.cancelled', ['no' => $checkout->request_no]));
+    }
+
+    /** "Hand out all": what is left of every line that can go without picking pieces. */
+    public function fulfillAll(Request $request, CheckoutRequest $checkout, FulfillCheckoutRequest $fulfill): RedirectResponse
+    {
+        Gate::authorize('fulfill', $checkout);
+        $result = $fulfill->handle($checkout, $request->user());
+
+        return back()->with('success', __($result['left'] > 0 ? 'asset.requests.fulfilled_all_left' : 'asset.requests.fulfilled_all', $result));
     }
 
     public function close(Request $request, CheckoutRequest $checkout, CloseCheckoutRequest $close): RedirectResponse

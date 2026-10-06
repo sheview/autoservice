@@ -30,6 +30,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Actions\QuickCloseTicket;
 use App\Modules\Service\Actions\SearchTickets;
 use App\Modules\Service\Actions\TicketCustomerIds;
 use App\Modules\Service\Actions\UpdateTicket;
@@ -309,6 +310,8 @@ class TicketController extends Controller
                 'internalNotes' => $user->customer_id === null,
                 'checkWarranty' => TicketActionController::canCheckWarranty($user, $ticket),
                 'report' => TicketActionController::canReport($user, $ticket),
+                // The one-page close (warranty, report, parts, photos, signature, resolve at once).
+                'quickClose' => $user->can('resolve', $ticket) && in_array($ticket->status, QuickCloseTicket::CLOSABLE, true),
             ],
         ]);
     }

@@ -3,6 +3,7 @@
 namespace App\Modules\RoomAccess\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\RoomAccess\Models\RoomAccessApproval;
 use App\Modules\RoomAccess\Models\RoomAccessPerson;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\RoomRuleAcceptance;
@@ -43,7 +44,7 @@ class SubmitRoomAccessRequest
             $this->checkTimes($request, $room);
             $this->checkPeople($request, $room);
 
-            $rules = $this->rules->handle($room, $actor);
+            $rules = $this->rules->handle($room, $actor, $request);
             if ($rules['blocked']) {
                 throw ValidationException::withMessages(['rules' => __('room_access.requests.no_rules')]);
             }
@@ -75,8 +76,9 @@ class SubmitRoomAccessRequest
             $from = $request->status;
             $request->fill([
                 'status' => RoomAccessRequest::STATUS_PENDING,
-                // Each sending starts the approval over (after "more information" it is sent again).
-                'round' => $request->round + 1,
+                // Sent again after "more information" under the same rules: the steps already approved
+                // stand and the step that asked decides again. Otherwise the approval starts over.
+                'round' => $this->resumes($request, $rules['version_id']) ? $request->round : $request->round + 1,
                 'rule_version_id' => $rules['version_id'],
                 'submitted_at' => now(),
                 'decision_note' => null,
@@ -93,6 +95,17 @@ class SubmitRoomAccessRequest
         RoomAccessAlert::send('room_access_requested', $request, $actor->name);
 
         return $request;
+    }
+
+    /** Whether the last decision of this round asked for more information, under the rules still in effect. */
+    private function resumes(RoomAccessRequest $request, ?int $versionId): bool
+    {
+        if ($request->round < 1 || $versionId === null || (int) $request->rule_version_id !== $versionId) {
+            return false;
+        }
+
+        return RoomAccessApproval::query()->where('request_id', $request->id)->where('round', $request->round)
+            ->orderByDesc('decided_at')->orderByDesc('id')->value('decision') === RoomAccessApproval::ASKED;
     }
 
     private function checkTimes(RoomAccessRequest $request, ServerRoom $room): void

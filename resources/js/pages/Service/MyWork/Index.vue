@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { ChevronLeft, ChevronRight, Lock, Plus } from 'lucide-vue-next';
+import { ChevronLeft, ChevronRight, CircleCheck, Lock, Plus } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 interface WorkItem {
@@ -29,6 +29,8 @@ interface WorkItem {
     open: boolean;
     overdue: boolean;
     href: string | null;
+    // Tickets only: the one-page close, while the job can be closed there.
+    close_href?: string | null;
 }
 
 const props = defineProps<{
@@ -180,7 +182,7 @@ const timeText = (item: WorkItem) =>
                                 {{ t(`my_work.${b.key}`) }} · {{ b.items.length }}
                             </div>
                             <ul class="space-y-2">
-                                <li v-for="item in b.items" :key="item.key">
+                                <li v-for="item in b.items" :key="item.key" class="flex items-stretch gap-2">
                                     <component
                                         :is="item.href ? Link : 'button'"
                                         :href="item.href ?? undefined"
@@ -204,6 +206,15 @@ const timeText = (item: WorkItem) =>
                                         </span>
                                         <TicketStatusBadge v-if="item.kind === 'ticket' && item.status" :status="item.status" />
                                     </component>
+                                    <Link
+                                        v-if="item.close_href"
+                                        :href="item.close_href"
+                                        :title="t('close.open')"
+                                        :aria-label="t('close.open')"
+                                        class="flex shrink-0 items-center rounded-lg bg-primary px-3 text-primary-foreground transition hover:bg-primary/90"
+                                    >
+                                        <CircleCheck class="h-5 w-5" />
+                                    </Link>
                                 </li>
                             </ul>
                         </div>

@@ -26,7 +26,8 @@ interface Rules {
     team_note: boolean;
 }
 
-const props = defineProps<{ roomUlid: string | null; open: boolean; processing?: boolean }>();
+// requestUlid: the draft being sent again, if any (rules it accepted already need no new tick).
+const props = defineProps<{ roomUlid: string | null; requestUlid?: string | null; open: boolean; processing?: boolean }>();
 const emit = defineEmits<{ accept: [versionId: number | null]; close: [] }>();
 
 const rules = ref<Rules | null>(null);
@@ -42,7 +43,8 @@ const load = async () => {
     readToEnd.value = false;
     ticked.value = false;
     try {
-        const response = await fetch(route('room-access.requests.rules', props.roomUlid), {
+        const url = route('room-access.requests.rules', props.requestUlid ? { room: props.roomUlid, request: props.requestUlid } : props.roomUlid);
+        const response = await fetch(url, {
             headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             credentials: 'same-origin',
         });
@@ -53,7 +55,11 @@ const load = async () => {
         requestAnimationFrame(onScroll);
     }
 };
-watch(() => [props.open, props.roomUlid], () => props.open && load(), { immediate: true });
+watch(
+    () => [props.open, props.roomUlid],
+    () => props.open && load(),
+    { immediate: true },
+);
 
 const onScroll = () => {
     const el = body.value;
@@ -63,13 +69,20 @@ const onScroll = () => {
 
 <template>
     <Teleport to="body">
-        <div v-if="open" class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true">
+        <div
+            v-if="open"
+            class="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4"
+            role="dialog"
+            aria-modal="true"
+        >
             <div class="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-2xl bg-background shadow-xl sm:rounded-2xl">
                 <header class="border-b px-5 py-4">
                     <h2 class="text-lg font-semibold">{{ t('room_requests.rules_title') }}</h2>
                     <p v-if="rules" class="text-sm text-muted-foreground">
                         {{ t('room_requests.rules_of', { customer: rules.customer, room: rules.room }) }}
-                        <template v-if="rules.version"> · {{ t('room_requests.rules_version', { version: rules.version, date: rules.effective_on ?? '' }) }}</template>
+                        <template v-if="rules.version">
+                            · {{ t('room_requests.rules_version', { version: rules.version, date: rules.effective_on ?? '' }) }}</template
+                        >
                     </p>
                 </header>
 
@@ -88,9 +101,13 @@ const onScroll = () => {
                                 <ol class="list-decimal space-y-1.5 pl-5">
                                     <li v-for="(line, i) in rules.summary" :key="i">{{ line }}</li>
                                 </ol>
-                                <a v-if="rules.file_url" :href="rules.file_url" target="_blank" class="inline-block text-primary underline-offset-4 hover:underline">{{
-                                    t('room_requests.rules_open_file')
-                                }}</a>
+                                <a
+                                    v-if="rules.file_url"
+                                    :href="rules.file_url"
+                                    target="_blank"
+                                    class="inline-block text-primary underline-offset-4 hover:underline"
+                                    >{{ t('room_requests.rules_open_file') }}</a
+                                >
                             </section>
                             <section v-if="rules.company_terms.length" class="space-y-2">
                                 <h3 class="font-semibold">{{ t('room_requests.rules_company') }}</h3>

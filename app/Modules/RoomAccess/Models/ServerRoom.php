@@ -40,7 +40,8 @@ class ServerRoom extends Model
     protected $attributes = [
         'requires_id_number' => false,
         'missing_rules' => self::MISSING_BLOCK,
-        'accept_mode' => self::ACCEPT_EVERY_REQUEST,
+        // Accepting a version once is enough unless the room asks for every request.
+        'accept_mode' => self::ACCEPT_ONCE_PER_VERSION,
         'accept_on_enter' => false,
         'entrants_accept_self' => false,
         'guard_link' => false,
