@@ -25,6 +25,11 @@ class Customer extends Model implements HasMedia
 
     protected $fillable = ['code', 'name', 'short_name', 'tax_id', 'contact_name', 'phone', 'email', 'address', 'notes', 'require_signature'];
 
+    protected function casts(): array
+    {
+        return ['require_signature' => 'boolean'];
+    }
+
     public function contracts(): HasMany
     {
         return $this->hasMany(Contract::class);

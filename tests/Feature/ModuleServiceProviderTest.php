@@ -25,7 +25,9 @@ it('runs on MariaDB 10.11 with explicit timestamp defaults', function () {
     expect(DB::connection()->getDriverName())->toBe('mariadb')
         ->and(DB::selectOne('select version() as v')->v)->toStartWith('10.11')
         // Otherwise the first NOT NULL timestamp of a table silently becomes "ON UPDATE now()".
-        ->and((int) DB::selectOne('select @@explicit_defaults_for_timestamp as v')->v)->toBe(1);
+        ->and((int) DB::selectOne('select @@explicit_defaults_for_timestamp as v')->v)->toBe(1)
+        // Thai time on the connection whatever the server's clock (config database.connections.mariadb.timezone)
+        ->and(DB::selectOne('select @@session.time_zone as v')->v)->toBe('+07:00');
 });
 
 it('uses Bangkok timezone and Thai locale', function () {

@@ -63,3 +63,16 @@ it('lets a technician view but not change customers', function () {
 
     $this->actingAs(userWithRole('user'))->get('/customers')->assertForbidden();
 });
+
+it('gives the forms the signature setting as true / false / null, so they show what is saved', function () {
+    $customer = createCustomer(['require_signature' => true]);
+    $inherit = createContract($customer);
+    $no = createContract($customer, ['require_signature' => false]);
+
+    $this->actingAs($this->admin)->get("/customers/{$customer->id}/edit")
+        ->assertInertia(fn (Assert $page) => $page->where('customer.require_signature', true));
+    $this->actingAs($this->admin)->get("/contracts/{$inherit->id}/edit")
+        ->assertInertia(fn (Assert $page) => $page->where('contract.require_signature', null));
+    $this->actingAs($this->admin)->get("/contracts/{$no->id}/edit")
+        ->assertInertia(fn (Assert $page) => $page->where('contract.require_signature', false));
+});

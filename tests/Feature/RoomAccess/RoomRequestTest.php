@@ -212,3 +212,10 @@ it('lets the requester cancel before going in, with a reason', function () {
         ->and($request->events()->reorder()->latest('id')->first()->only(['action', 'from_status', 'to_status', 'note']))
         ->toBe(['action' => 'cancelled', 'from_status' => 'pending', 'to_status' => 'cancelled', 'note' => 'ลูกค้าเลื่อน']);
 });
+
+it('keeps planned times after 2038 (a standing request can run as long as its contract)', function () {
+    $request = ($this->draft)(['planned_start' => '2040-03-01 09:00', 'planned_end' => '2040-03-01 11:00']);
+
+    expect($request->planned_start->format('Y-m-d H:i'))->toBe('2040-03-01 09:00')
+        ->and($request->planned_end->format('Y-m-d H:i'))->toBe('2040-03-01 11:00');
+});

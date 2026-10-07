@@ -91,3 +91,10 @@ it('is for staff only', function () {
     $client = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($client)->get('/my-work')->assertForbidden();
 });
+
+it('keeps an appointment after 2038 instead of failing the save', function () {
+    $visit = ($this->assigned)(['title' => 'Far away']);
+
+    $this->actingAs($this->tech)->post("/tickets/{$visit->ulid}/appointment", ['appointment_at' => '2040-05-01T10:00'])->assertSessionHasNoErrors();
+    expect($visit->fresh()->appointment_at->format('Y-m-d H:i'))->toBe('2040-05-01 10:00');
+});

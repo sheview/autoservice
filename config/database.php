@@ -77,6 +77,9 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Thai time on every connection, whatever the server's clock: TIMESTAMP columns and
+            // SQL now() / extract(month ...) then agree with the app (Asia/Bangkok, no DST).
+            'timezone' => env('DB_TIMEZONE', '+07:00'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],

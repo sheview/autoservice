@@ -60,6 +60,8 @@ class Contract extends Model implements HasMedia
             'pm_interval_months' => 'integer',
             'notify_days_before' => 'integer',
             'expiry_notified_at' => 'datetime',
+            // null = as the customer says
+            'require_signature' => 'boolean',
         ];
     }
 

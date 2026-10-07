@@ -74,6 +74,9 @@ Inventory, Labeling, Document, Survey, Reporting, Platform
   - ชื่อ index/constraint ยาวไม่เกิน 64 ตัวอักษร (ตั้งชื่อเองถ้ายาว)
   - เลขรันใช้ `Counter::next(...)`, การกันชนกันตอนออกเลขใช้ `Counter::lockTenant(...)`
   - `sum()` คืนค่าเป็น string — cast เป็น `(int)` ก่อนส่งไปหน้าเว็บ
+  - คอลัมน์ boolean ได้ค่า 1/0 — ทุก model ต้อง cast เป็น `'boolean'` (ไม่งั้นฟอร์มแสดงผิด)
+  - `timestamp` เก็บได้ถึง 2038-01-19 เท่านั้น — วันเวลาที่ผู้ใช้กรอกเองหรือยาวตามสัญญาใช้ `dateTime`
+  - connection ตั้ง time zone `+07:00` เสมอ (`DB_TIMEZONE`)
   - collation `utf8mb4_unicode_ci` ไม่สนตัวพิมพ์อยู่แล้ว ใช้ `like` ได้เลย (ไม่มี `ilike`)
 - migration ของ spatie (permission, activitylog, medialibrary) ยังไม่ได้ publish
   ให้ publish ในขั้นที่ใช้งาน พร้อมเพิ่ม `tenant_id`
