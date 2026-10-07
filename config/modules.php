@@ -66,6 +66,7 @@ return [
         ['group' => 'help', 'title' => 'nav.manuals', 'route' => 'document.manuals.index', 'icon' => 'book-open', 'permission' => 'manuals.view'],
         ['group' => 'settings', 'title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'users.view'],
         ['group' => 'settings', 'title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'roles.manage'],
+        ['group' => 'settings', 'title' => 'nav.branches', 'route' => 'tenancy.branches.index', 'icon' => 'map-pin', 'permission' => 'branches.view', 'company' => true],
         ['group' => 'settings', 'title' => 'nav.repair_presets', 'route' => 'service.presets.edit', 'icon' => 'list-checks', 'permission' => 'company.manage', 'module' => 'service', 'company' => true],
         ['group' => 'settings', 'title' => 'nav.server_rooms', 'route' => 'room-access.rooms.index', 'icon' => 'server', 'permission' => 'room-access.manage', 'module' => 'room_access', 'staff' => true, 'company' => true],
         ['group' => 'settings', 'title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holidays.view', 'module' => 'service'],

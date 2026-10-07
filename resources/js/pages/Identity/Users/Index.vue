@@ -68,9 +68,14 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('users.title')" :description="t('users.description')" />
-                <Button v-if="can.create" as-child>
-                    <Link :href="route('identity.users.create')">{{ t('users.create') }}</Link>
-                </Button>
+                <div v-if="can.create" class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <Link :href="route('identity.users.import')">{{ t('users.import') }}</Link>
+                    </Button>
+                    <Button as-child>
+                        <Link :href="route('identity.users.create')">{{ t('users.create') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
