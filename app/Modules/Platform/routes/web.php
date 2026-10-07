@@ -8,6 +8,7 @@ use App\Modules\Platform\Http\Controllers\ImpersonationController;
 use App\Modules\Platform\Http\Controllers\LinkedStaffController;
 use App\Modules\Platform\Http\Controllers\PlatformSettingsController;
 use App\Modules\Platform\Http\Controllers\SharedSearchController;
+use App\Modules\Platform\Http\Controllers\StaffPoolController;
 use App\Modules\Platform\Http\Controllers\SwitchCompanyController;
 use App\Modules\Platform\Http\Controllers\TenantController;
 use App\Modules\Platform\Http\Controllers\TenantModuleController;
@@ -54,6 +55,9 @@ Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(functi
     // Which companies each person works in (their own and linked accounts).
     Route::get('linked-staff', [LinkedStaffController::class, 'index'])->name('linked-staff.index');
     Route::put('linked-staff/{user}/{tenant:ulid}', [LinkedStaffController::class, 'update'])->whereNumber('user')->name('linked-staff.update');
+    Route::post('staff-pools', [StaffPoolController::class, 'store'])->name('staff-pools.store');
+    Route::put('staff-pools/{pool}', [StaffPoolController::class, 'update'])->whereNumber('pool')->name('staff-pools.update');
+    Route::delete('staff-pools/{pool}', [StaffPoolController::class, 'destroy'])->whereNumber('pool')->name('staff-pools.destroy');
 
     Route::get('settings', [PlatformSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('settings', [PlatformSettingsController::class, 'update'])->name('settings.update');

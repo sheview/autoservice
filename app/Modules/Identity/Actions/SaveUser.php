@@ -2,6 +2,7 @@
 
 namespace App\Modules\Identity\Actions;
 
+use App\Modules\Identity\Events\UserSaved;
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -25,7 +26,7 @@ class SaveUser
             $this->guardLastAdmin->handle($user, [$data['role']], (bool) ($data['is_active'] ?? $user->is_active));
         }
 
-        return DB::transaction(function () use ($user, $data) {
+        $saved = DB::transaction(function () use ($user, $data) {
             $user ??= new User;
             $before = $user->exists ? $user->getRoleNames()->all() : [];
 
@@ -52,5 +53,9 @@ class SaveUser
 
             return $user;
         });
+
+        UserSaved::dispatch($saved);
+
+        return $saved;
     }
 }

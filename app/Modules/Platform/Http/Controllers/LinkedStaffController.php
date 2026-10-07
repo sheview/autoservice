@@ -5,6 +5,7 @@ namespace App\Modules\Platform\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Platform\Actions\SetStaffCompany;
 use App\Modules\Platform\CrossTenant\CompanyStaff;
+use App\Modules\Platform\Models\StaffPool;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Http\RedirectResponse;
@@ -27,7 +28,19 @@ class LinkedStaffController extends Controller
             'tenant_id' => $tenants->contains('id', $request->integer('tenant_id')) ? $request->integer('tenant_id') : null,
         ];
 
+        $roleLabels = array_column(StaffPoolController::roleOptions(), 'label', 'name');
+
         return Inertia::render('Platform/LinkedStaff/Index', [
+            'pools' => StaffPool::with('fromTenant:id,name', 'toTenant:id,name')->orderBy('id')->get()
+                ->map(fn (StaffPool $pool) => [
+                    'id' => $pool->id,
+                    'from' => $pool->fromTenant?->name,
+                    'to' => $pool->toTenant?->name,
+                    'roles' => $pool->roles,
+                    'role_labels' => array_map(fn (string $role) => $roleLabels[$role] ?? $role, $pool->roles),
+                    'is_active' => $pool->is_active,
+                ]),
+            'roleOptions' => StaffPoolController::roleOptions(),
             'staff' => $staff->directory($filters['search'], $filters['tenant_id']),
             'tenants' => $tenants,
             'filters' => $filters,
