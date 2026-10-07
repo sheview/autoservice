@@ -76,6 +76,7 @@ return [
         ['group' => 'settings', 'title' => 'nav.activity_log', 'route' => 'platform.activity-log', 'icon' => 'scroll-text', 'permission' => 'activity-log.view'],
 
         ['group' => 'platform', 'title' => 'nav.tenants', 'route' => 'platform.impersonation.index', 'icon' => 'building-2', 'permission' => 'platform.impersonate'],
+        ['group' => 'platform', 'title' => 'nav.linked_staff', 'route' => 'platform.linked-staff.index', 'icon' => 'users', 'permission' => 'platform.tenants'],
         ['group' => 'platform', 'title' => 'nav.platform_settings', 'route' => 'platform.settings.edit', 'icon' => 'settings', 'permission' => 'platform.tenants'],
     ],
 ];
