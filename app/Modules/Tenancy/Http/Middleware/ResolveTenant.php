@@ -2,6 +2,7 @@
 
 namespace App\Modules\Tenancy\Http\Middleware;
 
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -14,7 +15,8 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Sets the tenant for the request:
  *   1. a superadmin who is impersonating: the impersonated tenant
- *   2. the subdomain ({sub}.{central domain}) if there is one
+ *   2. the subdomain ({sub}.{central domain}) if there is one; a person who also works in that
+ *      company is switched to their own row there (LinkedAccounts)
  *   3. otherwise the logged-in user's tenant
  *   4. otherwise no tenant (tenant tables return no rows)
  *
@@ -25,6 +27,7 @@ class ResolveTenant
     public function __construct(
         private TenantContext $context,
         private Impersonation $impersonation,
+        private LinkedAccounts $linkedAccounts,
     ) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -59,8 +62,13 @@ class ResolveTenant
 
             abort_if($tenant === null, 404);
             abort_unless($tenant->isActive(), 403);
-            // A user of tenant A must never work inside tenant B's subdomain.
-            abort_if($user !== null && $homeTenantId !== $tenant->id && $impersonated?->id !== $tenant->id, 403);
+            if ($user !== null && $homeTenantId !== $tenant->id && $impersonated?->id !== $tenant->id) {
+                // A user of tenant A never works inside tenant B as themselves: only as their own
+                // (linked) row of B, which their administrators set up.
+                $account = $this->linkedAccounts->accountIn($user, $tenant->id);
+                abort_if($account === null, 403);
+                Auth::guard('web')->login($account);
+            }
 
             return $tenant;
         }

@@ -25,6 +25,8 @@ export interface SharedData {
     auth: Auth;
     tenant: { name: string; is_platform: boolean } | null;
     impersonation: { tenant: { name: string } } | null;
+    /** Companies this person also works in (one account each); empty for most people. */
+    companies: { ulid: string; name: string; current: boolean }[];
     /** Sidebar items built on the server from config/modules.php; icon is a lucide icon name. */
     navigation: { title: string; href: string; icon: string; group: string | null }[];
     flash: { success: string | null; error: string | null; warning?: string | null };

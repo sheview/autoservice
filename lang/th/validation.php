@@ -49,6 +49,7 @@ return [
         'password' => 'รหัสผ่าน',
         'current_password' => 'รหัสผ่านปัจจุบัน',
         'password_confirmation' => 'การยืนยันรหัสผ่าน',
+        'main_email' => 'อีเมลบัญชีหลัก',
         'branch_id' => 'สาขา',
         'employee_code' => 'รหัสพนักงาน',
         'position' => 'ตำแหน่ง',

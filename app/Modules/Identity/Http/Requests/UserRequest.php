@@ -5,7 +5,9 @@ namespace App\Modules\Identity\Http\Requests;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
 use App\Modules\Platform\CrossTenant\UniqueUserEmail;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -33,7 +35,10 @@ class UserRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             // One e-mail = one login across the whole platform.
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', new UniqueUserEmail($user?->id)],
-            'password' => [$user ? 'nullable' : 'required', 'confirmed', Password::defaults()],
+            // A row linked to a main account never logs in itself, so it needs no password of its own.
+            'password' => [$user || $this->filled('main_email') ? 'nullable' : 'required', 'confirmed', Password::defaults()],
+            // A person who also works in another company: the e-mail of their main account there.
+            'main_email' => ['nullable', 'string', 'email', 'max:255'],
             'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at'),
                 // users.manage scope branch: only into the manager's own branch (or none).
                 ...(DataScope::of($this->user(), 'users.manage') === PermissionCatalog::SCOPE_BRANCH
@@ -65,7 +70,41 @@ class UserRequest extends FormRequest
                 if ($user?->is($this->user()) && $this->has('is_active') && ! $this->boolean('is_active')) {
                     $validator->errors()->add('is_active', __('identity.users.cannot_deactivate_self'));
                 }
+
+                if ($this->filled('main_email') && ! $validator->errors()->has('main_email')) {
+                    $this->checkMainAccount($validator, $user);
+                }
             },
         ];
+    }
+
+    /**
+     * The main account the user's row is linked to (null = the row is its own login).
+     */
+    public function loginUserId(): ?int
+    {
+        return $this->filled('main_email')
+            ? app(LinkedAccounts::class)->linkableMain((string) $this->input('main_email'), app(TenantContext::class)->id())?->id
+            : null;
+    }
+
+    private function checkMainAccount($validator, ?User $user): void
+    {
+        $accounts = app(LinkedAccounts::class);
+        $main = $accounts->linkableMain((string) $this->input('main_email'), app(TenantContext::class)->id());
+
+        $error = match (true) {
+            $main === null => 'identity.users.main_not_found',
+            $this->filled('customer_id') => 'identity.users.main_not_for_customer',
+            $user !== null && $accounts->hasLinkedAccounts($user) => 'identity.users.main_is_main',
+            $user?->is($this->user()) => 'identity.users.main_not_self',
+            // One row per company for each person (the tenant scope limits this to the current company).
+            User::where('login_user_id', $main->id)->when($user, fn ($q) => $q->whereKeyNot($user->id))->exists() => 'identity.users.main_taken',
+            default => null,
+        };
+
+        if ($error !== null) {
+            $validator->errors()->add('main_email', __($error));
+        }
     }
 }

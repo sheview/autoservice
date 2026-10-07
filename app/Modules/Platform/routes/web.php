@@ -7,6 +7,7 @@ use App\Modules\Platform\Http\Controllers\DashboardController;
 use App\Modules\Platform\Http\Controllers\ImpersonationController;
 use App\Modules\Platform\Http\Controllers\PlatformSettingsController;
 use App\Modules\Platform\Http\Controllers\SharedSearchController;
+use App\Modules\Platform\Http\Controllers\SwitchCompanyController;
 use App\Modules\Platform\Http\Controllers\TenantController;
 use App\Modules\Platform\Http\Controllers\TenantModuleController;
 use App\Modules\Platform\Http\Controllers\TenantShareController;
@@ -27,6 +28,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('settings/shares/{share}', [CompanyShareController::class, 'decide'])->whereNumber('share')->name('platform.company-shares.decide');
     Route::get('shared-search', SharedSearchController::class)->name('platform.shared-search');
     Route::post('shared-search/requests', [SharedSearchController::class, 'store'])->name('platform.shared-search.request');
+
+    // A person who also works in another company moves there (their own account of that company).
+    Route::post('switch-company/{tenant:ulid}', SwitchCompanyController::class)->name('platform.switch-company');
 });
 
 Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(function () {

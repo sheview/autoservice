@@ -20,6 +20,7 @@ interface UserRow {
     customer: string | null;
     role: string | null;
     is_active: boolean;
+    linked: boolean;
 }
 
 interface Filters {
@@ -123,7 +124,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <div class="font-medium">{{ user.name }}</div>
                                 <div v-if="user.position" class="text-xs text-muted-foreground">{{ user.position }}</div>
                             </td>
-                            <td class="px-4 py-2">{{ user.email }}</td>
+                            <td class="px-4 py-2">
+                                {{ user.email }}
+                                <span v-if="user.linked" class="ml-1 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">{{
+                                    t('users.linked')
+                                }}</span>
+                            </td>
                             <td class="px-4 py-2">{{ user.employee_code ?? '—' }}</td>
                             <td class="px-4 py-2">{{ user.branch ?? t('users.no_branch') }}</td>
                             <td class="px-4 py-2">

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\Subscription;
@@ -60,6 +61,8 @@ class HandleInertiaRequests extends Middleware
             'navigation' => fn () => $user ? app(Modules::class)->navigation($permissions(), $user->customer_id !== null, $user) : [],
             'tenant' => $tenant ? ['name' => $tenant->name, 'is_platform' => $tenant->is_platform] : null,
             'impersonation' => $impersonation->active() ? ['tenant' => ['name' => $impersonation->tenant()->name]] : null,
+            // Companies this person also works in (one account each, LinkedAccounts); empty for most people.
+            'companies' => fn () => $user && ! $impersonation->active() ? app(LinkedAccounts::class)->companiesOf($user) : [],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

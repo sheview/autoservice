@@ -10,6 +10,7 @@ use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
@@ -68,6 +69,7 @@ class UserController extends Controller
                 'customer' => $customerNames[$user->customer_id] ?? null,
                 'role' => $user->roles->first()?->label,
                 'is_active' => $user->is_active,
+                'linked' => $user->login_user_id !== null,
             ]);
 
         return Inertia::render('Identity/Users/Index', [
@@ -88,7 +90,7 @@ class UserController extends Controller
 
     public function store(UserRequest $request, SaveUser $saveUser): RedirectResponse
     {
-        $saveUser->handle(null, $request->validated());
+        $saveUser->handle(null, [...$request->validated(), 'login_user_id' => $request->loginUserId()]);
 
         return redirect()->route('identity.users.index')->with('success', __('identity.users.created'));
     }
@@ -102,7 +104,7 @@ class UserController extends Controller
 
     public function update(UserRequest $request, User $user, SaveUser $saveUser): RedirectResponse
     {
-        $saveUser->handle($user, $request->validated());
+        $saveUser->handle($user, [...$request->validated(), 'login_user_id' => $request->loginUserId()]);
 
         return redirect()->route('identity.users.index')->with('success', __('identity.users.updated'));
     }
@@ -122,6 +124,7 @@ class UserController extends Controller
                 'service_lines' => $user->service_lines,
                 'is_active' => $user->is_active,
                 'role' => $user->roles->first()?->name,
+                'main_email' => $user->login_user_id ? app(LinkedAccounts::class)->emailOf($user->login_user_id) : null,
             ] : null,
             'branches' => $this->branchOptions(),
             'roles' => $this->roleOptions(),

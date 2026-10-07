@@ -22,6 +22,7 @@ interface UserForm {
     service_lines: string[] | null;
     is_active: boolean;
     role: string | null;
+    main_email: string | null;
 }
 
 const props = defineProps<{
@@ -52,13 +53,19 @@ const form = useForm({
     service_lines: props.user?.service_lines ?? [],
     is_active: props.user?.is_active ?? true,
     role: props.user?.role ?? props.roles[0]?.name ?? '',
+    main_email: props.user?.main_email ?? '',
 });
+
+// A row linked to a main account logs in with that account, so it needs no password here.
+const linked = computed(() => form.main_email.trim() !== '');
 
 // A customer account belongs to a customer and has the customer role only.
 const isCustomerAccount = computed(() => form.role === props.customerRole);
 watch(isCustomerAccount, (yes) => {
-    if (yes) form.branch_id = null;
-    else form.customer_id = null;
+    if (yes) {
+        form.branch_id = null;
+        form.main_email = '';
+    } else form.customer_id = null;
 });
 
 const submit = () => {
@@ -93,10 +100,18 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <InputError :message="form.errors.email" />
                     </div>
 
+                    <div v-if="!isCustomerAccount" class="grid content-start gap-2 sm:col-span-2">
+                        <Label for="main_email">{{ t('users.main_email') }}</Label>
+                        <Input id="main_email" v-model="form.main_email" type="email" autocomplete="off" />
+                        <p class="text-xs text-muted-foreground">{{ t('users.main_email_hint') }}</p>
+                        <InputError :message="form.errors.main_email" />
+                    </div>
+
                     <div class="grid content-start gap-2">
                         <Label for="password">{{ t('users.password') }}</Label>
-                        <Input id="password" v-model="form.password" type="password" :required="!user" autocomplete="new-password" />
-                        <p v-if="user" class="text-xs text-muted-foreground">{{ t('users.password_hint_edit') }}</p>
+                        <Input id="password" v-model="form.password" type="password" :required="!user && !linked" autocomplete="new-password" />
+                        <p v-if="linked" class="text-xs text-muted-foreground">{{ t('users.main_email_password_hint') }}</p>
+                        <p v-else-if="user" class="text-xs text-muted-foreground">{{ t('users.password_hint_edit') }}</p>
                         <InputError :message="form.errors.password" />
                     </div>
 
@@ -106,7 +121,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             id="password_confirmation"
                             v-model="form.password_confirmation"
                             type="password"
-                            :required="!user"
+                            :required="!user && !linked"
                             autocomplete="new-password"
                         />
                     </div>

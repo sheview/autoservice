@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -43,9 +44,12 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        // Inactive users cannot log in, and on a tenant subdomain only that tenant's users can.
+        // Inactive users cannot log in, and on a tenant subdomain only that tenant's users can (or a
+        // person whose own row there is linked to this account). A linked row never logs in itself:
+        // its person logs in with their main account and switches company.
         $tenantId = app(TenantContext::class)->id();
-        $allowed = fn ($user) => $user->is_active && ($tenantId === null || $user->tenant_id === $tenantId);
+        $allowed = fn ($user) => $user->is_active && $user->login_user_id === null
+            && ($tenantId === null || $user->tenant_id === $tenantId || app(LinkedAccounts::class)->accountIn($user, $tenantId) !== null);
 
         if (! Auth::attemptWhen($this->only('email', 'password'), $allowed, $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());

@@ -3,6 +3,7 @@
 namespace App\Modules\Platform;
 
 use App\Modules\Platform\Console\InstallPlatformCommand;
+use App\Modules\Platform\Console\LinkAccountsCommand;
 use App\Modules\Platform\Console\PruneActivityLogCommand;
 use App\Modules\Platform\Console\SyncPermissionsCommand;
 use App\Modules\Platform\Listeners\FollowForwardedTicket;
@@ -36,7 +37,7 @@ class PlatformServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([InstallPlatformCommand::class, SyncPermissionsCommand::class, PruneActivityLogCommand::class]);
+            $this->commands([InstallPlatformCommand::class, LinkAccountsCommand::class, SyncPermissionsCommand::class, PruneActivityLogCommand::class]);
         }
 
         // The activity log keeps SearchActivityLog::KEEP_DAYS days.

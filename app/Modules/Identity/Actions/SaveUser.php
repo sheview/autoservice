@@ -4,6 +4,7 @@ namespace App\Modules\Identity\Actions;
 
 use App\Modules\Identity\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Creates or updates a user of the current tenant and sets their role. The company's last active
@@ -16,7 +17,7 @@ class SaveUser
     /**
      * @param  array{name: string, email: string, password?: string|null, branch_id?: int|null,
      *     employee_code?: string|null, position?: string|null, phone?: string|null,
-     *     service_lines?: list<string>, is_active?: bool, role: string}  $data
+     *     service_lines?: list<string>, is_active?: bool, role: string, login_user_id?: int|null}  $data
      */
     public function handle(?User $user, array $data): User
     {
@@ -28,12 +29,19 @@ class SaveUser
             $user ??= new User;
             $before = $user->exists ? $user->getRoleNames()->all() : [];
 
-            $attributes = collect($data)->except(['role', 'password'])->all();
+            $attributes = collect($data)->except(['role', 'password', 'main_email', 'login_user_id'])->all();
             if (! empty($data['password'])) {
                 $attributes['password'] = $data['password'];
+            } elseif (! $user->exists) {
+                // A row linked to a main account never logs in: it gets a password nobody knows.
+                $attributes['password'] = Str::password(32);
             }
 
-            $user->fill($attributes)->save();
+            $user->fill($attributes);
+            if (array_key_exists('login_user_id', $data)) {
+                $user->forceFill(['login_user_id' => $data['login_user_id']]);
+            }
+            $user->save();
             $user->syncRoles([$data['role']]);
 
             if ($before !== [$data['role']]) {

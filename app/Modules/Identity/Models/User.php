@@ -3,6 +3,7 @@
 namespace App\Modules\Identity\Models;
 
 use App\Modules\Identity\Policies\UserPolicy;
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Concerns\BelongsToTenant;
 use App\Modules\Tenancy\Models\Branch;
@@ -59,6 +60,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'service_lines' => 'array',
             'is_active' => 'boolean',
+            'login_user_id' => 'integer',
         ];
     }
 
@@ -78,6 +80,16 @@ class User extends Authenticatable
         return $this->checkRolePermissionTo($permission, $guardName);
     }
 
+    /**
+     * A person working in several companies reads their mail in one inbox: that of their main account.
+     */
+    public function routeNotificationForMail(): string
+    {
+        return $this->login_user_id !== null
+            ? (app(LinkedAccounts::class)->emailOf($this->login_user_id) ?? $this->email)
+            : $this->email;
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
@@ -86,7 +98,7 @@ class User extends Authenticatable
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email', 'branch_id', 'customer_id', 'employee_code', 'position', 'phone', 'service_lines', 'is_active'])
+            ->logOnly(['name', 'email', 'branch_id', 'customer_id', 'login_user_id', 'employee_code', 'position', 'phone', 'service_lines', 'is_active'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }

@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Platform\CrossTenant\IdentityLookup;
+use App\Modules\Platform\CrossTenant\LinkedAccounts;
+use Closure;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,14 +32,21 @@ class PasswordController extends Controller
      */
     public function update(Request $request): RedirectResponse
     {
+        // A person working in several companies has one password: that of their main account.
+        $account = app(LinkedAccounts::class)->mainOf($request->user());
+
         $validated = $request->validate([
-            'current_password' => ['required', 'current_password'],
+            'current_password' => ['required', 'string', function (string $attribute, mixed $value, Closure $fail) use ($account) {
+                if (! Hash::check((string) $value, $account->password)) {
+                    $fail('validation.current_password')->translate();
+                }
+            }],
             'password' => ['required', Password::defaults(), 'confirmed'],
         ]);
 
-        $request->user()->update([
+        IdentityLookup::run(fn () => $account->update([
             'password' => Hash::make($validated['password']),
-        ]);
+        ]));
 
         return back();
     }
