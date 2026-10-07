@@ -17,6 +17,8 @@ class PmVisitPolicy extends TenantPolicy
 {
     protected string $resource = 'pm-visits';
 
+    protected ?string $projectColumn = 'contract_id';
+
     protected array $actions = ['perform' => 'complete', 'cancel' => 'update'];
 
     protected ?string $branchColumn = null;

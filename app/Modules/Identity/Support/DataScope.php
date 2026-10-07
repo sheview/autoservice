@@ -2,6 +2,7 @@
 
 namespace App\Modules\Identity\Support;
 
+use App\Modules\Contract\Actions\MemberContractIds;
 use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -20,7 +21,10 @@ use Illuminate\Support\Facades\DB;
  *
  * branch = the "branch_id" column is the user's branch or empty (pass branch: null for a resource
  * without branches: then the whole company); customer = the "customer_id" column is the account's
- * customer (pass customer: null when the resource has no customer: then nothing). A customer
+ * customer (pass customer: null when the resource has no customer: then nothing); project = the
+ * user's own records and those whose contract column is a project the user is on the team of
+ * (pass project: the column, or a filter given the contract ids; null = no projects: then only
+ * the user's own). A customer
  * account never reaches beyond its customer, whatever its role says. A superadmin inside the
  * tenant and central staff reach the whole company.
  */
@@ -56,10 +60,11 @@ class DataScope
      * @param  string|Closure|null  $branch  the branch column (or a filter given the branch id); null = no branches
      * @param  string|Closure|null  $customer  the customer column (or a filter given the customer id); null = no customer
      * @param  Closure|null  $own  the filter of the user's own records; null = none are "own"
+     * @param  string|Closure|null  $project  the contract column (or a filter given the contract ids); null = no projects
      * @return T
      */
     public static function constrain(Builder $query, User $user, string $permission, string|Closure|null $branch = 'branch_id',
-        string|Closure|null $customer = 'customer_id', ?Closure $own = null): Builder
+        string|Closure|null $customer = 'customer_id', ?Closure $own = null, string|Closure|null $project = null): Builder
     {
         return match (self::of($user, $permission)) {
             PermissionCatalog::SCOPE_ALL => $query,
@@ -73,6 +78,7 @@ class DataScope
                 $customer instanceof Closure => $customer($query, $user->customer_id),
                 default => $query->where($customer, $user->customer_id),
             },
+            PermissionCatalog::SCOPE_PROJECT => self::constrainProject($query, $user, $own, $project),
             PermissionCatalog::SCOPE_OWN => $own ? $query->where(fn ($q) => $own($q)) : $query->whereRaw('false'),
             default => $query->whereRaw('false'),
         };
@@ -85,9 +91,10 @@ class DataScope
      * @param  string|Closure|null  $branch  the branch attribute (or a check given the branch id)
      * @param  string|Closure|null  $customer  the customer attribute (or a check given the customer id)
      * @param  Closure|null  $own  whether the record is the user's own
+     * @param  string|Closure|null  $project  the contract attribute (or a check given the contract ids)
      */
     public static function covers(Model $model, User $user, string $permission, string|Closure|null $branch = 'branch_id',
-        string|Closure|null $customer = 'customer_id', ?Closure $own = null): bool
+        string|Closure|null $customer = 'customer_id', ?Closure $own = null, string|Closure|null $project = null): bool
     {
         return match (self::of($user, $permission)) {
             PermissionCatalog::SCOPE_ALL => true,
@@ -101,9 +108,50 @@ class DataScope
                 $customer instanceof Closure => (bool) $customer($model, $user->customer_id),
                 default => $model->getAttribute($customer) !== null && (int) $model->getAttribute($customer) === (int) $user->customer_id,
             },
+            PermissionCatalog::SCOPE_PROJECT => ($own !== null && (bool) $own($model)) || match (true) {
+                $project === null => false,
+                $project instanceof Closure => (bool) $project($model, self::projectIds($user)),
+                default => $model->getAttribute($project) !== null && in_array((int) $model->getAttribute($project), self::projectIds($user), true),
+            },
             PermissionCatalog::SCOPE_OWN => $own !== null && (bool) $own($model),
             default => false,
         };
+    }
+
+    /**
+     * The projects (contract ids) whose team the user is on in the current tenant, once per request.
+     *
+     * @return list<int>
+     */
+    public static function projectIds(User $user): array
+    {
+        $key = 'data_scope.projects.'.$user->id.'.'.app(TenantContext::class)->id();
+        $request = request();
+        if (! $request->attributes->has($key)) {
+            $request->attributes->set($key, app(MemberContractIds::class)->handle((int) $user->id));
+        }
+
+        return $request->attributes->get($key);
+    }
+
+    /**
+     * Scope project: the user's own records, or those of the projects of their team.
+     *
+     * @template T of Builder
+     *
+     * @param  T  $query
+     * @return T
+     */
+    private static function constrainProject(Builder $query, User $user, ?Closure $own, string|Closure|null $project): Builder
+    {
+        $ids = $project === null ? [] : self::projectIds($user);
+        if ($own === null && $ids === []) {
+            return $query->whereRaw('false');
+        }
+
+        return $query->where(fn ($q) => $q
+            ->when($own, fn ($q) => $q->where(fn ($q) => $own($q)))
+            ->when($ids !== [], fn ($q) => $q->orWhere(fn ($q) => $project instanceof Closure ? $project($q, $ids) : $q->whereIn($project, $ids))));
     }
 
     /**

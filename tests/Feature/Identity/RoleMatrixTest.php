@@ -17,7 +17,7 @@ beforeEach(function () {
 
 it('seeds the default roles exactly as permissions.json says', function () {
     expect(($this->grants)('technician'))->toBe(collect(PermissionCatalog::grantsFor('technician'))->sortKeys()->all())
-        ->and(($this->grants)('technician')['tickets.view'])->toBe('own')
+        ->and(($this->grants)('technician')['tickets.view'])->toBe('project')
         ->and(($this->grants)('technician')['assets.view'])->toBe('branch')
         ->and(($this->grants)('helpdesk')['tickets.view'])->toBe('all')
         ->and(($this->grants)('customer_it')['tickets.view'])->toBe('customer')
@@ -30,7 +30,7 @@ it('shows the matrix of every role to whoever manages roles only', function () {
         ->component('Identity/Roles/Index')
         ->has('roles', 6)
         ->where('roles.0.locked', true)
-        ->where("grants.{$this->technician->id}", fn ($grants) => $grants['tickets.view'] === 'own')
+        ->where("grants.{$this->technician->id}", fn ($grants) => $grants['tickets.view'] === 'project')
         ->has('resources'));
 
     $this->actingAs(userWithRole('technician'))->get('/roles')->assertForbidden();
@@ -54,7 +54,7 @@ it('saves ticks and scopes, and logs what changed', function () {
     expect($log->causer_id)->toBe($this->admin->id)
         ->and($log->properties['added'])->toBe(['reports.view' => 'own'])
         ->and($log->properties['removed'])->toBe(['labels.print'])
-        ->and($log->properties['rescoped'])->toBe(['tickets.view' => ['own', 'branch']]);
+        ->and($log->properties['rescoped'])->toBe(['tickets.view' => ['project', 'branch']]);
 
     // takes effect at once: a technician now reaches the branch
     $tech = userWithRole('technician');
@@ -77,7 +77,7 @@ it('never changes the admin role and checks permissions and scopes', function ()
 
     $customer = Role::findByName('customer_it');
     $this->actingAs($this->admin)->put('/roles-matrix', ['matrix' => [$customer->id => ['tickets.view' => 'all']]])->assertSessionHasErrors('matrix');
-    expect(($this->grants)('technician')['tickets.view'])->toBe('own');
+    expect(($this->grants)('technician')['tickets.view'])->toBe('project');
 });
 
 it('creates a role, then gives it permissions on the matrix', function () {
@@ -132,7 +132,7 @@ it('leaves resources whose menu was removed off the matrix, keeping their grants
     // The page sends back every grant it was given, so grants not shown survive a save.
     $this->actingAs($this->admin)->get('/roles')->assertInertia(fn (Assert $page) => $page
         ->where('resources', fn ($rows) => collect($rows)->pluck('key')->intersect(PermissionCatalog::NO_MENU)->isEmpty())
-        ->where("grants.{$this->technician->id}", fn ($grants) => $grants['pm-visits.view'] === 'own'));
+        ->where("grants.{$this->technician->id}", fn ($grants) => $grants['pm-visits.view'] === 'project'));
 
     $this->actingAs($this->admin)->put('/roles-matrix', ['matrix' => [$this->technician->id => ($this->grants)('technician')]])->assertSessionHasNoErrors();
     expect(($this->grants)('technician'))->toHaveKeys(['pm-visits.view', 'pm-plans.view', 'pm-checklists.view']);

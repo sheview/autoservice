@@ -13,6 +13,7 @@ use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Support\ContractPhase;
 use App\Modules\Document\Actions\AddAttachments;
 use App\Modules\Document\Support\Attachments;
+use App\Modules\Identity\Actions\StaffList;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use Illuminate\Http\RedirectResponse;
@@ -79,7 +80,7 @@ class ContractController extends Controller
     /**
      * ?asset_search=... fills "candidates": assets of the customer that can still be added.
      */
-    public function show(Request $request, Contract $contract, AssetSummaries $assetSummaries, Modules $modules): Response
+    public function show(Request $request, Contract $contract, AssetSummaries $assetSummaries, Modules $modules, StaffList $staffList): Response
     {
         Gate::authorize('view', $contract);
 
@@ -88,6 +89,7 @@ class ContractController extends Controller
         $assetIds = $contract->contractAssets()->pluck('asset_id')->all();
         $canUpdate = $user->can('update', $contract);
         $assetsOn = $modules->enabled('asset') && $user->can('assets.view');
+        $memberIds = $contract->members()->pluck('user_id')->map(fn ($id) => (int) $id)->all();
 
         return Inertia::render('Contract/Contracts/Show', [
             'contract' => [
@@ -120,6 +122,9 @@ class ContractController extends Controller
                 ])
                 : [],
             'documents' => $this->documents($contract),
+            // The project's team, and whom it can take (only for whoever may change it).
+            'members' => $memberIds === [] ? [] : $staffList->handle($memberIds),
+            'staff' => $canUpdate ? $staffList->handle() : [],
             'history' => $contract->activities()->latest('id')->limit(20)->get()->map(fn ($log) => [
                 'id' => $log->id,
                 'description' => $log->description,

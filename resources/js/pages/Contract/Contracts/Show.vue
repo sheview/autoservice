@@ -23,6 +23,12 @@ interface AssetRow {
     serial_number: string | null;
 }
 
+interface StaffRow {
+    id: number;
+    name: string;
+    email: string | null;
+}
+
 interface ContractDetail {
     id: number;
     contract_no: string;
@@ -47,6 +53,8 @@ const props = defineProps<{
     assetSearch: string;
     candidates: AssetRow[];
     documents: Attachment[];
+    members: StaffRow[];
+    staff: StaffRow[];
     history: { id: number; description: string; event: string | null; actor: string | null; at: string }[];
     can: { update: boolean; delete: boolean; manageAssets: boolean };
 }>();
@@ -95,6 +103,30 @@ const removeAsset = (asset: AssetRow) => {
         router.delete(route('contract.contracts.assets.destroy', [props.contract.id, asset.id]), { preserveScroll: true });
     }
 };
+
+// --- team ----------------------------------------------------------------------
+const editingTeam = ref(false);
+const team = ref<number[]>([]);
+const teamSearch = ref('');
+const teamCandidates = computed(() => {
+    const needle = teamSearch.value.trim().toLowerCase();
+    return needle === ''
+        ? props.staff
+        : props.staff.filter((person) => `${person.name} ${person.email ?? ''}`.toLowerCase().includes(needle));
+});
+
+const editTeam = () => {
+    team.value = props.members.map((person) => person.id);
+    teamSearch.value = '';
+    editingTeam.value = true;
+};
+
+const saveTeam = () =>
+    router.put(
+        route('contract.contracts.members.update', props.contract.id),
+        { user_ids: team.value },
+        { preserveScroll: true, onSuccess: () => (editingTeam.value = false) },
+    );
 
 // --- formatting ----------------------------------------------------------------
 const money = (baht: string | null) =>
@@ -263,6 +295,40 @@ const dateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateSt
                     </table>
                 </div>
                 <p v-else-if="assetCount === 0" class="text-sm text-muted-foreground">{{ t('contracts.no_assets') }}</p>
+            </section>
+
+            <section class="space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="text-sm font-semibold">{{ t('contracts.team') }} ({{ members.length }})</h3>
+                    <Button v-if="can.update && !editingTeam" size="sm" variant="outline" @click="editTeam">{{ t('contracts.edit_team') }}</Button>
+                </div>
+                <p class="text-xs text-muted-foreground">{{ t('contracts.team_hint') }}</p>
+                <InputError :message="errors().user_ids" />
+
+                <div v-if="editingTeam" class="space-y-2 rounded-md border p-4">
+                    <Input v-model="teamSearch" type="search" :placeholder="t('contracts.team_search')" />
+                    <ul class="max-h-64 divide-y overflow-y-auto text-sm">
+                        <li v-for="person in teamCandidates" :key="person.id">
+                            <label class="flex items-center gap-3 px-1 py-1.5">
+                                <input v-model="team" type="checkbox" :value="person.id" class="size-4 rounded border-input" />
+                                <span>{{ person.name }}</span>
+                                <span class="text-xs text-muted-foreground">{{ person.email }}</span>
+                            </label>
+                        </li>
+                    </ul>
+                    <div class="flex gap-2">
+                        <Button size="sm" @click="saveTeam">{{ t('contracts.save_team') }}</Button>
+                        <Button size="sm" variant="outline" @click="editingTeam = false">{{ t('common.cancel') }}</Button>
+                    </div>
+                </div>
+
+                <ul v-else-if="members.length" class="flex flex-wrap gap-2">
+                    <li v-for="person in members" :key="person.id" class="rounded-full border px-3 py-1 text-sm">
+                        {{ person.name }}
+                        <span v-if="person.email" class="text-xs text-muted-foreground">{{ person.email }}</span>
+                    </li>
+                </ul>
+                <p v-else class="text-sm text-muted-foreground">{{ t('contracts.no_team') }}</p>
             </section>
 
             <section class="space-y-2">

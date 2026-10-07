@@ -5,6 +5,7 @@ namespace App\Modules\Identity\Policies;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Platform\Support\Impersonation;
+use Closure;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -16,8 +17,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * Each ability needs the permission "{resource}.{action}" and, for a record, that the record is
  * in the user's tenant and within the scope the user's role grants for that permission
- * (DataScope: all / branch / own / customer). Override owns() to say what "own" means, and set
- * $branchColumn / $customerColumn to null for a resource without branches / customers.
+ * (DataScope: all / branch / customer / project / own). Override owns() to say what "own" means,
+ * set $branchColumn / $customerColumn to null for a resource without branches / customers, and
+ * $projectColumn to the contract column of a resource that belongs to a project (MA contract).
  * A superadmin who is impersonating passes every check (Gate::before in IdentityServiceProvider).
  * Central staff who entered the tenant are checked here like anyone else, with the permissions
  * of their platform role over the whole company.
@@ -32,6 +34,9 @@ abstract class TenantPolicy
     protected ?string $branchColumn = 'branch_id';
 
     protected ?string $customerColumn = 'customer_id';
+
+    /** The contract column for scope "project"; null = the resource has no projects (only "own" counts). */
+    protected ?string $projectColumn = null;
 
     public function viewAny(User $user): bool
     {
@@ -79,7 +84,13 @@ abstract class TenantPolicy
         }
 
         return DataScope::covers($model, $user, $this->permission($ability), $this->branchColumn, $this->customerColumn,
-            fn (Model $record) => $this->owns($user, $record));
+            fn (Model $record) => $this->owns($user, $record), $this->project());
+    }
+
+    /** What scope "project" checks: the contract column, or a check given the user's contract ids. */
+    protected function project(): string|Closure|null
+    {
+        return $this->projectColumn;
     }
 
     /** Whether the record is the user's own (for scope "own"). */

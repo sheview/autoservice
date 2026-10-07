@@ -38,7 +38,7 @@ class SearchRoomAccessRequests
     public static function visibleTo(Builder $query, User $user, string $permission = 'room-access.view'): Builder
     {
         return DataScope::constrain($query, $user, $permission, branch: null, customer: null,
-            own: fn (Builder $q) => $q->where('requester_id', $user->id));
+            own: fn (Builder $q) => $q->where('requester_id', $user->id), project: 'contract_id');
     }
 
     /**

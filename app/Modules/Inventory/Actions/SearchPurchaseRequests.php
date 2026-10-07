@@ -102,6 +102,6 @@ class SearchPurchaseRequests
         }
 
         return DataScope::constrain($query, $user, 'purchase-requests.view', branch: null, customer: null,
-            own: fn ($q) => $q->where($query->qualifyColumn('requested_by'), $user->id));
+            own: fn ($q) => $q->where($query->qualifyColumn('requested_by'), $user->id), project: $query->qualifyColumn('contract_id'));
     }
 }

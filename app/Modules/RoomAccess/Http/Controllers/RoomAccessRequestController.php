@@ -390,10 +390,10 @@ class RoomAccessRequestController extends Controller
     {
         return [
             'rooms' => $this->roomOptions(),
-            'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
+            'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle(null, $user, 'room-access.request') : [],
             // Each contract's period, for a standing request "for the contract period".
             'contractPeriods' => $this->modules->enabled('contract')
-                ? collect(app(ContractDetails::class)->handle(array_column(app(ContractOptions::class)->handle(), 'id')))
+                ? collect(app(ContractDetails::class)->handle(array_column(app(ContractOptions::class)->handle(null, $user, 'room-access.request'), 'id')))
                     ->map(fn (array $c) => ['starts_on' => $c['starts_on'], 'ends_on' => $c['ends_on']])->all()
                 : [],
             // People this requester has taken in before (only theirs; never ID numbers).
@@ -450,7 +450,7 @@ class RoomAccessRequestController extends Controller
         if (filled($data['ticket_id'] ?? null) && $this->ticketLabel($form->user(), (int) $data['ticket_id']) === null) {
             throw ValidationException::withMessages(['ticket_id' => __('room_access.requests.ticket_not_found')]);
         }
-        if (filled($data['contract_id'] ?? null) && ! collect(app(ContractOptions::class)->handle((int) $data['contract_id']))->contains('id', (int) $data['contract_id'])) {
+        if (filled($data['contract_id'] ?? null) && ! collect(app(ContractOptions::class)->handle((int) $data['contract_id'], $form->user(), 'room-access.request'))->contains('id', (int) $data['contract_id'])) {
             throw ValidationException::withMessages(['contract_id' => __('room_access.requests.contract_not_found')]);
         }
 

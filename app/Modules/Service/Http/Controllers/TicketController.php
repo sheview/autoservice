@@ -32,7 +32,6 @@ use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\QuickCloseTicket;
 use App\Modules\Service\Actions\SearchTickets;
-use App\Modules\Service\Actions\TicketCustomerIds;
 use App\Modules\Service\Actions\UpdateTicket;
 use App\Modules\Service\Http\Requests\OpenTicketRequest;
 use App\Modules\Service\Http\Requests\UpdateTicketRequest;
@@ -60,7 +59,7 @@ class TicketController extends Controller
         private UserNames $userNames,
     ) {}
 
-    public function index(Request $request, SearchTickets $search, TicketCustomerIds $ticketCustomerIds): Response
+    public function index(Request $request, SearchTickets $search): Response
     {
         Gate::authorize('viewAny', Ticket::class);
 
@@ -86,9 +85,9 @@ class TicketController extends Controller
             'filters' => $filters,
             'statuses' => Ticket::STATUSES,
             'priorities' => Ticket::PRIORITIES,
-            // Scope "own": only the customers of the user's own tickets in the filter.
-            'customers' => DataScope::of($user, 'tickets.view') === PermissionCatalog::SCOPE_OWN
-                ? array_values(array_filter($this->customers(), fn (array $c) => in_array($c['id'], $ticketCustomerIds->handle($user), true)))
+            // Scope "own" / "project": only the customers of the tickets the user sees in the filter.
+            'customers' => in_array(DataScope::of($user, 'tickets.view'), [PermissionCatalog::SCOPE_OWN, PermissionCatalog::SCOPE_PROJECT], true)
+                ? $this->customersOf($this->visibleCustomerIds($user))
                 : $this->customers(),
             'dueSoonHours' => SearchTickets::DUE_SOON_HOURS,
             'can' => ['create' => $user->can('create', Ticket::class)],
@@ -394,5 +393,22 @@ class TicketController extends Controller
         $own = request()->user()?->customer_id;
 
         return $own === null ? $customers : array_values(array_filter($customers, fn (array $c) => $c['id'] === $own));
+    }
+
+    /**
+     * @param  list<int>  $ids
+     */
+    private function customersOf(array $ids): array
+    {
+        return array_values(array_filter($this->customers(), fn (array $c) => in_array($c['id'], $ids, true)));
+    }
+
+    /**
+     * @return list<int> the customers of the tickets the user sees
+     */
+    private function visibleCustomerIds(User $user): array
+    {
+        return SearchTickets::visibleTo(Ticket::query(), $user)->whereNotNull('customer_id')->distinct()
+            ->pluck('customer_id')->map(fn ($id) => (int) $id)->all();
     }
 }

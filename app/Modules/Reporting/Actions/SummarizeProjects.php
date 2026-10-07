@@ -6,6 +6,7 @@ use App\Modules\Contract\Actions\CustomerLabelNames;
 use App\Modules\Contract\Actions\SearchContracts;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Support\ContractPhase;
+use App\Modules\Contract\Support\ContractScope;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -21,7 +22,7 @@ use Illuminate\Support\Facades\DB;
  *
  * Which contracts (summary-projects.view): all / branch = every contract; customer = those of the
  * account's customer, and never purchases or amounts; own = those of the customers of the
- * user's own tickets (TicketCustomerIds).
+ * user's own tickets (TicketCustomerIds); project = those and the projects whose team the user is on.
  */
 class SummarizeProjects
 {
@@ -64,6 +65,9 @@ class SummarizeProjects
             PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH => null,
             PermissionCatalog::SCOPE_CUSTOMER => $viewer->customer_id === null ? [] : [(int) $viewer->customer_id],
             PermissionCatalog::SCOPE_OWN => $this->ticketCustomerIds->handle($viewer),
+            PermissionCatalog::SCOPE_PROJECT => array_values(array_unique([
+                ...$this->ticketCustomerIds->handle($viewer), ...ContractScope::projectCustomerIds(DataScope::projectIds($viewer)),
+            ])),
             default => [],
         };
     }

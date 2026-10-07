@@ -60,6 +60,6 @@ class SearchPmPlans
     public static function visibleTo(Builder $query, User $user): Builder
     {
         return DataScope::constrain($query, $user, 'pm-plans.view', branch: null,
-            own: fn (Builder $q) => $q->where('assignee_id', $user->id));
+            own: fn (Builder $q) => $q->where('assignee_id', $user->id), project: 'contract_id');
     }
 }

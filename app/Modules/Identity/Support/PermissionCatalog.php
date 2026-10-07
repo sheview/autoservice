@@ -8,6 +8,8 @@ namespace App\Modules\Identity\Support;
  *
  *   all       every record of the company
  *   branch    records of the user's own branch (and those of no branch)
+ *   project   the user's own records and those of the projects (MA contracts) whose team they
+ *             are on (contract_members); a resource without projects counts only its own
  *   own       records the user made, is assigned to or holds (each resource says which)
  *   customer  records of the customer the account belongs to (customer accounts only)
  *
@@ -26,8 +28,20 @@ class PermissionCatalog
 
     public const SCOPE_CUSTOMER = 'customer';
 
+    public const SCOPE_PROJECT = 'project';
+
     /** Widest first: with several roles a user gets the widest scope any of them grants. */
-    public const SCOPES = [self::SCOPE_ALL, self::SCOPE_BRANCH, self::SCOPE_CUSTOMER, self::SCOPE_OWN];
+    public const SCOPES = [self::SCOPE_ALL, self::SCOPE_BRANCH, self::SCOPE_CUSTOMER, self::SCOPE_PROJECT, self::SCOPE_OWN];
+
+    /**
+     * Technician grants that reach the projects of the user's team (scope project) rather than
+     * only their own records: what they see, and which projects they may ask for (ContractOptions).
+     * Changing and closing work stay "own".
+     */
+    public const TECHNICIAN_PROJECT_GRANTS = [
+        'tickets.view', 'pm-visits.view', 'asset-checkouts.view', 'asset-checkouts.request', 'customers.view', 'contracts.view',
+        'purchase-requests.view', 'purchase-requests.create', 'room-access.view', 'room-access.request',
+    ];
 
     public const PERMISSIONS = [
         'dashboard' => ['view'],
@@ -210,23 +224,23 @@ class PermissionCatalog
             'label' => 'ช่างเทคนิค',
             'grants' => [
                 'dashboard.view' => 'own',
-                'tickets.view' => 'own', 'tickets.create' => 'own', 'tickets.update' => 'own',
-                'pm-visits.view' => 'own', 'pm-visits.update' => 'own', 'pm-visits.complete' => 'own',
+                'tickets.view' => 'project', 'tickets.create' => 'own', 'tickets.update' => 'own',
+                'pm-visits.view' => 'project', 'pm-visits.update' => 'own', 'pm-visits.complete' => 'own',
                 'pm-plans.view' => 'branch',
                 'pm-checklists.view' => 'all',
                 'ip-check.view' => 'all', 'ip-check.run' => 'all',
                 'assets.view' => 'branch', 'assets.move' => 'branch',
-                'asset-checkouts.view' => 'own', 'asset-checkouts.request' => 'own', 'asset-checkouts.return' => 'own',
+                'asset-checkouts.view' => 'project', 'asset-checkouts.request' => 'project', 'asset-checkouts.return' => 'own',
                 'labels.view' => 'all', 'labels.print' => 'all',
-                'customers.view' => 'own',
-                'contracts.view' => 'own',
+                'customers.view' => 'project',
+                'contracts.view' => 'project',
                 'parts.view' => 'all', 'parts.issue' => 'own',
-                'purchase-requests.view' => 'own', 'purchase-requests.create' => 'own',
+                'purchase-requests.view' => 'project', 'purchase-requests.create' => 'project',
                 'stock-movements.view' => 'own',
                 'summary-people.view' => 'own',
                 'surveys.view' => 'own',
                 'manuals.view' => 'all',
-                'room-access.view' => 'own', 'room-access.request' => 'own',
+                'room-access.view' => 'project', 'room-access.request' => 'project',
             ],
         ],
         // Buys what was asked for: orders, takes deliveries, registers them as assets or parts

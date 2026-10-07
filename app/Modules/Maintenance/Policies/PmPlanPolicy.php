@@ -15,6 +15,8 @@ class PmPlanPolicy extends TenantPolicy
 {
     protected string $resource = 'pm-plans';
 
+    protected ?string $projectColumn = 'contract_id';
+
     protected ?string $branchColumn = null;
 
     protected function owns(User $user, Model $model): bool

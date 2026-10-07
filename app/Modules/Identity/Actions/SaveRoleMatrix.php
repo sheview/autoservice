@@ -46,7 +46,7 @@ class SaveRoleMatrix
                     }
                     $valid = $external
                         ? [PermissionCatalog::SCOPE_CUSTOMER]
-                        : [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH, PermissionCatalog::SCOPE_OWN];
+                        : [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH, PermissionCatalog::SCOPE_PROJECT, PermissionCatalog::SCOPE_OWN];
                     if (! in_array($scope, $valid, true)) {
                         throw ValidationException::withMessages(['matrix' => __('identity.roles.bad_scope', ['role' => $role->label ?? $role->name])]);
                     }

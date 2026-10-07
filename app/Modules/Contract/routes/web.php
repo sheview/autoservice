@@ -3,6 +3,7 @@
 use App\Modules\Contract\Http\Controllers\ContractAssetController;
 use App\Modules\Contract\Http\Controllers\ContractController;
 use App\Modules\Contract\Http\Controllers\ContractDocumentController;
+use App\Modules\Contract\Http\Controllers\ContractMemberController;
 use App\Modules\Contract\Http\Controllers\CustomerAttachmentController;
 use App\Modules\Contract\Http\Controllers\CustomerController;
 use App\Modules\Contract\Http\Controllers\CustomerSiteController;
@@ -25,6 +26,8 @@ Route::middleware(['auth', 'verified', 'module:contract'])->name('contract.')->g
     Route::post('contracts/{contract}/assets', [ContractAssetController::class, 'store'])->name('contracts.assets.store');
     Route::delete('contracts/{contract}/assets/{asset}', [ContractAssetController::class, 'destroy'])
         ->whereNumber('asset')->name('contracts.assets.destroy');
+
+    Route::put('contracts/{contract}/members', [ContractMemberController::class, 'update'])->name('contracts.members.update');
 
     Route::post('contracts/{contract}/documents', [ContractDocumentController::class, 'store'])->name('contracts.documents.store');
     Route::get('contracts/{contract}/documents/{document}', [ContractDocumentController::class, 'show'])

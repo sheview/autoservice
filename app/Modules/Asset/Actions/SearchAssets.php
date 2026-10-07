@@ -98,7 +98,7 @@ class SearchAssets
 
     /**
      * Spare assets the user may ask for on an issue/loan form: what they may see, except that
-     * someone who only sees what they hold (scope own) may still ask for the assets of their
+     * someone who only sees what they hold (scope own or project) may still ask for the assets of their
      * branch (and those of no branch).
      *
      * @param  Builder<Asset>  $query
@@ -106,7 +106,7 @@ class SearchAssets
      */
     public static function askableBy(Builder $query, User $user): Builder
     {
-        if (DataScope::of($user, 'assets.view') !== PermissionCatalog::SCOPE_OWN) {
+        if (! in_array(DataScope::of($user, 'assets.view'), [PermissionCatalog::SCOPE_OWN, PermissionCatalog::SCOPE_PROJECT], true)) {
             return self::visibleTo($query, $user);
         }
 

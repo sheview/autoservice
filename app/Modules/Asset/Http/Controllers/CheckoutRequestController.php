@@ -405,7 +405,7 @@ class CheckoutRequestController extends Controller
             'borrowers' => $user->can('createForOthers', CheckoutRequest::class)
                 ? app(UsersWithPermission::class)->handle('assets.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
                 : [],
-            'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle($contractId) : [],
+            'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle($contractId, $user, 'asset-checkouts.request') : [],
             'partsEnabled' => $this->modules->enabled('inventory'),
             'maxItems' => CheckoutRequestForm::MAX_ITEMS,
             // Nothing free to hand out: offer to open a purchase request for it instead.

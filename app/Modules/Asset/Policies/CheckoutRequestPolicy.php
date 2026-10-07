@@ -23,6 +23,8 @@ class CheckoutRequestPolicy extends TenantPolicy
 {
     protected string $resource = 'asset-checkouts';
 
+    protected ?string $projectColumn = 'contract_id';
+
     protected ?string $customerColumn = null;
 
     public function view(User $user, Model $request): bool

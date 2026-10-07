@@ -118,6 +118,7 @@ class SearchCheckoutRequests
             return $query->where(fn ($q) => $own($q));
         }
 
-        return DataScope::constrain($query, $user, $permission, branch: $query->qualifyColumn('branch_id'), customer: null, own: $own);
+        return DataScope::constrain($query, $user, $permission, branch: $query->qualifyColumn('branch_id'), customer: null, own: $own,
+            project: $query->qualifyColumn('contract_id'));
     }
 }

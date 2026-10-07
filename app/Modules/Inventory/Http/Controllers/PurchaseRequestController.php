@@ -94,7 +94,7 @@ class PurchaseRequestController extends Controller
             'source' => $source,
             'categories' => $this->categoryOptions($modules),
             'maxLinks' => PurchaseRequest::MAX_LINKS,
-            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
+            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle(null, $request->user(), 'purchase-requests.create') : [],
         ]);
     }
 
@@ -170,7 +170,7 @@ class PurchaseRequestController extends Controller
             'source' => null,
             'categories' => $this->categoryOptions($modules),
             'maxLinks' => PurchaseRequest::MAX_LINKS,
-            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($purchaseRequest->contract_id) : [],
+            'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($purchaseRequest->contract_id, request()->user(), 'purchase-requests.create') : [],
         ]);
     }
 

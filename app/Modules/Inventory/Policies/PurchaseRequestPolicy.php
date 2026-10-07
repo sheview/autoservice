@@ -21,6 +21,8 @@ class PurchaseRequestPolicy extends TenantPolicy
 {
     protected string $resource = 'purchase-requests';
 
+    protected ?string $projectColumn = 'contract_id';
+
     protected ?string $branchColumn = null;
 
     protected ?string $customerColumn = null;

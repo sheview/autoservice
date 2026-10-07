@@ -19,6 +19,8 @@ class RoomAccessRequestPolicy extends TenantPolicy
 {
     protected string $resource = 'room-access';
 
+    protected ?string $projectColumn = 'contract_id';
+
     protected ?string $branchColumn = null;
 
     protected ?string $customerColumn = null;

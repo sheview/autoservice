@@ -104,6 +104,7 @@ class SearchTickets
                 ->when($branchId, fn ($q, $id) => $q->orWhere('branch_id', $id))),
             customer: 'customer_id',
             own: fn (Builder $q) => $q->where('reported_by', $user->id)->orWhere('assignee_id', $user->id),
+            project: 'contract_id',
         );
     }
 }

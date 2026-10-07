@@ -87,6 +87,6 @@ class SearchPmVisits
     public static function visibleTo(Builder $query, User $user, string $permission = 'pm-visits.view'): Builder
     {
         return DataScope::constrain($query, $user, $permission, branch: null,
-            own: fn (Builder $q) => $q->where('assignee_id', $user->id));
+            own: fn (Builder $q) => $q->where('assignee_id', $user->id), project: 'contract_id');
     }
 }

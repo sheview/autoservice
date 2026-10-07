@@ -9,13 +9,15 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * contracts.* permissions. Contracts have no branch; "own" = contracts of the customers of the
- * user's own tickets; scope customer = contracts of the account's customer (ContractScope).
+ * user's own tickets; scope project = those and the projects whose team the user is on; scope customer = contracts of the account's customer (ContractScope).
  */
 class ContractPolicy extends TenantPolicy
 {
     protected string $resource = 'contracts';
 
     protected ?string $branchColumn = null;
+
+    protected ?string $projectColumn = 'id';
 
     protected function owns(User $user, Model $model): bool
     {

@@ -17,7 +17,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * An MA contract with a customer. value is in satang. The covered assets are in contract_assets
- * (ContractAsset); the files (signed contract, appendix) are the "documents" media collection.
+ * (ContractAsset), the project's team in contract_members (ContractMember); the files (signed contract, appendix) are the "documents" media collection.
  */
 #[UsePolicy(ContractPolicy::class)]
 class Contract extends Model implements HasMedia
@@ -78,6 +78,12 @@ class Contract extends Model implements HasMedia
     public function contractAssets(): HasMany
     {
         return $this->hasMany(ContractAsset::class);
+    }
+
+    /** The project's team (scope "project" of DataScope). */
+    public function members(): HasMany
+    {
+        return $this->hasMany(ContractMember::class);
     }
 
     public function registerMediaCollections(): void

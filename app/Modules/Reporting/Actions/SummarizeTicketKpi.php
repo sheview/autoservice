@@ -44,7 +44,7 @@ class SummarizeTicketKpi
         $scope = DataScope::of($viewer, SummarizePeople::PERMISSION);
         $only = match ($scope) {
             PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH => null,
-            PermissionCatalog::SCOPE_OWN => [(int) $viewer->id],
+            PermissionCatalog::SCOPE_OWN, PermissionCatalog::SCOPE_PROJECT => [(int) $viewer->id],
             default => [],
         };
 

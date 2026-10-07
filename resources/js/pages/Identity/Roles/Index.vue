@@ -22,7 +22,7 @@ interface RoleColumn {
 
 /**
  * The permissions matrix: a row per permission (grouped by menu), a column per role. Ticking a
- * cell grants the permission in a scope (all / own branch / own records / the account's customer)
+ * cell grants the permission in a scope (all / own branch / own projects / own records / the account's customer)
  * or not at all, colour-coded. Saved together; the server writes each changed role to the log.
  */
 const props = defineProps<{
@@ -57,6 +57,7 @@ const setScope = (role: RoleColumn, permission: string, scope: string) => {
 const scopeClass: Record<string, string> = {
     all: 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200',
     branch: 'bg-sky-100 text-sky-800 dark:bg-sky-900/50 dark:text-sky-200',
+    project: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-200',
     own: 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200',
     customer: 'bg-violet-100 text-violet-800 dark:bg-violet-900/50 dark:text-violet-200',
     none: 'bg-transparent text-muted-foreground/60 hover:bg-muted',
@@ -124,7 +125,7 @@ const reset = () => {
                 <!-- What each colour means -->
                 <div class="flex flex-wrap items-center gap-2 text-sm">
                     <span
-                        v-for="scope in ['all', 'branch', 'own', 'customer']"
+                        v-for="scope in ['all', 'branch', 'project', 'own', 'customer']"
                         :key="scope"
                         class="rounded-full px-2.5 py-0.5"
                         :class="scopeClass[scope]"

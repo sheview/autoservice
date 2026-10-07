@@ -46,13 +46,13 @@ class SummarizePeople
 
     /**
      * Whether the user may open the summary of one person: a user of the company ($userId) or
-     * someone from outside (null). With scope own, only of themself.
+     * someone from outside (null). With scope own (or project: people have no project), only of themself.
      */
     public static function reaches(User $viewer, ?int $userId): bool
     {
         return match (DataScope::of($viewer, self::PERMISSION)) {
             PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH => true,
-            PermissionCatalog::SCOPE_OWN => $userId !== null && $userId === (int) $viewer->id,
+            PermissionCatalog::SCOPE_OWN, PermissionCatalog::SCOPE_PROJECT => $userId !== null && $userId === (int) $viewer->id,
             default => false,
         };
     }
@@ -67,8 +67,8 @@ class SummarizePeople
 
         $people = DB::query()->fromSub($this->rows->handle($viewer), 'rows')
             ->selectRaw('user_id, case when user_id is null then name end as outside_name, max(name) as name, '.SummaryTotals::SELECT)
-            ->when($scope === PermissionCatalog::SCOPE_OWN, fn ($q) => $q->where('user_id', $viewer->id))
-            ->unless(in_array($scope, [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH, PermissionCatalog::SCOPE_OWN], true),
+            ->when(in_array($scope, [PermissionCatalog::SCOPE_OWN, PermissionCatalog::SCOPE_PROJECT], true), fn ($q) => $q->where('user_id', $viewer->id))
+            ->unless(in_array($scope, [PermissionCatalog::SCOPE_ALL, PermissionCatalog::SCOPE_BRANCH, PermissionCatalog::SCOPE_OWN, PermissionCatalog::SCOPE_PROJECT], true),
                 fn ($q) => $q->whereRaw('false'))
             ->when($search !== '', fn ($q) => $q->where('name', 'like', "%{$search}%"))
             ->when($filters['kind'] ?? null, fn ($q, $kind) => $q->where('kind', $kind))

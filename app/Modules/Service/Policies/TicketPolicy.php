@@ -22,6 +22,8 @@ class TicketPolicy extends TenantPolicy
 {
     protected string $resource = 'tickets';
 
+    protected ?string $projectColumn = 'contract_id';
+
     public function view(User $user, Model $ticket): bool
     {
         return $this->permits($user, 'view') && ($this->inScope($user, $ticket, 'view') || $this->isAssignee($user, $ticket));
