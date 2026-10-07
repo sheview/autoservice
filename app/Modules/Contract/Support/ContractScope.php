@@ -5,6 +5,7 @@ namespace App\Modules\Contract\Support;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Service\Actions\TicketCustomerIds;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -66,6 +67,21 @@ class ContractScope
         return DataScope::covers($probe, $user, $permission, branch: null, customer: 'customer_id',
             own: fn () => self::ownsCustomer($user, $customerId),
             project: fn ($probe, array $contractIds) => in_array($customerId, self::projectCustomerIds($contractIds), true));
+    }
+
+    /**
+     * Whether a form needing $permission may be for the project: with scope "project" only the
+     * projects of the user's team (any while they are on no team), or the one already chosen.
+     * The same choice ContractOptions offers, checked again on the server.
+     */
+    public static function allowsProject(User $user, string $permission, int $contractId, ?int $current = null): bool
+    {
+        if ($contractId === $current || DataScope::of($user, $permission) !== PermissionCatalog::SCOPE_PROJECT) {
+            return true;
+        }
+        $teamIds = DataScope::projectIds($user);
+
+        return $teamIds === [] || in_array($contractId, $teamIds, true);
     }
 
     /**

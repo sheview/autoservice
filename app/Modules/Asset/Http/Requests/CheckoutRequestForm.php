@@ -4,6 +4,7 @@ namespace App\Modules\Asset\Http\Requests;
 
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Contract\Support\ContractScope;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Inventory\Actions\PurchaseRequestLabels;
 use App\Modules\Service\Actions\TicketsForCheckout;
@@ -50,7 +51,13 @@ class CheckoutRequestForm extends FormRequest
                     $fail(__('validation.exists', ['attribute' => __('asset.requests.fields.ticket_id')]));
                 }
             }],
-            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
+            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at'),
+                // With scope project: one of the user's team (as the form offers), or the one already chosen.
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (! ContractScope::allowsProject($this->user(), 'asset-checkouts.request', (int) $value, $this->route('checkout')?->contract_id)) {
+                        $fail(__('contract.members.not_in_team'));
+                    }
+                }],
             'purpose' => ['nullable', 'string', 'max:2000'],
             'needed_by' => ['nullable', 'date'],
             'submit' => ['boolean'],

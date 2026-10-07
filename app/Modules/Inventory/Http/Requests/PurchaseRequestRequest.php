@@ -2,6 +2,7 @@
 
 namespace App\Modules\Inventory\Http\Requests;
 
+use App\Modules\Contract\Support\ContractScope;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Platform\Support\Money;
@@ -59,7 +60,13 @@ class PurchaseRequestRequest extends FormRequest
 
         return [
             'item_name' => ['required', 'string', 'max:255'],
-            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at')],
+            'contract_id' => ['nullable', 'integer', Rule::exists('contracts', 'id')->whereNull('deleted_at'),
+                // With scope project: one of the user's team (as the form offers), or the one already chosen.
+                function (string $attribute, mixed $value, \Closure $fail) {
+                    if (! ContractScope::allowsProject($this->user(), 'purchase-requests.create', (int) $value, $this->route('purchase_request')?->contract_id)) {
+                        $fail(__('contract.members.not_in_team'));
+                    }
+                }],
             'description' => ['nullable', 'string', 'max:5000'],
             'quantity' => ['required', 'integer', 'min:1', 'max:100000'],
             'unit' => ['required', 'string', 'max:30'],
