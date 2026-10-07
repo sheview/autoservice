@@ -39,7 +39,7 @@ class InstallPlatformCommand extends Command
         $data = [
             'name' => $this->option('name') ?? $this->ask('Superadmin name'),
             'email' => strtolower((string) ($this->option('email') ?? $this->ask('Superadmin e-mail'))),
-            'password' => $this->option('password') ?? $this->secret('Password (at least 8 characters)'),
+            'password' => $this->option('password') ?? $this->secret('Password (at least 8 characters, upper and lower case, and a special character)'),
         ];
 
         $validator = Validator::make($data, [

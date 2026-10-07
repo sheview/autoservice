@@ -14,7 +14,7 @@ beforeEach(function () {
         'name' => 'บริษัท ไอทีเซอร์วิส จำกัด', 'subdomain' => 'itservice', 'status' => 'active',
         'subscription_starts_on' => '2026-07-01', 'subscription_ends_on' => '2027-06-30',
         'admin_name' => 'คุณสมชาย', 'admin_email' => 'admin@itservice.test',
-        'admin_password' => 'password-123', 'admin_password_confirmation' => 'password-123',
+        'admin_password' => 'Password-123', 'admin_password_confirmation' => 'Password-123',
     ];
 });
 
@@ -41,7 +41,7 @@ it('creates a customer company with its roles and first admin', function () {
 
     // the new admin can sign in to their company
     $this->post('/logout');
-    $this->post('/login', ['email' => 'admin@itservice.test', 'password' => 'password-123'])->assertRedirect(route('dashboard', absolute: false));
+    $this->post('/login', ['email' => 'admin@itservice.test', 'password' => 'Password-123'])->assertRedirect(route('dashboard', absolute: false));
 });
 
 it('validates the company and its admin', function () {

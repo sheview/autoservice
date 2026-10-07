@@ -55,7 +55,7 @@ it('lists only the users within the scope of users.view', function () {
         ->where('branches', fn ($branches) => collect($branches)->pluck('id')->all() === [$north->id]));
     // and only into their own branch
     $this->actingAs($manager)->post('/users', [
-        'name' => 'X', 'email' => 'x.south@example.com', 'password' => 'password-123', 'password_confirmation' => 'password-123',
+        'name' => 'X', 'email' => 'x.south@example.com', 'password' => 'Password-123', 'password_confirmation' => 'Password-123',
         'branch_id' => $south->id, 'role' => 'user',
     ])->assertSessionHasErrors('branch_id');
 
@@ -71,8 +71,8 @@ it('lets the admin create a user with a role and logs who did it', function () {
     $this->actingAs($this->admin)->post('/users', [
         'name' => 'New Tech',
         'email' => 'new.tech@example.com',
-        'password' => 'password-123',
-        'password_confirmation' => 'password-123',
+        'password' => 'Password-123',
+        'password_confirmation' => 'Password-123',
         'branch_id' => $branch->id,
         'service_lines' => ['network', 'pc'],
         'is_active' => true,
@@ -94,7 +94,7 @@ it('rejects an e-mail that another tenant already uses', function () {
 
     $this->actingAs($this->admin)->post('/users', [
         'name' => 'Dup', 'email' => 'taken@example.com',
-        'password' => 'password-123', 'password_confirmation' => 'password-123', 'role' => 'user',
+        'password' => 'Password-123', 'password_confirmation' => 'Password-123', 'role' => 'user',
     ])->assertSessionHasErrors('email');
 });
 
@@ -104,7 +104,7 @@ it('rejects a branch or role of another tenant', function () {
 
     $this->actingAs($this->admin)->post('/users', [
         'name' => 'X', 'email' => 'x@example.com',
-        'password' => 'password-123', 'password_confirmation' => 'password-123',
+        'password' => 'Password-123', 'password_confirmation' => 'Password-123',
         'branch_id' => $foreignBranch->id, 'role' => 'foreign_role',
     ])->assertSessionHasErrors(['branch_id', 'role']);
 });
@@ -137,7 +137,7 @@ it('keeps the name of a system role', function () {
 
 it('gives a customer account the customer role only', function () {
     $customer = createCustomer();
-    $payload = ['name' => 'Client', 'email' => 'client@example.com', 'password' => 'password-123', 'password_confirmation' => 'password-123'];
+    $payload = ['name' => 'Client', 'email' => 'client@example.com', 'password' => 'Password-123', 'password_confirmation' => 'Password-123'];
 
     $this->actingAs($this->admin)->post('/users', $payload + ['customer_id' => $customer->id, 'role' => 'user'])->assertSessionHasErrors('role');
     $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer_it'])->assertSessionHasErrors('customer_id');

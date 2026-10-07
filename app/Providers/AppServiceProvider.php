@@ -6,6 +6,7 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -23,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->limitPublicPages();
+
+        // Every new or changed password: at least 8 characters, upper and lower case, and a special character.
+        Password::defaults(fn () => Password::min(8)->mixedCase()->symbols());
     }
 
     /**

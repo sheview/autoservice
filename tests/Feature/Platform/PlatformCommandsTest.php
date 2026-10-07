@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Bus;
 use Spatie\Permission\Models\Permission;
 
 it('installs the platform tenant and its first superadmin', function () {
-    $this->artisan('platform:install', ['--name' => 'Owner', '--email' => 'Owner@Example.com', '--password' => 'password-123'])
+    $this->artisan('platform:install', ['--name' => 'Owner', '--email' => 'Owner@Example.com', '--password' => 'Password-123'])
         ->assertSuccessful();
 
     $platform = Tenant::where('is_platform', true)->sole();
@@ -21,8 +21,8 @@ it('installs the platform tenant and its first superadmin', function () {
     });
 
     // run again: the tenant is kept, a second superadmin is added, a used e-mail is refused
-    $this->artisan('platform:install', ['--name' => 'Second', '--email' => 'second@example.com', '--password' => 'password-123'])->assertSuccessful();
-    $this->artisan('platform:install', ['--name' => 'Again', '--email' => 'owner@example.com', '--password' => 'password-123'])->assertFailed();
+    $this->artisan('platform:install', ['--name' => 'Second', '--email' => 'second@example.com', '--password' => 'Password-123'])->assertSuccessful();
+    $this->artisan('platform:install', ['--name' => 'Again', '--email' => 'owner@example.com', '--password' => 'Password-123'])->assertFailed();
     $this->artisan('platform:install', ['--name' => 'Weak', '--email' => 'weak@example.com', '--password' => '123'])->assertFailed();
 
     expect(Tenant::where('is_platform', true)->count())->toBe(1)

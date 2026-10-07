@@ -57,14 +57,14 @@ it('really changes the password on reset (not silently blocked by RLS)', functio
         $this->post('/reset-password', [
             'token' => $notification->token,
             'email' => $user->email,
-            'password' => 'new-password-123',
-            'password_confirmation' => 'new-password-123',
+            'password' => 'New-password-123',
+            'password_confirmation' => 'New-password-123',
         ])->assertSessionHasNoErrors();
 
         return true;
     });
 
-    expect(Hash::check('new-password-123', $user->fresh()->password))->toBeTrue();
+    expect(Hash::check('New-password-123', $user->fresh()->password))->toBeTrue();
 });
 
 it('hides users of every tenant when no tenant is set, except to the login lookup', function () {

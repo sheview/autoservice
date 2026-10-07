@@ -24,7 +24,7 @@ it('logs every action of an impersonating superadmin with their real name', func
     $this->actingAs($this->superadmin)->get('/users')->assertOk();
     $this->actingAs($this->superadmin)->post('/users', [
         'name' => 'Made By Superadmin', 'email' => 'made@customer.test',
-        'password' => 'password-123', 'password_confirmation' => 'password-123', 'role' => 'user',
+        'password' => 'Password-123', 'password_confirmation' => 'Password-123', 'role' => 'user',
     ])->assertSessionHasNoErrors();
 
     // the user was created inside the customer tenant

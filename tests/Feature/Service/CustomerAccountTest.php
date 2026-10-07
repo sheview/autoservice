@@ -26,7 +26,7 @@ beforeEach(function () {
 });
 
 it('lets an admin create a customer account, and only with the customer role', function () {
-    $payload = ['name' => 'Beta IT', 'email' => 'it@beta.test', 'password' => 'password-123', 'password_confirmation' => 'password-123'];
+    $payload = ['name' => 'Beta IT', 'email' => 'it@beta.test', 'password' => 'Password-123', 'password_confirmation' => 'Password-123'];
 
     $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'customer_it'])->assertSessionHasErrors('customer_id');
     $this->actingAs($this->admin)->post('/users', $payload + ['role' => 'technician', 'customer_id' => $this->beta->id])->assertSessionHasErrors('role');

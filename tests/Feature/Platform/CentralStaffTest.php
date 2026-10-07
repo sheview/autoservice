@@ -75,7 +75,7 @@ it('lets central staff work but not configure the company', function () {
 
     // settings are closed: users, roles, categories, checklists, holidays, parts, imports
     $this->actingAs($this->centralHelpdesk)->get('/users')->assertForbidden();
-    $this->actingAs($this->centralHelpdesk)->post('/users', ['name' => 'X', 'email' => 'x@x.test', 'password' => 'password-123', 'password_confirmation' => 'password-123', 'role' => 'user'])->assertForbidden();
+    $this->actingAs($this->centralHelpdesk)->post('/users', ['name' => 'X', 'email' => 'x@x.test', 'password' => 'Password-123', 'password_confirmation' => 'Password-123', 'role' => 'user'])->assertForbidden();
     $this->actingAs($this->centralHelpdesk)->get('/roles')->assertForbidden();
     $this->actingAs($this->centralHelpdesk)->post('/asset-categories', ['name' => 'X', 'code_prefix' => 'X'])->assertForbidden();
     $this->actingAs($this->centralHelpdesk)->post('/holidays', ['date' => '2026-12-25', 'name' => 'X'])->assertForbidden();
