@@ -37,6 +37,11 @@ class PmVisitEvent extends Model
 
     public const TYPE_SHARE_DOWNLOADED = 'share_downloaded';
 
+    /** The technician's "arrived" / "left" taps on site. */
+    public const TYPE_ARRIVED = 'arrived';
+
+    public const TYPE_DEPARTED = 'departed';
+
     protected $fillable = ['pm_visit_id', 'type', 'from_status', 'to_status', 'note', 'data', 'user_id', 'user_name', 'created_at'];
 
     protected function casts(): array

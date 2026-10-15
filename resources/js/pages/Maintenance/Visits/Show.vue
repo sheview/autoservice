@@ -2,7 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import PmSharePanel, { type PmShare } from '@/components/PmSharePanel.vue';
-import PmVisitItemCard, { type PmItem } from '@/components/PmVisitItemCard.vue';
+import PmVisitItemCard, { type PmInstrumentOption, type PmItem } from '@/components/PmVisitItemCard.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
 import SignaturePad from '@/components/SignaturePad.vue';
 import StepProgress, { type Step } from '@/components/StepProgress.vue';
@@ -69,6 +69,8 @@ const props = defineProps<{
     items: PmItem[];
     assignees: { id: number; name: string }[] | null;
     priorities: string[];
+    instruments: PmInstrumentOption[];
+    notInspectedReasons: string[];
     moves: string[];
     needsNote: string[];
     signing: { technician: boolean; customer: boolean; review_step: boolean };
@@ -197,6 +199,9 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 <div class="flex flex-wrap gap-2">
                     <Button variant="outline" as-child>
                         <a :href="route('maintenance.visits.pdf', visit.ulid)" target="_blank" rel="noopener">{{ t('pm_visits.pdf') }}</a>
+                    </Button>
+                    <Button v-if="can.start || can.perform" variant="outline" as-child>
+                        <Link :href="route('maintenance.field.visit', visit.ulid)">{{ t('pm_visits.field_page') }}</Link>
                     </Button>
                     <Button v-if="can.start" @click="start">{{ t('pm_visits.start') }}</Button>
                     <Button v-for="action in allMoves" :key="action" :variant="moveVariant(action)" @click="pickMove(action)">
@@ -358,6 +363,8 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     :editable="can.perform"
                     :can-open-ticket="can.openTicket"
                     :priorities="priorities"
+                    :instruments="instruments"
+                    :not-inspected-reasons="notInspectedReasons"
                 />
             </section>
 

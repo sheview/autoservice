@@ -5,6 +5,7 @@ namespace App\Modules\Service\Actions;
 use App\Modules\Asset\Actions\LoansDueFor;
 use App\Modules\Contract\Actions\ContractMilestones;
 use App\Modules\Identity\Models\User;
+use App\Modules\Maintenance\Actions\MyPmWork;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Models\PersonalEvent;
 use App\Modules\Service\Models\Ticket;
@@ -12,13 +13,18 @@ use Carbon\CarbonImmutable;
 
 /**
  * A person's "my work": the tickets they are assigned (on their appointment day, else when the
- * fix is due, else when opened), what they borrowed and must give back, their own appointments,
+ * fix is due, else when opened), the PM work orders they are given (with how far along), what they borrowed and must give back, their own appointments,
  * and the days the contracts they may see start and end — on a month calendar, and as a to-do list of what is still open (overdue / today / this week / later).
  * Dates are days in the app's time zone (Y-m-d), so the page needs no time zone sums.
  */
 class MyWork
 {
-    public function __construct(private LoansDueFor $loansDueFor, private ContractMilestones $contractMilestones, private Modules $modules) {}
+    public function __construct(
+        private LoansDueFor $loansDueFor,
+        private ContractMilestones $contractMilestones,
+        private MyPmWork $myPmWork,
+        private Modules $modules,
+    ) {}
 
     /**
      * @param  CarbonImmutable  $from  first day shown on the calendar
@@ -122,7 +128,26 @@ class MyWork
             ])
             : collect();
 
-        $all = $tickets->concat($loans)->concat($personal)->concat($contracts);
+        // PM work orders still to do, on their appointment (else due) day, with the equipment done so far.
+        $pm = $this->modules->enabled('maintenance')
+            ? collect($this->myPmWork->handle($user))->map(fn (array $visit) => [
+                'key' => "pm-{$visit['id']}",
+                'kind' => 'pm',
+                'title' => trim($visit['visit_no'].' '.($visit['customer'] ?? $visit['title'] ?? '')),
+                'date' => $visit['date'],
+                'time' => null,
+                'when' => 'pm',
+                'status' => $visit['status'],
+                'priority' => null,
+                'open' => true,
+                'overdue' => $visit['overdue'],
+                'notes' => $visit['title'],
+                'progress' => ['done' => $visit['done'], 'total' => $visit['items']],
+                'href' => $visit['href'],
+            ])
+            : collect();
+
+        $all = $tickets->concat($pm)->concat($loans)->concat($personal)->concat($contracts);
         $inRange = fn (array $e) => $e['date'] >= $from->toDateString() && $e['date'] <= $to->toDateString();
 
         return [

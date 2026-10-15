@@ -8,6 +8,17 @@ return [
         'standard_added' => 'เพิ่ม Template มาตรฐาน :count ชุดแล้ว',
     ],
 
+    'field' => [
+        'arrived' => 'บันทึกเวลาถึงหน้างานแล้ว',
+        'departed' => 'บันทึกเวลาออกจากงานแล้ว',
+        'not_arrived' => 'ยังไม่ได้กด "ถึงหน้างาน"',
+    ],
+
+    'instruments' => [
+        'saved' => 'บันทึกเครื่องมือวัดแล้ว',
+        'deleted' => 'ลบเครื่องมือวัดแล้ว',
+    ],
+
     'templates' => [
         'not_draft' => 'Template ที่เผยแพร่แล้วแก้ไขไม่ได้ ให้สร้างเวอร์ชันใหม่',
         'no_items' => 'Template ต้องมีอย่างน้อย 1 รายการ',
@@ -133,6 +144,10 @@ return [
     'fields' => [
         'name' => 'ชื่อ Template',
         'code' => 'รหัส Template',
+        'instrument_id' => 'เครื่องมือวัด',
+        'not_inspected_reason' => 'เหตุผลที่ไม่ได้ตรวจ',
+        'serial_no' => 'Serial Number',
+        'calibration_due_at' => 'ครบกำหนดสอบเทียบ',
         'layout' => 'รูปแบบฟอร์ม',
         'service_line' => 'สายงาน',
         'asset_category_id' => 'หมวดทรัพย์สิน',

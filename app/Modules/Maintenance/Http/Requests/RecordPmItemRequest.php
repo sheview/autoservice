@@ -28,6 +28,9 @@ class RecordPmItemRequest extends FormRequest
             // A note per question, by key.
             'remarks' => ['nullable', 'array'],
             'remarks.*' => ['nullable', 'string', 'max:1000'],
+            // Why it was not inspected (details in note), and the measuring instrument used: one of the company's.
+            'not_inspected_reason' => [Rule::requiredIf($this->input('result') === PmVisitItem::RESULT_NOT_INSPECTED), 'nullable', Rule::in(PmVisitItem::NOT_INSPECTED_REASONS)],
+            'instrument_id' => ['nullable', 'integer', Rule::exists('pm_instruments', 'id')->whereNull('deleted_at')],
         ];
 
         return $rules + ChecklistItems::answerRules($item->checklist);

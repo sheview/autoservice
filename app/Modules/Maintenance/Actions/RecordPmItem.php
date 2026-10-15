@@ -13,14 +13,16 @@ use Illuminate\Validation\ValidationException;
  * revision). Only the keys of the item's checklist are kept, each as its type stores it
  * (ChecklistItems), with a note per question. Unless it was skipped, required questions must be
  * answered, and equipment with a failed question (a Fail, or a reading out of range) cannot be
- * recorded as fine.
+ * recorded as fine. Equipment not inspected says why. Saving clears the autosaved draft (SavePmItemDraft);
+ * saving again changes the same row (one per asset of the work order).
  */
 class RecordPmItem
 {
     public function __construct(private AssetDetails $assetDetails) {}
 
     /**
-     * @param  array{result: string, answers?: array<string, mixed>, remarks?: array<string, string|null>, note?: string|null}  $data  validated
+     * @param  array{result: string, answers?: array<string, mixed>, remarks?: array<string, string|null>, note?: string|null,
+     *     not_inspected_reason?: string|null, instrument_id?: int|null}  $data  validated
      */
     public function handle(PmVisitItem $item, User $actor, array $data): PmVisitItem
     {
@@ -51,6 +53,9 @@ class RecordPmItem
             'answers' => $answers,
             'remarks' => $remarks ?: null,
             'note' => $data['note'] ?? null,
+            'not_inspected_reason' => $data['result'] === PmVisitItem::RESULT_NOT_INSPECTED ? ($data['not_inspected_reason'] ?? null) : null,
+            'instrument_id' => $data['instrument_id'] ?? null,
+            'draft' => null,
             'checked_by' => $actor->id,
             'checked_at' => now(),
         ]);

@@ -49,6 +49,7 @@ return [
         'pm_customer_reports' => 'รายงานถึงลูกค้า',
         'pm_settings' => 'ตั้งค่า PM',
         'pm_plans' => 'แผน PM',
+        'pm_instruments' => 'เครื่องมือวัด',
         'pm_checklists' => 'Template PM',
         'labels' => 'พิมพ์ป้าย QR',
         'parts' => 'อะไหล่',
@@ -261,12 +262,15 @@ return [
         'nothing' => 'ไม่มีงานค้าง',
         'all' => 'ทั้งหมด',
         'kinds' => [
+            'pm' => 'ใบงาน PM',
             'ticket' => 'ใบงาน',
             'loan' => 'ของที่ต้องคืน',
             'personal' => 'นัดหมายส่วนตัว',
             'contract' => 'สัญญา',
         ],
+        'progress' => 'ตรวจแล้ว :done / :total เครื่อง',
         'when' => [
+            'pm' => 'PM',
             'appointment' => 'นัดเข้าหน้างาน',
             'due' => 'ครบกำหนดแก้ไข',
             'opened' => 'เปิดใบงาน',
@@ -521,6 +525,16 @@ return [
     ],
 
     // Sidebar sections (config/modules.php "group").
+    // The tab bar on top of a module's pages (config/modules.php "tab").
+    'nav_tabs' => [
+        'pm' => [
+            'overview' => 'ภาพรวม',
+            'plans' => 'แผน PM',
+            'visits' => 'ใบงาน PM',
+            'settings' => 'ตั้งค่า PM',
+        ],
+    ],
+
     'nav_groups' => [
         'service' => 'งานบริการ',
         'pm' => 'บำรุงรักษาเชิงป้องกัน (PM)',
@@ -2867,6 +2881,52 @@ return [
         'updated_at' => 'แก้ไขล่าสุด',
     ],
 
+    'pm_field' => [
+        'back' => 'กลับไปรายการเครื่อง',
+        'arrive' => 'ถึงหน้างาน',
+        'depart' => 'ออกจากงาน',
+        'arrived_at' => 'ถึง :time',
+        'departed_at' => 'ออก :time',
+        'progress' => 'ตรวจแล้ว :done / :total เครื่อง',
+        'search' => 'ค้นหารหัส ชื่อ Serial',
+        'no_place' => 'ไม่ระบุตำแหน่ง',
+        'floor' => 'ชั้น :floor',
+        'has_draft' => 'มีร่าง',
+        'start_hint' => 'กด "ถึงหน้างาน" เพื่อเริ่มงาน',
+        'not_working' => 'ใบงานนี้ไม่ได้อยู่ระหว่างทำ จึงกรอกผลไม่ได้',
+        'submit' => 'ไปหน้าส่งงานและลงนาม',
+        'equipment' => 'เครื่องที่ :index / :total',
+        'previous' => 'เครื่องก่อนหน้า',
+        'next' => 'เครื่องถัดไป',
+        'save_next' => 'บันทึกและไปเครื่องถัดไป',
+        'save' => 'บันทึกผล',
+        'pass_all' => 'ปกติทั้งหมด',
+        'pass_all_hint' => 'ตั้งทุกข้อที่ยังว่างเป็น "ปกติ"',
+        'instrument' => 'เครื่องมือวัด',
+        'no_instrument' => 'ไม่ได้ใช้',
+        'calibration_overdue' => 'เลยกำหนดสอบเทียบ',
+        'draft_saving' => 'กำลังบันทึกร่าง…',
+        'draft_saved' => 'บันทึกร่างแล้ว :time',
+        'draft_failed' => 'บันทึกร่างไม่สำเร็จ จะลองใหม่เมื่อแก้ไขครั้งถัดไป',
+        'draft_restored' => 'โหลดร่างที่ยังไม่ได้บันทึก (:time)',
+        'all_done' => 'ตรวจครบทุกเครื่องแล้ว',
+    ],
+
+    'pm_instruments' => [
+        'title' => 'เครื่องมือวัด',
+        'description' => 'ทะเบียนเครื่องมือวัดที่ช่างเลือกตอนบันทึกผล PM (Measurement Serial Number) พร้อมวันครบกำหนดสอบเทียบ',
+        'create' => 'เพิ่มเครื่องมือวัด',
+        'edit' => 'แก้ไขเครื่องมือวัด',
+        'name' => 'ชื่อเครื่องมือ',
+        'serial_no' => 'Serial Number',
+        'calibration_due_at' => 'ครบกำหนดสอบเทียบ',
+        'notes' => 'หมายเหตุ',
+        'search_placeholder' => 'ค้นหาชื่อหรือ Serial',
+        'due_filter' => 'ครบกำหนดใน 30 วัน / เลยกำหนด',
+        'calibration' => ['ok' => 'ปกติ', 'soon' => 'ใกล้ครบกำหนด', 'overdue' => 'เลยกำหนด'],
+        'confirm_delete' => 'ลบ ":name"?',
+    ],
+
     'pm_plans' => [
         'title' => 'แผน PM',
         'description' => 'แผนบำรุงรักษาตามสัญญา ระบบแบ่งอายุสัญญาเป็นรอบ ๆ และสร้างรอบ PM ให้อัตโนมัติ',
@@ -2953,6 +3013,14 @@ return [
         'open_ticket' => 'เปิดใบงานซ่อม',
         'ticket' => 'ใบงาน',
         'pdf' => 'รายงาน PM (PDF)',
+        'field_page' => 'เปิดหน้ากรอกบนมือถือ',
+        'not_inspected_reason' => 'เหตุผลที่ไม่ได้ตรวจ',
+        'not_inspected_reasons' => [
+            'user_absent' => 'ผู้ใช้ไม่อยู่',
+            'sent_for_repair' => 'เครื่องส่งซ่อม',
+            'not_found' => 'ไม่พบเครื่อง',
+            'other' => 'อื่น ๆ (ระบุในหมายเหตุ)',
+        ],
         'results' => [
             'pending' => 'ยังไม่ตรวจ',
             'passed' => 'ปกติ',
@@ -3043,6 +3111,8 @@ return [
             'reopen' => 'เปิดกลับมาแก้ไข',
             'cancel' => 'ยกเลิก',
             'item_added' => 'เพิ่มอุปกรณ์',
+            'arrived' => 'ถึงหน้างาน',
+            'departed' => 'ออกจากงาน',
             'item_removed' => 'นำอุปกรณ์ออก',
             'signed' => 'เซ็นชื่อ',
             'version_created' => 'สร้างรายงานเวอร์ชันใหม่',

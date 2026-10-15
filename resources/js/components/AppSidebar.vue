@@ -98,9 +98,20 @@ const icons: Record<string, LucideIcon> = {
 };
 
 // Built on the server from config/modules.php (permission + enabled modules).
-const mainNavItems = computed<NavItem[]>(() =>
-    page.props.navigation.map((item) => ({ title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group })),
-);
+// Items of a tab set ("pm.overview", "pm.plans", ...) are one entry here, the first the user may open;
+// the others are tabs on top of the pages (ModuleTabs).
+const mainNavItems = computed<NavItem[]>(() => {
+    const sets = new Set<string>();
+    return page.props.navigation
+        .filter((item) => {
+            const set = item.tab?.split('.')[0];
+            if (!set) return true;
+            if (sets.has(set)) return false;
+            sets.add(set);
+            return true;
+        })
+        .map((item) => ({ title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group }));
+});
 </script>
 
 <template>

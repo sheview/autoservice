@@ -5,6 +5,8 @@ use App\Modules\Maintenance\Http\Controllers\PmChecklistController;
 use App\Modules\Maintenance\Http\Controllers\PmCustomerReportController;
 use App\Modules\Maintenance\Http\Controllers\PmDashboardController;
 use App\Modules\Maintenance\Http\Controllers\PmEquipmentController;
+use App\Modules\Maintenance\Http\Controllers\PmFieldController;
+use App\Modules\Maintenance\Http\Controllers\PmInstrumentController;
 use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
 use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
@@ -43,6 +45,18 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::get('pm-reports', [PmDashboardController::class, 'reports'])->name('reports.index');
     Route::get('pm-equipment', [PmEquipmentController::class, 'index'])->name('equipment.index');
     Route::get('pm-customer-reports', [PmCustomerReportController::class, 'index'])->name('customer-reports.index');
+    Route::resource('pm-instruments', PmInstrumentController::class)->only(['index', 'store', 'update', 'destroy'])
+        ->names('instruments')->parameters(['pm-instruments' => 'instrument']);
+
+    // A work order on the technician's phone (PmFieldController).
+    Route::get('pm-work/{visit}', [PmFieldController::class, 'visit'])->name('field.visit');
+    Route::post('pm-work/{visit}/arrive', [PmFieldController::class, 'arrive'])->name('field.arrive');
+    Route::post('pm-work/{visit}/depart', [PmFieldController::class, 'depart'])->name('field.depart');
+    Route::scopeBindings()->group(function () {
+        Route::get('pm-work/{visit}/items/{item}', [PmFieldController::class, 'item'])->name('field.item');
+        Route::put('pm-work/{visit}/items/{item}/draft', [PmFieldController::class, 'draft'])->name('field.draft');
+    });
+
     Route::get('pm-settings', [PmSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('pm-settings', [PmSettingsController::class, 'update'])->name('settings.update');
 

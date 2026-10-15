@@ -70,7 +70,7 @@ class Modules
      * @param  iterable<string>  $permissions  the permission names the UI already received
      * @param  bool  $customerAccount  hide items marked "staff" (pages a customer account may not open)
      * @param  User|null  $user  for items marked "shared": shown only when another company shares that with them
-     * @return list<array{title: string, href: string, icon: string, group: string|null}>
+     * @return list<array{title: string, href: string, icon: string, group: string|null, tab: string|null}>
      */
     public function navigation(iterable $permissions, bool $customerAccount = false, ?User $user = null): array
     {
@@ -105,6 +105,7 @@ class Modules
                 'href' => route($item['route'], absolute: false),
                 'icon' => $item['icon'],
                 'group' => isset($item['group']) ? __("ui.nav_groups.{$item['group']}") : null,
+                'tab' => $item['tab'] ?? null,
             ];
         }
 

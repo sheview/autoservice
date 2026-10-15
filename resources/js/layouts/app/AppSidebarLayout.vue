@@ -4,6 +4,7 @@ import AppShell from '@/components/AppShell.vue';
 import AppSidebar from '@/components/AppSidebar.vue';
 import AppSidebarHeader from '@/components/AppSidebarHeader.vue';
 import ImpersonationBanner from '@/components/ImpersonationBanner.vue';
+import ModuleTabs from '@/components/ModuleTabs.vue';
 import SubscriptionNotice from '@/components/SubscriptionNotice.vue';
 import type { BreadcrumbItemType } from '@/types';
 
@@ -23,6 +24,7 @@ withDefaults(defineProps<Props>(), {
             <ImpersonationBanner />
             <SubscriptionNotice />
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
+            <ModuleTabs />
             <slot />
         </AppContent>
     </AppShell>

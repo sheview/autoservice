@@ -117,7 +117,7 @@ it('records Pass / Fail / N/A, readings against their range, a note per question
     $record(['result' => 'passed', 'answers' => ['battery' => 'maybe']])->assertSessionHasErrors('answers.battery');
     // The required question must be answered (unless the equipment is skipped).
     $record(['result' => 'passed', 'answers' => ['volt' => 220]])->assertSessionHasErrors('answers');
-    $record(['result' => 'not_inspected', 'note' => 'ปิดเครื่องอยู่'])->assertSessionHasNoErrors();
+    $record(['result' => 'not_inspected', 'not_inspected_reason' => 'other', 'note' => 'ปิดเครื่องอยู่'])->assertSessionHasNoErrors();
     // A reading out of range is a fail: the equipment cannot be fine.
     $record(['result' => 'passed', 'answers' => ['battery' => 'pass', 'volt' => 250]])->assertSessionHasErrors('result');
     $record(['result' => 'passed', 'answers' => ['battery' => 'fail', 'volt' => 220]])->assertSessionHasErrors('result');

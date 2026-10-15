@@ -14,7 +14,7 @@ import { computed, ref } from 'vue';
 
 interface WorkItem {
     key: string;
-    kind: 'ticket' | 'loan' | 'personal' | 'contract';
+    kind: 'ticket' | 'pm' | 'loan' | 'personal' | 'contract';
     id?: number;
     title: string;
     date: string;
@@ -31,6 +31,8 @@ interface WorkItem {
     href: string | null;
     // Tickets only: the one-page close, while the job can be closed there.
     close_href?: string | null;
+    // PM work orders: equipment recorded / on it.
+    progress?: { done: number; total: number };
 }
 
 const props = defineProps<{
@@ -89,11 +91,12 @@ const buckets = computed(() => [
 ]);
 
 // --- colours: few, by kind (a contract's start and end apart); an overdue job stands out ---
-const tones = ['ticket', 'loan', 'personal', 'contract_start', 'contract_end'] as const;
+const tones = ['ticket', 'pm', 'loan', 'personal', 'contract_start', 'contract_end'] as const;
 type Tone = (typeof tones)[number];
 const toneOf = (item: WorkItem): Tone => (item.kind === 'contract' ? (item.when as Tone) : item.kind);
 const toneChip: Record<Tone, string> = {
     ticket: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100',
+    pm: 'bg-teal-100 text-teal-900 dark:bg-teal-950 dark:text-teal-100',
     loan: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100',
     personal: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
     contract_start: 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-100',
@@ -101,6 +104,7 @@ const toneChip: Record<Tone, string> = {
 };
 const toneDot: Record<Tone, string> = {
     ticket: 'bg-sky-500',
+    pm: 'bg-teal-500',
     loan: 'bg-amber-500',
     personal: 'bg-emerald-500',
     contract_start: 'bg-violet-500',
@@ -211,6 +215,17 @@ const timeText = (item: WorkItem) =>
                                                     })
                                                 }}
                                                 <template v-if="timeText(item)"> {{ timeText(item) }}</template>
+                                            </span>
+                                            <span v-if="item.progress" class="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+                                                <span class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                                    <span
+                                                        class="block h-full rounded-full bg-teal-500"
+                                                        :style="{
+                                                            width: `${item.progress.total ? (item.progress.done / item.progress.total) * 100 : 0}%`,
+                                                        }"
+                                                    />
+                                                </span>
+                                                {{ t('my_work.progress', { done: item.progress.done, total: item.progress.total }) }}
                                             </span>
                                         </span>
                                         <TicketStatusBadge v-if="item.kind === 'ticket' && item.status" :status="item.status" />

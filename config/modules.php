@@ -44,15 +44,20 @@ return [
         ['group' => 'service', 'title' => 'nav.ip_check', 'route' => 'asset.ip-check', 'icon' => 'network', 'permission' => 'ip-check.view', 'module' => 'asset', 'staff' => true],
 
         // Preventive maintenance: plans cut into work orders, checked, approved and reported to customers.
-        ['group' => 'pm', 'title' => 'nav.pm_dashboard', 'route' => 'maintenance.dashboard', 'icon' => 'gauge', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'title' => 'nav.pm_schedule', 'route' => 'maintenance.calendar', 'icon' => 'calendar-check', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'title' => 'nav.pm_equipment', 'route' => 'maintenance.equipment.index', 'icon' => 'hard-drive', 'permission' => ['pm-visits.view'], 'module' => ['maintenance', 'asset'], 'staff' => true],
-        ['group' => 'pm', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
+        // "tab" = shown as a tab bar on top of the pages ("{set}.{tab}"): the sidebar keeps only the first
+        // item of the set the user may open, the others are tabs (ภาพรวม / แผน PM / ใบงาน PM / ตั้งค่า PM)
+        // and, within a tab, sub-tabs. A customer account only has its reports.
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_dashboard', 'route' => 'maintenance.dashboard', 'icon' => 'gauge', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
         // Customer accounts see their own customer's published reports here.
-        ['group' => 'pm', 'title' => 'nav.pm_customer_reports', 'route' => 'maintenance.customer-reports.index', 'icon' => 'file-text', 'permission' => 'pm-reports.view', 'module' => 'maintenance'],
-        ['group' => 'pm', 'title' => 'nav.pm_settings', 'route' => 'maintenance.settings.edit', 'icon' => 'settings', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true, 'company' => true],
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_customer_reports', 'route' => 'maintenance.customer-reports.index', 'icon' => 'file-text', 'permission' => 'pm-reports.view', 'module' => 'maintenance'],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'calendar-check', 'permission' => 'pm-plans.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_schedule', 'route' => 'maintenance.calendar', 'icon' => 'calendar-check', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_equipment', 'route' => 'maintenance.equipment.index', 'icon' => 'hard-drive', 'permission' => ['pm-visits.view'], 'module' => ['maintenance', 'asset'], 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_instruments', 'route' => 'maintenance.instruments.index', 'icon' => 'gauge', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_settings', 'route' => 'maintenance.settings.edit', 'icon' => 'settings', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true, 'company' => true],
 
         ['group' => 'assets', 'title' => 'nav.assets', 'route' => 'asset.assets.index', 'icon' => 'hard-drive', 'permission' => 'assets.view', 'module' => 'asset'],
         ['group' => 'assets', 'title' => 'nav.checkouts', 'route' => 'asset.requests.index', 'icon' => 'hand-helping', 'permission' => 'asset-checkouts.view', 'module' => 'asset', 'staff' => true],

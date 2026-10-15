@@ -5,11 +5,13 @@ import PmResultBadge from '@/components/PmResultBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { usePmItemForm } from '@/composables/usePmItemForm';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
-import { failures as failuresOf, formAnswer, sectionsOf, type Answer, type TemplateField } from '@/lib/pmTemplate';
+import type { PmItemDraft } from '@/lib/pmDraftStore';
+import { sectionsOf, type Answer, type TemplateField } from '@/lib/pmTemplate';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { Camera, MessageSquarePlus, Trash2, X } from 'lucide-vue-next';
+import { Camera, CheckCheck, MessageSquarePlus, Trash2, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /** A field of the item's copy of its template (see resources/js/lib/pmTemplate.ts). */
@@ -29,31 +31,56 @@ export interface PmItem {
     checked_at: string | null;
     photos: { id: number; name: string; url: string; question: string | null }[];
     removable: boolean;
+    // what was typed and not saved yet (autosave), the instrument used, why it was not inspected
+    draft?: (PmItemDraft & { saved_at?: string }) | null;
+    instrument_id?: number | null;
+    not_inspected_reason?: string | null;
 }
 
-const props = defineProps<{
-    item: PmItem;
-    visitUlid: string;
-    editable: boolean;
-    canOpenTicket: boolean;
-    priorities: string[];
-}>();
+export interface PmInstrumentOption {
+    id: number;
+    name: string;
+    serial_no: string;
+    calibration_due_at: string | null;
+    calibration_overdue: boolean;
+}
+
+const props = withDefaults(
+    defineProps<{
+        item: PmItem;
+        visitUlid: string;
+        editable: boolean;
+        canOpenTicket: boolean;
+        priorities: string[];
+        instruments?: PmInstrumentOption[];
+        notInspectedReasons?: string[];
+        // the field page: big controls, and "save and go to the next one" when there is a next one
+        nextUrl?: string | null;
+    }>(),
+    { instruments: () => [], notInspectedReasons: () => [], nextUrl: null },
+);
 
 const results = ['passed', 'failed', 'not_inspected'];
 
-const form = useForm({
-    result: props.item.result === 'pending' ? 'passed' : props.item.result,
-    answers: Object.fromEntries(props.item.checklist.map((q) => [q.key, formAnswer(q, props.item.answers[q.key])])) as Record<string, Answer>,
-    remarks: Object.fromEntries(props.item.checklist.map((q) => [q.key, props.item.remarks?.[q.key] ?? ''])) as Record<string, string>,
-    note: props.item.note ?? '',
+// The form, its draft autosave and "ปกติทั้งหมด" (resources/js/composables/usePmItemForm.ts).
+const {
+    form,
+    failures,
+    passAll,
+    save: saveItem,
+    draftState,
+    draftSavedAt,
+    restoredDraft,
+} = usePmItemForm(props.item, props.visitUlid, {
+    autosave: props.editable,
 });
-const save = () => form.put(route('maintenance.visits.items.update', [props.visitUlid, props.item.id]), { preserveScroll: true });
+const save = (next = false) => saveItem(next && props.nextUrl ? () => router.visit(props.nextUrl!) : undefined);
+const timeOf = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '');
 
 // A question's remark box opens when asked for, or when it already has one.
 const remarkOpen = ref<Record<string, boolean>>(Object.fromEntries(props.item.checklist.map((q) => [q.key, !!props.item.remarks?.[q.key]])));
 
-// What failed so far (as ChecklistItems::failures on the server), and the fields under their headings.
-const failures = computed(() => failuresOf(props.item.checklist, form.answers));
+// The fields under their headings.
 const sections = computed(() => sectionsOf(props.item.checklist));
 const assetValues = computed(() => (props.item.asset ?? {}) as Record<string, string | null>);
 
@@ -91,7 +118,7 @@ const photosOf = (question: string | null) => props.item.photos.filter((p) => (p
 const errorOf = (key: string) => (form.errors as Record<string, string>)[key];
 // A table's errors come per cell (answers.key.row.column).
 const firstErrorUnder = (prefix: string) => Object.entries(form.errors as Record<string, string>).find(([key]) => key.startsWith(prefix))?.[1];
-const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
+const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
 
 <template>
@@ -146,7 +173,31 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         </div>
 
         <!-- Recording -->
-        <form v-if="editable" class="space-y-4" @submit.prevent="save">
+        <form v-if="editable" class="space-y-4" @submit.prevent="save()">
+            <p v-if="restoredDraft" class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                {{ t('pm_field.draft_restored', { time: dateTime(restoredDraft) }) }}
+            </p>
+            <div class="flex flex-wrap items-end gap-3">
+                <div v-if="instruments.length" class="grid min-w-48 flex-1 gap-1">
+                    <label :for="`instrument_${item.id}`" class="text-xs text-muted-foreground">{{ t('pm_field.instrument') }}</label>
+                    <select :id="`instrument_${item.id}`" v-model="form.instrument_id" :class="selectClass">
+                        <option :value="null">{{ t('pm_field.no_instrument') }}</option>
+                        <option v-for="instrument in instruments" :key="instrument.id" :value="instrument.id">
+                            {{ instrument.name }} · {{ instrument.serial_no
+                            }}{{ instrument.calibration_overdue ? ` (${t('pm_field.calibration_overdue')})` : '' }}
+                        </option>
+                    </select>
+                    <InputError :message="errorOf('instrument_id')" />
+                </div>
+                <Button type="button" variant="outline" :title="t('pm_field.pass_all_hint')" @click="passAll">
+                    <CheckCheck class="mr-1 h-4 w-4" />{{ t('pm_field.pass_all') }}
+                </Button>
+                <span class="ml-auto text-xs text-muted-foreground" aria-live="polite">
+                    <template v-if="draftState === 'saving'">{{ t('pm_field.draft_saving') }}</template>
+                    <template v-else-if="draftState === 'saved'">{{ t('pm_field.draft_saved', { time: timeOf(draftSavedAt) }) }}</template>
+                    <span v-else-if="draftState === 'failed'" class="text-red-600">{{ t('pm_field.draft_failed') }}</span>
+                </span>
+            </div>
             <p v-if="item.checklist.length === 0" class="text-xs text-muted-foreground">{{ t('pm_visits.no_checklist') }}</p>
             <div v-for="(section, s) in sections" :key="s" class="space-y-2">
                 <h4 v-if="section.title" class="border-b pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -218,13 +269,28 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ t('pm_visits.failures_hint', { items: failures.join(', ') }) }}
             </p>
 
-            <div class="flex flex-wrap gap-4">
-                <label v-for="result in results" :key="result" class="flex items-center gap-2 text-sm">
+            <div class="flex flex-wrap gap-2" role="radiogroup">
+                <label
+                    v-for="result in results"
+                    :key="result"
+                    class="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-4 text-sm"
+                    :class="form.result === result ? 'border-primary bg-primary/10 font-semibold' : 'hover:bg-muted'"
+                >
                     <input v-model="form.result" type="radio" :value="result" class="size-4" />
                     {{ t(`pm_visits.results.${result}`) }}
                 </label>
             </div>
             <InputError :message="form.errors.result" />
+            <div v-if="form.result === 'not_inspected'" class="grid gap-1 sm:max-w-xs">
+                <label :for="`reason_${item.id}`" class="text-sm">{{ t('pm_visits.not_inspected_reason') }}</label>
+                <select :id="`reason_${item.id}`" v-model="form.not_inspected_reason" :class="selectClass" required>
+                    <option :value="null"></option>
+                    <option v-for="reason in notInspectedReasons" :key="reason" :value="reason">
+                        {{ t(`pm_visits.not_inspected_reasons.${reason}`) }}
+                    </option>
+                </select>
+                <InputError :message="errorOf('not_inspected_reason')" />
+            </div>
 
             <div class="grid gap-1">
                 <label :for="`note_${item.id}`" class="text-sm">{{
@@ -240,7 +306,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <InputError :message="form.errors.note" />
             </div>
 
-            <Button size="sm" :disabled="form.processing">{{ t('pm_visits.save_item') }}</Button>
+            <div class="flex flex-wrap gap-2">
+                <Button :size="nextUrl === null ? 'sm' : 'default'" :variant="nextUrl ? 'outline' : 'default'" :disabled="form.processing">
+                    {{ t('pm_visits.save_item') }}
+                </Button>
+                <Button v-if="nextUrl" type="button" :disabled="form.processing" @click="save(true)">{{ t('pm_field.save_next') }}</Button>
+            </div>
         </form>
 
         <!-- Read only -->

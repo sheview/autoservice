@@ -12,6 +12,7 @@ use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Actions\MovePmVisit;
 use App\Modules\Maintenance\Actions\OpenTicketFromPmItem;
+use App\Modules\Maintenance\Actions\PmInstrumentOptions;
 use App\Modules\Maintenance\Actions\RecordPmItem;
 use App\Modules\Maintenance\Actions\SearchPmVisits;
 use App\Modules\Maintenance\Actions\StartPmVisit;
@@ -130,7 +131,7 @@ class PmVisitController extends Controller
                 'asset' => isset($assets[$item->asset_id]) ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name'])->all(), 'can_view' => $user->can('assets.view')] : null,
                 'ticket' => null, 'checked_by' => null, 'checked_at' => null, 'removable' => false,
             ] : [
-                ...$item->only(['id', 'result', 'answers', 'note', 'checklist']),
+                ...$item->only(['id', 'result', 'answers', 'note', 'checklist', 'draft', 'instrument_id', 'not_inspected_reason']),
                 // The register values too: fields of the template that show them (readonly_from_asset).
                 'asset' => isset($assets[$item->asset_id])
                     ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name', ...ChecklistItems::ASSET_SOURCES])->all(), 'can_view' => $user->can('assets.view')]
@@ -148,6 +149,8 @@ class PmVisitController extends Controller
                 // Equipment with nothing recorded may still be taken off a work order that is still to do.
                 'removable' => $canEditItems && $item->result === PmVisitItem::RESULT_PENDING && $item->ticket_id === null && ! $item->hasMedia(PmVisitItem::PHOTOS),
             ]),
+            'instruments' => fn () => $canPerform ? app(PmInstrumentOptions::class)->handle() : [],
+            'notInspectedReasons' => PmVisitItem::NOT_INSPECTED_REASONS,
             // ?asset_search= : equipment of the customer that may still be put on the work order.
             'assetSearch' => $request->string('asset_search')->trim()->value(),
             'candidates' => fn () => $canEditItems && $request->filled('asset_search') && $this->modules->enabled('asset')

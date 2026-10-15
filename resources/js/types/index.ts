@@ -28,7 +28,8 @@ export interface SharedData {
     /** Companies this person also works in (one account each); empty for most people. */
     companies: { ulid: string; name: string; current: boolean }[];
     /** Sidebar items built on the server from config/modules.php; icon is a lucide icon name. */
-    navigation: { title: string; href: string; icon: string; group: string | null }[];
+    // tab: "{set}.{tab}" — shown as a tab bar on top of the pages of the set (ModuleTabs), not in the sidebar
+    navigation: { title: string; href: string; icon: string; group: string | null; tab: string | null }[];
     flash: { success: string | null; error: string | null; warning?: string | null };
     /** The company's paid period; null for the platform tenant and customer accounts. */
     subscription: {

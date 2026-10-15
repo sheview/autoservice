@@ -20,7 +20,7 @@ it('builds the sidebar from config, filtered by permission', function () {
             ->toBe([
                 'หน้าหลัก',
                 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
-                'ภาพรวม PM', 'ตาราง PM (Schedule)', 'ใบงาน PM (Work Orders)', 'อุปกรณ์ในแผน PM', 'Template PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'ตั้งค่า PM',
+                'ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'แผน PM', 'ตาราง PM (Schedule)', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'Template PM', 'เครื่องมือวัด', 'ตั้งค่า PM',
                 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
                 'ลูกค้า', 'สัญญา MA',
                 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
@@ -37,7 +37,7 @@ it('builds the sidebar from config, filtered by permission', function () {
     $this->actingAs(userWithRole('technician'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe([
             'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
-            'ภาพรวม PM', 'ตาราง PM (Schedule)', 'ใบงาน PM (Work Orders)', 'อุปกรณ์ในแผน PM', 'Template PM', 'รายงาน PM',
+            'ภาพรวม PM', 'รายงาน PM', 'แผน PM', 'ตาราง PM (Schedule)', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'Template PM',
             'ทรัพย์สิน', 'เบิก / ยืม', 'พิมพ์ป้าย QR',
             'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'สรุปรายบุคคล', 'ผลประเมินความพึงพอใจ', 'คู่มือ',
         ]));
@@ -103,4 +103,14 @@ it('forbids a customer admin and an impersonating superadmin from switching modu
         ->assertForbidden();
 
     expect(app(Modules::class)->enabled('asset', $this->customer))->toBeTrue();
+});
+
+it('puts the PM pages under four tabs, and gives a customer account only its reports', function () {
+    $this->actingAs(userWithRole('admin_company'))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('navigation', fn ($items) => collect($items)->whereNotNull('tab')->pluck('tab')->unique()->values()->all()
+            === ['pm.overview', 'pm.plans', 'pm.visits', 'pm.settings']));
+
+    $customer = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
+    $this->actingAs($customer)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('navigation', fn ($items) => collect($items)->whereNotNull('tab')->pluck('title')->all() === ['รายงานถึงลูกค้า']));
 });

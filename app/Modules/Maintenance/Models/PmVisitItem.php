@@ -41,7 +41,7 @@ class PmVisitItem extends Model implements HasMedia
 
     protected $fillable = [
         'asset_id', 'pm_checklist_id', 'template_code', 'template_version', 'checklist', 'result', 'not_inspected_reason',
-        'answers', 'remarks', 'instrument_id', 'note', 'ticket_id', 'checked_by', 'checked_at',
+        'answers', 'remarks', 'draft', 'instrument_id', 'note', 'ticket_id', 'checked_by', 'checked_at',
     ];
 
     protected $attributes = [
@@ -56,6 +56,7 @@ class PmVisitItem extends Model implements HasMedia
             'checklist' => 'array',
             'answers' => 'array',
             'remarks' => 'array',
+            'draft' => 'array',
             'template_version' => 'integer',
             'checked_at' => 'datetime',
         ];
