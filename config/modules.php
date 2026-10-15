@@ -49,14 +49,15 @@ return [
         // and, within a tab, sub-tabs. A customer account only has its reports.
         // The PM menu is for those who run the work; technicians work from "งานของฉัน" (the
         // work orders and the field pages still open by their own permissions).
+        // "pinned": also in the sidebar (used every day), besides the set's first page.
         ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_dashboard', 'route' => 'maintenance.dashboard', 'icon' => 'gauge', 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'pinned' => true, 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
         // Customer accounts see their own customer's published reports here.
         ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_customer_reports', 'route' => 'maintenance.customer-reports.index', 'icon' => 'file-text', 'permission' => 'pm-reports.view', 'module' => 'maintenance'],
-        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'calendar-check', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_schedule', 'route' => 'maintenance.calendar', 'icon' => 'calendar-check', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'calendar-check', 'pinned' => true, 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_schedule', 'route' => 'maintenance.calendar', 'icon' => 'calendar-days', 'pinned' => true, 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_equipment', 'route' => 'maintenance.equipment.index', 'icon' => 'hard-drive', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => ['maintenance', 'asset'], 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'permission' => ['pm-visits.create', 'pm-visits.review', 'pm-visits.approve'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'pinned' => true, 'permission' => ['pm-visits.create', 'pm-visits.review', 'pm-visits.approve'], 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.manage', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_instruments', 'route' => 'maintenance.instruments.index', 'icon' => 'gauge', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_settings', 'route' => 'maintenance.settings.edit', 'icon' => 'settings', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true, 'company' => true],

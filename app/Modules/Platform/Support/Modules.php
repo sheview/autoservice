@@ -106,6 +106,8 @@ class Modules
                 'icon' => $item['icon'],
                 'group' => isset($item['group']) ? __("ui.nav_groups.{$item['group']}") : null,
                 'tab' => $item['tab'] ?? null,
+                // A page of a tab set kept in the sidebar too (used often).
+                'pinned' => (bool) ($item['pinned'] ?? false),
             ];
         }
 

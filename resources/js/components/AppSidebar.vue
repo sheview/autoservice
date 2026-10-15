@@ -99,27 +99,35 @@ const icons: Record<string, LucideIcon> = {
 };
 
 // Built on the server from config/modules.php (permission + enabled modules).
-// Items of a tab set ("pm.overview", "pm.plans", ...) are one entry here, the first the user may open;
-// the others are tabs on top of the pages (ModuleTabs). A set named in nav_sets (settings) shows that
-// name and a gear instead of its first page's.
+// Items of a tab set ("pm.overview", "pm.plans", ...) are one entry here, the first the user may open,
+// plus the pages pinned in config (used every day); the others are tabs on top of the pages
+// (ModuleTabs). Each page of a set marks one entry current: its pinned page, else a pinned page of
+// its tab, else the set's entry. A set named in nav_sets (settings) shows that name and a gear.
 const mainNavItems = computed<NavItem[]>(() => {
+    const navigation = page.props.navigation;
+    const setOf = (item: { tab: string | null }) => item.tab?.split('.')[0] ?? null;
     const sets = new Set<string>();
-    return page.props.navigation
-        .filter((item) => {
-            const set = item.tab?.split('.')[0];
-            if (!set) return true;
-            if (sets.has(set)) return false;
-            sets.add(set);
-            return true;
-        })
-        .map((item) => {
-            const set = item.tab?.split('.')[0];
-            const named = set ? t(`nav_sets.${set}`) : '';
-            const also = set ? page.props.navigation.filter((other) => other.tab?.split('.')[0] === set).map((other) => other.href) : [];
-            return named && named !== `nav_sets.${set}`
-                ? { title: named, href: item.href, icon: Settings, group: item.group, also }
-                : { title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group, also };
-        });
+    const shown = navigation.filter((item) => {
+        const set = setOf(item);
+        if (!set || item.pinned) return true;
+        if (sets.has(set)) return false;
+        sets.add(set);
+        return true;
+    });
+    // The entry each page of a set belongs to.
+    const owner = (item: (typeof navigation)[number]) =>
+        item.pinned
+            ? item
+            : (shown.find((entry) => entry.pinned && entry.tab === item.tab) ?? shown.find((entry) => !entry.pinned && setOf(entry) === setOf(item)));
+
+    return shown.map((item) => {
+        const set = setOf(item);
+        const also = set ? navigation.filter((other) => setOf(other) === set && owner(other) === item).map((other) => other.href) : [];
+        const named = set && !item.pinned ? t(`nav_sets.${set}`) : '';
+        return named && named !== `nav_sets.${set}`
+            ? { title: named, href: item.href, icon: Settings, group: item.group, also }
+            : { title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group, also };
+    });
 });
 </script>
 

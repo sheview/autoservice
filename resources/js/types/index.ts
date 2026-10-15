@@ -31,7 +31,8 @@ export interface SharedData {
     companies: { ulid: string; name: string; current: boolean }[];
     /** Sidebar items built on the server from config/modules.php; icon is a lucide icon name. */
     // tab: "{set}.{tab}" — shown as a tab bar on top of the pages of the set (ModuleTabs), not in the sidebar
-    navigation: { title: string; href: string; icon: string; group: string | null; tab: string | null }[];
+    // pinned: a page of a tab set that stays in the sidebar too
+    navigation: { title: string; href: string; icon: string; group: string | null; tab: string | null; pinned: boolean }[];
     flash: { success: string | null; error: string | null; warning?: string | null };
     /** The company's paid period; null for the platform tenant and customer accounts. */
     subscription: {
