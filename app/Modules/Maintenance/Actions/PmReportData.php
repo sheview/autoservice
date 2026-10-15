@@ -63,7 +63,9 @@ class PmReportData
 
         return [
             'visit' => [
-                ...$visit->only(['visit_no', 'round', 'summary']),
+                ...$visit->only(['visit_no', 'summary']),
+                // A revision has the round of the work order it corrects.
+                'round' => $visit->round ?? $visit->revisionOf?->round,
                 'title' => $visit->displayTitle(),
                 'customer' => $customer ? ['name' => $customer['name'], 'code' => $customer['code']] : null,
                 'contract_no' => $contract['contract_no'] ?? null,

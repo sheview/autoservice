@@ -33,8 +33,11 @@ const props = defineProps<{
         assignee: string | null;
         starts_on: string;
         ends_on: string;
+        active: boolean;
+        assets: { asset_code: string; name: string; location: string | null; floor: string | null; room: string | null }[];
     };
     visits: VisitRow[];
+    upcoming: { round: number; period_starts_on: string; due_on: string; creates_on: string }[];
     can: { update: boolean; delete: boolean };
 }>();
 
@@ -58,7 +61,15 @@ const destroy = () => {
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="plan.title" :description="plan.customer ?? ''" />
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <a
+                            :href="route('maintenance.reports.round', { plan: plan.id, from: plan.starts_on, to: plan.ends_on })"
+                            target="_blank"
+                            rel="noopener"
+                            >{{ t('pm_plans.round_report') }}</a
+                        >
+                    </Button>
                     <Button v-if="can.update" variant="outline" as-child>
                         <Link :href="route('maintenance.plans.edit', plan.id)">{{ t('common.edit') }}</Link>
                     </Button>
@@ -98,6 +109,17 @@ const destroy = () => {
                 <div>
                     <dt class="text-xs text-muted-foreground">{{ t('pm_plans.assignee') }}</dt>
                     <dd>{{ plan.assignee ?? t('pm_plans.no_assignee') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-xs text-muted-foreground">{{ t('pm_plans.assets') }}</dt>
+                    <dd>
+                        {{
+                            plan.assets.length
+                                ? t('pm_plans.assets_picked', { count: plan.assets.length, total: plan.contract?.assets_count ?? plan.assets.length })
+                                : t('pm_plans.assets_all', { total: plan.contract?.assets_count ?? 0 })
+                        }}
+                    </dd>
+                    <dd v-if="!plan.active" class="text-xs font-semibold text-amber-700 dark:text-amber-300">{{ t('pm_plans.inactive') }}</dd>
                 </div>
                 <div v-if="plan.notes" class="sm:col-span-2">
                     <dt class="text-xs text-muted-foreground">{{ t('pm_plans.notes') }}</dt>
@@ -140,6 +162,29 @@ const destroy = () => {
                         </tbody>
                     </table>
                 </div>
+            </section>
+
+            <!-- Rounds to come: their work orders are made ahead by the daily run -->
+            <section v-if="upcoming.length" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('pm_plans.upcoming') }}</h3>
+                <ul class="divide-y rounded-md border border-dashed text-sm">
+                    <li v-for="round in upcoming" :key="round.round" class="flex flex-wrap justify-between gap-2 px-4 py-2 text-muted-foreground">
+                        <span>{{ t('pm_visits.round', { round: round.round }) }} · {{ round.period_starts_on }} – {{ round.due_on }}</span>
+                        <span class="text-xs">{{ t('pm_plans.creates_on', { date: round.creates_on }) }}</span>
+                    </li>
+                </ul>
+            </section>
+
+            <section v-if="plan.assets.length" class="space-y-2">
+                <h3 class="text-sm font-semibold">{{ t('pm_plans.assets') }}</h3>
+                <ul class="grid gap-1 text-sm sm:grid-cols-2">
+                    <li v-for="asset in plan.assets" :key="asset.asset_code">
+                        <span class="font-mono text-xs">{{ asset.asset_code }}</span> {{ asset.name }}
+                        <span class="text-xs text-muted-foreground">{{
+                            [asset.floor, asset.room].filter(Boolean).join(' · ') || asset.location
+                        }}</span>
+                    </li>
+                </ul>
             </section>
         </div>
     </AppLayout>

@@ -30,8 +30,20 @@ interface Filters {
     [key: string]: unknown;
 }
 
+interface ProjectedRound {
+    plan_id: number;
+    plan: string;
+    round: number;
+    calendar_date: string;
+    creates_on: string;
+    customer: string | null;
+    assignee: string | null;
+}
+
 const props = defineProps<{
     visits: CalendarVisit[];
+    // rounds of plans whose work orders are not made yet
+    projected: ProjectedRound[];
     filters: Filters;
     customers: { id: number; code: string; name: string }[];
     assignees: { id: number; name: string }[];
@@ -72,13 +84,23 @@ const weeks = computed(() => {
         byDay.set(visit.calendar_date, [...(byDay.get(visit.calendar_date) ?? []), visit]);
     }
 
-    const rows: { date: string; day: number; inMonth: boolean; visits: CalendarVisit[] }[][] = [];
+    const projectedByDay = new Map<string, ProjectedRound[]>();
+    for (const round of props.projected) {
+        projectedByDay.set(round.calendar_date, [...(projectedByDay.get(round.calendar_date) ?? []), round]);
+    }
+    const rows: { date: string; day: number; inMonth: boolean; visits: CalendarVisit[]; projected: ProjectedRound[] }[][] = [];
     const cursor = new Date(start);
     do {
         const row = [];
         for (let i = 0; i < 7; i++) {
             const date = ymd(cursor);
-            row.push({ date, day: cursor.getDate(), inMonth: cursor.getMonth() === month.value - 1, visits: byDay.get(date) ?? [] });
+            row.push({
+                date,
+                day: cursor.getDate(),
+                inMonth: cursor.getMonth() === month.value - 1,
+                visits: byDay.get(date) ?? [],
+                projected: projectedByDay.get(date) ?? [],
+            });
             cursor.setDate(cursor.getDate() + 1);
         }
         rows.push(row);
@@ -163,6 +185,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 {{ visit.customer ?? visit.visit_no }}
                             </Link>
                             <Link
+                                v-for="round in cell.projected"
+                                :key="`${round.plan_id}-${round.round}`"
+                                :href="route('maintenance.plans.show', round.plan_id)"
+                                class="block truncate rounded border border-dashed border-muted-foreground/40 px-1.5 py-0.5 text-xs text-muted-foreground hover:opacity-80"
+                                :title="`${round.plan} · ${t('pm_visits.round', { round: round.round })} · ${t('pm_plans.creates_on', { date: round.creates_on })}`"
+                            >
+                                {{ round.customer ?? round.plan }}
+                            </Link>
+                            <Link
                                 v-if="cell.visits.length > MAX_PER_DAY"
                                 :href="route('maintenance.visits.index', { status: 'all', month: filters.month })"
                                 class="block px-1.5 text-xs text-muted-foreground hover:underline"
@@ -190,7 +221,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <span class="flex items-center gap-1"
                     ><span class="h-3 w-3 rounded border border-dashed border-foreground/40" />{{ t('pm_visits.calendar.due_marker') }}</span
                 >
-                <span v-if="visits.length === 0">· {{ t('pm_visits.calendar.empty') }}</span>
+                <span class="flex items-center gap-1"
+                    ><span class="h-3 w-3 rounded border border-dashed border-muted-foreground/40 bg-transparent" />{{
+                        t('pm_visits.calendar.projected')
+                    }}</span
+                >
+                <span v-if="visits.length === 0 && projected.length === 0">· {{ t('pm_visits.calendar.empty') }}</span>
             </div>
         </div>
     </AppLayout>

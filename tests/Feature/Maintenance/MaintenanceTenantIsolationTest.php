@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmPlan;
@@ -22,7 +21,7 @@ function startedPmPlan(): array
     $contract->contractAssets()->create(['asset_id' => createAsset(createAssetCategory(), ['customer_id' => $customer->id])->id]);
     $checklist = createPmTemplate(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'Look', 'type' => 'check']]]);
 
-    $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM', 'interval_months' => 6, 'assignee_id' => $admin->id]);
+    $plan = pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'PM', 'interval_months' => 6, 'assignee_id' => $admin->id]);
     $visit = app(StartPmVisit::class)->handle($plan->visits()->orderBy('round')->first(), $admin);
 
     return [$admin, $plan, $visit, $checklist, $contract];

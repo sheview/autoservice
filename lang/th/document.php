@@ -321,4 +321,12 @@ return [
             'closed' => 'ปิดงาน', 'cancelled' => 'ยกเลิก',
         ],
     ],
+
+    // The cover of a PM round report (documents.pm-round-cover).
+    'pm_round' => [
+        'title' => 'รายงานสรุปการบำรุงรักษาเชิงป้องกัน (PM)',
+        'period' => 'ช่วงเวลา',
+        'work_orders' => 'ใบงานในรายงาน :count ใบ',
+        'signed' => 'ลงนามแล้ว',
+    ],
 ];

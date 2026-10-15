@@ -2,6 +2,7 @@
 
 namespace App\Modules\Maintenance\Actions;
 
+use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -17,6 +18,9 @@ use Illuminate\Database\Eloquent\Builder;
  *               (handed in), on time, overdue, cancelled, compliance %, results of the equipment
  *   trend       due and done per month, for the last N months
  *   customers   the period per customer
+ *   plans       progress of each plan: rounds handed in of the rounds of the period due by today (or
+ *               handed in ahead)
+ *   failing     the equipment found failed most often within the period (top N)
  */
 class PmOverview
 {
@@ -100,6 +104,60 @@ class PmOverview
             'done' => $rows->whereIn('status', PmVisit::DONE_STATUSES)->count(),
             'overdue' => $rows->filter(fn (PmVisit $visit) => $visit->isOverdue())->count(),
             'issues' => (int) $rows->sum('issue_count'),
+        ])->all();
+    }
+
+    /**
+     * Lowest progress first. Rounds of a revised work order count once: the original is cancelled,
+     * the revision counts.
+     *
+     * @return list<array{plan_id: int, plan: string|null, due: int, done: int, progress: int}>
+     */
+    public function plans(User $user, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $until = $to->min(today()->toImmutable())->toDateString();
+        $rows = $this->inPeriod($user, $from, $to, null)->whereNotNull('pm_plan_id')
+            ->where('status', '!=', PmVisit::STATUS_CANCELLED)
+            // due by today, or handed in already (ahead of its due date)
+            ->where(fn (Builder $q) => $q->where('due_on', '<=', $until)->orWhereIn('status', PmVisit::DONE_STATUSES))
+            ->with('plan:id,title')
+            ->get(['id', 'pm_plan_id', 'status']);
+
+        return $rows->groupBy('pm_plan_id')->map(function ($visits, $planId) {
+            $done = $visits->whereIn('status', PmVisit::DONE_STATUSES)->count();
+
+            return [
+                'plan_id' => (int) $planId,
+                'plan' => $visits->first()->plan?->title,
+                'due' => $visits->count(),
+                'done' => $done,
+                'progress' => (int) round($done * 100 / $visits->count()),
+            ];
+        })->sortBy('progress')->values()->all();
+    }
+
+    /**
+     * @return list<array{asset_id: int, asset_code: string|null, ulid: string|null, name: string|null, failed: int, last_on: string|null}>
+     */
+    public function failing(User $user, CarbonImmutable $from, CarbonImmutable $to, ?int $customerId = null, int $limit = 10): array
+    {
+        $rows = PmVisitItem::query()
+            ->whereIn('pm_visit_id', $this->inPeriod($user, $from, $to, $customerId)
+                ->where('status', '!=', PmVisit::STATUS_CANCELLED)->select('id'))
+            ->where('result', PmVisitItem::RESULT_FAILED)
+            ->groupBy('asset_id')
+            ->selectRaw('asset_id, count(*) as failed, max(checked_at) as last_at')
+            ->orderByDesc('failed')->orderByDesc('last_at')->orderBy('asset_id')
+            ->limit($limit)->get();
+        $assets = app(AssetDetails::class)->handle($rows->pluck('asset_id')->all());
+
+        return $rows->map(fn ($row) => [
+            'asset_id' => (int) $row->asset_id,
+            'asset_code' => $assets[$row->asset_id]['asset_code'] ?? null,
+            'ulid' => $assets[$row->asset_id]['ulid'] ?? null,
+            'name' => $assets[$row->asset_id]['name'] ?? null,
+            'failed' => (int) $row->failed,
+            'last_on' => $row->last_at ? CarbonImmutable::parse($row->last_at)->toDateString() : null,
         ])->all();
     }
 

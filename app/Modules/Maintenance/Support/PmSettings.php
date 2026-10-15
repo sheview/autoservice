@@ -19,6 +19,7 @@ use App\Modules\Tenancy\Support\TenantContext;
  *                          the approver signs when approving
  *   share_days             how long a new customer report link lasts by default
  *   sign_link_days         how long a link for the customer to sign on their phone lasts
+ *   generate_days_ahead    how many days before a plan's round starts its work order is made
  *   report_note            printed at the end of every PM report (terms, contact)
  */
 final class PmSettings
@@ -29,6 +30,8 @@ final class PmSettings
 
     public const MAX_SIGN_LINK_DAYS = 30;
 
+    public const MAX_DAYS_AHEAD = 90;
+
     public function __construct(
         public readonly bool $reviewStep = true,
         public readonly bool $requireTechnicianSignature = true,
@@ -38,6 +41,7 @@ final class PmSettings
         public readonly bool $approvalStep = true,
         public readonly bool $requireApproverSignature = false,
         public readonly int $signLinkDays = 3,
+        public readonly int $generateDaysAhead = 14,
     ) {}
 
     public static function of(?Tenant $tenant = null): self
@@ -54,6 +58,7 @@ final class PmSettings
             approvalStep: (bool) ($saved['approval_step'] ?? true),
             requireApproverSignature: (bool) ($saved['require_approver_signature'] ?? false),
             signLinkDays: max(1, min(self::MAX_SIGN_LINK_DAYS, (int) ($saved['sign_link_days'] ?? 3))),
+            generateDaysAhead: max(1, min(self::MAX_DAYS_AHEAD, (int) ($saved['generate_days_ahead'] ?? 14))),
         );
     }
 
@@ -68,6 +73,7 @@ final class PmSettings
             'require_approver_signature' => $this->requireApproverSignature,
             'share_days' => $this->shareDays,
             'sign_link_days' => $this->signLinkDays,
+            'generate_days_ahead' => $this->generateDaysAhead,
             'report_note' => $this->reportNote,
         ];
     }

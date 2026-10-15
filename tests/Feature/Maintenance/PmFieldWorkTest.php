@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -25,7 +24,7 @@ beforeEach(function () {
     $this->upsB = createAsset($category, ['customer_id' => $customer->id, 'name' => 'UPS B', 'location' => 'อาคาร B']);
     $contract->contractAssets()->createMany([['asset_id' => $this->upsA->id], ['asset_id' => $this->upsB->id]]);
 
-    $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM UPS', 'interval_months' => 6, 'assignee_id' => $this->tech->id]);
+    $plan = pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'PM UPS', 'interval_months' => 6, 'assignee_id' => $this->tech->id]);
     $this->visit = $plan->visits()->orderBy('round')->first();
     $this->url = "/pm-work/{$this->visit->ulid}";
 });

@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Support\PmNumber;
 use Illuminate\Http\Client\Request as HttpRequest;
@@ -51,7 +50,7 @@ beforeEach(function () {
         ['key' => 'load', 'label' => 'โหลดใช้งาน', 'type' => 'measure', 'unit' => '%', 'max' => 80],
     ]]);
 
-    $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM Acme', 'interval_months' => 3, 'assignee_id' => $this->tech->id]);
+    $plan = pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'PM Acme', 'interval_months' => 3, 'assignee_id' => $this->tech->id]);
     $this->visit = $plan->visits()->orderBy('round')->first();
     $this->url = "/pm-visits/{$this->visit->ulid}";
 
@@ -149,9 +148,53 @@ it('keeps the reports to their own company', function () {
         $customer = createCustomer();
         $contract = createContract($customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
 
-        return app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'Theirs', 'interval_months' => 6])->visits()->first();
+        return pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'Theirs', 'interval_months' => 6])->visits()->first();
     });
 
     $this->actingAs($this->admin)->get("/pm-visits/{$theirs->ulid}/pdf")->assertNotFound();
     expect(PmVisit::count())->toBe(4);
+});
+
+// --- round report ------------------------------------------------------------------
+
+it('joins the approved work orders of a customer within a period into one PDF, after a cover', function () {
+    $query = ['customer_id' => $this->customer->id, 'from' => '2026-01-01', 'to' => '2026-12-31'];
+
+    // nothing approved yet: a message, no PDF
+    $this->actingAs($this->helpdesk)->from('/pm-reports')->get(route('maintenance.reports.round', $query))
+        ->assertRedirect('/pm-reports')->assertSessionHas('error', __('maintenance.round_report.empty'));
+    Http::assertNothingSent();
+
+    ($this->approve)();
+    $response = $this->actingAs($this->helpdesk)->get(route('maintenance.reports.round', $query))->assertOk();
+    expect($response->headers->get('Content-Type'))->toBe('application/pdf')
+        ->and($response->headers->get('Content-Disposition'))->toContain('PM-round-')->toContain('2026-01-01-2026-12-31.pdf');
+
+    // the cover, the one approved sheet (round 2 is not approved), then one merge of both in order
+    $sent = Http::recorded()->map(fn ($pair) => $pair[0]);
+    $converts = $sent->filter(fn (HttpRequest $r) => str_ends_with($r->url(), '/forms/chromium/convert/html'))->values();
+    $merges = $sent->filter(fn (HttpRequest $r) => str_ends_with($r->url(), '/forms/pdfengines/merge'))->values();
+    $html = fn (HttpRequest $r) => collect($r->data())->firstWhere('filename', 'index.html')['contents'];
+    expect($converts)->toHaveCount(2)
+        ->and($html($converts[0]))->toContain('รายงานสรุปการบำรุงรักษาเชิงป้องกัน')->toContain(PmNumber::shown($this->visit->visit_no, $this->visit->tenant_id))
+        ->and($html($converts[1]))->toContain('UPS Alpha')
+        ->and($merges)->toHaveCount(1)
+        ->and(collect($merges[0]->data())->pluck('filename')->all())->toBe(['001.pdf', '002.pdf']);
+
+    // PM report viewers only
+    $this->actingAs($this->tech)->get(route('maintenance.reports.round', $query))->assertForbidden();
+    // a customer or a plan is needed
+    $this->actingAs($this->helpdesk)->get(route('maintenance.reports.round', ['from' => '2026-01-01', 'to' => '2026-12-31']))
+        ->assertSessionHasErrors('customer_id');
+});
+
+it('says so when the PDF service cannot join the round report', function () {
+    ($this->approve)();
+    // another host: the fakes of beforeEach answer every request to the first one
+    config(['services.gotenberg.url' => 'http://pdf.test']);
+    Http::fake(['pdf.test/forms/pdfengines/merge' => Http::response('down', 503), 'pdf.test/*' => Http::response('%PDF-1.7', 200)]);
+
+    $this->actingAs($this->helpdesk)->from('/pm-reports')
+        ->get(route('maintenance.reports.round', ['customer_id' => $this->customer->id, 'from' => '2026-01-01', 'to' => '2026-12-31']))
+        ->assertRedirect('/pm-reports')->assertSessionHas('error', __('document.unavailable'));
 });

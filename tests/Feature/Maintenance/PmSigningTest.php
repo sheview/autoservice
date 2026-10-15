@@ -1,7 +1,6 @@
 <?php
 
 use App\Modules\Maintenance\Actions\PmTrackingUrl;
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\SavePmSettings;
 use App\Modules\Maintenance\Models\PmSignLink;
 use App\Modules\Maintenance\Models\PmVisit;
@@ -25,7 +24,7 @@ beforeEach(function () {
     $contract = createContract($customer);
     $this->asset = createAsset($category, ['customer_id' => $customer->id]);
     $contract->contractAssets()->create(['asset_id' => $this->asset->id]);
-    $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM UPS', 'interval_months' => 6, 'assignee_id' => $this->tech->id]);
+    $plan = pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'PM UPS', 'interval_months' => 6, 'assignee_id' => $this->tech->id]);
     $this->visit = $plan->visits()->orderBy('round')->first();
     $this->url = "/pm-visits/{$this->visit->ulid}";
 

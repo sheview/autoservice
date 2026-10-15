@@ -62,4 +62,45 @@ class Gotenberg
 
         return $response->body();
     }
+
+    /**
+     * Joins PDFs into one, in the order given (PDF engines route: files are merged by name, so they
+     * are named 001.pdf, 002.pdf, …).
+     *
+     * @param  list<string>  $pdfs  the PDF bytes
+     * @return string the PDF bytes
+     *
+     * @throws PdfUnavailable when Gotenberg cannot be reached or refuses the files
+     */
+    public function mergePdfs(array $pdfs): string
+    {
+        if (count($pdfs) === 1) {
+            return $pdfs[0];
+        }
+        $url = rtrim((string) config('services.gotenberg.url'), '/').'/forms/pdfengines/merge';
+
+        try {
+            $request = Http::timeout((int) config('services.gotenberg.timeout', 30) * 2);
+            foreach (array_values($pdfs) as $i => $pdf) {
+                $request = $request->attach('files', $pdf, sprintf('%03d.pdf', $i + 1), ['Content-Type' => 'application/pdf']);
+            }
+            $response = $request->post($url);
+        } catch (ConnectionException $e) {
+            report($e);
+
+            throw new PdfUnavailable('Gotenberg is not reachable at '.$url, previous: $e);
+        } catch (Throwable $e) {
+            report($e);
+
+            throw new PdfUnavailable('Gotenberg request failed', previous: $e);
+        }
+
+        if (! $response->successful()) {
+            report(new PdfUnavailable("Gotenberg answered {$response->status()}: ".mb_substr($response->body(), 0, 500)));
+
+            throw new PdfUnavailable("Gotenberg answered {$response->status()}");
+        }
+
+        return $response->body();
+    }
 }

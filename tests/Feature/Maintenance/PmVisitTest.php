@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -32,7 +31,7 @@ beforeEach(function () {
     ]]);
     createPmTemplate(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'ตรวจสภาพ', 'type' => 'text']]]);
 
-    $this->plan = app(SavePmPlan::class)->handle(null, [
+    $this->plan = pmPlanWithAllRounds([
         'contract_id' => $this->contract->id, 'title' => 'PM Acme', 'interval_months' => 3, 'assignee_id' => $this->tech->id,
     ]);
     $this->visit = $this->plan->visits()->orderBy('round')->first();

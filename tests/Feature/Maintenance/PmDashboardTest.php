@@ -1,7 +1,6 @@
 <?php
 
 use App\Modules\Maintenance\Actions\MovePmVisit;
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Actions\SubmitPmVisit;
 use App\Modules\Maintenance\Models\PmVisit;
@@ -22,7 +21,7 @@ beforeEach(function () {
         $contract = createContract($customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
         $contract->contractAssets()->create(['asset_id' => $asset->id]);
 
-        return app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM '.$customer->name, 'interval_months' => 1, 'assignee_id' => $tech->id]);
+        return pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'PM '.$customer->name, 'interval_months' => 1, 'assignee_id' => $tech->id]);
     };
     // Monthly rounds from May: Acme for tech, Beta for the other technician.
     $this->acmeVisits = $plan($this->acme, $this->tech)->visits()->orderBy('round')->get();
@@ -85,4 +84,24 @@ it('reports a period by figures and by customer, with its work orders', function
     $this->actingAs($this->otherTech)->get('/pm-reports?from=2026-05-31&to=2026-05-01')
         ->assertInertia(fn (Assert $page) => $page->where('filters.from', '2026-05-01')->where('visits.total', 1));
     expect(PmVisit::count())->toBeGreaterThan(2);
+});
+
+it('shows how far each plan has come, the equipment failing most and the work of each technician', function () {
+    // Acme's May round: on site 09:00–10:30
+    $this->acmeVisits[0]->update(['onsite_at' => '2026-05-10 09:00:00', 'departed_at' => '2026-05-10 10:30:00']);
+
+    // handed in ahead of its due date (2026-05-31): counts; Beta's May round is not due yet
+    $this->actingAs($this->helpdesk)->get('/pm-dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('plans', fn ($plans) => collect($plans)->map(fn ($p) => [$p['plan'], $p['due'], $p['done'], $p['progress']])->all() === [['PM Acme', 1, 1, 100]]));
+
+    $this->travelTo('2026-06-05');
+    $this->actingAs($this->helpdesk)->get('/pm-dashboard')->assertInertia(fn (Assert $page) => $page
+        ->where('plans', fn ($plans) => collect($plans)->map(fn ($p) => [$p['plan'], $p['progress']])->all() === [['PM Beta', 0], ['PM Acme', 100]]));
+
+    $this->actingAs($this->helpdesk)->get('/pm-reports?from=2026-05-01&to=2026-05-31')->assertInertia(fn (Assert $page) => $page
+        ->where('failing', fn ($assets) => count($assets) === 1 && $assets[0]['failed'] === 1 && $assets[0]['asset_code'] !== null)
+        ->where('technicians', fn ($rows) => collect($rows)->map(fn ($r) => collect($r)->except(['assignee_id', 'name'])->all())->sortBy('done')->values()->all() === [
+            ['assigned' => 1, 'done' => 0, 'on_time' => 0, 'on_time_rate' => 0, 'checked' => 0, 'failed' => 0, 'onsite_minutes' => null],
+            ['assigned' => 1, 'done' => 1, 'on_time' => 1, 'on_time_rate' => 100, 'checked' => 1, 'failed' => 1, 'onsite_minutes' => 90],
+        ]));
 });

@@ -11,6 +11,7 @@ use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
 use App\Modules\Maintenance\Http\Controllers\PmPublicController;
 use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
+use App\Modules\Maintenance\Http\Controllers\PmRoundReportController;
 use App\Modules\Maintenance\Http\Controllers\PmSettingsController;
 use App\Modules\Maintenance\Http\Controllers\PmSharedReportController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitController;
@@ -52,6 +53,7 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::get('pm-calendar', [PmCalendarController::class, 'index'])->name('calendar');
     Route::get('pm-dashboard', [PmDashboardController::class, 'dashboard'])->name('dashboard');
     Route::get('pm-reports', [PmDashboardController::class, 'reports'])->name('reports.index');
+    Route::get('pm-reports/round', PmRoundReportController::class)->name('reports.round');
     Route::get('pm-equipment', [PmEquipmentController::class, 'index'])->name('equipment.index');
     Route::get('pm-customer-reports', [PmCustomerReportController::class, 'index'])->name('customer-reports.index');
     Route::resource('pm-instruments', PmInstrumentController::class)->only(['index', 'store', 'update', 'destroy'])

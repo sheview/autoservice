@@ -1,7 +1,6 @@
 <?php
 
 use App\Modules\Document\Models\Media;
-use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -23,7 +22,7 @@ beforeEach(function () {
     $this->contract = createContract($this->customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
     $this->contract->contractAssets()->create(['asset_id' => $this->asset->id]);
 
-    $this->plan = app(SavePmPlan::class)->handle(null, [
+    $this->plan = pmPlanWithAllRounds([
         'contract_id' => $this->contract->id, 'title' => 'PM Acme', 'interval_months' => 3, 'assignee_id' => $this->tech->id,
     ]);
     $this->visits = $this->plan->visits()->orderBy('round')->get();
@@ -110,7 +109,7 @@ it('keeps site photos of an asset while the round runs, served only through the 
 it('shows a customer account the PM rounds of its own customer only, read only', function () {
     $mine = app(StartPmVisit::class)->handle($this->visits[0], $this->tech);
     $otherCustomer = createCustomer();
-    $otherPlan = app(SavePmPlan::class)->handle(null, [
+    $otherPlan = pmPlanWithAllRounds([
         'contract_id' => createContract($otherCustomer)->id, 'title' => 'PM Other', 'interval_months' => 6,
     ]);
     $theirs = $otherPlan->visits()->first();

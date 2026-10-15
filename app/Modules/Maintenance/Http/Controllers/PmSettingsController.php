@@ -28,6 +28,7 @@ class PmSettingsController extends Controller
             'maxShareDays' => PmReportShare::MAX_DAYS,
             'noteMax' => PmSettings::NOTE_MAX,
             'maxSignLinkDays' => PmSettings::MAX_SIGN_LINK_DAYS,
+            'maxDaysAhead' => PmSettings::MAX_DAYS_AHEAD,
         ]);
     }
 
@@ -42,6 +43,7 @@ class PmSettingsController extends Controller
             'approval_step' => ['required', 'boolean'],
             'require_approver_signature' => ['required', 'boolean'],
             'sign_link_days' => ['required', 'integer', 'min:1', 'max:'.PmSettings::MAX_SIGN_LINK_DAYS],
+            'generate_days_ahead' => ['sometimes', 'integer', 'min:1', 'max:'.PmSettings::MAX_DAYS_AHEAD],
             'share_days' => ['required', 'integer', 'min:1', 'max:'.PmReportShare::MAX_DAYS],
             'report_note' => ['nullable', 'string', 'max:'.PmSettings::NOTE_MAX],
         ], [], __('maintenance.fields'));

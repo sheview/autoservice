@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, FileDown } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface VisitRow {
@@ -51,6 +51,18 @@ const props = defineProps<{
     visits: Paginated<VisitRow>;
     customers: { id: number; name: string }[];
     statuses: string[];
+    failing: { asset_id: number; asset_code: string | null; ulid: string | null; name: string | null; failed: number; last_on: string | null }[];
+    technicians: {
+        assignee_id: number;
+        name: string | null;
+        assigned: number;
+        done: number;
+        on_time: number;
+        on_time_rate: number | null;
+        checked: number;
+        failed: number;
+        onsite_minutes: number | null;
+    }[];
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('pm_reports.title'), href: route('maintenance.reports.index') }];
@@ -92,6 +104,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <option :value="null">{{ t('pm_visits.all_customers') }}</option>
                     <option v-for="customer in customers" :key="customer.id" :value="customer.id">{{ customer.name }}</option>
                 </select>
+                <!-- One PDF of the approved work orders of the customer within the period -->
+                <a
+                    v-if="filters.customer_id"
+                    :href="route('maintenance.reports.round', { customer_id: filters.customer_id, from: filters.from, to: filters.to })"
+                    class="shadow-xs inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm hover:bg-muted"
+                >
+                    <FileDown class="h-4 w-4" />{{ t('pm_reports.round_report') }}
+                </a>
+                <span v-else class="self-center text-xs text-muted-foreground">{{ t('pm_reports.round_report_hint') }}</span>
             </div>
 
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -132,6 +153,78 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     </table>
                 </div>
             </section>
+
+            <div class="grid gap-6 xl:grid-cols-2">
+                <!-- The equipment found failed most often -->
+                <section class="space-y-2">
+                    <h3 class="text-sm font-semibold">{{ t('pm_reports.failing') }}</h3>
+                    <div class="overflow-x-auto rounded-md border">
+                        <table class="w-full text-sm">
+                            <thead class="bg-muted/40 text-left">
+                                <tr>
+                                    <th class="px-4 py-2 font-medium">{{ t('pm_reports.asset') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.failed_times') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.last_failed') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in failing" :key="row.asset_id" class="border-t">
+                                    <td class="px-4 py-2">
+                                        <Link
+                                            v-if="row.ulid"
+                                            :href="route('asset.assets.show', row.ulid)"
+                                            class="text-primary underline-offset-4 hover:underline"
+                                            ><span class="font-mono text-xs">{{ row.asset_code }}</span> {{ row.name }}</Link
+                                        >
+                                        <span v-else>-</span>
+                                    </td>
+                                    <td class="px-4 py-2 text-right font-semibold tabular-nums text-red-700 dark:text-red-400">{{ row.failed }}</td>
+                                    <td class="px-4 py-2 text-right">{{ row.last_on ?? '-' }}</td>
+                                </tr>
+                                <tr v-if="failing.length === 0">
+                                    <td colspan="3" class="px-4 py-6 text-center text-muted-foreground">{{ t('pm_reports.no_failing') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <!-- The work of each technician -->
+                <section class="space-y-2">
+                    <h3 class="text-sm font-semibold">{{ t('pm_reports.technicians') }}</h3>
+                    <div class="overflow-x-auto rounded-md border">
+                        <table class="w-full text-sm">
+                            <thead class="bg-muted/40 text-left">
+                                <tr>
+                                    <th class="px-4 py-2 font-medium">{{ t('pm_reports.technician') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.assigned') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.tiles.done') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.on_time_rate') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.checked') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.failed_found') }}</th>
+                                    <th class="px-4 py-2 text-right font-medium">{{ t('pm_reports.onsite_minutes') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="row in technicians" :key="row.assignee_id" class="border-t">
+                                    <td class="px-4 py-2">{{ row.name ?? '-' }}</td>
+                                    <td class="px-4 py-2 text-right tabular-nums">{{ row.assigned }}</td>
+                                    <td class="px-4 py-2 text-right tabular-nums">{{ row.done }}</td>
+                                    <td class="px-4 py-2 text-right tabular-nums">{{ row.on_time_rate === null ? '–' : `${row.on_time_rate}%` }}</td>
+                                    <td class="px-4 py-2 text-right tabular-nums">{{ row.checked }}</td>
+                                    <td class="px-4 py-2 text-right tabular-nums">{{ row.failed }}</td>
+                                    <td class="px-4 py-2 text-right tabular-nums">
+                                        {{ row.onsite_minutes === null ? '–' : t('pm_reports.minutes', { minutes: row.onsite_minutes }) }}
+                                    </td>
+                                </tr>
+                                <tr v-if="technicians.length === 0">
+                                    <td colspan="7" class="px-4 py-6 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
 
             <!-- The work orders of the period -->
             <section class="space-y-3">

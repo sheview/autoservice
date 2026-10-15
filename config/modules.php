@@ -47,15 +47,17 @@ return [
         // "tab" = shown as a tab bar on top of the pages ("{set}.{tab}"): the sidebar keeps only the first
         // item of the set the user may open, the others are tabs (ภาพรวม / แผน PM / ใบงาน PM / ตั้งค่า PM)
         // and, within a tab, sub-tabs. A customer account only has its reports.
-        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_dashboard', 'route' => 'maintenance.dashboard', 'icon' => 'gauge', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
+        // The PM menu is for those who run the work; technicians work from "งานของฉัน" (the
+        // work orders and the field pages still open by their own permissions).
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_dashboard', 'route' => 'maintenance.dashboard', 'icon' => 'gauge', 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
         // Customer accounts see their own customer's published reports here.
         ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_customer_reports', 'route' => 'maintenance.customer-reports.index', 'icon' => 'file-text', 'permission' => 'pm-reports.view', 'module' => 'maintenance'],
-        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'calendar-check', 'permission' => 'pm-plans.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_schedule', 'route' => 'maintenance.calendar', 'icon' => 'calendar-check', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_equipment', 'route' => 'maintenance.equipment.index', 'icon' => 'hard-drive', 'permission' => ['pm-visits.view'], 'module' => ['maintenance', 'asset'], 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'permission' => 'pm-visits.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.view', 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'calendar-check', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_schedule', 'route' => 'maintenance.calendar', 'icon' => 'calendar-check', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_equipment', 'route' => 'maintenance.equipment.index', 'icon' => 'hard-drive', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => ['maintenance', 'asset'], 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'permission' => ['pm-visits.create', 'pm-visits.review', 'pm-visits.approve'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.manage', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_instruments', 'route' => 'maintenance.instruments.index', 'icon' => 'gauge', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_settings', 'route' => 'maintenance.settings.edit', 'icon' => 'settings', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true, 'company' => true],
 

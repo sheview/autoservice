@@ -14,7 +14,7 @@ class SavePmSettings
 {
     /**
      * @param  array{review_step: bool, approval_step?: bool, require_technician_signature: bool, require_customer_signature: bool,
-     *     require_approver_signature?: bool, share_days: int, sign_link_days?: int, report_note: string|null}  $data  validated
+     *     require_approver_signature?: bool, share_days: int, sign_link_days?: int, generate_days_ahead?: int, report_note: string|null}  $data  validated
      */
     public function handle(Tenant $tenant, array $data, User $actor): PmSettings
     {
@@ -28,6 +28,7 @@ class SavePmSettings
             'require_approver_signature' => (bool) ($data['require_approver_signature'] ?? $old['require_approver_signature']),
             'share_days' => (int) $data['share_days'],
             'sign_link_days' => (int) ($data['sign_link_days'] ?? $old['sign_link_days']),
+            'generate_days_ahead' => (int) ($data['generate_days_ahead'] ?? $old['generate_days_ahead']),
             'report_note' => filled($data['report_note'] ?? null) ? trim($data['report_note']) : null,
         ];
         $tenant->settings = $settings;

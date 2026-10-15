@@ -33,7 +33,7 @@ class CreatePmRevision
             }
 
             $revision = $visit->replicate([
-                'ulid', 'tracking_token', 'status', 'locked_at', 'completed_at', 'submitted_by', 'reviewed_at', 'reviewed_by',
+                'ulid', 'alive', 'tracking_token', 'status', 'locked_at', 'completed_at', 'submitted_by', 'reviewed_at', 'reviewed_by',
                 'approved_at', 'approved_by', 'published_at', 'published_by', 'closed_at', 'closed_by', 'cancelled_at',
                 'current_version', 'published_version', 'revision_note', 'revision_count', 'departed_at',
             ]);
@@ -41,6 +41,8 @@ class CreatePmRevision
                 'visit_no' => "{$base}-R{$number}",
                 'status' => PmVisit::STATUS_REVISION_REQUIRED,
                 'revision_of_id' => $visit->id,
+                // The round stays the signed one's (a plan has one work order per round): read through revision_of.
+                'round' => null,
                 'revision_note' => trim($reason),
                 'revision_count' => 0,
                 'current_version' => 0,

@@ -5,6 +5,7 @@ namespace App\Modules\Maintenance\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Maintenance\Actions\PmOverview;
+use App\Modules\Maintenance\Actions\PmTechnicianStats;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -19,9 +20,11 @@ use Inertia\Response;
  * PM Dashboard and PM Reports, staff only, over the work orders the user may see:
  *
  *   dashboard  where the work stands now (by stage, overdue, due this month), what waits for the
- *              user (to review, to approve, to publish), the last 12 months, the latest history
- *   reports    a period (default this year to date) by figures and by customer, with the work
- *              orders of the period (search, customer and status filters, sort, paging)
+ *              user (to review, to approve, to publish), the last 12 months, progress of each plan
+ *              this year, the latest history
+ *   reports    a period (default this year to date) by figures, by customer, the equipment failed
+ *              most often and the work of each technician, with the work orders of the period
+ *              (search, customer and status filters, sort, paging)
  */
 class PmDashboardController extends Controller
 {
@@ -30,7 +33,11 @@ class PmDashboardController extends Controller
     /** Customer names by id, read once per request. */
     private ?Collection $customerNames = null;
 
-    public function __construct(private PmOverview $overview, private ListCustomers $listCustomers) {}
+    public function __construct(
+        private PmOverview $overview,
+        private ListCustomers $listCustomers,
+        private PmTechnicianStats $technicianStats,
+    ) {}
 
     public function dashboard(Request $request): Response
     {
@@ -44,6 +51,7 @@ class PmDashboardController extends Controller
             'counts' => $this->overview->counts($user),
             'thisMonth' => $this->overview->period($user, today()->toImmutable()->startOfMonth(), today()->toImmutable()->endOfMonth()),
             'trend' => $this->overview->trend($user),
+            'plans' => $this->overview->plans($user, today()->toImmutable()->startOfYear(), today()->toImmutable()->endOfYear()),
             'waiting' => [
                 'review' => $waiting([PmVisit::STATUS_SUBMITTED], 'review'),
                 'approve' => $waiting([PmVisit::STATUS_PENDING_APPROVAL], 'approve'),
@@ -109,6 +117,8 @@ class PmDashboardController extends Controller
                 ...$visit->only(['items_count', 'issue_count', 'current_version']),
                 'completed_at' => $visit->completed_at?->toIso8601String(),
             ]),
+            'failing' => $this->overview->failing($user, $from, $to, $filters['customer_id']),
+            'technicians' => $this->technicianStats->handle($user, $from, $to, $filters['customer_id']),
             'customers' => $this->listCustomers->handle(),
             'statuses' => PmVisit::STATUSES,
         ]);

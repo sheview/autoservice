@@ -15,9 +15,12 @@ use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Maintenance\Actions\SavePmPlan;
+use App\Modules\Maintenance\Actions\SchedulePmVisits;
 use App\Modules\Maintenance\Actions\SyncTemplateAssignments;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmInstrument;
+use App\Modules\Maintenance\Models\PmPlan;
 use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SaveRepairReport;
@@ -156,6 +159,18 @@ function createAsset(AssetCategory $category, array $attributes = []): Asset
         'name' => 'Asset',
         'status' => Asset::STATUS_IN_USE,
     ]);
+}
+
+/**
+ * A PM plan (SavePmPlan) with the work orders of all its rounds not ended yet made at once, as if
+ * the daily run had reached them all (only the near ones are made on saving).
+ */
+function pmPlanWithAllRounds(array $data): PmPlan
+{
+    $plan = app(SavePmPlan::class)->handle(null, $data);
+    app(SchedulePmVisits::class)->handle($plan, 3650);
+
+    return $plan;
 }
 
 /**

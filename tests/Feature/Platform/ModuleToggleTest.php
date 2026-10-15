@@ -34,13 +34,18 @@ it('builds the sidebar from config, filtered by permission', function () {
         ->where('navigation.0.group', null)
         ->where('navigation.1.group', 'งานบริการ'));
 
+    // technicians do PM from their own work (งานของฉัน): no PM menu
     $this->actingAs(userWithRole('technician'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe([
             'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
-            'ภาพรวม PM', 'รายงาน PM', 'แผน PM', 'ตาราง PM (Schedule)', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'Template PM',
             'ทรัพย์สิน', 'เบิก / ยืม', 'พิมพ์ป้าย QR',
             'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'สรุปรายบุคคล', 'ผลประเมินความพึงพอใจ', 'คู่มือ',
         ]));
+
+    // helpdesk runs the PM work but does not shape templates or settings
+    $this->actingAs(userWithRole('helpdesk'))->get('/dashboard')
+        ->assertInertia(fn (Assert $page) => expect(collect(navigationTitles($page))->filter(fn ($title) => str_contains($title, 'PM') || $title === 'รายงานถึงลูกค้า')->values()->all())
+            ->toBe(['ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'แผน PM', 'ตาราง PM (Schedule)', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)']));
 });
 
 it('turns the asset module on by default', function () {

@@ -18,11 +18,13 @@ const props = defineProps<{
         require_approver_signature: boolean;
         share_days: number;
         sign_link_days: number;
+        generate_days_ahead: number;
         report_note: string | null;
     };
     maxShareDays: number;
     noteMax: number;
     maxSignLinkDays: number;
+    maxDaysAhead: number;
 }>();
 
 const page = usePage<SharedData>();
@@ -55,6 +57,16 @@ const toggles = ['review_step', 'approval_step', 'require_technician_signature',
                             <span class="block text-muted-foreground">{{ t(`pm_settings.${key}_hint`) }}</span>
                         </span>
                     </label>
+                </section>
+
+                <section class="space-y-2 rounded-lg border p-4">
+                    <h3 class="font-semibold">{{ t('pm_settings.plans') }}</h3>
+                    <div class="grid gap-2 sm:max-w-xs">
+                        <Label for="generate_days_ahead">{{ t('pm_settings.generate_days_ahead') }}</Label>
+                        <Input id="generate_days_ahead" v-model="form.generate_days_ahead" type="number" min="1" :max="maxDaysAhead" />
+                        <p class="text-xs text-muted-foreground">{{ t('pm_settings.generate_days_ahead_hint', { max: maxDaysAhead }) }}</p>
+                        <InputError :message="form.errors.generate_days_ahead" />
+                    </div>
                 </section>
 
                 <section class="space-y-4 rounded-lg border p-4">

@@ -24,6 +24,8 @@ const props = defineProps<{
     counts: Record<string, number>;
     thisMonth: { due: number; done: number; on_time: number; overdue: number; compliance: number | null };
     trend: { month: string; due: number; done: number }[];
+    // rounds handed in of the rounds due this year up to today, per plan (lowest first)
+    plans: { plan_id: number; plan: string | null; due: number; done: number; progress: number }[];
     waiting: { review: VisitRow[]; approve: VisitRow[]; publish: VisitRow[]; overdue: VisitRow[] };
     history: {
         id: number;
@@ -116,6 +118,32 @@ const lists = computed(() =>
                     <ColumnChart v-bind="chart" />
                 </div>
             </div>
+
+            <!-- Progress of each plan this year -->
+            <section v-if="plans.length" class="space-y-2 rounded-md border p-4">
+                <h3 class="text-sm font-semibold">{{ t('pm_dashboard.plans') }}</h3>
+                <ul class="grid gap-x-6 gap-y-2 md:grid-cols-2">
+                    <li v-for="row in plans" :key="row.plan_id" class="space-y-1">
+                        <div class="flex items-center justify-between gap-2 text-sm">
+                            <Link
+                                :href="route('maintenance.plans.show', row.plan_id)"
+                                class="truncate text-primary underline-offset-4 hover:underline"
+                                >{{ row.plan ?? '-' }}</Link
+                            >
+                            <span class="shrink-0 text-xs tabular-nums text-muted-foreground"
+                                >{{ t('pm_dashboard.plan_rounds', { done: row.done, due: row.due }) }} · {{ row.progress }}%</span
+                            >
+                        </div>
+                        <div class="h-2 overflow-hidden rounded bg-muted">
+                            <div
+                                class="h-full rounded"
+                                :class="row.progress < 80 ? 'bg-amber-500' : 'bg-emerald-600'"
+                                :style="{ width: `${row.progress}%` }"
+                            />
+                        </div>
+                    </li>
+                </ul>
+            </section>
 
             <!-- What waits for this user -->
             <div v-if="lists.length" class="grid gap-4 lg:grid-cols-2">

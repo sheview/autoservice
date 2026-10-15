@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PmAssetPicker, { type PickableAsset } from '@/components/pm/PmAssetPicker.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
 
 interface ContractOption {
@@ -22,7 +23,21 @@ interface ContractOption {
 }
 
 const props = defineProps<{
-    plan: { id: number; title: string; interval_months: number; assignee_id: number | null; notes: string | null; contract_no: string | null } | null;
+    plan: {
+        id: number;
+        title: string;
+        interval_months: number;
+        assignee_id: number | null;
+        notes: string | null;
+        contract_no: string | null;
+        active: boolean;
+        starts_on: string;
+        ends_on: string;
+        asset_ids: number[];
+        contract_starts_on: string | null;
+        contract_ends_on: string | null;
+    } | null;
+    contractAssets: PickableAsset[];
     contracts?: ContractOption[];
     preselectedContractId?: number | null;
     intervalLocked?: boolean;
@@ -43,6 +58,10 @@ const form = useForm({
     interval_months: props.plan?.interval_months ?? 3,
     assignee_id: props.plan?.assignee_id ?? null,
     notes: props.plan?.notes ?? '',
+    active: props.plan?.active ?? true,
+    starts_on: props.plan?.starts_on ?? '',
+    ends_on: props.plan?.ends_on ?? '',
+    asset_ids: props.plan?.asset_ids ?? ([] as number[]),
 });
 
 const contract = computed(() => props.contracts?.find((c) => c.id === form.contract_id) ?? null);
@@ -54,8 +73,18 @@ watch(
         if (!picked || props.plan) return;
         if (picked.pm_interval_months) form.interval_months = picked.pm_interval_months;
         if (!form.title) form.title = `PM ${picked.title}`;
+        // The plan runs the contract's period unless changed; its equipment is picked from the contract's.
+        form.starts_on = picked.starts_on;
+        form.ends_on = picked.ends_on;
+        form.asset_ids = [];
+        router.reload({ only: ['contractAssets'], data: { contract_id: picked.id } });
     },
     { immediate: true },
+);
+const bounds = computed(() =>
+    props.plan
+        ? { from: props.plan.contract_starts_on ?? undefined, to: props.plan.contract_ends_on ?? undefined }
+        : { from: contract.value?.starts_on, to: contract.value?.ends_on },
 );
 
 const submit = () => {
@@ -132,6 +161,29 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </select>
                         <InputError :message="form.errors.assignee_id" />
                     </div>
+                </div>
+
+                <div class="grid gap-6 sm:grid-cols-3">
+                    <div class="grid content-start gap-2">
+                        <Label for="starts_on">{{ t('pm_plans.starts_on') }}</Label>
+                        <Input id="starts_on" v-model="form.starts_on" type="date" :min="bounds.from" :max="bounds.to" :disabled="intervalLocked" />
+                        <InputError :message="form.errors.starts_on" />
+                    </div>
+                    <div class="grid content-start gap-2">
+                        <Label for="ends_on">{{ t('pm_plans.ends_on') }}</Label>
+                        <Input id="ends_on" v-model="form.ends_on" type="date" :min="bounds.from" :max="bounds.to" :disabled="intervalLocked" />
+                        <InputError :message="form.errors.ends_on" />
+                    </div>
+                    <label class="flex items-center gap-2 self-end pb-2 text-sm">
+                        <input v-model="form.active" type="checkbox" class="size-4 rounded border-input" />
+                        {{ t('pm_plans.active') }}
+                    </label>
+                </div>
+
+                <div v-if="contractAssets.length" class="grid content-start gap-2">
+                    <Label>{{ t('pm_plans.assets') }}</Label>
+                    <PmAssetPicker v-model="form.asset_ids" :assets="contractAssets" />
+                    <InputError :message="form.errors.asset_ids" />
                 </div>
 
                 <div class="grid content-start gap-2">

@@ -43,32 +43,42 @@ it('cuts the contract period into rounds due at the end of each period', functio
         ]);
 });
 
-it('creates a plan with its rounds, numbered and given to the assignee', function () {
+it('creates a plan with the work order of the round at hand, the later rounds shown as to come', function () {
     $this->actingAs($this->helpdesk)->post('/pm-plans', planPayload())->assertSessionHasNoErrors();
 
+    // 2026-01-15: round 1 (from 2026-01-01) is at hand; round 2 (from 2026-04-01) gets its
+    // work order 14 days ahead (the default), on 2026-03-18.
     $plan = PmPlan::first();
     expect($plan->customer_id)->toBe($this->customer->id)
         ->and($plan->starts_on->toDateString())->toBe('2026-01-01')
         ->and($plan->ends_on->toDateString())->toBe('2026-12-31')
+        ->and($plan->active)->toBeTrue()
         ->and($plan->visits()->orderBy('round')->get()->map->only(['visit_no', 'round', 'due_on', 'status', 'assignee_id'])->map(fn ($v) => [
             $v['visit_no'], $v['round'], $v['due_on']->toDateString(), $v['status'], $v['assignee_id'],
         ])->all())->toBe([
             ['PM-2569-00001', 1, '2026-03-31', 'scheduled', $this->tech->id],
-            ['PM-2569-00002', 2, '2026-06-30', 'scheduled', $this->tech->id],
-            ['PM-2569-00003', 3, '2026-09-30', 'scheduled', $this->tech->id],
-            ['PM-2569-00004', 4, '2026-12-31', 'scheduled', $this->tech->id],
         ]);
 
     $this->actingAs($this->helpdesk)->get("/pm-plans/{$plan->id}")
         ->assertInertia(fn (Assert $page) => $page->component('Maintenance/Plans/Show')
             ->where('plan.contract.contract_no', $this->contract->contract_no)
-            ->has('visits', 4));
+            ->has('visits', 1)
+            ->where('upcoming', fn ($rounds) => collect($rounds)->map(fn ($r) => [$r['round'], $r['due_on'], $r['creates_on']])->all() === [
+                [2, '2026-06-30', '2026-03-18'],
+                [3, '2026-09-30', '2026-06-17'],
+                [4, '2026-12-31', '2026-09-17'],
+            ]));
 
     $this->actingAs($this->helpdesk)->get('/pm-plans')
         ->assertInertia(fn (Assert $page) => $page->component('Maintenance/Plans/Index')
             ->where('plans.total', 1)
-            ->where('plans.data.0.visits_count', 4)
+            ->where('plans.data.0.visits_count', 1)
             ->where('plans.data.0.customer', 'Acme'));
+
+    // the daily run makes round 2 on its day, numbered next
+    $this->travelTo('2026-03-18 06:00');
+    $this->artisan('pm:generate-rounds')->assertSuccessful();
+    expect($plan->visits()->orderBy('round')->pluck('visit_no', 'round')->all())->toBe([1 => 'PM-2569-00001', 2 => 'PM-2569-00002']);
 });
 
 it('does not schedule rounds that already ended when planned mid-contract', function () {
@@ -76,7 +86,8 @@ it('does not schedule rounds that already ended when planned mid-contract', func
 
     $this->actingAs($this->helpdesk)->post('/pm-plans', planPayload())->assertSessionHasNoErrors();
 
-    expect(PmVisit::orderBy('round')->pluck('round')->all())->toBe([2, 3, 4]);
+    expect(PmVisit::orderBy('round')->pluck('round')->all())->toBe([2])
+        ->and(collect(app(SchedulePmVisits::class)->upcoming(PmPlan::first()))->pluck('round')->all())->toBe([3, 4]);
 });
 
 it('accepts only an active running contract without a plan, and assignees who may do PM', function () {
@@ -106,16 +117,17 @@ it('re-schedules on a new interval until a round has started, and passes on a ne
 
     $this->actingAs($this->helpdesk)->put("/pm-plans/{$plan->id}", planPayload(['interval_months' => 6, 'assignee_id' => $this->tech->id]))
         ->assertSessionHasNoErrors();
-    expect($plan->visits()->pluck('due_on')->map->toDateString()->all())->toBe(['2026-06-30', '2026-12-31'])
+    expect($plan->visits()->pluck('due_on')->map->toDateString()->all())->toBe(['2026-06-30'])
         ->and($plan->visits()->pluck('assignee_id')->unique()->all())->toBe([$this->tech->id])
-        ->and(PmVisit::onlyTrashed()->count())->toBe(4);
+        ->and(PmVisit::onlyTrashed()->count())->toBe(1)
+        ->and(collect(app(SchedulePmVisits::class)->upcoming($plan->fresh()))->pluck('due_on')->all())->toBe(['2026-12-31']);
 
     $tech2 = userWithRole('technician');
     $first = $plan->visits()->orderBy('round')->first();
     $first->update(['assignee_id' => $tech2->id]); // moved to someone else by hand
     $this->actingAs($this->helpdesk)->put("/pm-plans/{$plan->id}", planPayload(['interval_months' => 6, 'assignee_id' => null]));
     expect($first->fresh()->assignee_id)->toBe($tech2->id)
-        ->and($plan->visits()->where('round', 2)->value('assignee_id'))->toBeNull();
+        ->and($plan->fresh()->assignee_id)->toBeNull();
 
     $first->update(['status' => PmVisit::STATUS_IN_PROGRESS]);
     $this->actingAs($this->helpdesk)->put("/pm-plans/{$plan->id}", planPayload(['interval_months' => 3]))

@@ -3,6 +3,8 @@
 namespace App\Modules\Maintenance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\AssetDetails;
+use App\Modules\Asset\Actions\CategoryNames;
 use App\Modules\Contract\Actions\ContractDetails;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
@@ -10,6 +12,7 @@ use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Actions\DeletePmPlan;
 use App\Modules\Maintenance\Actions\SavePmPlan;
+use App\Modules\Maintenance\Actions\SchedulePmVisits;
 use App\Modules\Maintenance\Actions\SearchPmPlans;
 use App\Modules\Maintenance\Http\Requests\PmPlanRequest;
 use App\Modules\Maintenance\Models\PmPlan;
@@ -71,9 +74,14 @@ class PmPlanController extends Controller
             ])
             ->values();
 
-        return Inertia::render('Maintenance/Plans/Form', $this->formProps(null) + [
+        $contractId = $request->integer('contract_id') ?: null;
+
+        return Inertia::render('Maintenance/Plans/Form', [
+            ...$this->formProps(null),
             'contracts' => $contracts,
-            'preselectedContractId' => $request->integer('contract_id') ?: null,
+            'preselectedContractId' => $contractId,
+            // The equipment of the contract picked (reloaded when another is picked: ?contract_id=).
+            'contractAssets' => fn () => $contractId ? $this->contractAssets($contractId) : [],
         ]);
     }
 
@@ -84,6 +92,24 @@ class PmPlanController extends Controller
         return redirect()->route('maintenance.plans.show', $plan)->with('success', __('maintenance.plans.created', ['count' => $plan->visits()->count()]));
     }
 
+    /**
+     * The equipment of a contract to pick from: what the filters of the plan form need.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function contractAssets(int $contractId): array
+    {
+        $ids = $this->contractDetails->handle([$contractId])[$contractId]['asset_ids'] ?? [];
+        $categories = app(CategoryNames::class)->handle(withTrashed: true);
+
+        return collect(app(AssetDetails::class)->handle($ids))
+            ->map(fn (array $asset) => [
+                ...collect($asset)->only(['id', 'asset_code', 'name', 'brand', 'model', 'serial_number', 'location', 'floor', 'room'])->all(),
+                'category' => $categories[$asset['category_id']] ?? null,
+            ])
+            ->sortBy('asset_code')->values()->all();
+    }
+
     public function show(Request $request, PmPlan $plan): Response
     {
         Gate::authorize('view', $plan);
@@ -91,6 +117,7 @@ class PmPlanController extends Controller
         $user = $request->user();
         $contract = $this->contractDetails->handle([$plan->contract_id])[$plan->contract_id] ?? null;
         $visits = $plan->visits()->withCount(['items'])->orderBy('round')->get();
+        $planAssets = $plan->assets()->pluck('asset_id')->all();
         $names = $this->userNames->handle([$plan->assignee_id, ...$visits->pluck('assignee_id')->all()]);
 
         return Inertia::render('Maintenance/Plans/Show', [
@@ -105,7 +132,13 @@ class PmPlanController extends Controller
                 'assignee' => $names[$plan->assignee_id] ?? null,
                 'starts_on' => $plan->starts_on->toDateString(),
                 'ends_on' => $plan->ends_on->toDateString(),
+                'active' => $plan->active,
+                // Equipment chosen for the plan; none = every asset of the contract.
+                'assets' => $planAssets === [] ? [] : collect(app(AssetDetails::class)->handle($planAssets))
+                    ->map(fn (array $asset) => collect($asset)->only(['asset_code', 'name', 'location', 'floor', 'room'])->all())->sortBy('asset_code')->values(),
             ],
+            // Rounds still to come, with the day their work orders will be made.
+            'upcoming' => app(SchedulePmVisits::class)->upcoming($plan),
             'visits' => $visits->map(fn (PmVisit $visit) => [
                 ...$visit->only(['ulid', 'visit_no', 'round', 'status', 'items_count']),
                 'period_starts_on' => $visit->period_starts_on->toDateString(),
@@ -152,9 +185,15 @@ class PmPlanController extends Controller
     {
         return [
             'plan' => $plan ? [
-                ...$plan->only(['id', 'title', 'interval_months', 'assignee_id', 'notes']),
+                ...$plan->only(['id', 'title', 'interval_months', 'assignee_id', 'notes', 'active', 'contract_id']),
+                'starts_on' => $plan->starts_on->toDateString(),
+                'ends_on' => $plan->ends_on->toDateString(),
+                'asset_ids' => $plan->assets()->pluck('asset_id')->map(fn ($id) => (int) $id)->all(),
                 'contract_no' => $this->contractDetails->handle([$plan->contract_id])[$plan->contract_id]['contract_no'] ?? null,
+                'contract_starts_on' => $this->contractDetails->handle([$plan->contract_id])[$plan->contract_id]['starts_on'] ?? null,
+                'contract_ends_on' => $this->contractDetails->handle([$plan->contract_id])[$plan->contract_id]['ends_on'] ?? null,
             ] : null,
+            'contractAssets' => $plan ? $this->contractAssets($plan->contract_id) : [],
             'intervals' => PmPlan::INTERVALS,
             'assignees' => $this->usersWithPermission->handle(PmPlanRequest::ASSIGNABLE_PERMISSION)
                 ->map(fn (User $user) => $user->only(['id', 'name']))->values(),
