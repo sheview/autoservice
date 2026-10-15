@@ -46,7 +46,7 @@ class PmReport
             'cancelled' => $cancelled,
             // Share of the rounds that were not cancelled and are done.
             'compliance' => $toDo === 0 ? null : (int) round($completed->count() * 100 / $toDo),
-            'items' => collect([PmVisitItem::RESULT_OK, PmVisitItem::RESULT_ISSUE, PmVisitItem::RESULT_SKIPPED, PmVisitItem::RESULT_PENDING])
+            'items' => collect([PmVisitItem::RESULT_PASSED, PmVisitItem::RESULT_FAILED, PmVisitItem::RESULT_NOT_INSPECTED, PmVisitItem::RESULT_PENDING])
                 ->mapWithKeys(fn (string $result) => [$result => (int) ($items[$result] ?? 0)])->all(),
         ];
     }

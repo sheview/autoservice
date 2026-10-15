@@ -4,16 +4,15 @@ namespace App\Modules\Maintenance\Actions;
 
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Identity\Models\User;
-use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
-use App\Modules\Maintenance\Support\ChecklistItems;
+use App\Modules\Maintenance\Support\PmTemplateResolver;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Puts equipment on a work order that is still to do (draft, scheduled, in progress or sent
- * back), each with a copy of the checklist of its category. Only assets of the work order's
+ * back), each with a copy of its template (PmTemplateResolver). Only assets of the work order's
  * customer; those already on it are skipped.
  */
 class AddPmVisitItems
@@ -42,19 +41,14 @@ class AddPmVisitItems
 
         return DB::transaction(function () use ($visit, $assets, $actor) {
             $existing = $visit->items()->pluck('asset_id')->map(fn ($id) => (int) $id)->all();
-            $checklists = PmChecklist::query()->orderBy('id')->get();
+            $templates = PmTemplateResolver::load($visit->pm_plan_id);
             $added = [];
 
             foreach ($assets as $asset) {
                 if (in_array((int) $asset['id'], $existing, true)) {
                     continue;
                 }
-                $checklist = ChecklistItems::pickFor($checklists, $asset['category_id']);
-                $visit->items()->create([
-                    'asset_id' => $asset['id'],
-                    'pm_checklist_id' => $checklist?->id,
-                    'checklist' => $checklist?->items ?? [],
-                ]);
+                $visit->items()->create(['asset_id' => $asset['id'], ...PmTemplateResolver::itemColumns($templates->for($asset))]);
                 $added[] = $asset['asset_code'];
             }
 

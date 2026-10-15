@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Maintenance\Actions\SearchPmVisits;
 use App\Modules\Maintenance\Models\PmVisit;
+use App\Modules\Maintenance\Models\PmVisitItem;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -46,7 +47,7 @@ class PmCustomerReportController extends Controller
             ->when($filters['customer_id'], fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['month'], fn (Builder $q, $month) => $q->whereBetween('published_at', [$month.'-01 00:00:00', date('Y-m-t 23:59:59', strtotime($month.'-01'))]))
             ->when($staff, fn (Builder $q) => $q->withCount(['shares as live_shares' => fn ($q) => $q->whereNull('revoked_at')->where('expires_at', '>', now())]))
-            ->withCount(['items', 'items as issue_count' => fn ($q) => $q->where('result', 'issue')])
+            ->withCount(['items', 'items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_FAILED)])
             ->orderBy($filters['sort'], $filters['direction'])
             ->orderByDesc('id')
             ->paginate(20)

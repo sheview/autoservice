@@ -7,6 +7,7 @@ use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Maintenance\Actions\PmOverview;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
+use App\Modules\Maintenance\Models\PmVisitItem;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -93,7 +94,7 @@ class PmDashboardController extends Controller
                 ->where('visit_no', 'like', "%{$filters['search']}%")
                 ->orWhere('title', 'like', "%{$filters['search']}%")
                 ->orWhereHas('plan', fn ($q) => $q->where('title', 'like', "%{$filters['search']}%"))))
-            ->withCount(['items', 'items as issue_count' => fn ($q) => $q->where('result', 'issue')])
+            ->withCount(['items', 'items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_FAILED)])
             ->orderBy($filters['sort'], $filters['direction'])->orderBy('id')
             ->paginate(20)->withQueryString();
 

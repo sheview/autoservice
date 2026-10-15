@@ -15,6 +15,9 @@ use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
+use App\Modules\Maintenance\Actions\AssignTemplateToCategory;
+use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Models\PmInstrument;
 use App\Modules\Service\Actions\CheckTicketWarranty;
 use App\Modules\Service\Actions\OpenTicket;
 use App\Modules\Service\Actions\SaveRepairReport;
@@ -153,6 +156,32 @@ function createAsset(AssetCategory $category, array $attributes = []): Asset
         'name' => 'Asset',
         'status' => Asset::STATUS_IN_USE,
     ]);
+}
+
+/**
+ * A published PM template (pm_checklists row) in the current tenant, tied to its
+ * asset_category_id (none = the default template). Items are stored as given.
+ */
+function createPmTemplate(array $attributes = []): PmChecklist
+{
+    static $n = 0;
+    $n++;
+
+    $template = PmChecklist::create($attributes + ['code' => "T{$n}", 'name' => "Template {$n}", 'items' => []]);
+    app(AssignTemplateToCategory::class)->handle($template->code, $template->asset_category_id);
+
+    return $template;
+}
+
+/**
+ * A measuring instrument (PM) in the current tenant.
+ */
+function createPmInstrument(array $attributes = []): PmInstrument
+{
+    static $n = 0;
+    $n++;
+
+    return PmInstrument::create($attributes + ['name' => "Meter {$n}", 'serial_no' => "SN-{$n}"]);
 }
 
 /**

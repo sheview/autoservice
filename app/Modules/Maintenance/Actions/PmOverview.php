@@ -62,7 +62,7 @@ class PmOverview
             'overdue' => $visits->filter(fn (PmVisit $visit) => $visit->isOverdue())->count(),
             'cancelled' => $cancelled,
             'compliance' => $toDo === 0 ? null : (int) round($done->count() * 100 / $toDo),
-            'results' => collect([PmVisitItem::RESULT_OK, PmVisitItem::RESULT_ISSUE, PmVisitItem::RESULT_SKIPPED, PmVisitItem::RESULT_PENDING])
+            'results' => collect([PmVisitItem::RESULT_PASSED, PmVisitItem::RESULT_FAILED, PmVisitItem::RESULT_NOT_INSPECTED, PmVisitItem::RESULT_PENDING])
                 ->mapWithKeys(fn (string $result) => [$result => (int) ($results[$result] ?? 0)])->all(),
         ];
     }
@@ -92,7 +92,7 @@ class PmOverview
     public function customers(User $user, CarbonImmutable $from, CarbonImmutable $to): array
     {
         $visits = $this->inPeriod($user, $from, $to, null)->where('status', '!=', PmVisit::STATUS_CANCELLED)
-            ->withCount(['items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_ISSUE)])
+            ->withCount(['items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_FAILED)])
             ->get(['id', 'customer_id', 'status', 'due_on']);
 
         return $visits->groupBy('customer_id')->map(fn ($rows) => [

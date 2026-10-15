@@ -5,17 +5,17 @@ namespace App\Modules\Maintenance\Actions;
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Contract\Actions\ContractDetails;
 use App\Modules\Identity\Models\User;
-use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Models\PmPlanAsset;
 use App\Modules\Maintenance\Models\PmVisit;
-use App\Modules\Maintenance\Support\ChecklistItems;
+use App\Modules\Maintenance\Support\PmTemplateResolver;
 use App\Modules\Maintenance\Support\PmWorkflow;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Starts a work order. Its equipment is what was listed on it beforehand (AddPmVisitItems); with
- * none listed, every asset its contract covers now. Each item gets a copy of the checklist of its
- * category (or the general checklist, the one without a category). Whoever starts an unassigned
+ * none listed, the equipment of its plan (pm_plan_assets), else every asset its contract covers
+ * now. Each item gets a copy of its template (PmTemplateResolver). Whoever starts an unassigned
  * work order becomes its technician.
  */
 class StartPmVisit
@@ -35,15 +35,13 @@ class StartPmVisit
             }
 
             if (! $visit->items()->exists() && $visit->contract_id) {
-                $assetIds = $this->contractDetails->handle([$visit->contract_id])[$visit->contract_id]['asset_ids'] ?? [];
-                $checklists = PmChecklist::query()->orderBy('id')->get();
+                $assetIds = $visit->pm_plan_id ? PmPlanAsset::query()->where('pm_plan_id', $visit->pm_plan_id)->pluck('asset_id')->all() : [];
+                if ($assetIds === []) {
+                    $assetIds = $this->contractDetails->handle([$visit->contract_id])[$visit->contract_id]['asset_ids'] ?? [];
+                }
+                $templates = PmTemplateResolver::load($visit->pm_plan_id);
                 foreach ($this->assetDetails->handle($assetIds) as $asset) {
-                    $checklist = ChecklistItems::pickFor($checklists, $asset['category_id']);
-                    $visit->items()->create([
-                        'asset_id' => $asset['id'],
-                        'pm_checklist_id' => $checklist?->id,
-                        'checklist' => $checklist?->items ?? [],
-                    ]);
+                    $visit->items()->create(['asset_id' => $asset['id'], ...PmTemplateResolver::itemColumns($templates->for($asset))]);
                 }
             }
 

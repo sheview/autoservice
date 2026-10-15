@@ -1,7 +1,6 @@
 <?php
 
 use App\Modules\Maintenance\Actions\SavePmPlan;
-use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmReportShare;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Support\ShareToken;
@@ -25,7 +24,7 @@ beforeEach(function () {
     $ups = createAsset($category, ['customer_id' => $this->customer->id, 'name' => 'UPS Alpha']);
     $contract = createContract($this->customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
     $contract->contractAssets()->create(['asset_id' => $ups->id]);
-    PmChecklist::create(['name' => 'UPS PM', 'asset_category_id' => $category->id, 'items' => [['key' => 'battery', 'label' => 'แบตเตอรี่', 'type' => 'pass_fail']]]);
+    createPmTemplate(['name' => 'UPS PM', 'asset_category_id' => $category->id, 'items' => [['key' => 'battery', 'label' => 'แบตเตอรี่', 'type' => 'pass_fail']]]);
 
     $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM Acme', 'interval_months' => 3, 'assignee_id' => $this->tech->id]);
     $this->visit = $plan->visits()->orderBy('round')->first();
@@ -39,7 +38,7 @@ beforeEach(function () {
 
     $this->actingAs($this->tech)->post("{$this->url}/start");
     $item = $this->visit->items()->first();
-    $this->actingAs($this->tech)->put("{$this->url}/items/{$item->id}", ['result' => 'ok', 'answers' => ['battery' => 'pass']]);
+    $this->actingAs($this->tech)->put("{$this->url}/items/{$item->id}", ['result' => 'passed', 'answers' => ['battery' => 'pass']]);
     ($this->approve)('ฉบับแรก');
 
     // Makes a link and returns its path (the token is only in the flashed link).
@@ -111,7 +110,7 @@ it('stops working when expired, revoked, or the token is wrong', function () {
     ($this->guest)()->get("{$path}/pdf?download=1")->assertNotFound();
 
     // A changed or malformed token.
-    $notFound(substr($path, 0, -1).'X');
+    $notFound(substr($path, 0, -1).(str_ends_with($path, 'X') ? 'Y' : 'X'));
     $notFound(substr($path, 0, -5));
     // The right token on another company's path.
     $other = createTenant('other');

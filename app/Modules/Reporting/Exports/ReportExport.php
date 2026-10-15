@@ -109,8 +109,8 @@ class ReportExport implements Export, WithMultipleSheets
                 __('ui.reports.pm_overdue') => $pm['overdue'],
                 __('ui.reports.pm_cancelled') => $pm['cancelled'],
                 __('ui.reports.pm_compliance') => $percent($pm['compliance']),
-                __('ui.reports.pm_items_ok') => $pm['items']['ok'],
-                __('ui.reports.pm_items_issue') => $pm['items']['issue'],
+                __('ui.reports.pm_items_ok') => $pm['items']['passed'],
+                __('ui.reports.pm_items_issue') => $pm['items']['failed'],
             ]);
         }
 

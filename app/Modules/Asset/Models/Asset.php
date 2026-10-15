@@ -22,6 +22,8 @@ use Spatie\MediaLibrary\HasMedia;
  * property_no is the owner's equipment number (เลขครุภัณฑ์), optional and unique.
  * Serial numbers are in "serials"; serial_number keeps the first one for lists, labels and tickets.
  * quantity is the number of serials when the category requires them, otherwise typed in with a unit.
+ * brand / model are the text shown; asset_brand_id / asset_model_id point at the same names in the
+ * catalog (kept in step by SaveAsset). parent_asset_id ties a part to the asset it belongs to.
  * It carries up to four photos (HasPhotoSlots) and attached files (HasAttachments).
  */
 #[UsePolicy(AssetPolicy::class)]
@@ -43,10 +45,13 @@ class Asset extends Model implements HasMedia
         'branch_id',
         'customer_id',
         'category_id',
+        'parent_asset_id',
         'asset_code',
         'name',
         'brand',
+        'asset_brand_id',
         'model',
+        'asset_model_id',
         'subtype',
         'serial_number',
         'quantity',
@@ -54,6 +59,8 @@ class Asset extends Model implements HasMedia
         'property_no',
         'status',
         'location',
+        'floor',
+        'room',
         'ip_address',
         'mac_address',
         'used_by',
@@ -111,6 +118,27 @@ class Asset extends Model implements HasMedia
         return $this->hasMany(AssetSerial::class)->orderBy('id');
     }
 
+    /** The asset this one is part of (a monitor's PC, a battery cabinet's UPS). */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_asset_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_asset_id')->orderBy('asset_code');
+    }
+
+    public function catalogBrand(): BelongsTo
+    {
+        return $this->belongsTo(AssetBrand::class, 'asset_brand_id')->withTrashed();
+    }
+
+    public function catalogModel(): BelongsTo
+    {
+        return $this->belongsTo(AssetModel::class, 'asset_model_id')->withTrashed();
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
@@ -120,8 +148,8 @@ class Asset extends Model implements HasMedia
     {
         return LogOptions::defaults()
             ->logOnly([
-                'branch_id', 'customer_id', 'category_id', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit',
-                'property_no', 'status', 'location', 'ip_address', 'mac_address', 'used_by', 'department',
+                'branch_id', 'customer_id', 'category_id', 'parent_asset_id', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit',
+                'property_no', 'status', 'location', 'floor', 'room', 'ip_address', 'mac_address', 'used_by', 'department',
                 'purchased_at', 'purchase_price', 'warranty_expires_at', 'specs', 'notes',
             ])
             ->logOnlyDirty()

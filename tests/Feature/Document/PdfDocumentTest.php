@@ -3,7 +3,6 @@
 use App\Modules\Document\Support\ThaiDate;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
-use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Tenancy\Support\TenantContext;
@@ -70,14 +69,14 @@ it('makes the PM report PDF of a round with every asset and its checklist answer
 
     $contract = createContract($this->customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
     $contract->contractAssets()->create(['asset_id' => $this->asset->id]);
-    PmChecklist::create(['name' => 'ทั่วไป', 'asset_category_id' => null, 'items' => [
+    createPmTemplate(['name' => 'ทั่วไป', 'asset_category_id' => null, 'items' => [
         ['key' => 'clean', 'label' => 'ทำความสะอาด', 'type' => 'check'],
         ['key' => 'temp', 'label' => 'อุณหภูมิ', 'type' => 'number'],
     ]]);
     $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM Acme', 'interval_months' => 6, 'assignee_id' => $this->tech->id]);
     $visit = app(StartPmVisit::class)->handle($plan->visits()->orderBy('round')->first(), $this->tech);
     $item = $visit->items()->first();
-    $item->update(['result' => PmVisitItem::RESULT_ISSUE, 'answers' => ['clean' => true, 'temp' => 41], 'note' => 'พัดลมเสียงดัง']);
+    $item->update(['result' => PmVisitItem::RESULT_FAILED, 'answers' => ['clean' => true, 'temp' => 41], 'note' => 'พัดลมเสียงดัง']);
 
     $this->actingAs($this->tech)->get("/pm-visits/{$visit->ulid}/pdf")->assertOk()
         ->assertHeader('content-type', 'application/pdf');

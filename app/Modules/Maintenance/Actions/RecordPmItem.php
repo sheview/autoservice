@@ -28,11 +28,11 @@ class RecordPmItem
         $checklist = $item->checklist ?? [];
         $answers = ChecklistItems::normalize($checklist, $data['answers'] ?? []);
 
-        if ($data['result'] !== PmVisitItem::RESULT_SKIPPED) {
+        if ($data['result'] !== PmVisitItem::RESULT_NOT_INSPECTED) {
             if ($missing = ChecklistItems::missing($checklist, $answers)) {
                 throw ValidationException::withMessages(['answers' => __('maintenance.visits.answers_missing', ['items' => implode(', ', $missing)])]);
             }
-            if ($data['result'] === PmVisitItem::RESULT_OK && ($failed = ChecklistItems::failures($checklist, $answers))) {
+            if ($data['result'] === PmVisitItem::RESULT_PASSED && ($failed = ChecklistItems::failures($checklist, $answers))) {
                 throw ValidationException::withMessages(['result' => __('maintenance.visits.failed_not_ok', ['items' => implode(', ', $failed)])]);
             }
         }

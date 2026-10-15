@@ -20,7 +20,7 @@ function startedPmPlan(): array
     $customer = createCustomer();
     $contract = createContract($customer);
     $contract->contractAssets()->create(['asset_id' => createAsset(createAssetCategory(), ['customer_id' => $customer->id])->id]);
-    $checklist = PmChecklist::create(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'Look', 'type' => 'check']]]);
+    $checklist = createPmTemplate(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'Look', 'type' => 'check']]]);
 
     $plan = app(SavePmPlan::class)->handle(null, ['contract_id' => $contract->id, 'title' => 'PM', 'interval_months' => 6, 'assignee_id' => $admin->id]);
     $visit = app(StartPmVisit::class)->handle($plan->visits()->orderBy('round')->first(), $admin);
@@ -47,7 +47,7 @@ it('keeps checklists, plans, rounds and their numbers per tenant', function () {
     $this->actingAs($admin)->post("/pm-visits/{$theirVisit->ulid}/move", ['action' => 'cancel', 'note' => 'x'])->assertNotFound();
     $this->actingAs($admin)->put("/pm-checklists/{$theirChecklist->id}", ['name' => 'x', 'items' => []])->assertNotFound();
     // an item of another tenant, even under my own round
-    $this->actingAs($admin)->put("/pm-visits/{$myVisit->ulid}/items/{$theirItem->id}", ['result' => 'ok'])->assertNotFound();
+    $this->actingAs($admin)->put("/pm-visits/{$myVisit->ulid}/items/{$theirItem->id}", ['result' => 'passed'])->assertNotFound();
 
     // a contract of the other tenant cannot be planned
     $this->actingAs($admin)->post('/pm-plans', ['contract_id' => $theirContract->id, 'title' => 'x', 'interval_months' => 3])

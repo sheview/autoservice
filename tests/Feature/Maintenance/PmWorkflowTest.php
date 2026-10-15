@@ -3,7 +3,6 @@
 use App\Modules\Maintenance\Actions\MovePmVisit;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\SavePmSettings;
-use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmReportVersion;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
@@ -24,7 +23,7 @@ beforeEach(function () {
     $this->switch = createAsset($category, ['customer_id' => $this->customer->id, 'name' => 'Core switch']);
     $contract = createContract($this->customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
     $contract->contractAssets()->create(['asset_id' => $this->switch->id]);
-    PmChecklist::create(['name' => 'Switch PM', 'asset_category_id' => $category->id, 'items' => [
+    createPmTemplate(['name' => 'Switch PM', 'asset_category_id' => $category->id, 'items' => [
         ['key' => 'fan', 'label' => 'พัดลม', 'type' => 'pass_fail'],
         ['key' => 'temp', 'label' => 'อุณหภูมิ', 'type' => 'measure', 'unit' => '°C', 'max' => 45],
     ]]);
@@ -39,7 +38,7 @@ beforeEach(function () {
     $this->work = function () {
         $this->actingAs($this->tech)->post("{$this->url}/start")->assertSessionHasNoErrors();
         $item = $this->visit->items()->first();
-        $this->actingAs($this->tech)->put("{$this->url}/items/{$item->id}", ['result' => 'ok', 'answers' => ['fan' => 'pass', 'temp' => 38]])
+        $this->actingAs($this->tech)->put("{$this->url}/items/{$item->id}", ['result' => 'passed', 'answers' => ['fan' => 'pass', 'temp' => 38]])
             ->assertSessionHasNoErrors();
 
         return $item;
@@ -99,7 +98,7 @@ it('sends handed-in work back with the reason, and takes it again once fixed', f
         ->toBe(['status' => PmVisit::STATUS_REVISION_REQUIRED, 'revision_note' => 'ใส่ค่าอุณหภูมิผิดหน่วย', 'revision_count' => 1]);
 
     // The technician fixes it and hands it in again; the earlier signature still counts.
-    $this->actingAs($this->tech)->put("{$this->url}/items/{$item->id}", ['result' => 'ok', 'answers' => ['fan' => 'pass', 'temp' => 40]])
+    $this->actingAs($this->tech)->put("{$this->url}/items/{$item->id}", ['result' => 'passed', 'answers' => ['fan' => 'pass', 'temp' => 40]])
         ->assertSessionHasNoErrors();
     $this->actingAs($this->tech)->post("{$this->url}/submit")->assertSessionHasNoErrors();
     expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_SUBMITTED);
@@ -215,7 +214,7 @@ it('shows a customer account the schedule and equipment, never the work in the m
     $this->actingAs($client)->get("{$this->url}/items/{$item->id}/photos/{$photo->id}")->assertNotFound();
     // Staff still see it all.
     $this->actingAs($this->helpdesk)->get($this->url)->assertInertia(fn (Assert $page) => $page
-        ->where('visit.revision_note', 'เหตุผลภายในของหัวหน้า')->where('items.0.result', 'ok'));
+        ->where('visit.revision_note', 'เหตุผลภายในของหัวหน้า')->where('items.0.result', 'passed'));
 });
 
 it('refuses a move whose status changed after the permission was checked', function () {

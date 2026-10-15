@@ -17,10 +17,10 @@ use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Maintenance\Actions\MovePmVisit;
 use App\Modules\Maintenance\Actions\RecordPmItem;
+use App\Modules\Maintenance\Actions\SaveChecklist;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Actions\SubmitPmVisit;
-use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\CheckTicketWarranty;
@@ -436,7 +436,7 @@ class DemoSeeder extends Seeder
     {
         $categories = AssetCategory::pluck('id', 'code_prefix');
         foreach (self::CHECKLISTS as $prefix => [$name, $items]) {
-            PmChecklist::create([
+            app(SaveChecklist::class)->handle(null, [
                 'name' => $name,
                 'asset_category_id' => $prefix === '' ? null : $categories[$prefix] ?? null,
                 'items' => array_map(fn (array $item) => ['key' => $item[0], 'label' => $item[1], 'type' => $item[2]], $items),
@@ -474,7 +474,7 @@ class DemoSeeder extends Seeder
                     Carbon::setTestNow(now()->addMinutes(fake()->numberBetween(10, 40)));
                     $issue = fake()->boolean(10);
                     $this->recordPmItem->handle($item, $technician, [
-                        'result' => $issue ? PmVisitItem::RESULT_ISSUE : PmVisitItem::RESULT_OK,
+                        'result' => $issue ? PmVisitItem::RESULT_FAILED : PmVisitItem::RESULT_PASSED,
                         'answers' => collect($item->checklist)->mapWithKeys(fn (array $field) => [$field['key'] => match ($field['type']) {
                             'check' => true,
                             'number' => fake()->numberBetween(20, 60),

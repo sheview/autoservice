@@ -31,7 +31,7 @@ beforeEach(function () {
     // Acme's May round handed in, waiting for review.
     $may = $this->acmeVisits[0];
     app(StartPmVisit::class)->handle($may, $this->tech);
-    $may->items()->update(['result' => PmVisitItem::RESULT_ISSUE, 'note' => 'x']);
+    $may->items()->update(['result' => PmVisitItem::RESULT_FAILED, 'note' => 'x']);
     app(SubmitPmVisit::class)->handle($may, $this->tech, ['technician_signature' => signaturePng()]);
 });
 
@@ -75,7 +75,7 @@ it('reports a period by figures and by customer, with its work orders', function
         ->component('Maintenance/Reports')
         ->where('summary.due', 2)
         ->where('summary.done', 1)
-        ->where('summary.results.issue', 1)
+        ->where('summary.results.failed', 1)
         ->where('byCustomer', fn ($rows) => collect($rows)->pluck('customer')->sort()->values()->all() === ['Acme', 'Beta'])
         ->where('visits.total', 2));
 

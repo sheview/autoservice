@@ -948,7 +948,7 @@ class DemoExtrasSeeder extends Seeder
                 'number' => fake()->numberBetween(1, 100),
                 default => 'ปกติ',
             }])->all();
-            app(RecordPmItem::class)->handle($item, $technician, ['result' => PmVisitItem::RESULT_OK, 'answers' => $answers]);
+            app(RecordPmItem::class)->handle($item, $technician, ['result' => PmVisitItem::RESULT_PASSED, 'answers' => $answers]);
         }
     }
 

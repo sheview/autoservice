@@ -24,7 +24,7 @@ class RecordPmItemRequest extends FormRequest
         $rules = [
             'result' => ['required', Rule::in(PmVisitItem::RESULTS)],
             'answers' => ['array'],
-            'note' => [Rule::requiredIf($this->input('result') === PmVisitItem::RESULT_ISSUE), 'nullable', 'string', 'max:5000'],
+            'note' => [Rule::requiredIf($this->input('result') === PmVisitItem::RESULT_FAILED), 'nullable', 'string', 'max:5000'],
             // A note per question, by key.
             'remarks' => ['nullable', 'array'],
             'remarks.*' => ['nullable', 'string', 'max:1000'],

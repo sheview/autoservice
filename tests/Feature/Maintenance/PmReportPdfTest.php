@@ -1,7 +1,6 @@
 <?php
 
 use App\Modules\Maintenance\Actions\SavePmPlan;
-use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisit;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
@@ -46,7 +45,7 @@ beforeEach(function () {
     $contract = createContract($this->customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
     $contract->contractAssets()->create(['asset_id' => $this->upsA->id]);
     $contract->contractAssets()->create(['asset_id' => $this->upsB->id]);
-    PmChecklist::create(['name' => 'UPS PM', 'asset_category_id' => $category->id, 'items' => [
+    createPmTemplate(['name' => 'UPS PM', 'asset_category_id' => $category->id, 'items' => [
         ['key' => 'battery', 'label' => 'ทดสอบแบตเตอรี่', 'type' => 'pass_fail', 'section' => 'แบตเตอรี่'],
         ['key' => 'load', 'label' => 'โหลดใช้งาน', 'type' => 'measure', 'unit' => '%', 'max' => 80],
     ]]);
@@ -59,8 +58,8 @@ beforeEach(function () {
     $this->actingAs($this->tech)->post("{$this->url}/start");
     $this->itemA = $this->visit->items()->where('asset_id', $this->upsA->id)->first();
     $this->itemB = $this->visit->items()->where('asset_id', $this->upsB->id)->first();
-    $this->actingAs($this->tech)->put("{$this->url}/items/{$this->itemA->id}", ['result' => 'issue', 'answers' => ['battery' => 'fail', 'load' => 92], 'remarks' => ['battery' => 'แบตเสื่อม'], 'note' => 'ต้องเปลี่ยนแบต']);
-    $this->actingAs($this->tech)->put("{$this->url}/items/{$this->itemB->id}", ['result' => 'ok', 'answers' => ['battery' => 'pass', 'load' => 40]]);
+    $this->actingAs($this->tech)->put("{$this->url}/items/{$this->itemA->id}", ['result' => 'failed', 'answers' => ['battery' => 'fail', 'load' => 92], 'remarks' => ['battery' => 'แบตเสื่อม'], 'note' => 'ต้องเปลี่ยนแบต']);
+    $this->actingAs($this->tech)->put("{$this->url}/items/{$this->itemB->id}", ['result' => 'passed', 'answers' => ['battery' => 'pass', 'load' => 40]]);
     $this->actingAs($this->tech)->post("{$this->url}/items/{$this->itemA->id}/photos", ['photo' => UploadedFile::fake()->image('batt.jpg', 1600, 1200), 'question' => 'battery']);
 
     $this->approve = function (string $summary = 'สรุป') {

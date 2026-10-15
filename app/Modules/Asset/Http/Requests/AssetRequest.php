@@ -89,6 +89,10 @@ class AssetRequest extends FormRequest
             // A branch or a location, at least one (checked in after()).
             'branch_id' => ['nullable', 'integer', Rule::exists('branches', 'id')->whereNull('deleted_at')],
             'location' => ['nullable', 'string', 'max:255'],
+            'floor' => ['nullable', 'string', 'max:50'],
+            'room' => ['nullable', 'string', 'max:100'],
+            // The asset this one is part of (a monitor's PC); not itself (a loop is checked in after()).
+            'parent_asset_id' => ['nullable', 'integer', Rule::notIn(array_filter([$asset?->id])), Rule::exists('assets', 'id')->whereNull('deleted_at')],
             'ip_address' => ['nullable', 'ip'],
             'mac_address' => ['nullable', 'regex:/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/'],
             'used_by' => ['nullable', 'string', 'max:255'],
@@ -135,7 +139,7 @@ class AssetRequest extends FormRequest
     {
         return [
             ...collect(__('asset.columns'))->only([
-                'name', 'brand', 'model', 'subtype', 'quantity', 'unit', 'property_no', 'status', 'location', 'ip_address', 'mac_address',
+                'name', 'brand', 'model', 'subtype', 'quantity', 'unit', 'property_no', 'status', 'location', 'floor', 'room', 'parent_asset_id', 'ip_address', 'mac_address',
                 'used_by', 'department', 'purchased_at',
                 'purchase_price', 'warranty_expires_at', 'notes',
             ])->all(),
@@ -185,6 +189,13 @@ class AssetRequest extends FormRequest
                 // Typed-in quantity: never fewer than the serial numbers listed.
                 if (is_numeric($this->input('quantity')) && (int) $this->input('quantity') < count($serials)) {
                     $validator->errors()->add('quantity', __('asset.assets.quantity_below_serials', ['count' => count($serials)]));
+                }
+            },
+            function (Validator $validator) {
+                // One level only: the parent is not itself a part, so no asset ends up under its own part.
+                $parentId = $this->input('parent_asset_id');
+                if (filled($parentId) && Asset::query()->whereKey($parentId)->whereNotNull('parent_asset_id')->exists()) {
+                    $validator->errors()->add('parent_asset_id', __('asset.assets.parent_is_part'));
                 }
             },
             fn (Validator $validator) => $this->checkSerialsTaken($validator),

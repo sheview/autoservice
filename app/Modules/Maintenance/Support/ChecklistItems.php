@@ -2,9 +2,6 @@
 
 namespace App\Modules\Maintenance\Support;
 
-use App\Modules\Maintenance\Models\PmChecklist;
-use Illuminate\Support\Collection;
-
 /**
  * The questions of a PM checklist (pm_checklists.items, copied to pm_visit_items.checklist when
  * the work starts) and their answers (pm_visit_items.answers, by key):
@@ -28,17 +25,6 @@ final class ChecklistItems
     public const PASS_FAIL = ['pass', 'fail', 'na'];
 
     public const MAX_ITEMS = 80;
-
-    /**
-     * The checklist for an asset of a category: its category's own, else the general one (no category).
-     *
-     * @param  Collection<int, PmChecklist>  $checklists
-     */
-    public static function pickFor(Collection $checklists, ?int $categoryId): ?PmChecklist
-    {
-        return ($categoryId ? $checklists->firstWhere('asset_category_id', $categoryId) : null)
-            ?? $checklists->firstWhere('asset_category_id', null);
-    }
 
     /**
      * Questions as saved: known fields only, unit / range only on a measure.

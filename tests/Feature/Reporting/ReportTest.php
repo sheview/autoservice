@@ -126,7 +126,7 @@ it('counts SLA results, PM rounds and assets', function () {
             ->where('report.tickets.sla.response', ['met' => 0, 'breached' => 1, 'pending' => 1, 'rate' => 0])
             ->where('report.tickets.sla.resolve', ['met' => 0, 'breached' => 1, 'pending' => 1, 'rate' => 0])
             ->where('report.pm', ['due' => 0, 'completed' => 0, 'on_time' => 0, 'in_progress' => 0, 'overdue' => 0, 'scheduled' => 0,
-                'cancelled' => 0, 'compliance' => null, 'items' => ['ok' => 0, 'issue' => 0, 'skipped' => 0, 'pending' => 0]])
+                'cancelled' => 0, 'compliance' => null, 'items' => ['passed' => 0, 'failed' => 0, 'not_inspected' => 0, 'pending' => 0]])
             ->where('report.assets.total', 3)
             ->where('report.assets.by_status', ['in_use' => 1, 'spare' => 1, 'in_repair' => 0, 'retired' => 1])
             ->where('report.assets.by_category', [['name' => 'Switch', 'count' => 2], ['name' => 'Server', 'count' => 1]])

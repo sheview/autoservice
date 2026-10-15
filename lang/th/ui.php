@@ -2882,9 +2882,9 @@ return [
         'pdf' => 'รายงาน PM (PDF)',
         'results' => [
             'pending' => 'ยังไม่ตรวจ',
-            'ok' => 'ปกติ',
-            'issue' => 'พบปัญหา',
-            'skipped' => 'ข้าม',
+            'passed' => 'ปกติ',
+            'failed' => 'ผิดปกติ',
+            'not_inspected' => 'ไม่ได้ตรวจ',
         ],
         'statuses' => [
             'draft' => 'ร่าง',

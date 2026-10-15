@@ -26,11 +26,11 @@ beforeEach(function () {
     $this->contract->contractAssets()->create(['asset_id' => $this->switch->id]);
     $this->contract->contractAssets()->create(['asset_id' => $this->printer->id]);
 
-    PmChecklist::create(['name' => 'Switch PM', 'asset_category_id' => $this->switches->id, 'items' => [
+    createPmTemplate(['name' => 'Switch PM', 'asset_category_id' => $this->switches->id, 'items' => [
         ['key' => 'clean', 'label' => 'ทำความสะอาด', 'type' => 'check'],
         ['key' => 'temp', 'label' => 'อุณหภูมิ', 'type' => 'number'],
     ]]);
-    PmChecklist::create(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'ตรวจสภาพ', 'type' => 'text']]]);
+    createPmTemplate(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'ตรวจสภาพ', 'type' => 'text']]]);
 
     $this->plan = app(SavePmPlan::class)->handle(null, [
         'contract_id' => $this->contract->id, 'title' => 'PM Acme', 'interval_months' => 3, 'assignee_id' => $this->tech->id,
@@ -65,23 +65,23 @@ it('records results per asset and closes the round once every asset has one', fu
     $printerItem = itemOf($this->visit, $this->printer->id);
 
     $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$switchItem->id}", [
-        'result' => 'ok', 'answers' => ['clean' => true, 'temp' => 'hot', 'extra' => 'x'],
+        'result' => 'passed', 'answers' => ['clean' => true, 'temp' => 'hot', 'extra' => 'x'],
     ])->assertSessionHasErrors('answers.temp');
 
     $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$switchItem->id}", [
-        'result' => 'ok', 'answers' => ['clean' => true, 'temp' => '38.5', 'extra' => 'x'],
+        'result' => 'passed', 'answers' => ['clean' => true, 'temp' => '38.5', 'extra' => 'x'],
     ])->assertSessionHasNoErrors();
     expect($switchItem->fresh()->answers)->toEqual(['clean' => true, 'temp' => 38.5])
         ->and($switchItem->fresh()->checked_by)->toBe($this->tech->id);
 
     // an issue needs a note
-    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", ['result' => 'issue'])
+    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", ['result' => 'failed'])
         ->assertSessionHasErrors('note');
 
     $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/submit", ['technician_signature' => signaturePng()])->assertSessionHasErrors('visit');
 
     $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", [
-        'result' => 'issue', 'answers' => ['look' => 'ลูกยางดึงกระดาษสึก'], 'note' => 'ดึงกระดาษไม่เข้า',
+        'result' => 'failed', 'answers' => ['look' => 'ลูกยางดึงกระดาษสึก'], 'note' => 'ดึงกระดาษไม่เข้า',
     ])->assertSessionHasNoErrors();
 
     // the company asks for the technician's signature (PmSettings default)
@@ -91,12 +91,12 @@ it('records results per asset and closes the round once every asset has one', fu
         ->and($this->visit->fresh()->summary)->toBe('เรียบร้อย');
 
     // handed-in work is read only
-    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", ['result' => 'ok'])
+    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", ['result' => 'passed'])
         ->assertSessionHasErrors('visit');
 
     // the asset page shows its PM history
     $this->actingAs($this->tech)->get("/assets/{$this->printer->ulid}")
-        ->assertInertia(fn (Assert $page) => $page->where('pmHistory.0.visit_no', $this->visit->visit_no)->where('pmHistory.0.result', 'issue'));
+        ->assertInertia(fn (Assert $page) => $page->where('pmHistory.0.visit_no', $this->visit->visit_no)->where('pmHistory.0.result', 'failed'));
 });
 
 it('opens a repair ticket for an asset found with an issue', function () {
@@ -106,7 +106,7 @@ it('opens a repair ticket for an asset found with an issue', function () {
     $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/items/{$item->id}/ticket", ['priority' => 'medium'])
         ->assertSessionHasErrors('item');
 
-    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$item->id}", ['result' => 'issue', 'note' => 'ดึงกระดาษไม่เข้า']);
+    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$item->id}", ['result' => 'failed', 'note' => 'ดึงกระดาษไม่เข้า']);
     $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/items/{$item->id}/ticket", ['priority' => 'medium'])
         ->assertSessionHasNoErrors();
 

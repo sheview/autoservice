@@ -109,7 +109,7 @@ class PmReportData
             })->all(),
             'totals' => [
                 'total' => $items->count(),
-                ...collect([PmVisitItem::RESULT_OK, PmVisitItem::RESULT_ISSUE, PmVisitItem::RESULT_SKIPPED, PmVisitItem::RESULT_PENDING])
+                ...collect([PmVisitItem::RESULT_PASSED, PmVisitItem::RESULT_FAILED, PmVisitItem::RESULT_NOT_INSPECTED, PmVisitItem::RESULT_PENDING])
                     ->mapWithKeys(fn (string $result) => [$result => $items->where('result', $result)->count()])->all(),
             ],
             'signatures' => [

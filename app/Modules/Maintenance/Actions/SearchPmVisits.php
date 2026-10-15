@@ -57,7 +57,7 @@ class SearchPmVisits
             ->withCount([
                 'items',
                 'items as checked_count' => fn ($q) => $q->where('result', '!=', PmVisitItem::RESULT_PENDING),
-                'items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_ISSUE),
+                'items as issue_count' => fn ($q) => $q->where('result', PmVisitItem::RESULT_FAILED),
             ])
             ->when($search !== '', fn (Builder $q) => $q->where(fn ($q) => $q
                 ->where('visit_no', 'like', "%{$search}%")

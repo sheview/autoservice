@@ -44,11 +44,11 @@ const props = defineProps<{
     priorities: string[];
 }>();
 
-const results = ['ok', 'issue', 'skipped'];
+const results = ['passed', 'failed', 'not_inspected'];
 const passFail = ['pass', 'fail', 'na'];
 
 const form = useForm({
-    result: props.item.result === 'pending' ? 'ok' : props.item.result,
+    result: props.item.result === 'pending' ? 'passed' : props.item.result,
     answers: Object.fromEntries(
         props.item.checklist.map((q) => [q.key, props.item.answers[q.key] ?? (q.type === 'check' ? false : q.type === 'pass_fail' ? null : '')]),
     ) as Record<string, boolean | string | number | null>,
@@ -292,14 +292,14 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
             <div class="grid gap-1">
                 <label :for="`note_${item.id}`" class="text-sm">{{
-                    form.result === 'issue' ? t('pm_visits.note_issue') : t('pm_visits.note')
+                    form.result === 'failed' ? t('pm_visits.note_issue') : t('pm_visits.note')
                 }}</label>
                 <textarea
                     :id="`note_${item.id}`"
                     v-model="form.note"
                     rows="2"
                     class="shadow-xs rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    :required="form.result === 'issue'"
+                    :required="form.result === 'failed'"
                 />
                 <InputError :message="form.errors.note" />
             </div>
@@ -365,7 +365,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         </div>
 
         <!-- A found issue can become a repair ticket -->
-        <div v-if="canOpenTicket && item.result === 'issue' && !item.ticket" class="flex flex-wrap items-center gap-2 border-t pt-3">
+        <div v-if="canOpenTicket && item.result === 'failed' && !item.ticket" class="flex flex-wrap items-center gap-2 border-t pt-3">
             <select v-model="ticket.priority" :class="selectClass" :aria-label="t('tickets.priority')">
                 <option v-for="priority in priorities" :key="priority" :value="priority">{{ t(`tickets.priorities.${priority}`) }}</option>
             </select>

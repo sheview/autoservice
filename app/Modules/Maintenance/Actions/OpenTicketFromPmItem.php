@@ -24,7 +24,7 @@ class OpenTicketFromPmItem
 
     public function handle(PmVisitItem $item, User $actor, string $priority): Ticket
     {
-        if ($item->result !== PmVisitItem::RESULT_ISSUE || $item->ticket_id !== null) {
+        if ($item->result !== PmVisitItem::RESULT_FAILED || $item->ticket_id !== null) {
             throw ValidationException::withMessages(['item' => __('maintenance.visits.cannot_open_ticket')]);
         }
 

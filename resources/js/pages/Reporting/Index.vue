@@ -341,8 +341,8 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
                     </div>
                     <div class="rounded-md border p-4">
                         <p class="text-xs text-muted-foreground">{{ t('reports.pm_items_issue') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.pm.items.issue ?? 0) }}</p>
-                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_items_ok') }} {{ number(report.pm.items.ok ?? 0) }}</p>
+                        <p class="text-2xl font-semibold">{{ number(report.pm.items.failed ?? 0) }}</p>
+                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_items_ok') }} {{ number(report.pm.items.passed ?? 0) }}</p>
                     </div>
                 </div>
             </section>

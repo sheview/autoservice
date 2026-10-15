@@ -20,7 +20,7 @@ beforeEach(function () {
     $this->upsB = createAsset($this->ups, ['customer_id' => $this->customer->id, 'name' => 'UPS B']);
     $this->theirs = createAsset($this->ups, ['customer_id' => createCustomer()->id, 'name' => 'Other UPS']);
 
-    PmChecklist::create(['name' => 'UPS PM', 'asset_category_id' => $this->ups->id, 'items' => [
+    createPmTemplate(['name' => 'UPS PM', 'asset_category_id' => $this->ups->id, 'items' => [
         ['key' => 'battery', 'label' => 'แบตเตอรี่', 'type' => 'pass_fail', 'section' => 'ภายใน', 'required' => true],
         ['key' => 'volt', 'label' => 'แรงดันขาออก', 'type' => 'measure', 'unit' => 'V', 'min' => 210, 'max' => 240],
         ['key' => 'look', 'label' => 'ข้อสังเกต', 'type' => 'text'],
@@ -92,7 +92,7 @@ it('adds and removes equipment while the work is still to do, never recorded wor
     $this->actingAs($this->tech)->post("{$url}/start");
     $a = $visit->items()->where('asset_id', $this->upsA->id)->first();
     $b = $visit->items()->where('asset_id', $this->upsB->id)->first();
-    $this->actingAs($this->tech)->put("{$url}/items/{$a->id}", ['result' => 'ok', 'answers' => ['battery' => 'pass', 'volt' => 220]])->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->put("{$url}/items/{$a->id}", ['result' => 'passed', 'answers' => ['battery' => 'pass', 'volt' => 220]])->assertSessionHasNoErrors();
     $this->actingAs($this->helpdesk)->delete("{$url}/items/{$a->id}")->assertSessionHasErrors('item');
     $this->actingAs($this->helpdesk)->delete("{$url}/items/{$b->id}")->assertSessionHasNoErrors();
     expect($visit->items()->pluck('asset_id')->all())->toBe([$this->upsA->id]);
@@ -114,15 +114,15 @@ it('records Pass / Fail / N/A, readings against their range, a note per question
     $item = $visit->items()->first();
     $record = fn (array $data) => $this->actingAs($this->tech)->put("{$url}/items/{$item->id}", $data);
 
-    $record(['result' => 'ok', 'answers' => ['battery' => 'maybe']])->assertSessionHasErrors('answers.battery');
+    $record(['result' => 'passed', 'answers' => ['battery' => 'maybe']])->assertSessionHasErrors('answers.battery');
     // The required question must be answered (unless the equipment is skipped).
-    $record(['result' => 'ok', 'answers' => ['volt' => 220]])->assertSessionHasErrors('answers');
-    $record(['result' => 'skipped', 'note' => 'ปิดเครื่องอยู่'])->assertSessionHasNoErrors();
+    $record(['result' => 'passed', 'answers' => ['volt' => 220]])->assertSessionHasErrors('answers');
+    $record(['result' => 'not_inspected', 'note' => 'ปิดเครื่องอยู่'])->assertSessionHasNoErrors();
     // A reading out of range is a fail: the equipment cannot be fine.
-    $record(['result' => 'ok', 'answers' => ['battery' => 'pass', 'volt' => 250]])->assertSessionHasErrors('result');
-    $record(['result' => 'ok', 'answers' => ['battery' => 'fail', 'volt' => 220]])->assertSessionHasErrors('result');
+    $record(['result' => 'passed', 'answers' => ['battery' => 'pass', 'volt' => 250]])->assertSessionHasErrors('result');
+    $record(['result' => 'passed', 'answers' => ['battery' => 'fail', 'volt' => 220]])->assertSessionHasErrors('result');
     $record([
-        'result' => 'issue', 'answers' => ['battery' => 'fail', 'volt' => '250', 'look' => '  บวม  ', 'extra' => 'x'],
+        'result' => 'failed', 'answers' => ['battery' => 'fail', 'volt' => '250', 'look' => '  บวม  ', 'extra' => 'x'],
         'remarks' => ['battery' => 'แบตบวม 2 ก้อน', 'unknown' => 'x', 'volt' => ''], 'note' => 'ต้องเปลี่ยนแบต',
     ])->assertSessionHasNoErrors();
 

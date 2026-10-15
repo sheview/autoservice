@@ -9,8 +9,8 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
- * The result of one asset in a PM round. "checklist" is a copy of the checklist items when the
- * round started; "answers" maps their keys to what the technician recorded. Site photos are
+ * The result of one asset in a PM round. "checklist" is a copy of the template's items when the
+ * round started (template_code / template_version say which); "answers" maps their keys to what the technician recorded. Site photos are
  * the "photos" media collection.
  *
  * @property list<array{key: string, label: string, type: string}> $checklist
@@ -27,16 +27,22 @@ class PmVisitItem extends Model implements HasMedia
 
     public const RESULT_PENDING = 'pending';
 
-    public const RESULT_OK = 'ok';
+    public const RESULT_PASSED = 'passed';
 
-    public const RESULT_ISSUE = 'issue';
+    public const RESULT_FAILED = 'failed';
 
-    public const RESULT_SKIPPED = 'skipped';
+    public const RESULT_NOT_INSPECTED = 'not_inspected';
 
     /** Results a technician can record. */
-    public const RESULTS = [self::RESULT_OK, self::RESULT_ISSUE, self::RESULT_SKIPPED];
+    public const RESULTS = [self::RESULT_PASSED, self::RESULT_FAILED, self::RESULT_NOT_INSPECTED];
 
-    protected $fillable = ['asset_id', 'pm_checklist_id', 'checklist', 'result', 'answers', 'remarks', 'note', 'ticket_id', 'checked_by', 'checked_at'];
+    /** Why a piece of equipment was not inspected (details in note). */
+    public const NOT_INSPECTED_REASONS = ['user_absent', 'sent_for_repair', 'not_found', 'other'];
+
+    protected $fillable = [
+        'asset_id', 'pm_checklist_id', 'template_code', 'template_version', 'checklist', 'result', 'not_inspected_reason',
+        'answers', 'remarks', 'instrument_id', 'note', 'ticket_id', 'checked_by', 'checked_at',
+    ];
 
     protected $attributes = [
         'result' => self::RESULT_PENDING,
@@ -50,6 +56,7 @@ class PmVisitItem extends Model implements HasMedia
             'checklist' => 'array',
             'answers' => 'array',
             'remarks' => 'array',
+            'template_version' => 'integer',
             'checked_at' => 'datetime',
         ];
     }

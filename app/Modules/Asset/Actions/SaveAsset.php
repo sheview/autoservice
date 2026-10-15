@@ -11,16 +11,18 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Creates or updates an asset of the current tenant and its serial numbers.
- * An empty asset_code gets the next code of the category's prefix.
+ * An empty asset_code gets the next code of the category's prefix; the brand / model text is
+ * matched to the catalog (CatalogIds).
  */
 class SaveAsset
 {
-    public function __construct(private GenerateAssetCode $generateCode) {}
+    public function __construct(private GenerateAssetCode $generateCode, private CatalogIds $catalogIds) {}
 
     /**
      * @param  array{category_id: int, name: string, asset_code?: string|null, branch_id?: int|null,
      *     brand?: string|null, model?: string|null, subtype?: string|null, serial_number?: string|null,
-     *     quantity?: int, unit?: string|null, status: string, location?: string|null, purchased_at?: string|null,
+     *     quantity?: int, unit?: string|null, status: string, location?: string|null, floor?: string|null,
+     *     room?: string|null, parent_asset_id?: int|null, purchased_at?: string|null,
      *     purchase_price?: int|null, warranty_expires_at?: string|null, specs?: array<string, mixed>, notes?: string|null}  $data
      *     validated data; purchase_price in satang
      * @param  list<string>|null  $serials  every serial number of the asset (validated unique); null keeps
@@ -47,6 +49,15 @@ class SaveAsset
                 if ($category->requires_serial) {
                     $data['quantity'] = max(count($serials), 1);
                 }
+            }
+
+            // The catalog follows the brand / model text whenever either is given.
+            if (array_key_exists('brand', $data) || array_key_exists('model', $data)) {
+                $data = [...$data, ...$this->catalogIds->handle(
+                    array_key_exists('brand', $data) ? $data['brand'] : $asset->brand,
+                    array_key_exists('model', $data) ? $data['model'] : $asset->model,
+                    $category->id,
+                )];
             }
 
             $isNew = ! $asset->exists;

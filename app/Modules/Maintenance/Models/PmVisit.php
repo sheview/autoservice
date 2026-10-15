@@ -20,7 +20,9 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  *   draft → scheduled → in_progress → submitted → pending_approval → approved → published → closed
  *
  * with revision_required (sent back to the technician) and cancelled. completed_at = when the
- * field work was handed in. The technician's and the customer's signatures are media.
+ * field work was handed in; onsite_at / departed_at = the technician's "arrived" / "left";
+ * locked_at = the customer signed, results are final (a correction is a new work order with
+ * revision_of_id). The technician's and the customer's signatures are media.
  */
 #[UsePolicy(PmVisitPolicy::class)]
 class PmVisit extends Model implements HasMedia
@@ -72,9 +74,10 @@ class PmVisit extends Model implements HasMedia
 
     protected $fillable = [
         'pm_plan_id', 'contract_id', 'customer_id', 'visit_no', 'title', 'round', 'period_starts_on', 'due_on', 'scheduled_on',
-        'status', 'assignee_id', 'created_by', 'started_at', 'completed_at', 'submitted_by', 'reviewed_at', 'reviewed_by',
+        'status', 'assignee_id', 'created_by', 'started_at', 'onsite_at', 'departed_at', 'completed_at', 'submitted_by', 'reviewed_at', 'reviewed_by',
         'approved_at', 'approved_by', 'published_at', 'published_by', 'closed_at', 'closed_by', 'cancelled_at', 'reminded_at',
-        'summary', 'revision_note', 'revision_count', 'current_version', 'published_version',
+        'summary', 'office_data', 'revision_note', 'revision_count', 'current_version', 'published_version',
+        'locked_at', 'revision_of_id',
     ];
 
     protected $attributes = [
@@ -95,6 +98,8 @@ class PmVisit extends Model implements HasMedia
             'due_on' => 'date',
             'scheduled_on' => 'date',
             'started_at' => 'datetime',
+            'onsite_at' => 'datetime',
+            'departed_at' => 'datetime',
             'completed_at' => 'datetime',
             'reviewed_at' => 'datetime',
             'approved_at' => 'datetime',
@@ -102,6 +107,8 @@ class PmVisit extends Model implements HasMedia
             'closed_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'reminded_at' => 'datetime',
+            'locked_at' => 'datetime',
+            'office_data' => 'array',
         ];
     }
 
@@ -126,6 +133,17 @@ class PmVisit extends Model implements HasMedia
     public function items(): HasMany
     {
         return $this->hasMany(PmVisitItem::class);
+    }
+
+    public function signatures(): HasMany
+    {
+        return $this->hasMany(PmSignature::class);
+    }
+
+    /** The locked work order this one corrects. */
+    public function revisionOf(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'revision_of_id')->withTrashed();
     }
 
     public function events(): HasMany

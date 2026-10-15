@@ -34,7 +34,7 @@ it('adds the standard checklists of the categories the company has, never over i
     $admin = userWithRole('admin_company');
     app(AddStandardCategories::class)->handle();
     $ups = AssetCategory::where('code_prefix', 'UPS')->sole();
-    PmChecklist::create(['name' => 'UPS ของเรา', 'asset_category_id' => $ups->id, 'items' => [['key' => 'a', 'label' => 'A', 'type' => 'check']]]);
+    createPmTemplate(['name' => 'UPS ของเรา', 'asset_category_id' => $ups->id, 'items' => [['key' => 'a', 'label' => 'A', 'type' => 'check']]]);
     // A category of the company's own (no standard prefix) gets nothing.
     createAssetCategory(['name' => 'โดรน', 'code_prefix' => 'DRN']);
 

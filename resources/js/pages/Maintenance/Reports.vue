@@ -66,7 +66,7 @@ const tiles = computed(() => [
     { key: 'on_time', value: props.summary.on_time },
     { key: 'overdue', value: props.summary.overdue },
     { key: 'compliance', value: props.summary.compliance === null ? '–' : `${props.summary.compliance}%` },
-    { key: 'issues', value: props.summary.results.issue ?? 0 },
+    { key: 'issues', value: props.summary.results.failed ?? 0 },
 ]);
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
