@@ -3126,6 +3126,8 @@ return [
         // The workflow buttons (PmWorkflow) and what they ask for.
         'moves' => [
             'schedule' => 'ยืนยันกำหนดการ',
+            'start' => 'เริ่มงาน',
+            'submit' => 'ส่งงาน',
             'review' => 'ตรวจผ่าน ส่งต่อผู้อนุมัติ',
             'return' => 'ส่งกลับให้ช่างแก้ไข',
             'approve' => 'อนุมัติรายงาน',
@@ -3133,6 +3135,7 @@ return [
             'close' => 'ปิดงาน',
             'reopen' => 'เปิดกลับมาแก้ไข',
             'cancel' => 'ยกเลิกใบงาน',
+            'revise' => 'ออกฉบับแก้ไข (Revision)',
         ],
         'move_note' => 'หมายเหตุ',
         'move_reason' => 'เหตุผล (จำเป็น)',
