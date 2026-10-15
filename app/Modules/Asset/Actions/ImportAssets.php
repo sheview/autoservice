@@ -2,6 +2,7 @@
 
 namespace App\Modules\Asset\Actions;
 
+use App\Modules\Asset\Events\AssetImportRowSaved;
 use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
@@ -18,6 +19,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 use Throwable;
 
@@ -27,7 +29,12 @@ use Throwable;
  * A row whose asset_code already exists updates that asset; any other row creates a new asset
  * (an empty asset_code gets the next code of the category). A bad row is skipped and reported
  * with its Excel row number; the other rows are still imported. Contract numbers in the row put
- * the asset into those contracts (never out of others).
+ * the asset into those contracts (never out of others). The parent column ties a part to its
+ * asset (by code or serial number, of a row above or already registered).
+ *
+ * An import asked from another module carries its context (AssetImport::context): a contract every
+ * row goes into (its customer by default), and that module's own columns, handed on with each saved
+ * row (AssetImportRowSaved) — a listener refusing the row undoes it.
  */
 class ImportAssets
 {
@@ -51,6 +58,9 @@ class ImportAssets
     /** @var array<string, array{id: int, customer_id: int}>|null lower(contract no) => contract rows may put their asset into; null = column ignored */
     private ?array $contracts = null;
 
+    /** @var array<string, mixed> see AssetImport::context */
+    private array $context = [];
+
     public function __construct(
         private SaveAsset $saveAsset,
         private ListCustomers $listCustomers,
@@ -66,6 +76,7 @@ class ImportAssets
     public function handle(AssetImport $import, bool $allBranches, ?int $ownBranchId, ?array $contracts = null): void
     {
         $this->contracts = $contracts;
+        $this->context = $import->context ?? [];
         $import->update(['status' => AssetImport::STATUS_PROCESSING]);
 
         try {
@@ -86,7 +97,7 @@ class ImportAssets
      */
     private function importRows(AssetImport $import, Collection $rows, bool $allBranches, ?int $ownBranchId): void
     {
-        $columns = AssetSheet::mapHeadings($rows->first()?->all() ?? []);
+        $columns = AssetSheet::mapHeadings($rows->first()?->all() ?? [], $this->context['columns'] ?? []);
         if (! in_array('name', $columns, true) || ! in_array('category', $columns, true)) {
             $this->fail($import, __('asset.imports.missing_headings'));
 
@@ -118,7 +129,7 @@ class ImportAssets
                 };
             }
 
-            $result = $this->importRow($values, $allBranches, $ownBranchId);
+            $result = $this->importRow($import, $values, $allBranches, $ownBranchId);
 
             if (is_array($result)) {
                 $counts['failed_rows']++;
@@ -142,7 +153,7 @@ class ImportAssets
      * @param  array<string, mixed>  $values  column => cell
      * @return 'created_rows'|'updated_rows'|list<string> the counter to bump, or the error messages
      */
-    private function importRow(array $values, bool $allBranches, ?int $ownBranchId): string|array
+    private function importRow(AssetImport $import, array $values, bool $allBranches, ?int $ownBranchId): string|array
     {
         $category = $this->categories->get(mb_strtolower((string) ($values['category'] ?? '')));
         $branchText = mb_strtolower((string) ($values['branch'] ?? ''));
@@ -174,7 +185,7 @@ class ImportAssets
         }
 
         // Columns added later (sub-type, quantity, unit) are only set by a file that has them.
-        foreach (['subtype', 'quantity', 'unit', 'ip_address', 'mac_address', 'used_by', 'department'] as $column) {
+        foreach (['subtype', 'quantity', 'unit', 'ip_address', 'mac_address', 'used_by', 'department', 'floor', 'room'] as $column) {
             if (array_key_exists($column, $values)) {
                 $data[$column] = $values[$column];
             }
@@ -190,6 +201,11 @@ class ImportAssets
         $customerText = mb_strtolower((string) ($values['customer'] ?? ''));
         if (array_key_exists('customer', $values)) {
             $data['customer_id'] = $customerText === '' ? null : ($this->customers[$customerText] ?? null);
+        }
+        // Into the context's contract: its customer unless the row names one.
+        $forcedContract = $this->context['contract_id'] ?? null;
+        if ($forcedContract !== null && ($data['customer_id'] ?? null) === null && ($customerText === '' || ! array_key_exists('customer', $values))) {
+            $data['customer_id'] = $existing?->customer_id ?? ($this->context['customer_id'] ?? null);
         }
 
         if (! $allBranches && $branch === null && $branchText === '') {
@@ -218,6 +234,8 @@ class ImportAssets
             'purchase_price' => ['nullable', 'numeric', 'min:0', 'max:9999999999'],
             'warranty_expires_at' => ['nullable', 'date'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            'floor' => ['nullable', 'string', 'max:50'],
+            'room' => ['nullable', 'string', 'max:100'],
             ...SpecFields::rules($category?->spec_fields ?? []),
         ], [], [
             ...array_combine(AssetSheet::COLUMNS, array_map(fn ($c) => __("asset.columns.{$c}"), AssetSheet::COLUMNS)),
@@ -267,6 +285,19 @@ class ImportAssets
             }
             $messages = array_filter($messages);
         }
+        if ($forcedContract !== null) {
+            $customerId = array_key_exists('customer_id', $data) ? $data['customer_id'] : $existing?->customer_id;
+            if ($customerId !== null && (int) $customerId !== (int) ($this->context['customer_id'] ?? 0)) {
+                $messages[] = __('asset.imports.contract_other_customer', ['value' => $this->context['contract_no'] ?? '']);
+            }
+            $contractIds[] = (int) $forcedContract;
+        }
+
+        if (array_key_exists('parent', $values)) {
+            $customerId = array_key_exists('customer_id', $data) ? $data['customer_id'] : $existing?->customer_id;
+            [$data['parent_asset_id'], $parentErrors] = $this->parent($values['parent'], $existing, $customerId);
+            $messages = [...$messages, ...$parentErrors];
+        }
 
         if ($messages !== []) {
             return array_values(array_unique($messages));
@@ -276,12 +307,52 @@ class ImportAssets
         if (($data['quantity'] ?? null) === null) {
             unset($data['quantity']);
         }
-        DB::transaction(function () use ($existing, $data, $serials, $contractIds) {
-            $asset = $this->saveAsset->handle($existing, $data, $serials);
-            $this->addToContracts->handle($asset->id, array_values(array_unique($contractIds)));
-        });
+        $extra = [];
+        foreach ($values as $column => $value) {
+            if (str_starts_with($column, 'extra.')) {
+                $extra[substr($column, 6)] = $value;
+            }
+        }
+
+        try {
+            DB::transaction(function () use ($import, $existing, $data, $serials, $contractIds, $extra) {
+                $asset = $this->saveAsset->handle($existing, $data, $serials);
+                $this->addToContracts->handle($asset->id, array_values(array_unique($contractIds)));
+                // The module that asked for the import takes it further (or refuses the row).
+                if ($this->context !== []) {
+                    event(new AssetImportRowSaved($import, $asset, $extra));
+                }
+            });
+        } catch (ValidationException $e) {
+            return array_values(array_unique($e->validator->errors()->all()));
+        }
 
         return $existing ? 'updated_rows' : 'created_rows';
+    }
+
+    /**
+     * The asset a row is a part of, by code or serial number; empty = none.
+     *
+     * @return array{0: int|null, 1: list<string>} its id, and what is wrong
+     */
+    private function parent(mixed $cell, ?Asset $existing, mixed $customerId): array
+    {
+        $text = trim((string) ($cell ?? ''));
+        if ($text === '') {
+            return [null, []];
+        }
+
+        $parent = Asset::query()->whereRaw('lower(asset_code) = ?', [mb_strtolower($text)])->first()
+            ?? AssetSerial::query()->with('asset')->whereRaw('lower(serial_number) = ?', [mb_strtolower($text)])->first()?->asset;
+
+        return match (true) {
+            $parent === null => [null, [__('asset.imports.unknown_parent', ['value' => $text])]],
+            $existing !== null && $parent->id === $existing->id => [null, [__('asset.imports.parent_self')]],
+            $parent->parent_asset_id !== null => [null, [__('asset.imports.parent_is_part', ['value' => $text])]],
+            $existing !== null && $existing->children()->exists() => [null, [__('asset.imports.has_parts')]],
+            $parent->customer_id !== null && $customerId !== null && (int) $parent->customer_id !== (int) $customerId => [null, [__('asset.imports.parent_other_customer', ['value' => $text])]],
+            default => [$parent->id, []],
+        };
     }
 
     /**

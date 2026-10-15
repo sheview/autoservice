@@ -17,7 +17,9 @@ class AssetSheet
 {
     public const COLUMNS = [
         'asset_code', 'name', 'category', 'branch', 'customer', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit',
-        'property_no', 'status', 'location', 'ip_address', 'mac_address', 'used_by', 'department', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'notes',
+        'property_no', 'status', 'location', 'floor', 'room', 'ip_address', 'mac_address', 'used_by', 'department', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'notes',
+        // The code (or a serial number) of the asset it is a part of: a monitor of a PC.
+        'parent',
         // Contract numbers it is in (Contract module). Importing only adds to contracts, never takes it out.
         'contracts',
     ];
@@ -51,17 +53,23 @@ class AssetSheet
     }
 
     /**
-     * Map a heading row to column index => "column" or "spec.{key}". Unknown headings are skipped.
+     * Map a heading row to column index => "column", "spec.{key}" or "extra.{key}" (columns of the
+     * module that asked for the import: key => heading). Unknown headings are skipped.
      *
      * @param  array<int, mixed>  $headingRow
+     * @param  array<string, string>  $extra
      * @return array<int, string>
      */
-    public static function mapHeadings(array $headingRow): array
+    public static function mapHeadings(array $headingRow, array $extra = []): array
     {
         $byLabel = [];
         foreach (self::COLUMNS as $column) {
             $byLabel[mb_strtolower(__("asset.columns.{$column}"))] = $column;
             $byLabel[$column] = $column;
+        }
+        foreach ($extra as $key => $heading) {
+            $byLabel[mb_strtolower($heading)] = "extra.{$key}";
+            $byLabel[$key] = "extra.{$key}";
         }
 
         $map = [];

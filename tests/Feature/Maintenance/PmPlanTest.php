@@ -169,7 +169,7 @@ it('lets technicians look at plans but not change them', function () {
     $this->actingAs($customerUser)->get('/pm-plans')
         ->assertInertia(fn (Assert $page) => $page->where('plans.total', 1)->where('plans.data.0.id', $plan->id)->where('customers', []));
     $this->actingAs($customerUser)->get("/pm-plans/{$plan->id}")
-        ->assertInertia(fn (Assert $page) => $page->where('can', ['update' => false, 'delete' => false]));
+        ->assertInertia(fn (Assert $page) => $page->where('can', ['update' => false, 'delete' => false, 'import' => false]));
     $this->actingAs($customerUser)->get("/pm-plans/{$theirs->id}")->assertForbidden();
     $this->actingAs($customerUser)->put("/pm-plans/{$plan->id}", planPayload())->assertForbidden();
 });

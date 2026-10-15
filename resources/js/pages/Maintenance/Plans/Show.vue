@@ -38,7 +38,7 @@ const props = defineProps<{
     };
     visits: VisitRow[];
     upcoming: { round: number; period_starts_on: string; due_on: string; creates_on: string }[];
-    can: { update: boolean; delete: boolean };
+    can: { update: boolean; delete: boolean; import: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -77,6 +77,9 @@ const destroy = () => {
                             rel="noopener"
                             >{{ t('pm_plans.round_print') }}</a
                         >
+                    </Button>
+                    <Button v-if="can.import" variant="outline" as-child>
+                        <Link :href="route('maintenance.plans.import', plan.id)">{{ t('pm_plans.import.title') }}</Link>
                     </Button>
                     <Button v-if="can.update" variant="outline" as-child>
                         <Link :href="route('maintenance.plans.edit', plan.id)">{{ t('common.edit') }}</Link>

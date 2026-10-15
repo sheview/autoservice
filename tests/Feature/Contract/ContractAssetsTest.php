@@ -181,8 +181,8 @@ it('exports the contracts of each asset and imports contract numbers as addition
 
     $response = $this->actingAs($this->admin)->get('/assets/export?search=Acme+Switch')->assertOk();
     $rows = Excel::toCollection(null, $response->getFile()->getPathname())->first();
-    expect($rows[0][22])->toBe('สัญญา MA (เลขที่)')
-        ->and($rows[1][22])->toBe('MA-OLD, MA-1');
+    expect($rows[0][25])->toBe('สัญญา MA (เลขที่)')
+        ->and($rows[1][25])->toBe('MA-OLD, MA-1');
 
     $spreadsheet = new Spreadsheet;
     $spreadsheet->getActiveSheet()->fromArray([

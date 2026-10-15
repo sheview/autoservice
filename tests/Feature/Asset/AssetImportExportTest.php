@@ -131,13 +131,13 @@ it('exports the filtered list and imports the same file back as updates', functi
     $rows = sheetRows($spareOnly->getFile()->getPathname());
     expect($rows[0])->toBe([
         'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'ประเภทย่อย', 'Serial Number', 'จำนวน', 'หน่วย',
-        'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'IP Address', 'MAC Address', 'ผู้ใช้งานประจำเครื่อง', 'แผนก',
-        'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'สัญญา MA (เลขที่)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
+        'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'ชั้น', 'ห้อง', 'IP Address', 'MAC Address', 'ผู้ใช้งานประจำเครื่อง', 'แผนก',
+        'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'รหัสเครื่องแม่ (ชุด)', 'สัญญา MA (เลขที่)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
     ])
         ->and(count($rows))->toBe(2)
         ->and($rows[1][1])->toBe('Spare PC')
         ->and($rows[1][12])->toBe('สำรอง')
-        ->and($rows[1][19])->toEqual(9900.5);
+        ->and($rows[1][21])->toEqual(9900.5);
 
     $all = $this->actingAs($this->admin)->get('/assets/export')->assertOk();
     $file = new UploadedFile($all->getFile()->getPathname(), 'export.xlsx', null, null, true);
@@ -165,6 +165,32 @@ it('rejects an imported serial number that another asset already has', function 
     expect($import->failed_rows)->toBe(1)
         ->and($import->errors[0]['messages'])->toBe(["Serial Number dup-1 ซ้ำกับทรัพย์สิน {$taken->asset_code}"])
         ->and(Asset::count())->toBe(1);
+});
+
+it('imports floor, room and the asset a row is a part of, by its code or serial number', function () {
+    $pc = createAsset($this->pc, ['serial_number' => 'PC-SN-1', 'specs' => ['cpu' => 'x']]);
+    $monitors = createAssetCategory(['name' => 'จอภาพ', 'code_prefix' => 'MON']);
+    $monitor = createAsset($monitors, ['parent_asset_id' => null]);
+    createAsset($monitors, ['name' => 'จอ ชิ้นลูก', 'parent_asset_id' => $pc->id]);
+
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([
+        ['รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'Serial Number', 'ชั้น', 'ห้อง', 'รหัสเครื่องแม่ (ชุด)', 'CPU [spec.cpu]'],
+        [null, 'PC ใหม่', 'คอมพิวเตอร์', 'NEW-PC', '3', 'ประชุม', null, 'i5'],
+        [null, 'จอ ของ PC ใหม่', 'จอภาพ', 'NEW-MON', '3', 'ประชุม', 'new-pc', null],
+        [$monitor->asset_code, 'จอ เดิม', 'จอภาพ', null, null, null, $pc->asset_code, null],
+        [null, 'จอ แม่ไม่มี', 'จอภาพ', null, null, null, 'NOPE', null],
+        [null, 'จอ ซ้อนชั้น', 'จอภาพ', null, null, null, 'จอ ชิ้นลูก', null],
+        [null, 'จอ แม่เป็นชิ้นลูก', 'จอภาพ', null, null, null, Asset::where('name', 'จอ ชิ้นลูก')->value('asset_code'), null],
+    ])]);
+
+    $import = AssetImport::first();
+    $newPc = Asset::where('name', 'PC ใหม่')->first();
+    expect($import->only(['created_rows', 'updated_rows', 'failed_rows']))->toBe(['created_rows' => 2, 'updated_rows' => 1, 'failed_rows' => 3])
+        ->and($newPc->only(['floor', 'room']))->toBe(['floor' => '3', 'room' => 'ประชุม'])
+        ->and(Asset::where('name', 'จอ ของ PC ใหม่')->value('parent_asset_id'))->toBe($newPc->id)
+        ->and($monitor->fresh()->parent_asset_id)->toBe($pc->id)
+        ->and($import->errors[0]['messages'][0])->toContain('NOPE')
+        ->and($import->errors[2]['messages'][0])->toContain('ชิ้นส่วนของเครื่องอื่น');
 });
 
 it('downloads an empty template with the spec columns', function () {

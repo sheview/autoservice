@@ -15,7 +15,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 
 /**
- * Stores an uploaded asset Excel file and queues ImportAssetsJob for it.
+ * Stores an uploaded asset Excel file and queues ImportAssetsJob for it. Another module asking for
+ * an import (a PM plan) passes its context: see ImportAssets.
  */
 class StartAssetImport
 {
@@ -26,7 +27,10 @@ class StartAssetImport
         private EditableContracts $editableContracts,
     ) {}
 
-    public function handle(User $user, UploadedFile $file): AssetImport
+    /**
+     * @param  array{contract_id?: int, contract_no?: string, customer_id?: int, columns?: array<string, string>}&array<string, mixed>  $context
+     */
+    public function handle(User $user, UploadedFile $file, array $context = []): AssetImport
     {
         $path = $file->storeAs(
             'asset-imports/'.$this->context->id(),
@@ -38,6 +42,7 @@ class StartAssetImport
             'user_id' => $user->id,
             'file_name' => $file->getClientOriginalName(),
             'file_path' => $path,
+            'context' => $context ?: null,
         ]);
 
         ImportAssetsJob::dispatch($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id, $this->contracts($user));

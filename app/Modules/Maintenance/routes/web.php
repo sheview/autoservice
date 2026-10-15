@@ -9,6 +9,7 @@ use App\Modules\Maintenance\Http\Controllers\PmFieldController;
 use App\Modules\Maintenance\Http\Controllers\PmInstrumentController;
 use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
+use App\Modules\Maintenance\Http\Controllers\PmPlanImportController;
 use App\Modules\Maintenance\Http\Controllers\PmPublicController;
 use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
 use App\Modules\Maintenance\Http\Controllers\PmRoundReportController;
@@ -58,6 +59,11 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::get('pm-customer-reports', [PmCustomerReportController::class, 'index'])->name('customer-reports.index');
     Route::resource('pm-instruments', PmInstrumentController::class)->only(['index', 'store', 'update', 'destroy'])
         ->names('instruments')->parameters(['pm-instruments' => 'instrument']);
+
+    // Equipment of a plan from Excel (PmPlanImportController).
+    Route::get('pm-plans/{plan}/import', [PmPlanImportController::class, 'show'])->name('plans.import');
+    Route::post('pm-plans/{plan}/import', [PmPlanImportController::class, 'store'])->name('plans.import.store');
+    Route::get('pm-plans/{plan}/import/template', [PmPlanImportController::class, 'template'])->name('plans.import.template');
 
     // A work order on the technician's phone (PmFieldController).
     Route::get('pm-work/{visit}', [PmFieldController::class, 'visit'])->name('field.visit');

@@ -151,6 +151,8 @@ class PmPlanController extends Controller
             'can' => [
                 'update' => $user->can('update', $plan),
                 'delete' => $user->can('delete', $plan),
+                // equipment from Excel (PmPlanImportController)
+                'import' => $user->can('update', $plan) && $user->can('assets.import'),
             ],
         ]);
     }

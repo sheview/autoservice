@@ -22,7 +22,7 @@ class AssetImport extends Model
     public const STATUS_FAILED = 'failed';
 
     protected $fillable = [
-        'user_id', 'file_name', 'file_path', 'status',
+        'user_id', 'file_name', 'file_path', 'context', 'status',
         'total_rows', 'created_rows', 'updated_rows', 'failed_rows', 'errors', 'finished_at',
     ];
 
@@ -35,6 +35,8 @@ class AssetImport extends Model
     {
         return [
             'errors' => 'array',
+            // where it was asked from, when not the asset page (see ImportAssets)
+            'context' => 'array',
             'finished_at' => 'datetime',
         ];
     }
