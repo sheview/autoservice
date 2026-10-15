@@ -13,8 +13,8 @@ use App\Modules\Tenancy\Models\Tenant;
 class SavePmSettings
 {
     /**
-     * @param  array{review_step: bool, require_technician_signature: bool, require_customer_signature: bool,
-     *     share_days: int, report_note: string|null}  $data  validated
+     * @param  array{review_step: bool, approval_step?: bool, require_technician_signature: bool, require_customer_signature: bool,
+     *     require_approver_signature?: bool, share_days: int, sign_link_days?: int, report_note: string|null}  $data  validated
      */
     public function handle(Tenant $tenant, array $data, User $actor): PmSettings
     {
@@ -22,9 +22,12 @@ class SavePmSettings
         $settings = $tenant->settings ?? [];
         $settings[PmSettings::KEY] = [
             'review_step' => (bool) $data['review_step'],
+            'approval_step' => (bool) ($data['approval_step'] ?? $old['approval_step']),
             'require_technician_signature' => (bool) $data['require_technician_signature'],
             'require_customer_signature' => (bool) $data['require_customer_signature'],
+            'require_approver_signature' => (bool) ($data['require_approver_signature'] ?? $old['require_approver_signature']),
             'share_days' => (int) $data['share_days'],
+            'sign_link_days' => (int) ($data['sign_link_days'] ?? $old['sign_link_days']),
             'report_note' => filled($data['report_note'] ?? null) ? trim($data['report_note']) : null,
         ];
         $tenant->settings = $settings;

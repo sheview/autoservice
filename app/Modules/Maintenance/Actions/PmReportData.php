@@ -8,12 +8,16 @@ use App\Modules\Asset\Actions\CategoryNames;
 use App\Modules\Contract\Actions\ContractDetails;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
+use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Models\PmInstrument;
+use App\Modules\Maintenance\Models\PmSignature;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Maintenance\Support\ChecklistItems;
 use App\Modules\Maintenance\Support\PmSettings;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketLabels;
+use App\Modules\Survey\Actions\PmVisitSatisfaction;
 
 /**
  * Everything a PM report says, as plain data: the snapshot frozen into a report version when the
@@ -33,6 +37,7 @@ class PmReportData
         private UserNames $userNames,
         private TicketLabels $ticketLabels,
         private Modules $modules,
+        private PmVisitSatisfaction $satisfaction,
     ) {}
 
     /**
@@ -53,6 +58,8 @@ class PmReportData
             $visit->assignee_id, $visit->submitted_by, $visit->reviewed_by, $visit->approved_by, ...$items->pluck('checked_by')->all(),
         ]);
         $iso = fn ($date) => $date?->toIso8601String();
+        $instruments = PmInstrument::withTrashed()->whereIn('id', $items->pluck('instrument_id')->filter()->unique()->all())->get()->keyBy('id');
+        $templates = PmChecklist::withTrashed()->whereIn('id', $items->pluck('pm_checklist_id')->filter()->unique()->all())->get()->keyBy('id');
 
         return [
             'visit' => [
@@ -72,8 +79,13 @@ class PmReportData
                 'reviewed_at' => $iso($visit->reviewed_at),
                 'approved_by' => $names[$visit->approved_by] ?? null,
                 'approved_at' => $iso($visit->approved_at),
+                'onsite_at' => $iso($visit->onsite_at),
+                'departed_at' => $iso($visit->departed_at),
+                'office_data' => $visit->office_data,
+                'locked_at' => $iso($visit->locked_at),
+                'status' => $visit->status,
             ],
-            'items' => $items->map(function (PmVisitItem $item) use ($assets, $devices, $categories, $tickets, $names, $iso) {
+            'items' => $items->map(function (PmVisitItem $item) use ($assets, $devices, $categories, $tickets, $names, $iso, $instruments, $templates) {
                 $asset = $assets[$item->asset_id] ?? null;
                 $device = $devices[$item->asset_id] ?? [];
                 $checklist = $item->checklist ?? [];
@@ -88,7 +100,14 @@ class PmReportData
                         ...collect($device)->only(['brand', 'model', 'serial_number', 'property_no', 'location', 'ip_address'])->all(),
                     ] : null,
                     'result' => $item->result,
+                    'not_inspected_reason' => $item->not_inspected_reason,
                     'note' => $item->note,
+                    'instrument' => $item->instrument_id && isset($instruments[$item->instrument_id])
+                        ? $instruments[$item->instrument_id]->only(['name', 'serial_no']) : null,
+                    // How its template lays the sheet out, and which blocks it shows.
+                    'template_code' => $item->template_code,
+                    'layout' => $templates[$item->pm_checklist_id]->layout ?? PmChecklist::LAYOUT_PER_ASSET,
+                    'blocks' => $templates[$item->pm_checklist_id]->blocks ?? null,
                     // Each field (with its settings, for documents.partials.pm-field) with its answer, its
                     // note and how it came out, in template order.
                     'checks' => array_map(fn (array $field) => [
@@ -114,17 +133,37 @@ class PmReportData
                     ->mapWithKeys(fn (string $result) => [$result => $items->where('result', $result)->count()])->all(),
             ],
             'signatures' => [
-                'technician' => $this->signature($visit, PmVisit::TECHNICIAN_SIGNATURE),
-                'customer' => $this->signature($visit, PmVisit::CUSTOMER_SIGNATURE),
+                'technician' => $this->signature($visit, PmSignature::ROLE_ENGINEER, PmVisit::TECHNICIAN_SIGNATURE),
+                'customer' => $this->signature($visit, PmSignature::ROLE_CUSTOMER, PmVisit::CUSTOMER_SIGNATURE),
+                'approver' => $this->signature($visit, PmSignature::ROLE_APPROVER),
             ],
+            'satisfaction' => $this->satisfaction->handle($visit->id),
             'note' => PmSettings::of()->reportNote,
         ];
     }
 
-    /** @return array{image: string, signer: string|null, position: string|null, signed_at: string|null}|null */
-    private function signature(PmVisit $visit, string $collection): ?array
+    /**
+     * A signature of the work order (pm_signatures), else one drawn before those existed (media).
+     *
+     * @return array{image: string|null, signer: string|null, position: string|null, phone?: string|null, email?: string|null,
+     *     signed_at: string|null, data_hash?: string|null}|null
+     */
+    private function signature(PmVisit $visit, string $role, ?string $collection = null): ?array
     {
-        $media = $visit->getFirstMedia($collection);
+        $signature = $visit->signatureOf($role);
+        if ($signature !== null) {
+            return [
+                'image' => SignPmVisit::dataUrl($signature),
+                'signer' => $signature->name,
+                'position' => $signature->position,
+                'phone' => $signature->phone,
+                'email' => $signature->email,
+                'signed_at' => $signature->signed_at->toIso8601String(),
+                'data_hash' => $signature->data_hash,
+            ];
+        }
+
+        $media = $collection ? $visit->getFirstMedia($collection) : null;
 
         return $media ? [
             'image' => 'data:image/png;base64,'.base64_encode(stream_get_contents($media->stream())),

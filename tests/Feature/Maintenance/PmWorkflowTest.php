@@ -51,7 +51,7 @@ it('takes a work order from the field to the customer: submit, review, approve, 
     ($this->work)();
     ($this->submit)(['summary' => 'ทุกเครื่องปกติ'])->assertSessionHasNoErrors();
     expect($this->visit->fresh()->only(['status', 'submitted_by']))->toBe(['status' => PmVisit::STATUS_SUBMITTED, 'submitted_by' => $this->tech->id])
-        ->and($this->visit->fresh()->hasMedia(PmVisit::TECHNICIAN_SIGNATURE))->toBeTrue();
+        ->and($this->visit->fresh()->signatureOf('engineer')?->name)->toBe($this->tech->name);
 
     ($this->move)($this->helpdesk, 'review')->assertSessionHasNoErrors();
     expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_PENDING_APPROVAL);
@@ -117,14 +117,17 @@ it('goes straight to the approver when the company has no review step', function
     ], $this->admin);
 
     ($this->work)();
-    // The customer must sign now, with a name; the technician need not.
-    $this->actingAs($this->tech)->post("{$this->url}/submit")->assertSessionHasErrors('customer_signature');
+    // A customer signature needs a name; the technician need not sign.
     $this->actingAs($this->tech)->post("{$this->url}/submit", ['customer_signature' => signaturePng()])->assertSessionHasErrors('customer_signer_name');
-    $this->actingAs($this->tech)->post("{$this->url}/submit", ['customer_signature' => signaturePng(), 'customer_signer_name' => 'คุณสมศรี'])
-        ->assertSessionHasNoErrors();
+    // Handed in without the customer: it waits for their signature before it can be approved.
+    $this->actingAs($this->tech)->post("{$this->url}/submit")->assertSessionHasNoErrors();
+    expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_PENDING_APPROVAL);
+    ($this->move)($this->admin, 'approve')->assertSessionHasErrors('action');
 
-    expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_PENDING_APPROVAL)
-        ->and($this->visit->fresh()->getFirstMedia(PmVisit::CUSTOMER_SIGNATURE)->getCustomProperty('signer'))->toBe('คุณสมศรี');
+    $this->actingAs($this->tech)->post("{$this->url}/customer-sign", ['image' => signaturePng(), 'name' => 'คุณสมศรี'])->assertSessionHasNoErrors();
+    expect($this->visit->fresh()->signatureOf('customer')->name)->toBe('คุณสมศรี')
+        ->and($this->visit->fresh()->locked_at)->not->toBeNull();
+    ($this->move)($this->admin, 'approve')->assertSessionHasNoErrors();
 });
 
 it('reopens an approved report for a correction, which becomes version 2', function () {
@@ -181,14 +184,12 @@ it('lets each step be made only by who may make it, and only from its status', f
 it('keeps PM settings to who may manage them', function () {
     $this->actingAs($this->admin)->get('/pm-settings')->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('Maintenance/Settings')->where('settings.review_step', true));
-    $this->actingAs($this->admin)->put('/pm-settings', [
-        'review_step' => false, 'require_technician_signature' => true, 'require_customer_signature' => false,
-        'share_days' => 400, 'report_note' => 'x',
-    ])->assertSessionHasErrors('share_days');
-    $this->actingAs($this->admin)->put('/pm-settings', [
-        'review_step' => false, 'require_technician_signature' => true, 'require_customer_signature' => false,
-        'share_days' => 45, 'report_note' => 'รับประกันงาน 30 วัน',
-    ])->assertSessionHasNoErrors();
+    $settings = ['review_step' => false, 'approval_step' => true, 'require_technician_signature' => true, 'require_customer_signature' => false,
+        'require_approver_signature' => false, 'sign_link_days' => 3];
+    $this->actingAs($this->admin)->put('/pm-settings', [...$settings, 'share_days' => 400, 'report_note' => 'x'])->assertSessionHasErrors('share_days');
+    $this->actingAs($this->admin)->put('/pm-settings', [...$settings, 'sign_link_days' => 60, 'share_days' => 45, 'report_note' => 'x'])
+        ->assertSessionHasErrors('sign_link_days');
+    $this->actingAs($this->admin)->put('/pm-settings', [...$settings, 'share_days' => 45, 'report_note' => 'รับประกันงาน 30 วัน'])->assertSessionHasNoErrors();
     expect(app(TenantContext::class)->tenant()->fresh()->settings['pm'])->toMatchArray(['review_step' => false, 'share_days' => 45]);
 
     $this->actingAs($this->helpdesk)->get('/pm-settings')->assertForbidden();

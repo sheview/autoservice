@@ -3,6 +3,7 @@
 namespace App\Modules\Maintenance\Actions;
 
 use App\Modules\Identity\Models\User;
+use App\Modules\Maintenance\Models\PmSignature;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Support\PmSettings;
 use App\Modules\Maintenance\Support\PmWorkflow;
@@ -17,11 +18,15 @@ use Illuminate\Validation\ValidationException;
  */
 class MovePmVisit
 {
-    public function __construct(private LogPmEvent $logEvent, private CreatePmReportVersion $createVersion) {}
+    public function __construct(private LogPmEvent $logEvent, private CreatePmReportVersion $createVersion, private SignPmVisit $sign) {}
 
-    public function handle(PmVisit $visit, string $action, User $actor, ?string $note = null): PmVisit
+    /**
+     * @param  string|null  $approverSignature  the approver's drawing (data:image/png;base64,…) when approving
+     * @param  array{ip?: string|null, user_agent?: string|null}  $client
+     */
+    public function handle(PmVisit $visit, string $action, User $actor, ?string $note = null, ?string $approverSignature = null, array $client = []): PmVisit
     {
-        return DB::transaction(function () use ($visit, $action, $actor, $note) {
+        return DB::transaction(function () use ($visit, $action, $actor, $note, $approverSignature, $client) {
             // Read the status under a lock: two people pressing at once move it only once. Who may make
             // a move can depend on the status (a return: review or approve), so a status that changed
             // since the caller checked the permission is refused too.
@@ -31,6 +36,9 @@ class MovePmVisit
                 throw ValidationException::withMessages(['action' => __('maintenance.visits.changed_meanwhile')]);
             }
             $this->check($visit, $action, $note);
+            if ($action === 'approve') {
+                $this->checkSignatures($visit, $actor, $approverSignature, $client);
+            }
 
             $from = $visit->status;
             $to = PmWorkflow::target($action, PmSettings::of());
@@ -54,6 +62,8 @@ class MovePmVisit
 
             if ($action === 'approve') {
                 $this->createVersion->handle($visit, $actor);
+            } elseif ($to === PmVisit::STATUS_PENDING_APPROVAL && ! PmSettings::of()->approvalStep) {
+                $this->approveBySystem($visit, $actor);
             }
 
             activity()->performedOn($visit)->causedBy($actor)->event('pm_'.$action)
@@ -62,6 +72,42 @@ class MovePmVisit
 
             return $visit;
         });
+    }
+
+    /**
+     * The company has no approval step: work that reaches the approver is approved there and then,
+     * its report frozen as a version, with no approver named.
+     */
+    public function approveBySystem(PmVisit $visit, ?User $actor): void
+    {
+        // Not waiting for approval (approved already), or still waiting for the customer's signature
+        // the company asks for: approved once they sign.
+        if ($visit->status !== PmVisit::STATUS_PENDING_APPROVAL || (PmSettings::of()->requireCustomerSignature && ! $visit->isLocked())) {
+            return;
+        }
+        $from = $visit->status;
+        $visit->update(['status' => PmVisit::STATUS_APPROVED, 'approved_at' => now(), 'approved_by' => null]);
+        $this->logEvent->handle($visit, 'approve', null, __('maintenance.visits.auto_approved'), $from, PmVisit::STATUS_APPROVED);
+        $this->createVersion->handle($visit, $actor);
+    }
+
+    /**
+     * Before approving: the customer's signature when the company asks for it, and the approver's own
+     * (drawn now, or earlier) when the company asks for that.
+     *
+     * @param  array{ip?: string|null, user_agent?: string|null}  $client
+     */
+    private function checkSignatures(PmVisit $visit, User $actor, ?string $approverSignature, array $client): void
+    {
+        $settings = PmSettings::of();
+        if ($settings->requireCustomerSignature && ! $visit->isLocked()) {
+            throw ValidationException::withMessages(['action' => __('maintenance.signing.customer_missing')]);
+        }
+        if (filled($approverSignature)) {
+            $this->sign->handle($visit, PmSignature::ROLE_APPROVER, ['image' => $approverSignature, 'name' => $actor->name], $actor, $client);
+        } elseif ($settings->requireApproverSignature && ! $visit->signatures()->where('role', PmSignature::ROLE_APPROVER)->exists()) {
+            throw ValidationException::withMessages(['approver_signature' => __('maintenance.signing.approver_missing')]);
+        }
     }
 
     /**

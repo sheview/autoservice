@@ -77,8 +77,10 @@ class PmVisit extends Model implements HasMedia
         'status', 'assignee_id', 'created_by', 'started_at', 'onsite_at', 'departed_at', 'completed_at', 'submitted_by', 'reviewed_at', 'reviewed_by',
         'approved_at', 'approved_by', 'published_at', 'published_by', 'closed_at', 'closed_by', 'cancelled_at', 'reminded_at',
         'summary', 'office_data', 'revision_note', 'revision_count', 'current_version', 'published_version',
-        'locked_at', 'revision_of_id',
+        'locked_at', 'revision_of_id', 'tracking_token',
     ];
+
+    protected $hidden = ['tracking_token'];
 
     protected $attributes = [
         'status' => self::STATUS_SCHEDULED,
@@ -140,6 +142,17 @@ class PmVisit extends Model implements HasMedia
         return $this->hasMany(PmSignature::class);
     }
 
+    public function signLinks(): HasMany
+    {
+        return $this->hasMany(PmSignLink::class);
+    }
+
+    /** The signature of a role (PmSignature::ROLES), the latest. */
+    public function signatureOf(string $role): ?PmSignature
+    {
+        return $this->signatures()->where('role', $role)->latest('id')->first();
+    }
+
     /** The locked work order this one corrects. */
     public function revisionOf(): BelongsTo
     {
@@ -176,13 +189,19 @@ class PmVisit extends Model implements HasMedia
 
     public function isOpen(): bool
     {
-        return in_array($this->status, self::OPEN_STATUSES, true);
+        return ! $this->isLocked() && in_array($this->status, self::OPEN_STATUSES, true);
     }
 
-    /** The technician may record results now. */
+    /** The technician may record results now (never once the customer signed). */
     public function isWorking(): bool
     {
-        return in_array($this->status, self::WORKING_STATUSES, true);
+        return ! $this->isLocked() && in_array($this->status, self::WORKING_STATUSES, true);
+    }
+
+    /** The customer signed: the results are final; a correction is a revision (CreatePmRevision). */
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
     }
 
     /** Still to do and past its due date. */

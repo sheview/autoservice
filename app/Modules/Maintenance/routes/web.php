@@ -9,6 +9,7 @@ use App\Modules\Maintenance\Http\Controllers\PmFieldController;
 use App\Modules\Maintenance\Http\Controllers\PmInstrumentController;
 use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
+use App\Modules\Maintenance\Http\Controllers\PmPublicController;
 use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
 use App\Modules\Maintenance\Http\Controllers\PmSettingsController;
 use App\Modules\Maintenance\Http\Controllers\PmSharedReportController;
@@ -27,6 +28,14 @@ Route::middleware('throttle:track-link')->group(function () {
     Route::get('t/{code}/pm-report/{token}/pdf', [PmSharedReportController::class, 'pdfOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.shared.pdf.path');
     Route::get('t/{code}/pm-report/{token}/equipment/{item}/pdf', [PmSharedReportController::class, 'pdfOnPath'])
         ->where('code', '[0-9]{1,10}')->whereNumber('item')->name('maintenance.shared.equipment.path');
+
+    // The customer signs on their own phone (a sign link), and the tracking QR on the sheet (PmPublicController).
+    Route::get('pm-sign/{token}', [PmPublicController::class, 'signOnHost'])->name('maintenance.public.sign');
+    Route::post('pm-sign/{token}', [PmPublicController::class, 'storeSignOnHost'])->name('maintenance.public.sign.store');
+    Route::get('t/{code}/pm-sign/{token}', [PmPublicController::class, 'signOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.public.sign.path');
+    Route::post('t/{code}/pm-sign/{token}', [PmPublicController::class, 'storeSignOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.public.sign.store.path');
+    Route::get('pm-track/{token}', [PmPublicController::class, 'trackOnHost'])->name('maintenance.public.track');
+    Route::get('t/{code}/pm-track/{token}', [PmPublicController::class, 'trackOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.public.track.path');
 });
 
 Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance.')->group(function () {
@@ -52,6 +61,7 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::get('pm-work/{visit}', [PmFieldController::class, 'visit'])->name('field.visit');
     Route::post('pm-work/{visit}/arrive', [PmFieldController::class, 'arrive'])->name('field.arrive');
     Route::post('pm-work/{visit}/depart', [PmFieldController::class, 'depart'])->name('field.depart');
+    Route::get('pm-work/{visit}/sign', [PmFieldController::class, 'sign'])->name('field.sign');
     Route::scopeBindings()->group(function () {
         Route::get('pm-work/{visit}/items/{item}', [PmFieldController::class, 'item'])->name('field.item');
         Route::put('pm-work/{visit}/items/{item}/draft', [PmFieldController::class, 'draft'])->name('field.draft');
@@ -68,6 +78,10 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::resource('pm-visits', PmVisitController::class)->only(['index', 'show', 'update'])
         ->names('visits')->parameters(['pm-visits' => 'visit']);
     Route::get('pm-visits/{visit}/pdf', [PmVisitPdfController::class, 'consolidated'])->name('visits.pdf');
+    Route::get('pm-visits/{visit}/sheet', [PmVisitPdfController::class, 'sheet'])->name('visits.sheet');
+    Route::post('pm-visits/{visit}/sign-link', [PmVisitController::class, 'signLink'])->name('visits.sign-link');
+    Route::post('pm-visits/{visit}/revise', [PmVisitController::class, 'revise'])->name('visits.revise');
+    Route::post('pm-visits/{visit}/customer-sign', [PmVisitController::class, 'customerSign'])->name('visits.customer-sign');
     Route::get('pm-visits/{visit}/equipment/{item}/pdf', [PmVisitPdfController::class, 'equipment'])->whereNumber('item')->name('visits.equipment.pdf');
     Route::post('pm-visits/{visit}/start', [PmVisitController::class, 'start'])->name('visits.start');
     Route::post('pm-visits/{visit}/submit', [PmVisitController::class, 'submit'])->name('visits.submit');

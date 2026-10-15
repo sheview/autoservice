@@ -19,6 +19,12 @@ use App\Modules\Maintenance\Models\PmVisit as V;
  *   close     approved | published → closed                    publish
  *   reopen    approved | published → revision_required         approve, with the reason (a new version follows)
  *   cancel    draft | scheduled | in_progress | revision_required → cancelled   update, with the reason
+ *   revise    a work order the customer signed (locked) → a revision -R1 … to correct; the signed one
+ *             is cancelled                                    approve, with the reason (CreatePmRevision)
+ *
+ * Once the customer signed (locked), return, reopen and cancel are no longer allowed: the results stay
+ * as signed and a correction is a revision. Without an approval step (PmSettings) work reaching
+ * pending_approval is approved at once (MovePmVisit::approveBySystem).
  */
 class PmWorkflow
 {
@@ -33,17 +39,26 @@ class PmWorkflow
         'close' => ['from' => [V::STATUS_APPROVED, V::STATUS_PUBLISHED], 'to' => V::STATUS_CLOSED, 'ability' => 'publish'],
         'reopen' => ['from' => [V::STATUS_APPROVED, V::STATUS_PUBLISHED], 'to' => V::STATUS_REVISION_REQUIRED, 'ability' => 'approve'],
         'cancel' => ['from' => V::OPEN_STATUSES, 'to' => V::STATUS_CANCELLED, 'ability' => 'cancel'],
+        'revise' => ['from' => [V::STATUS_SUBMITTED, V::STATUS_PENDING_APPROVAL, V::STATUS_APPROVED, V::STATUS_PUBLISHED, V::STATUS_CLOSED],
+            'to' => V::STATUS_CANCELLED, 'ability' => 'approve'],
     ];
 
+    /** Not allowed once the customer signed. */
+    public const NOT_WHEN_LOCKED = ['return', 'reopen', 'cancel'];
+
     /** Moves that need a reason. */
-    public const NEEDS_NOTE = ['return', 'reopen', 'cancel'];
+    public const NEEDS_NOTE = ['return', 'reopen', 'cancel', 'revise'];
 
     /** Moves made by their own action (they do more than change the status). */
-    public const OWN_ACTION = ['start' => 'StartPmVisit', 'submit' => 'SubmitPmVisit'];
+    public const OWN_ACTION = ['start' => 'StartPmVisit', 'submit' => 'SubmitPmVisit', 'revise' => 'CreatePmRevision'];
 
     public static function allows(V $visit, string $action): bool
     {
-        return isset(self::ACTIONS[$action]) && in_array($visit->status, self::ACTIONS[$action]['from'], true);
+        if (! isset(self::ACTIONS[$action]) || ! in_array($visit->status, self::ACTIONS[$action]['from'], true)) {
+            return false;
+        }
+
+        return $visit->isLocked() ? ! in_array($action, self::NOT_WHEN_LOCKED, true) : $action !== 'revise';
     }
 
     /** Where a move leads for this company: a submit skips review when the company has none. */

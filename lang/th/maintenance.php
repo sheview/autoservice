@@ -47,7 +47,22 @@ return [
         'has_work' => 'แผนนี้มีรอบที่เริ่มทำแล้ว ลบไม่ได้ ให้ยกเลิกรอบที่เหลือแทน',
     ],
 
+    'signing' => [
+        'drawing_required' => 'กรุณาเซ็นชื่อในกรอบ',
+        'locked' => 'ลูกค้าลงนามแล้ว ผลตรวจถูกล็อก แก้ไขได้ด้วยการออก revision เท่านั้น',
+        'link_not_allowed' => 'สร้างลิงก์ให้ลูกค้าเซ็นได้เมื่อส่งงานแล้วและลูกค้ายังไม่ได้ลงนาม',
+        'customer_missing' => 'ต้องให้ลูกค้าลงนามก่อนอนุมัติ',
+        'approver_missing' => 'กรุณาเซ็นชื่อผู้อนุมัติ',
+        'signed' => 'บันทึกลายเซ็นแล้ว',
+    ],
+
+    'revisions' => [
+        'created' => 'ออก revision :no แล้ว ส่งกลับให้ช่างแก้ไขและให้ลูกค้าลงนามใหม่',
+        'replaced_by' => 'ถูกแทนที่ด้วย :no: :reason',
+    ],
+
     'visits' => [
+        'auto_approved' => 'อนุมัติอัตโนมัติ (ไม่มีขั้นอนุมัติ)',
         'updated' => 'บันทึกนัดหมายเรียบร้อยแล้ว',
         'started' => 'เริ่มรอบ PM แล้ว',
         'item_saved' => 'บันทึกผลตรวจเรียบร้อยแล้ว',
@@ -93,6 +108,8 @@ return [
 
     // Activity log lines (Log การใช้งาน).
     'log' => [
+        'locked' => 'ลูกค้าลงนามใบงาน PM :no — ล็อกผลตรวจ',
+        'revised' => 'ออก revision ของใบงาน PM :no เป็น :revision',
         'schedule' => 'ยืนยันกำหนดการใบงาน PM :no',
         'submit' => 'ส่งงาน PM :no',
         'review' => 'ตรวจงาน PM :no ผ่าน',
@@ -145,6 +162,16 @@ return [
         'name' => 'ชื่อ Template',
         'code' => 'รหัส Template',
         'instrument_id' => 'เครื่องมือวัด',
+        'image' => 'ลายเซ็น',
+        'signer_name' => 'ชื่อผู้ลงนาม',
+        'position' => 'ตำแหน่ง',
+        'phone' => 'เบอร์โทร',
+        'email' => 'อีเมล',
+        'satisfaction' => 'ความพึงพอใจ',
+        'comment' => 'ความคิดเห็น',
+        'customer_signer_name' => 'ชื่อผู้ลงนาม (ลูกค้า)',
+        'customer_signer_email' => 'อีเมลผู้ลงนาม',
+        'approver_signature' => 'ลายเซ็นผู้อนุมัติ',
         'not_inspected_reason' => 'เหตุผลที่ไม่ได้ตรวจ',
         'serial_no' => 'Serial Number',
         'calibration_due_at' => 'ครบกำหนดสอบเทียบ',

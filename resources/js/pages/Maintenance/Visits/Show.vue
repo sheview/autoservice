@@ -50,7 +50,10 @@ interface VisitDetail {
     published_at: string | null;
     closed_at: string | null;
     cancelled_at: string | null;
-    signatures: { technician_signature: Signature | null; customer_signature: Signature | null };
+    signatures: { technician_signature: Signature | null; customer_signature: Signature | null; approver_signature: Signature | null };
+    locked_at: string | null;
+    data_hash: string | null;
+    revision_of: { ulid: string; visit_no: string } | null;
 }
 
 interface HistoryEvent {
@@ -73,7 +76,7 @@ const props = defineProps<{
     notInspectedReasons: string[];
     moves: string[];
     needsNote: string[];
-    signing: { technician: boolean; customer: boolean; review_step: boolean };
+    signing: { technician: boolean; customer: boolean; approver: boolean; review_step: boolean; approval_step: boolean };
     events: HistoryEvent[];
     versions: { id: number; version: number; approved_by_name: string | null; at: string }[];
     can: { update: boolean; start: boolean; perform: boolean; cancel: boolean; openTicket: boolean; editItems: boolean; share: boolean };
@@ -98,7 +101,7 @@ const start = () => router.post(route('maintenance.visits.start', props.visit.ul
 
 // --- the other moves of the workflow: one button each; those that need a reason open a box first ---
 const moving = ref<string | null>(null);
-const move = useForm({ action: '', note: '' });
+const move = useForm({ action: '', note: '', approver_signature: null as string | null });
 const allMoves = computed(() => [...props.moves, ...(props.can.cancel ? ['cancel'] : [])]);
 const pickMove = (action: string) => {
     moving.value = action;
@@ -106,9 +109,13 @@ const pickMove = (action: string) => {
     move.note = '';
     move.clearErrors();
 };
+// A revision (of a work order the customer signed) has its own action: it opens the new work order.
 const sendMove = () =>
-    move.post(route('maintenance.visits.move', props.visit.ulid), { preserveScroll: true, onSuccess: () => (moving.value = null) });
-const moveVariant = (action: string) => (['return', 'reopen', 'cancel'].includes(action) ? 'outline' : 'default');
+    move.post(route(move.action === 'revise' ? 'maintenance.visits.revise' : 'maintenance.visits.move', props.visit.ulid), {
+        preserveScroll: true,
+        onSuccess: () => (moving.value = null),
+    });
+const moveVariant = (action: string) => (['return', 'reopen', 'cancel', 'revise'].includes(action) ? 'outline' : 'default');
 
 // --- hand the work in: summary and the signatures drawn on the screen ---
 const submit = useForm({
@@ -121,6 +128,10 @@ const submit = useForm({
 const sendSubmit = () => submit.post(route('maintenance.visits.submit', props.visit.ulid), { preserveScroll: true });
 
 const pending = computed(() => props.items.filter((item) => item.result === 'pending').length);
+// Handed in and not yet signed by the customer: the sign page can make a link for them.
+const signLinkable = computed(
+    () => !props.visit.locked_at && ['submitted', 'pending_approval', 'approved', 'published'].includes(props.visit.status),
+);
 
 // --- step bar: plan → field work → review/approval → approved → published → closed ---
 const stepBar = computed(() => {
@@ -203,6 +214,12 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     <Button v-if="can.start || can.perform" variant="outline" as-child>
                         <Link :href="route('maintenance.field.visit', visit.ulid)">{{ t('pm_visits.field_page') }}</Link>
                     </Button>
+                    <Button variant="outline" as-child>
+                        <a :href="route('maintenance.visits.sheet', visit.ulid)" target="_blank" rel="noopener">{{ t('pm_sign.sheet') }}</a>
+                    </Button>
+                    <Button v-if="can.perform || (can.start === false && signLinkable)" variant="outline" as-child>
+                        <Link :href="route('maintenance.field.sign', visit.ulid)">{{ t('pm_sign.open_sign') }}</Link>
+                    </Button>
                     <Button v-if="can.start" @click="start">{{ t('pm_visits.start') }}</Button>
                     <Button v-for="action in allMoves" :key="action" :variant="moveVariant(action)" @click="pickMove(action)">
                         {{ t(`pm_visits.moves.${action}`) }}
@@ -227,11 +244,31 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 <p class="mt-1 text-xs text-muted-foreground">{{ t('pm_visits.revision_count', { count: visit.revision_count }) }}</p>
             </div>
 
+            <!-- Signed by the customer: locked, corrected only by a revision -->
+            <p
+                v-if="visit.locked_at"
+                class="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900 dark:border-green-900 dark:bg-green-950/40 dark:text-green-200"
+            >
+                {{ t('pm_sign.locked', { at: dateTime(visit.locked_at) }) }}
+                <span v-if="visit.data_hash" class="ml-1 font-mono text-xs">#{{ visit.data_hash.slice(0, 16) }}</span>
+            </p>
+            <p v-if="visit.revision_of" class="text-sm text-muted-foreground">
+                <Link :href="route('maintenance.visits.show', visit.revision_of.ulid)" class="underline">{{
+                    t('pm_sign.revision_of', { no: visit.revision_of.visit_no })
+                }}</Link>
+            </p>
+
             <!-- Confirm a move (with its reason or a remark) -->
             <form v-if="moving" class="space-y-2 rounded-md border p-4" @submit.prevent="sendMove">
                 <p class="font-semibold">{{ t(`pm_visits.moves.${moving}`) }}</p>
                 <Label for="move_note">{{ needsNote.includes(moving) ? t('pm_visits.move_reason') : t('pm_visits.move_note') }}</Label>
                 <textarea id="move_note" v-model="move.note" rows="2" :required="needsNote.includes(moving)" :class="textareaClass" />
+                <p v-if="moving === 'revise'" class="text-xs text-muted-foreground">{{ t('pm_sign.revise_hint') }}</p>
+                <div v-if="moving === 'approve' && signing.approver" class="grid gap-1">
+                    <Label>{{ t('pm_sign.approver_signature') }}</Label>
+                    <SignaturePad v-model="move.approver_signature" />
+                    <InputError :message="(move.errors as Record<string, string>).approver_signature" />
+                </div>
                 <InputError :message="move.errors.note ?? move.errors.action" />
                 <div class="flex gap-2">
                     <Button size="sm" :variant="moving === 'cancel' ? 'destructive' : 'default'" :disabled="move.processing">{{

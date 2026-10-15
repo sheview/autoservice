@@ -104,12 +104,12 @@ class PmSharedReportController extends Controller
         ['visit' => $visit, 'version' => $version] = $found;
 
         return $this->context->run($tenant, function () use ($visit, $version, $itemId, $download) {
-            $data = $this->document->handle($visit, $version, $itemId);
+            $data = $this->document->handle($visit, $version, $itemId, customerCopy: true);
             $assetCode = $itemId !== null ? ($data['items'][0]['asset']['asset_code'] ?? null) : null;
 
             try {
                 return $this->renderPdf->handle(
-                    $itemId === null ? 'documents.pm-report' : 'documents.pm-equipment-report',
+                    'documents.pm-sheet',
                     $data,
                     $this->document->fileName($visit, $version, $assetCode),
                     $this->document->footer($visit, $version, $assetCode),

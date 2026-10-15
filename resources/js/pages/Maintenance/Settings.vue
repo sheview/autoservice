@@ -12,13 +12,17 @@ import { Head, useForm, usePage } from '@inertiajs/vue3';
 const props = defineProps<{
     settings: {
         review_step: boolean;
+        approval_step: boolean;
         require_technician_signature: boolean;
         require_customer_signature: boolean;
+        require_approver_signature: boolean;
         share_days: number;
+        sign_link_days: number;
         report_note: string | null;
     };
     maxShareDays: number;
     noteMax: number;
+    maxSignLinkDays: number;
 }>();
 
 const page = usePage<SharedData>();
@@ -27,7 +31,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: t('pm_settings.title'), href: ro
 const form = useForm({ ...props.settings, report_note: props.settings.report_note ?? '' });
 const submit = () => form.put(route('maintenance.settings.update'), { preserveScroll: true });
 
-const toggles = ['review_step', 'require_technician_signature', 'require_customer_signature'] as const;
+const toggles = ['review_step', 'approval_step', 'require_technician_signature', 'require_customer_signature', 'require_approver_signature'] as const;
 </script>
 
 <template>
@@ -60,6 +64,12 @@ const toggles = ['review_step', 'require_technician_signature', 'require_custome
                         <Input id="share_days" v-model="form.share_days" type="number" min="1" :max="maxShareDays" />
                         <p class="text-xs text-muted-foreground">{{ t('pm_settings.share_days_hint', { max: maxShareDays }) }}</p>
                         <InputError :message="form.errors.share_days" />
+                    </div>
+                    <div class="grid gap-2 sm:max-w-xs">
+                        <Label for="sign_link_days">{{ t('pm_settings.sign_link_days') }}</Label>
+                        <Input id="sign_link_days" v-model="form.sign_link_days" type="number" min="1" :max="maxSignLinkDays" />
+                        <p class="text-xs text-muted-foreground">{{ t('pm_settings.sign_link_days_hint', { max: maxSignLinkDays }) }}</p>
+                        <InputError :message="form.errors.sign_link_days" />
                     </div>
                     <div class="grid gap-2">
                         <Label for="report_note">{{ t('pm_settings.report_note') }}</Label>

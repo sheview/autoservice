@@ -4,9 +4,8 @@
 <head>
     <meta charset="utf-8">
     <title>@yield('title')</title>
-    {{-- Thai font from Google Fonts; Gotenberg's own Noto fonts are the fallback when it has no internet. --}}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+    {{-- Thai font inline (EmbeddedFonts): no internet needed by the PDF service. --}}
+    <style>{!! \App\Modules\Document\Support\EmbeddedFonts::css() !!}</style>
     <style>
         * { box-sizing: border-box; }
         body { font-family: 'Sarabun', 'Noto Sans Thai', 'Noto Sans', sans-serif; font-size: 10.5pt; line-height: 1.45; color: #000; margin: 0; }
@@ -50,8 +49,11 @@
             @page { size: A4; margin: 12mm 14mm; }
             @media screen { body { max-width: 182mm; margin: 12mm auto; } }
         </style>
-        <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
+        @if ($autoPrint ?? true)
+            <script>window.addEventListener('load', () => setTimeout(() => window.print(), 300));</script>
+        @endif
     @endif
+    @stack('head')
 </head>
 <body>
     @yield('content')

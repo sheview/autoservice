@@ -72,6 +72,8 @@ class HandleInertiaRequests extends Middleware
                 'already' => fn () => $request->session()->get('already'),
                 // A customer's PM report link just made: the only time it is shown (its token is stored hashed).
                 'share_url' => fn () => $request->session()->get('share_url'),
+                // A link for the customer to sign a PM work order on their phone, just made: {url, expires_at}.
+                'sign_link' => fn () => $request->session()->get('sign_link'),
             ],
             // The company's subscription, for the warning popup and banner. Customer accounts are
             // not told about their MA company's contract with the platform.

@@ -22,6 +22,9 @@ class PmSignature extends Model
 
     public const ROLES = [self::ROLE_ENGINEER, self::ROLE_CUSTOMER, self::ROLE_APPROVER];
 
+    /** The satisfaction a customer ticks when signing (as on the paper form), kept by the Survey module. */
+    public const SATISFACTION_LEVELS = ['excellent', 'good', 'fair', 'poor'];
+
     protected $fillable = ['role', 'name', 'position', 'phone', 'email', 'image_path', 'signed_at', 'ip', 'user_agent', 'data_hash'];
 
     protected function casts(): array

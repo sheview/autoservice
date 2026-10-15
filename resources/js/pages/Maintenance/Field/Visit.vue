@@ -177,7 +177,7 @@ const errors = computed(() => page.props.errors as Record<string, string>);
             </section>
 
             <Button variant="outline" class="h-12 w-full" as-child>
-                <Link :href="route('maintenance.visits.show', visit.ulid)">{{ t('pm_field.submit') }}</Link>
+                <Link :href="route('maintenance.field.sign', visit.ulid)">{{ t('pm_field.submit') }}</Link>
             </Button>
         </div>
     </AppLayout>

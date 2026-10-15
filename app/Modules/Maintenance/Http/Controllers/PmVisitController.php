@@ -10,17 +10,22 @@ use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
+use App\Modules\Labeling\Actions\QrSvg;
+use App\Modules\Maintenance\Actions\CreatePmRevision;
+use App\Modules\Maintenance\Actions\CreatePmSignLink;
 use App\Modules\Maintenance\Actions\MovePmVisit;
 use App\Modules\Maintenance\Actions\OpenTicketFromPmItem;
 use App\Modules\Maintenance\Actions\PmInstrumentOptions;
 use App\Modules\Maintenance\Actions\RecordPmItem;
 use App\Modules\Maintenance\Actions\SearchPmVisits;
+use App\Modules\Maintenance\Actions\SignPmVisitByCustomer;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Actions\SubmitPmVisit;
 use App\Modules\Maintenance\Actions\UpdatePmVisit;
 use App\Modules\Maintenance\Http\Requests\PmPlanRequest;
 use App\Modules\Maintenance\Http\Requests\RecordPmItemRequest;
 use App\Modules\Maintenance\Models\PmReportShare;
+use App\Modules\Maintenance\Models\PmSignature;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -108,11 +113,21 @@ class PmVisitController extends Controller
                 'revision_note' => $hideWork ? null : $visit->revision_note,
                 'title' => $visit->displayTitle(),
                 ...collect(['reviewed_at', 'approved_at', 'published_at', 'closed_at'])->mapWithKeys(fn ($field) => [$field => $visit->{$field}?->toIso8601String()]),
-                'signatures' => collect([PmVisit::TECHNICIAN_SIGNATURE, PmVisit::CUSTOMER_SIGNATURE])->mapWithKeys(fn (string $collection) => [
-                    $collection => ($media = $visit->getFirstMedia($collection))
-                        ? ['signer' => $media->getCustomProperty('signer'), 'position' => $media->getCustomProperty('position'), 'signed_at' => $media->getCustomProperty('signed_at')]
-                        : null,
+                // Who signed (pm_signatures; else a signature drawn before those existed, kept as media).
+                'signatures' => collect([
+                    PmVisit::TECHNICIAN_SIGNATURE => PmSignature::ROLE_ENGINEER,
+                    PmVisit::CUSTOMER_SIGNATURE => PmSignature::ROLE_CUSTOMER,
+                    'approver_signature' => PmSignature::ROLE_APPROVER,
+                ])->mapWithKeys(fn (string $role, string $key) => [
+                    $key => ($signature = $visit->signatureOf($role))
+                        ? ['signer' => $signature->name, 'position' => $signature->position, 'signed_at' => $signature->signed_at->toIso8601String()]
+                        : (($media = $key !== 'approver_signature' ? $visit->getFirstMedia($key) : null)
+                            ? ['signer' => $media->getCustomProperty('signer'), 'position' => $media->getCustomProperty('position'), 'signed_at' => $media->getCustomProperty('signed_at')]
+                            : null),
                 ]),
+                'locked_at' => $visit->locked_at?->toIso8601String(),
+                'data_hash' => $visit->isLocked() ? $visit->signatureOf(PmSignature::ROLE_CUSTOMER)?->data_hash : null,
+                'revision_of' => $visit->revisionOf ? $visit->revisionOf->only(['ulid', 'visit_no']) : null,
                 'plan' => $visit->plan ? ['id' => $visit->plan->id, 'title' => $visit->plan->title, 'can_view' => $user->can('view', $visit->plan)] : null,
                 'customer' => collect($this->listCustomers->handle(withTrashed: true))->firstWhere('id', $visit->customer_id)['name'] ?? null,
                 'contract' => $contract ? [...collect($contract)->only(['id', 'contract_no', 'title'])->all(), 'can_view' => $user->can('contracts.view')] : null,
@@ -168,7 +183,9 @@ class PmVisitController extends Controller
             'signing' => [
                 'technician' => $settings->requireTechnicianSignature,
                 'customer' => $settings->requireCustomerSignature,
+                'approver' => $settings->requireApproverSignature,
                 'review_step' => $settings->reviewStep,
+                'approval_step' => $settings->approvalStep,
             ],
             // The work order's lasting history (staff only: it names the people who worked on it).
             'events' => $staff ? $visit->events()->latest('id')->limit(100)->get()->map(fn (PmVisitEvent $event) => [
@@ -259,17 +276,75 @@ class PmVisitController extends Controller
     {
         Gate::authorize('perform', $visit);
 
-        $signature = ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:400000'];
+        $signature = ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:600000'];
         $data = $request->validate([
             'summary' => ['nullable', 'string', 'max:5000'],
             'technician_signature' => $signature,
             'customer_signature' => $signature,
-            'customer_signer_name' => ['nullable', 'string', 'max:255'],
+            'customer_signer_name' => ['nullable', 'required_with:customer_signature', 'string', 'max:255'],
             'customer_signer_position' => ['nullable', 'string', 'max:255'],
+            'customer_signer_phone' => ['nullable', 'string', 'max:30'],
+            'customer_signer_email' => ['nullable', 'email', 'max:255'],
+            'satisfaction' => ['nullable', Rule::in(PmSignature::SATISFACTION_LEVELS)],
+            'satisfaction_comment' => ['nullable', 'string', 'max:1000'],
         ], [], __('maintenance.fields'));
-        $submitVisit->handle($visit, $request->user(), $data);
+        $submitVisit->handle($visit, $request->user(), $data, $this->client($request));
 
         return back()->with('success', __('maintenance.visits.submitted'));
+    }
+
+    /**
+     * A link (QR) for the customer to sign on their own phone; shown once (flash sign_link).
+     */
+    public function signLink(Request $request, PmVisit $visit, CreatePmSignLink $createLink): RedirectResponse
+    {
+        Gate::authorize('perform', $visit);
+
+        $link = $createLink->handle($visit, $request->user());
+
+        return back()->with('sign_link', [...$link, 'qr' => app(QrSvg::class)->handle($link['url'])]);
+    }
+
+    /**
+     * The customer signs on the technician's device after the work was handed in (with the
+     * satisfaction they tick): locks the results.
+     */
+    public function customerSign(Request $request, PmVisit $visit, SignPmVisitByCustomer $sign): RedirectResponse
+    {
+        Gate::authorize('perform', $visit);
+        abort_unless(in_array($visit->status, CreatePmSignLink::STATUSES, true), 404);
+
+        $data = $request->validate([
+            'image' => ['required', 'string', 'starts_with:data:image/png;base64,', 'max:600000'],
+            'name' => ['required', 'string', 'max:255'],
+            'position' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'satisfaction' => ['nullable', Rule::in(PmSignature::SATISFACTION_LEVELS)],
+            'comment' => ['nullable', 'string', 'max:1000'],
+        ], [], ['name' => __('maintenance.fields.signer_name')] + __('maintenance.fields'));
+        $sign->handle($visit, $data, $request->user(), $this->client($request));
+
+        return back()->with('success', __('maintenance.signing.signed'));
+    }
+
+    /**
+     * A work order the customer signed is corrected as a revision (-R1 …): opens the new one.
+     */
+    public function revise(Request $request, PmVisit $visit, CreatePmRevision $createRevision): RedirectResponse
+    {
+        Gate::authorize(PmWorkflow::ACTIONS['revise']['ability'], $visit);
+        $data = $request->validate(['note' => ['required', 'string', 'max:5000']], [], __('maintenance.fields'));
+
+        $revision = $createRevision->handle($visit, $request->user(), $data['note']);
+
+        return redirect()->route('maintenance.visits.show', $revision)->with('success', __('maintenance.revisions.created', ['no' => $revision->visit_no]));
+    }
+
+    /** @return array{ip: string|null, user_agent: string|null} */
+    private function client(Request $request): array
+    {
+        return ['ip' => $request->ip(), 'user_agent' => $request->userAgent()];
     }
 
     /**
@@ -281,10 +356,13 @@ class PmVisitController extends Controller
         $data = $request->validate([
             'action' => ['required', Rule::in(array_diff(array_keys(PmWorkflow::ACTIONS), array_keys(PmWorkflow::OWN_ACTION)))],
             'note' => ['nullable', 'string', 'max:5000'],
+            // the approver's drawing, when approving
+            'approver_signature' => ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:600000'],
         ], [], __('maintenance.fields'));
         Gate::authorize(PmWorkflow::ACTIONS[$data['action']]['ability'], $visit);
 
-        $moveVisit->handle($visit, $data['action'], $request->user(), $data['note'] ?? null);
+        $moveVisit->handle($visit, $data['action'], $request->user(), $data['note'] ?? null,
+            $data['action'] === 'approve' ? ($data['approver_signature'] ?? null) : null, $this->client($request));
 
         return back()->with('success', __('maintenance.visits.moved.'.$data['action']));
     }

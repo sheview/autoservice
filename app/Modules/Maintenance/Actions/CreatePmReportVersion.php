@@ -15,14 +15,17 @@ class CreatePmReportVersion
 {
     public function __construct(private PmReportData $reportData, private LogPmEvent $logEvent) {}
 
-    public function handle(PmVisit $visit, User $actor): PmReportVersion
+    /**
+     * @param  User|null  $actor  null = approved by the system (a company without an approval step)
+     */
+    public function handle(PmVisit $visit, ?User $actor): PmReportVersion
     {
         $number = (int) $visit->versions()->max('version') + 1;
         $version = $visit->versions()->create([
             'version' => $number,
             'snapshot' => $this->reportData->handle($visit),
-            'approved_by' => $actor->id,
-            'approved_by_name' => $actor->name,
+            'approved_by' => $visit->approved_by,
+            'approved_by_name' => $visit->approved_by ? $actor?->name : __('maintenance.visits.auto_approved'),
             'created_at' => now(),
         ]);
 

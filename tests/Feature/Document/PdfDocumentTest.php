@@ -4,6 +4,7 @@ use App\Modules\Document\Support\ThaiDate;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
+use App\Modules\Maintenance\Support\PmNumber;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\Client\ConnectionException;
@@ -81,8 +82,8 @@ it('makes the PM report PDF of a round with every asset and its checklist answer
     $this->actingAs($this->tech)->get("/pm-visits/{$visit->ulid}/pdf")->assertOk()
         ->assertHeader('content-type', 'application/pdf');
 
-    expect(sentHtml())->toContain($visit->visit_no, 'PM Acme', 'Acme', 'Core switch', 'ทำความสะอาด', 'อุณหภูมิ', '41', 'พัดลมเสียงดัง', 'พบปัญหา')
-        ->toContain('ทั้งหมด 1 เครื่อง');
+    expect(sentHtml())->toContain(PmNumber::shown($visit->visit_no, $visit->tenant_id), 'PM Acme', 'Acme', 'Core switch', 'ทำความสะอาด', 'อุณหภูมิ', '41', 'พัดลมเสียงดัง', 'ผิดปกติ')
+        ->toContain('ใบตรวจเช็กบำรุงรักษาเชิงป้องกัน (PM)');
 });
 
 it('sends the user back with a message when Gotenberg is not available', function () {

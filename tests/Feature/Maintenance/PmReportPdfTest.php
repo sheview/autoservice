@@ -2,6 +2,7 @@
 
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmVisit;
+use App\Modules\Maintenance\Support\PmNumber;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
@@ -74,7 +75,7 @@ it('prints the work order as a draft before approval, then the approved version 
     $this->actingAs($this->helpdesk)->get("{$this->url}/pdf")->assertOk();
     [$html, $footer] = pmPdfSent();
     expect($html)->toContain('ฉบับร่าง — ยังไม่อนุมัติ')
-        ->and($footer)->toContain($this->visit->visit_no)->toContain('DRAFT')->toContain('class="pageNumber"')->toContain('class="totalPages"');
+        ->and($footer)->toContain(PmNumber::shown($this->visit->visit_no, $this->visit->tenant_id))->toContain('DRAFT')->toContain('class="pageNumber"')->toContain('class="totalPages"');
 
     ($this->approve)('ทุกเครื่องตรวจแล้ว');
 
@@ -88,7 +89,7 @@ it('prints the work order as a draft before approval, then the approved version 
         ->toContain('แบตเตอรี่')->toContain('ทดสอบแบตเตอรี่')->toContain('≤ 80 %')->toContain('92 %')->toContain('แบตเสื่อม')
         // the photo, shrunk to JPEG, and the drawn signature
         ->toContain('data:image/jpeg;base64,')->toContain('data:image/png;base64,')
-        ->toContain('อนุมัติโดย')->toContain('Boss')
+        ->toContain('ผู้อนุมัติ')->toContain('Boss')
         ->and($footer)->toContain('v1');
 });
 
@@ -98,7 +99,7 @@ it('prints the report of one piece of equipment from the same data', function ()
     $this->actingAs($this->helpdesk)->get("{$this->url}/equipment/{$this->itemA->id}/pdf")->assertOk()
         ->assertHeader('Content-Disposition', 'inline; filename="'.$this->visit->visit_no.'_'.$this->upsA->asset_code.'_v1.pdf"');
     [$html, $footer] = pmPdfSent();
-    expect($html)->toContain('รายงาน PM รายอุปกรณ์')->toContain('UPS Alpha')->toContain('SN-ALPHA')->not->toContain('UPS Bravo')
+    expect($html)->toContain('ใบตรวจเช็กบำรุงรักษาเชิงป้องกัน (PM)')->toContain('UPS Alpha')->toContain('SN-ALPHA')->not->toContain('UPS Bravo')
         ->and($footer)->toContain($this->upsA->asset_code);
 
     // An item of another work order is not in this report.

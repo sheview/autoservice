@@ -42,6 +42,16 @@ class PmVisitEvent extends Model
 
     public const TYPE_DEPARTED = 'departed';
 
+    /** The customer signed: the results were locked (with their hash). */
+    public const TYPE_LOCKED = 'locked';
+
+    /** A locked work order was replaced by a revision (on both: the old one and the new one). */
+    public const TYPE_REVISED = 'revised';
+
+    public const TYPE_SIGN_LINK_CREATED = 'sign_link_created';
+
+    public const TYPE_SIGN_LINK_REVOKED = 'sign_link_revoked';
+
     protected $fillable = ['pm_visit_id', 'type', 'from_status', 'to_status', 'note', 'data', 'user_id', 'user_name', 'created_at'];
 
     protected function casts(): array

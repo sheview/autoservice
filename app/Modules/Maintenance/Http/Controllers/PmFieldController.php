@@ -6,14 +6,19 @@ use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
+use App\Modules\Maintenance\Actions\CreatePmSignLink;
 use App\Modules\Maintenance\Actions\MarkPmVisitArrival;
 use App\Modules\Maintenance\Actions\MarkPmVisitDeparture;
 use App\Modules\Maintenance\Actions\PmInstrumentOptions;
+use App\Modules\Maintenance\Actions\PmSignSummary;
 use App\Modules\Maintenance\Actions\SavePmItemDraft;
 use App\Modules\Maintenance\Http\Requests\PmItemDraftRequest;
+use App\Modules\Maintenance\Models\PmSignature;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Maintenance\Support\ChecklistItems;
+use App\Modules\Maintenance\Support\PmSettings;
+use App\Modules\Maintenance\Support\PmWorkflow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketLabels;
 use App\Modules\Service\Models\Ticket;
@@ -91,6 +96,28 @@ class PmFieldController extends Controller
         ]);
     }
 
+    /**
+     * Hand in and sign on the technician's device: the summary of the round, the technician's
+     * signature, the customer's here — or a link (QR) for them to sign on their own phone.
+     */
+    public function sign(PmVisit $visit, PmSignSummary $summary): Response
+    {
+        Gate::authorize('perform', $visit);
+        $settings = PmSettings::of();
+
+        return Inertia::render('Maintenance/Field/Sign', [
+            'visit' => $this->visitSummary($visit),
+            'work' => $summary->handle($visit),
+            'can' => [
+                'submit' => PmWorkflow::allows($visit, 'submit') && ! $visit->isLocked(),
+                'link' => ! $visit->isLocked() && in_array($visit->status, CreatePmSignLink::STATUSES, true),
+            ],
+            'signing' => ['technician' => $settings->requireTechnicianSignature, 'customer' => $settings->requireCustomerSignature],
+            'levels' => PmSignature::SATISFACTION_LEVELS,
+            'surveyOn' => $this->modules->enabled('survey'),
+        ]);
+    }
+
     public function arrive(Request $request, PmVisit $visit, MarkPmVisitArrival $arrive): RedirectResponse
     {
         Gate::authorize('perform', $visit);
@@ -133,6 +160,7 @@ class PmFieldController extends Controller
             'departed_at' => $visit->departed_at?->toIso8601String(),
             'working' => $visit->isWorking(),
             'can_start' => $visit->status === PmVisit::STATUS_SCHEDULED,
+            'locked_at' => $visit->locked_at?->toIso8601String(),
         ];
     }
 }

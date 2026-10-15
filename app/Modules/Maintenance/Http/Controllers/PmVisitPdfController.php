@@ -33,17 +33,31 @@ class PmVisitPdfController extends Controller
         return $this->render($request, $visit, $item);
     }
 
+    /**
+     * The same sheet as HTML in the browser ("view"): works without the PDF service, prints from the
+     * browser, and shows the status badge on screen only.
+     */
+    public function sheet(Request $request, PmVisit $visit): HttpResponse
+    {
+        Gate::authorize('view', $visit);
+
+        $version = $this->versionFor->handle($visit, $request->user(), $request->integer('version') ?: null);
+        $data = $this->document->handle($visit, $version, null, $this->customerCopy($request), screen: true);
+
+        return response()->view('documents.pm-sheet', [...$data, 'forBrowser' => true, 'autoPrint' => false]);
+    }
+
     private function render(Request $request, PmVisit $visit, ?int $itemId): HttpResponse|RedirectResponse
     {
         Gate::authorize('view', $visit);
 
         $version = $this->versionFor->handle($visit, $request->user(), $request->integer('version') ?: null);
-        $data = $this->document->handle($visit, $version, $itemId);
+        $data = $this->document->handle($visit, $version, $itemId, $this->customerCopy($request));
         $assetCode = $itemId !== null ? ($data['items'][0]['asset']['asset_code'] ?? null) : null;
 
         try {
             return $this->renderPdf->handle(
-                $itemId === null ? 'documents.pm-report' : 'documents.pm-equipment-report',
+                'documents.pm-sheet',
                 $data,
                 $this->document->fileName($visit, $version, $assetCode),
                 $this->document->footer($visit, $version, $assetCode),
@@ -52,5 +66,11 @@ class PmVisitPdfController extends Controller
         } catch (PdfUnavailable) {
             return back()->with('error', __('document.unavailable'));
         }
+    }
+
+    /** The customer's copy (no office-use blocks): always for a customer account, else on ?copy=customer. */
+    private function customerCopy(Request $request): bool
+    {
+        return $request->user()->customer_id !== null || $request->input('copy') === 'customer';
     }
 }
