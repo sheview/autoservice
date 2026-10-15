@@ -16,11 +16,13 @@ use App\Modules\Inventory\Actions\IssuePartToTicket;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Maintenance\Actions\MovePmVisit;
+use App\Modules\Maintenance\Actions\PublishTemplate;
 use App\Modules\Maintenance\Actions\RecordPmItem;
-use App\Modules\Maintenance\Actions\SaveChecklist;
 use App\Modules\Maintenance\Actions\SavePmPlan;
+use App\Modules\Maintenance\Actions\SaveTemplateDraft;
 use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Actions\SubmitPmVisit;
+use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\CheckTicketWarranty;
@@ -436,11 +438,14 @@ class DemoSeeder extends Seeder
     {
         $categories = AssetCategory::pluck('id', 'code_prefix');
         foreach (self::CHECKLISTS as $prefix => [$name, $items]) {
-            app(SaveChecklist::class)->handle(null, [
+            $template = app(SaveTemplateDraft::class)->handle(null, [
+                'code' => 'DEMO-'.($prefix === '' ? 'GENERAL' : $prefix),
                 'name' => $name,
-                'asset_category_id' => $prefix === '' ? null : $categories[$prefix] ?? null,
+                'layout' => PmChecklist::LAYOUT_PER_ASSET,
                 'items' => array_map(fn (array $item) => ['key' => $item[0], 'label' => $item[1], 'type' => $item[2]], $items),
+                'assignments' => [['asset_category_id' => $prefix === '' ? null : $categories[$prefix] ?? null]],
             ]);
+            app(PublishTemplate::class)->handle($template);
         }
 
         $realNow = now()->toImmutable();

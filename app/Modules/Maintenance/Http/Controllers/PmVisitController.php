@@ -23,6 +23,7 @@ use App\Modules\Maintenance\Models\PmReportShare;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
+use App\Modules\Maintenance\Support\ChecklistItems;
 use App\Modules\Maintenance\Support\PmSettings;
 use App\Modules\Maintenance\Support\PmWorkflow;
 use App\Modules\Platform\Support\Modules;
@@ -130,8 +131,9 @@ class PmVisitController extends Controller
                 'ticket' => null, 'checked_by' => null, 'checked_at' => null, 'removable' => false,
             ] : [
                 ...$item->only(['id', 'result', 'answers', 'note', 'checklist']),
+                // The register values too: fields of the template that show them (readonly_from_asset).
                 'asset' => isset($assets[$item->asset_id])
-                    ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name'])->all(), 'can_view' => $user->can('assets.view')]
+                    ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name', ...ChecklistItems::ASSET_SOURCES])->all(), 'can_view' => $user->can('assets.view')]
                     : null,
                 'ticket' => $tickets[$item->ticket_id] ?? null,
                 'remarks' => $item->remarks ?? (object) [],

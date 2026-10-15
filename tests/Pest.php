@@ -15,7 +15,7 @@ use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
-use App\Modules\Maintenance\Actions\AssignTemplateToCategory;
+use App\Modules\Maintenance\Actions\SyncTemplateAssignments;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmInstrument;
 use App\Modules\Service\Actions\CheckTicketWarranty;
@@ -168,7 +168,7 @@ function createPmTemplate(array $attributes = []): PmChecklist
     $n++;
 
     $template = PmChecklist::create($attributes + ['code' => "T{$n}", 'name' => "Template {$n}", 'items' => []]);
-    app(AssignTemplateToCategory::class)->handle($template->code, $template->asset_category_id);
+    app(SyncTemplateAssignments::class)->handle($template->code, [['asset_category_id' => $template->asset_category_id]]);
 
     return $template;
 }

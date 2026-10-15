@@ -150,14 +150,14 @@ it('records Pass / Fail / N/A, readings against their range, a note per question
 it('saves checklist templates with Pass/Fail, readings with unit and range, sections and required questions', function () {
     $admin = userWithRole('admin_company');
     $this->actingAs($admin)->post('/pm-checklists', [
-        'name' => 'Generator PM', 'items' => [
+        'code' => 'GEN', 'name' => 'Generator PM', 'layout' => 'per_asset', 'items' => [
             ['key' => 'oil', 'label' => 'ระดับน้ำมัน', 'type' => 'pass_fail', 'section' => 'เครื่องยนต์', 'required' => true],
             ['key' => 'volt', 'label' => 'แรงดัน', 'type' => 'measure', 'unit' => 'V', 'min' => 240, 'max' => 210],
         ],
-    ])->assertSessionHasErrors('items.1.max');
+    ])->assertSessionHasErrors('items');
 
     $this->actingAs($admin)->post('/pm-checklists', [
-        'name' => 'Generator PM', 'items' => [
+        'code' => 'GEN', 'name' => 'Generator PM', 'layout' => 'per_asset', 'items' => [
             ['key' => 'oil', 'label' => 'ระดับน้ำมัน', 'type' => 'pass_fail', 'section' => 'เครื่องยนต์', 'required' => true, 'unit' => 'x'],
             ['key' => 'volt', 'label' => 'แรงดัน', 'type' => 'measure', 'unit' => 'V', 'min' => '210', 'max' => '240', 'required' => false],
         ],

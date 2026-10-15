@@ -29,6 +29,9 @@ Route::middleware('throttle:track-link')->group(function () {
 
 Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance.')->group(function () {
     Route::post('pm-checklists/standard', [PmChecklistController::class, 'addStandard'])->name('checklists.standard');
+    Route::post('pm-checklists/{checklist}/publish', [PmChecklistController::class, 'publish'])->name('checklists.publish');
+    Route::post('pm-checklists/{checklist}/new-version', [PmChecklistController::class, 'newVersion'])->name('checklists.new-version');
+    Route::post('pm-checklists/{checklist}/copy', [PmChecklistController::class, 'copy'])->name('checklists.copy');
     Route::resource('pm-checklists', PmChecklistController::class)->except(['show'])
         ->names('checklists')->parameters(['pm-checklists' => 'checklist']);
 

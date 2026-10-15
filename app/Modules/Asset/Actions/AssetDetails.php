@@ -13,12 +13,13 @@ class AssetDetails
     private const COLUMNS = [
         'id', 'ulid', 'asset_code', 'name', 'customer_id', 'branch_id', 'category_id',
         'asset_brand_id', 'asset_model_id', 'parent_asset_id',
+        'brand', 'model', 'serial_number', 'property_no', 'ip_address', 'location', 'floor', 'room',
     ];
 
     /**
      * @param  list<int|string>  $keys  ids, or ulids when $byUlid
-     * @return array<int, array{id: int, ulid: string, asset_code: string, name: string, customer_id: int|null, branch_id: int|null, category_id: int, asset_brand_id: int|null, asset_model_id: int|null, parent_asset_id: int|null}>
-     *                                                                                                                                                                                                                                 keyed by asset id
+     * @return array<int, array{id: int, ulid: string, asset_code: string, name: string, customer_id: int|null, branch_id: int|null, category_id: int, asset_brand_id: int|null, asset_model_id: int|null, parent_asset_id: int|null, brand: string|null, model: string|null, serial_number: string|null, property_no: string|null, ip_address: string|null, location: string|null, floor: string|null, room: string|null}>
+     *                                                                                                                                                                                                                                                                                                                                                                                                                      keyed by asset id
      */
     public function handle(array $keys, bool $byUlid = false): array
     {

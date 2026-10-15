@@ -25,6 +25,9 @@ class PmChecklist extends Model
     /** The question types (ChecklistItems::TYPES); kept for older callers. */
     public const ITEM_TYPES = ChecklistItems::TYPES;
 
+    /** The MA service lines (as asset categories have them). */
+    public const SERVICE_LINES = ['datacenter', 'network', 'pc'];
+
     public const LAYOUT_PER_ASSET = 'per_asset';
 
     public const LAYOUT_GROUPED_TABLE = 'grouped_table';

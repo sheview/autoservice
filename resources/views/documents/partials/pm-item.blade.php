@@ -1,25 +1,6 @@
-{{-- One piece of equipment of a PM report: what it is, every checklist question with its outcome, the photos. --}}
+{{-- One piece of equipment of a PM report: what it is, every field of its template with the answer (pm-field), the photos. --}}
 @php($date = fn ($value, $time = false) => \App\Modules\Document\Support\ThaiDate::format($value, $time))
 @php($asset = $item['asset'])
-@php($outcome = function (array $check) use ($item) {
-    $answer = $check['answer'];
-    // Not checked yet (a draft): nothing to say about any question.
-    if ($item['result'] === 'pending') {
-        return __('document.pm.none');
-    }
-    return match ($check['type']) {
-        'pass_fail' => $answer ? __('document.pm.'.$answer) : __('document.pm.none'),
-        'check' => $answer ? __('document.pm.done') : __('document.pm.not_done'),
-        default => $answer === null || $answer === '' ? __('document.pm.none') : (is_float($answer) || is_int($answer) ? rtrim(rtrim(number_format((float) $answer, 2, '.', ''), '0'), '.') : $answer).(isset($check['unit']) && $answer !== null && $answer !== '' ? ' '.$check['unit'] : ''),
-    };
-})
-@php($criterion = fn (array $check) => $check['type'] !== 'measure' ? '' : match (true) {
-    isset($check['min'], $check['max']) => $check['min'].' – '.$check['max'].' '.($check['unit'] ?? ''),
-    isset($check['min']) => '≥ '.$check['min'].' '.($check['unit'] ?? ''),
-    isset($check['max']) => '≤ '.$check['max'].' '.($check['unit'] ?? ''),
-    default => '',
-})
-@php($verdictStyle = ['pass' => 'color: #166534', 'fail' => 'color: #b91c1c; font-weight: 700', 'na' => 'color: #555'])
 
 <div class="pm-item">
     <h3 class="pm-item-title">
@@ -52,14 +33,7 @@
                             <tr><td colspan="4" style="background: #f8f8f8; font-weight: 600">{{ $section }}</td></tr>
                         @endif
                     @endif
-                    <tr>
-                        <td>{{ $check['label'] }}</td>
-                        <td class="muted">{{ $criterion($check) }}</td>
-                        <td style="{{ $verdictStyle[$check['verdict'] ?? ''] ?? '' }}">
-                            {{ $outcome($check) }}@if (($check['verdict'] ?? null) === 'fail' && $check['type'] !== 'pass_fail') ({{ __('document.pm.fail') }})@endif
-                        </td>
-                        <td class="pre">{{ $check['remark'] }}</td>
-                    </tr>
+                    @include('documents.partials.pm-field', ['check' => $check, 'pending' => $item['result'] === 'pending'])
                 @endforeach
             </tbody>
         </table>

@@ -5,64 +5,77 @@ use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Support\StandardCategories;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmChecklist;
-use App\Modules\Maintenance\Support\StandardChecklists;
+use App\Modules\Maintenance\Models\PmTemplateAssignment;
+use App\Modules\Maintenance\Support\ChecklistItems;
+use App\Modules\Maintenance\Support\StandardTemplates;
 use App\Modules\Tenancy\Models\Tenant;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('has a standard category and checklist for every kind of equipment an MA company looks after', function () {
+it('has a standard category and template for every kind of equipment an MA company looks after', function () {
     $prefixes = array_column(StandardCategories::all(), 'code_prefix');
+    $covered = array_merge(...array_column(StandardTemplates::all(), 'prefixes'));
 
     // PC, Laptop, Server, Printer, Network, Data Center, UPS, Battery Bank, Generator, ATS, Precision Air,
-    // Fire Alarm, Smoke Detector, CCTV, Access Control, Cabling, Environmental Monitoring, Backup & Storage
-    foreach (['PC', 'NB', 'SV', 'PR', 'SW', 'RT', 'FW', 'AP', 'DC', 'RK', 'UPS', 'BAT', 'GEN', 'ATS', 'PAC', 'FA', 'SD', 'CCTV', 'ACS', 'CAB', 'EMS', 'STO'] as $prefix) {
-        expect($prefixes)->toContain($prefix)
-            ->and(StandardChecklists::all())->toHaveKey($prefix);
+    // Fire Alarm, Smoke Detector, CCTV, Access Control, Cabling, Environmental Monitoring, Backup & Storage,
+    // electrical boards, water leak, fire suppression, control room
+    foreach (['PC', 'NB', 'SV', 'PR', 'SW', 'RT', 'FW', 'AP', 'DC', 'RK', 'UPS', 'BAT', 'GEN', 'ATS', 'PAC', 'FA', 'SD', 'CCTV', 'ACS', 'CAB', 'EMS', 'STO', 'EDB', 'WLD', 'FSS', 'CTR'] as $prefix) {
+        expect($prefixes)->toContain($prefix)->and($covered)->toContain($prefix);
     }
-    expect(StandardChecklists::all())->toHaveKey('');
+    expect($covered)->toContain('');
 
-    // Every standard checklist is valid as a template would be saved.
-    foreach (StandardChecklists::all() as $checklist) {
-        $keys = array_column($checklist['items'], 'key');
-        expect($keys)->toBe(array_values(array_unique($keys)));
-        foreach ($checklist['items'] as $item) {
-            expect($item['key'])->toMatch('/^[a-z][a-z0-9_]{0,39}$/');
+    // Every standard template is valid as a template would be saved, and has a code of its own.
+    $codes = array_column(StandardTemplates::all(), 'code');
+    expect($codes)->toBe(array_values(array_unique($codes)));
+    foreach (StandardTemplates::all() as $template) {
+        $items = ChecklistItems::clean($template['items']);
+        $keys = array_column($items, 'key');
+        expect($keys)->toBe(array_values(array_unique($keys)))
+            ->and(ChecklistItems::schemaErrors($items))->toBe([])
+            ->and(ChecklistItems::clean($items))->toBe($items);
+        foreach ($keys as $key) {
+            expect($key)->toMatch(ChecklistItems::KEY_PATTERN);
         }
     }
 });
 
-it('adds the standard checklists of the categories the company has, never over its own', function () {
+it('adds the standard templates of the categories the company has, never over its own', function () {
     $admin = userWithRole('admin_company');
     app(AddStandardCategories::class)->handle();
     $ups = AssetCategory::where('code_prefix', 'UPS')->sole();
-    createPmTemplate(['name' => 'UPS ของเรา', 'asset_category_id' => $ups->id, 'items' => [['key' => 'a', 'label' => 'A', 'type' => 'check']]]);
+    createPmTemplate(['code' => 'MY-UPS', 'name' => 'UPS ของเรา', 'asset_category_id' => $ups->id, 'items' => [['key' => 'a', 'label' => 'A', 'type' => 'check']]]);
     // A category of the company's own (no standard prefix) gets nothing.
-    createAssetCategory(['name' => 'โดรน', 'code_prefix' => 'DRN']);
+    $drone = createAssetCategory(['name' => 'โดรน', 'code_prefix' => 'DRN']);
 
-    $expected = count(StandardChecklists::all()) - 1;
+    $expected = count(StandardTemplates::all());
     $this->actingAs($admin)->get('/pm-checklists')->assertInertia(fn (Assert $page) => $page
-        ->where('standardMissing', fn ($names) => count($names) === $expected && ! collect($names)->contains('PM เครื่องสำรองไฟ (UPS)')));
+        ->where('standardMissing', fn ($names) => count($names) === $expected && collect($names)->contains('UPS PM')));
 
     $this->actingAs($admin)->post('/pm-checklists/standard')->assertSessionHasNoErrors();
     expect(PmChecklist::count())->toBe($expected + 1)
-        ->and(PmChecklist::where('asset_category_id', $ups->id)->sole()->name)->toBe('UPS ของเรา')
-        ->and(PmChecklist::whereNull('asset_category_id')->sole()->name)->toBe('PM ทั่วไป');
+        ->and(PmChecklist::where('code', 'DC-UPS')->sole()->status)->toBe(PmChecklist::STATUS_PUBLISHED)
+        // the company's own UPS template stays the one UPS assets get; the standard one is there to choose
+        ->and(PmTemplateAssignment::where('asset_category_id', $ups->id)->pluck('template_code')->all())->toBe(['MY-UPS'])
+        ->and(PmTemplateAssignment::where('template_code', 'DC-UPS')->exists())->toBeFalse()
+        ->and(PmTemplateAssignment::whereNull('asset_category_id')->sole()->template_code)->toBe('STD-GENERAL')
+        ->and(PmTemplateAssignment::where('asset_category_id', $drone->id)->exists())->toBeFalse()
+        ->and(PmTemplateAssignment::where('template_code', 'PC-SET')->count())->toBe(3);
 
-    $generator = PmChecklist::where('name', 'PM เครื่องกำเนิดไฟฟ้า')->sole();
-    expect(collect($generator->items)->firstWhere('key', 'frequency'))
-        ->toMatchArray(['type' => 'measure', 'unit' => 'Hz', 'min' => 49.5, 'max' => 50.5]);
+    $battery = PmChecklist::where('code', 'DC-BATT')->sole();
+    expect(collect($battery->items)->firstWhere('key', 'block_voltage'))
+        ->toMatchArray(['type' => 'repeat_table', 'rows' => ['from' => 'battery_total', 'max' => 100]]);
 
     $this->actingAs($admin)->get('/pm-checklists')->assertInertia(fn (Assert $page) => $page->where('standardMissing', []));
     $this->actingAs(userWithRole('helpdesk'))->post('/pm-checklists/standard')->assertForbidden();
 });
 
-it('gives a new company the standard checklists with its categories', function () {
+it('gives a new company the standard templates with its categories', function () {
     $this->actingAs(createSuperadmin())->post('/platform/tenants', [
         'name' => 'บริษัท ใหม่ จำกัด', 'subdomain' => 'newco', 'status' => 'active',
         'admin_name' => 'คุณสมชาย', 'admin_email' => 'admin@newco.test',
         'admin_password' => 'Password-123', 'admin_password_confirmation' => 'Password-123',
     ])->assertSessionHasNoErrors();
 
-    asTenant(Tenant::where('subdomain', 'newco')->sole(), fn () => expect(PmChecklist::count())->toBe(count(StandardChecklists::all())));
+    asTenant(Tenant::where('subdomain', 'newco')->sole(), fn () => expect(PmChecklist::count())->toBe(count(StandardTemplates::all())));
 });
 
 it('lists the equipment under PM with its last and next PM', function () {

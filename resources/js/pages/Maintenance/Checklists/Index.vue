@@ -11,16 +11,24 @@ import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp } from 'lucide-vue-next';
 
-interface ChecklistRow {
+interface TemplateRow {
     id: number;
+    code: string;
     name: string;
-    category: string | null;
+    version: number;
+    status: 'draft' | 'published' | 'archived';
+    published_version: number | null;
+    service_line: string | null;
+    layout: string;
     items_count: number;
+    tied_to: string[];
     updated_at: string;
 }
 
 interface Filters {
     search: string;
+    status: string | null;
+    service_line: string | null;
     category: string | null;
     sort: string;
     direction: 'asc' | 'desc';
@@ -28,11 +36,13 @@ interface Filters {
 }
 
 const props = defineProps<{
-    checklists: Paginated<ChecklistRow>;
+    checklists: Paginated<TemplateRow>;
     filters: Filters;
     categories: { id: number; name: string }[];
-    can: { create: boolean; update: boolean; delete: boolean };
-    // Standard checklists the company does not have yet (names).
+    statuses: string[];
+    serviceLines: string[];
+    can: { create: boolean; update: boolean };
+    // Standard templates the company does not have yet (names).
     standardMissing: string[];
 }>();
 
@@ -48,10 +58,10 @@ const sortBy = (column: string) => {
     filters.sort = column;
 };
 
-const destroy = (checklist: ChecklistRow) => {
-    if (confirm(t('common.confirm_delete', { name: checklist.name }))) {
-        router.delete(route('maintenance.checklists.destroy', checklist.id), { preserveScroll: true });
-    }
+const statusClass: Record<string, string> = {
+    draft: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+    published: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+    archived: 'bg-muted text-muted-foreground',
 };
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
@@ -73,7 +83,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ page.props.flash.success }}
             </p>
 
-            <!-- Standard checklists not added yet: add them all in one go, then change them as you like -->
+            <!-- Standard templates not added yet: add them all in one go, then change them as you like -->
             <div v-if="standardMissing.length" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4">
                 <div class="min-w-0 space-y-1">
                     <p class="text-sm font-medium">{{ t('pm_checklists.standard_title', { count: standardMissing.length }) }}</p>
@@ -85,9 +95,17 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('pm_checklists.search_placeholder')" />
+                <select v-model="filters.status" :class="selectClass" :aria-label="t('pm_checklists.status')">
+                    <option :value="null">{{ t('pm_checklists.all_statuses') }}</option>
+                    <option v-for="status in statuses" :key="status" :value="status">{{ t(`pm_checklists.statuses.${status}`) }}</option>
+                </select>
+                <select v-model="filters.service_line" :class="selectClass" :aria-label="t('pm_checklists.service_line')">
+                    <option :value="null">{{ t('pm_checklists.all_service_lines') }}</option>
+                    <option v-for="line in serviceLines" :key="line" :value="line">{{ t(`pm_checklists.service_lines.${line}`) }}</option>
+                </select>
                 <select v-model="filters.category" :class="selectClass" :aria-label="t('pm_checklists.category')">
                     <option :value="null">{{ t('pm_checklists.all_categories') }}</option>
-                    <option value="general">{{ t('pm_checklists.general') }}</option>
+                    <option value="default">{{ t('pm_checklists.default_assignment') }}</option>
                     <option v-for="category in categories" :key="category.id" :value="String(category.id)">{{ category.name }}</option>
                 </select>
             </div>
@@ -96,16 +114,18 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <table class="w-full text-sm">
                     <thead class="bg-muted/50 text-left">
                         <tr>
-                            <th class="px-4 py-2 font-medium">
-                                <button type="button" class="flex items-center gap-1" @click="sortBy('name')">
-                                    {{ t('pm_checklists.name') }}
-                                    <template v-if="filters.sort === 'name'">
+                            <th v-for="column in ['code', 'name']" :key="column" class="px-4 py-2 font-medium">
+                                <button type="button" class="flex items-center gap-1" @click="sortBy(column)">
+                                    {{ t(`pm_checklists.${column}`) }}
+                                    <template v-if="filters.sort === column">
                                         <ArrowUp v-if="filters.direction === 'asc'" class="h-3 w-3" />
                                         <ArrowDown v-else class="h-3 w-3" />
                                     </template>
                                 </button>
                             </th>
-                            <th class="px-4 py-2 font-medium">{{ t('pm_checklists.category') }}</th>
+                            <th class="px-4 py-2 font-medium">{{ t('pm_checklists.status') }}</th>
+                            <th class="px-4 py-2 font-medium">{{ t('pm_checklists.service_line') }}</th>
+                            <th class="px-4 py-2 font-medium">{{ t('pm_checklists.tied_to') }}</th>
                             <th class="px-4 py-2 text-right font-medium">{{ t('pm_checklists.items_count') }}</th>
                             <th class="px-4 py-2 font-medium">
                                 <button type="button" class="flex items-center gap-1" @click="sortBy('updated_at')">
@@ -116,26 +136,44 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                     </template>
                                 </button>
                             </th>
-                            <th v-if="can.update || can.delete" class="px-4 py-2 text-right font-medium">{{ t('common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="checklist in checklists.data" :key="checklist.id" class="border-t">
-                            <td class="px-4 py-2 font-medium">{{ checklist.name }}</td>
-                            <td class="px-4 py-2">{{ checklist.category ?? t('pm_checklists.general') }}</td>
-                            <td class="px-4 py-2 text-right">{{ checklist.items_count }}</td>
-                            <td class="whitespace-nowrap px-4 py-2 text-muted-foreground">{{ dateTime(checklist.updated_at) }}</td>
-                            <td v-if="can.update || can.delete" class="whitespace-nowrap px-4 py-2 text-right">
-                                <Button v-if="can.update" variant="ghost" size="sm" as-child>
-                                    <Link :href="route('maintenance.checklists.edit', checklist.id)">{{ t('common.edit') }}</Link>
-                                </Button>
-                                <Button v-if="can.delete" variant="ghost" size="sm" class="text-destructive" @click="destroy(checklist)">
-                                    {{ t('common.delete') }}
-                                </Button>
+                        <tr v-for="template in checklists.data" :key="template.id" class="border-t">
+                            <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">{{ template.code }}</td>
+                            <td class="px-4 py-2">
+                                <Link
+                                    :href="route('maintenance.checklists.edit', template.id)"
+                                    class="font-medium text-primary underline-offset-4 hover:underline"
+                                >
+                                    {{ template.name }}
+                                </Link>
+                                <div class="text-xs text-muted-foreground">{{ t(`pm_checklists.layouts.${template.layout}`) }}</div>
                             </td>
+                            <td class="whitespace-nowrap px-4 py-2">
+                                <span class="rounded-full px-2 py-0.5 text-xs" :class="statusClass[template.status]">
+                                    {{ t(`pm_checklists.statuses.${template.status}`) }}
+                                    {{ t('pm_checklists.version_value', { version: template.version }) }}
+                                </span>
+                                <div v-if="template.status === 'draft' && template.published_version" class="mt-0.5 text-xs text-muted-foreground">
+                                    {{ t('pm_checklists.published_version', { version: template.published_version }) }}
+                                </div>
+                            </td>
+                            <td class="px-4 py-2">
+                                {{
+                                    template.service_line
+                                        ? t(`pm_checklists.service_lines.${template.service_line}`)
+                                        : t('pm_checklists.no_service_line')
+                                }}
+                            </td>
+                            <td class="px-4 py-2 text-xs">
+                                {{ template.tied_to.length ? template.tied_to.join(', ') : t('pm_checklists.not_tied') }}
+                            </td>
+                            <td class="px-4 py-2 text-right">{{ template.items_count }}</td>
+                            <td class="whitespace-nowrap px-4 py-2 text-muted-foreground">{{ dateTime(template.updated_at) }}</td>
                         </tr>
                         <tr v-if="checklists.data.length === 0">
-                            <td colspan="5" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
+                            <td colspan="7" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
                         </tr>
                     </tbody>
                 </table>

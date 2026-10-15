@@ -1,34 +1,29 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import PmField from '@/components/pm/PmField.vue';
 import PmResultBadge from '@/components/PmResultBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { failures as failuresOf, formAnswer, sectionsOf, type Answer, type TemplateField } from '@/lib/pmTemplate';
 import { Link, router, useForm } from '@inertiajs/vue3';
 import { Camera, MessageSquarePlus, Trash2, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
-export interface ChecklistQuestion {
-    key: string;
-    label: string;
-    type: 'pass_fail' | 'measure' | 'check' | 'number' | 'text' | string;
-    section?: string;
-    unit?: string;
-    min?: number;
-    max?: number;
-    required?: boolean;
-}
+/** A field of the item's copy of its template (see resources/js/lib/pmTemplate.ts). */
+export type ChecklistQuestion = TemplateField;
 
 export interface PmItem {
     id: number;
     result: string;
-    answers: Record<string, boolean | string | number | null>;
+    answers: Record<string, Answer>;
     remarks: Record<string, string>;
     note: string | null;
     checklist: ChecklistQuestion[];
-    asset: { ulid: string; asset_code: string; name: string; can_view: boolean } | null;
+    // with the register values its readonly_from_asset fields show
+    asset: ({ ulid: string; asset_code: string; name: string; can_view: boolean } & Record<string, string | boolean | null>) | null;
     ticket: { ulid: string; ticket_no: string; status: string } | null;
     checked_by: string | null;
     checked_at: string | null;
@@ -45,13 +40,10 @@ const props = defineProps<{
 }>();
 
 const results = ['passed', 'failed', 'not_inspected'];
-const passFail = ['pass', 'fail', 'na'];
 
 const form = useForm({
     result: props.item.result === 'pending' ? 'passed' : props.item.result,
-    answers: Object.fromEntries(
-        props.item.checklist.map((q) => [q.key, props.item.answers[q.key] ?? (q.type === 'check' ? false : q.type === 'pass_fail' ? null : '')]),
-    ) as Record<string, boolean | string | number | null>,
+    answers: Object.fromEntries(props.item.checklist.map((q) => [q.key, formAnswer(q, props.item.answers[q.key])])) as Record<string, Answer>,
     remarks: Object.fromEntries(props.item.checklist.map((q) => [q.key, props.item.remarks?.[q.key] ?? ''])) as Record<string, string>,
     note: props.item.note ?? '',
 });
@@ -60,31 +52,10 @@ const save = () => form.put(route('maintenance.visits.items.update', [props.visi
 // A question's remark box opens when asked for, or when it already has one.
 const remarkOpen = ref<Record<string, boolean>>(Object.fromEntries(props.item.checklist.map((q) => [q.key, !!props.item.remarks?.[q.key]])));
 
-// --- how an answer came out (as ChecklistItems::verdict on the server) ---
-const verdict = (q: ChecklistQuestion, answer: unknown): 'pass' | 'fail' | 'na' | null => {
-    if (q.type === 'pass_fail') return (passFail.includes(answer as string) ? answer : null) as 'pass' | 'fail' | 'na' | null;
-    if (q.type === 'check') return answer === true ? 'pass' : null;
-    if (q.type === 'measure' && answer !== '' && answer !== null && !isNaN(Number(answer)) && (q.min !== undefined || q.max !== undefined)) {
-        const n = Number(answer);
-        return (q.min !== undefined && n < q.min) || (q.max !== undefined && n > q.max) ? 'fail' : 'pass';
-    }
-    return null;
-};
-const failures = computed(() => props.item.checklist.filter((q) => verdict(q, form.answers[q.key]) === 'fail').map((q) => q.label));
-const range = (q: ChecklistQuestion) =>
-    q.min !== undefined && q.max !== undefined ? `${q.min}–${q.max}` : q.min !== undefined ? `≥ ${q.min}` : q.max !== undefined ? `≤ ${q.max}` : '';
-
-// Questions grouped under their section headings, in checklist order.
-const sections = computed(() => {
-    const groups: { title: string | null; questions: ChecklistQuestion[] }[] = [];
-    for (const q of props.item.checklist) {
-        const title = q.section ?? null;
-        const last = groups[groups.length - 1];
-        if (last && last.title === title) last.questions.push(q);
-        else groups.push({ title, questions: [q] });
-    }
-    return groups;
-});
+// What failed so far (as ChecklistItems::failures on the server), and the fields under their headings.
+const failures = computed(() => failuresOf(props.item.checklist, form.answers));
+const sections = computed(() => sectionsOf(props.item.checklist));
+const assetValues = computed(() => (props.item.asset ?? {}) as Record<string, string | null>);
 
 const ticket = useForm({ priority: 'medium' });
 const openTicket = () => ticket.post(route('maintenance.visits.items.ticket', [props.visitUlid, props.item.id]), { preserveScroll: true });
@@ -117,20 +88,9 @@ const deletePhoto = (id: number) => {
 };
 const photosOf = (question: string | null) => props.item.photos.filter((p) => (p.question ?? null) === question);
 
-const answerText = (q: ChecklistQuestion) => {
-    const value = props.item.answers[q.key];
-    if (q.type === 'check') return value ? t('pm_visits.yes') : t('pm_visits.no');
-    if (q.type === 'pass_fail') return value ? t(`pm_visits.pass_fail.${value}`) : t('common.none');
-    if (value === null || value === undefined || value === '') return t('common.none');
-    return q.unit ? `${value} ${q.unit}` : String(value);
-};
-const verdictClass: Record<string, string> = {
-    pass: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
-    fail: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
-    na: 'bg-muted text-muted-foreground',
-};
-
 const errorOf = (key: string) => (form.errors as Record<string, string>)[key];
+// A table's errors come per cell (answers.key.row.column).
+const firstErrorUnder = (prefix: string) => Object.entries(form.errors as Record<string, string>).find(([key]) => key.startsWith(prefix))?.[1];
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
 
@@ -193,47 +153,23 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     {{ section.title }}
                 </h4>
                 <div
-                    v-for="q in section.questions"
+                    v-for="q in section.fields"
                     :key="q.key"
                     class="grid gap-1 rounded-md px-2 py-1.5"
-                    :class="{ 'bg-red-50 dark:bg-red-950/30': verdict(q, form.answers[q.key]) === 'fail' }"
+                    :class="{ 'bg-red-50 dark:bg-red-950/30': failures.some((f) => f === q.label || f.startsWith(q.label + ' \u2013')) }"
                 >
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <label v-if="q.type === 'check'" class="flex items-center gap-2 text-sm">
-                            <input v-model="form.answers[q.key]" type="checkbox" class="size-4 rounded border-input" />
-                            {{ q.label }}<span v-if="q.required" class="text-red-600">*</span>
-                        </label>
-                        <label v-else :for="`answer_${item.id}_${q.key}`" class="text-sm">
-                            {{ q.label }}<span v-if="q.required" class="text-red-600">*</span>
-                            <span v-if="q.type === 'measure' && range(q)" class="ml-1 text-xs text-muted-foreground"
-                                >({{ t('pm_visits.range') }} {{ range(q) }} {{ q.unit }})</span
-                            >
-                        </label>
-
-                        <!-- Pass / Fail / N/A -->
-                        <div v-if="q.type === 'pass_fail'" class="inline-flex overflow-hidden rounded-md border text-xs" role="radiogroup">
-                            <button
-                                v-for="option in passFail"
-                                :key="option"
-                                type="button"
-                                class="px-3 py-1.5"
-                                :class="form.answers[q.key] === option ? verdictClass[option] + ' font-semibold' : 'hover:bg-muted'"
-                                :aria-pressed="form.answers[q.key] === option"
-                                @click="form.answers[q.key] = form.answers[q.key] === option ? null : option"
-                            >
-                                {{ t(`pm_visits.pass_fail.${option}`) }}
-                            </button>
-                        </div>
-                        <div v-else-if="q.type === 'measure' || q.type === 'number'" class="flex items-center gap-2">
-                            <Input :id="`answer_${item.id}_${q.key}`" v-model="form.answers[q.key] as string" type="number" step="any" class="w-32" />
-                            <span v-if="q.unit" class="text-sm text-muted-foreground">{{ q.unit }}</span>
-                        </div>
-                    </div>
-                    <Input v-if="q.type === 'text'" :id="`answer_${item.id}_${q.key}`" v-model="form.answers[q.key] as string" />
+                    <PmField
+                        v-model="form.answers[q.key]"
+                        :field="q"
+                        mode="edit"
+                        :answers="form.answers"
+                        :id-prefix="`answer_${item.id}`"
+                        :asset="assetValues"
+                    />
 
                     <div class="flex flex-wrap items-center gap-3 text-xs">
                         <button
-                            v-if="!remarkOpen[q.key]"
+                            v-if="!remarkOpen[q.key] && q.type !== 'photo'"
                             type="button"
                             class="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
                             @click="remarkOpen[q.key] = true"
@@ -273,7 +209,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             </button>
                         </div>
                     </div>
-                    <InputError :message="errorOf(`answers.${q.key}`) ?? errorOf(`remarks.${q.key}`)" />
+                    <InputError :message="errorOf(`answers.${q.key}`) ?? firstErrorUnder(`answers.${q.key}.`) ?? errorOf(`remarks.${q.key}`)" />
                 </div>
             </div>
             <InputError :message="errorOf('answers')" />
@@ -313,20 +249,16 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <h4 v-if="section.title" class="border-b pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     {{ section.title }}
                 </h4>
-                <dl class="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
-                    <div v-for="q in section.questions" :key="q.key" class="border-b py-1">
-                        <div class="flex justify-between gap-2">
-                            <dt class="text-muted-foreground">{{ q.label }}</dt>
-                            <dd class="flex items-center gap-2">
-                                {{ answerText(q) }}
-                                <span v-if="verdict(q, item.answers[q.key]) === 'fail'" class="rounded px-1.5 text-xs" :class="verdictClass.fail">{{
-                                    t('pm_visits.pass_fail.fail')
-                                }}</span>
-                            </dd>
-                        </div>
-                        <p v-if="item.remarks?.[q.key]" class="text-xs text-muted-foreground">{{ item.remarks[q.key] }}</p>
-                    </div>
-                </dl>
+                <div v-for="q in section.fields" :key="q.key" class="border-b py-1">
+                    <PmField
+                        :model-value="item.answers[q.key] ?? null"
+                        :field="q"
+                        mode="view"
+                        :answers="item.answers"
+                        :id-prefix="`view_${item.id}`"
+                    />
+                    <p v-if="item.remarks?.[q.key]" class="text-xs text-muted-foreground">{{ item.remarks[q.key] }}</p>
+                </div>
             </div>
             <p v-if="item.note" class="whitespace-pre-line text-sm">{{ item.note }}</p>
         </template>

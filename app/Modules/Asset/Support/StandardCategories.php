@@ -107,6 +107,22 @@ class StandardCategories
                 self::field('sensors', 'จำนวนเซนเซอร์', 'number'),
                 $ip,
             ]),
+            self::category('ตู้ไฟฟ้า / PDU (MDB, PDU, ESDB, UDB)', 'EDB', 'datacenter', [
+                self::field('board_type', 'ชนิดตู้', 'select', ['MDB', 'PDU', 'ESDB', 'UDB', 'DB']),
+                self::field('rating', 'พิกัด (เช่น 320AT/400AF)'),
+            ]),
+            self::category('ระบบตรวจจับน้ำรั่ว (Water Leak)', 'WLD', 'datacenter', [
+                self::field('cable_length_m', 'ความยาวสายตรวจจับ (เมตร)', 'number'),
+                self::field('zones', 'จำนวนโซน', 'number'),
+                $ip,
+            ]),
+            self::category('ระบบดับเพลิงอัตโนมัติ (Fire Suppression)', 'FSS', 'datacenter', [
+                self::field('agent', 'สารดับเพลิง', 'select', ['Novec 1230', 'FM-200', 'CO2', 'Inergen', 'อื่น ๆ']),
+                self::field('panel', 'รุ่นตู้ควบคุม'),
+            ]),
+            self::category('ห้องควบคุม (Control Room)', 'CTR', 'datacenter', [
+                self::field('displays', 'จำนวนจอแสดงผล', 'number'),
+            ]),
             self::category('ซอฟต์แวร์ลิขสิทธิ์', 'LIC', 'pc', [
                 self::field('seats', 'จำนวนสิทธิ์ใช้งาน', 'number', required: true),
                 self::field('license_key', 'License Key'),

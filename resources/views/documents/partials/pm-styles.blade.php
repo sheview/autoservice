@@ -13,6 +13,10 @@
     .photos img { width: 100%; height: 45mm; object-fit: cover; border: 1px solid #ccc; }
     .photos figcaption { font-size: 8.5pt; color: #555; }
     .overview td, .overview th { font-size: 9.5pt; }
+    /* A measure / repeat table of a template field, inside the checks table. */
+    .pm-grid { width: 100%; margin: 3px 0; border-collapse: collapse; }
+    .pm-grid th, .pm-grid td { border: 1px solid #ccc; padding: 1px 4px; font-size: 9pt; text-align: center; }
+    .pm-grid td:first-child { text-align: left; }
     /* The footer of the layout is replaced by the PDF's own on every page. */
     .footer { display: none; }
 </style>

@@ -2,6 +2,7 @@
 
 namespace App\Modules\Maintenance\Actions;
 
+use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Maintenance\Support\ChecklistItems;
@@ -16,6 +17,8 @@ use Illuminate\Validation\ValidationException;
  */
 class RecordPmItem
 {
+    public function __construct(private AssetDetails $assetDetails) {}
+
     /**
      * @param  array{result: string, answers?: array<string, mixed>, remarks?: array<string, string|null>, note?: string|null}  $data  validated
      */
@@ -26,7 +29,8 @@ class RecordPmItem
         }
 
         $checklist = $item->checklist ?? [];
-        $answers = ChecklistItems::normalize($checklist, $data['answers'] ?? []);
+        $asset = $this->assetDetails->handle([$item->asset_id])[$item->asset_id] ?? [];
+        $answers = ChecklistItems::normalize($checklist, $data['answers'] ?? [], $asset);
 
         if ($data['result'] !== PmVisitItem::RESULT_NOT_INSPECTED) {
             if ($missing = ChecklistItems::missing($checklist, $answers)) {

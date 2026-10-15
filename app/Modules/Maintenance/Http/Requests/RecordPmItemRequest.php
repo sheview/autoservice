@@ -30,16 +30,7 @@ class RecordPmItemRequest extends FormRequest
             'remarks.*' => ['nullable', 'string', 'max:1000'],
         ];
 
-        foreach ($item->checklist as $field) {
-            $rules["answers.{$field['key']}"] = match ($field['type']) {
-                'check' => ['nullable', 'boolean'],
-                'number', 'measure' => ['nullable', 'numeric', 'between:-999999,999999'],
-                'pass_fail' => ['nullable', Rule::in(ChecklistItems::PASS_FAIL)],
-                default => ['nullable', 'string', 'max:500'],
-            };
-        }
-
-        return $rules;
+        return $rules + ChecklistItems::answerRules($item->checklist);
     }
 
     public function attributes(): array

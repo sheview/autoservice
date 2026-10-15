@@ -4,19 +4,20 @@ namespace App\Modules\Maintenance\Actions;
 
 use App\Modules\Asset\Actions\CategoryIdsByPrefix;
 use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Models\PmTemplateAssignment;
 use App\Modules\Maintenance\Support\ChecklistItems;
-use App\Modules\Maintenance\Support\StandardChecklists;
+use App\Modules\Maintenance\Support\StandardTemplates;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Adds the standard PM checklists (StandardChecklists) the current company is missing: one for
- * each of its categories with a standard code prefix that has no checklist yet, and the general
- * checklist when it has none. A checklist the company made or changed is never touched.
- * Each is a template with the code STD-{prefix} (STD-GENERAL), tied to its category.
+ * Adds the standard PM templates (StandardTemplates) the current company does not have yet: those
+ * of its categories with a standard code prefix, and the default template. Each is published and
+ * tied to its categories, unless a category already has a template of the company's own: a template
+ * the company made or changed is never replaced, the standard one is then only added to choose from.
  */
 class AddStandardChecklists
 {
-    public function __construct(private CategoryIdsByPrefix $categoryIds, private AssignTemplateToCategory $assign) {}
+    public function __construct(private CategoryIdsByPrefix $categoryIds) {}
 
     /**
      * @return int how many were added
@@ -24,16 +25,33 @@ class AddStandardChecklists
     public function handle(): int
     {
         return DB::transaction(function () {
+            $categories = $this->categoryIds->handle();
             $missing = $this->missing();
-            foreach ($missing as $checklist) {
-                $template = PmChecklist::create([
-                    'code' => $checklist['code'],
-                    'name' => $checklist['name'],
-                    'asset_category_id' => $checklist['asset_category_id'],
-                    'items' => ChecklistItems::clean($checklist['items']),
+            $taken = PmTemplateAssignment::query()
+                ->whereNull('asset_id')->whereNull('asset_model_id')->whereNull('asset_brand_id')
+                ->pluck('asset_category_id')->map(fn ($id) => (int) $id)->all(); // 0 = the default
+
+            foreach ($missing as $standard) {
+                PmChecklist::create([
+                    'code' => $standard['code'],
+                    'name' => $standard['name'],
+                    'service_line' => $standard['service_line'],
+                    'layout' => $standard['layout'],
+                    'blocks' => $standard['blocks'],
+                    'items' => ChecklistItems::clean($standard['items']),
+                    'version' => 1,
+                    'status' => PmChecklist::STATUS_PUBLISHED,
                     'published_at' => now(),
                 ]);
-                $this->assign->handle($template->code, $template->asset_category_id);
+
+                foreach ($standard['prefixes'] as $prefix) {
+                    $categoryId = $prefix === '' ? 0 : ($categories[$prefix] ?? null);
+                    if ($categoryId === null || in_array($categoryId, $taken, true)) {
+                        continue;
+                    }
+                    PmTemplateAssignment::create(['template_code' => $standard['code'], 'asset_category_id' => $categoryId ?: null]);
+                    $taken[] = $categoryId;
+                }
             }
 
             return count($missing);
@@ -41,22 +59,16 @@ class AddStandardChecklists
     }
 
     /**
-     * @return list<array{code: string, name: string, asset_category_id: int|null, items: list<array<string, mixed>>}>
+     * Standard templates whose code the company does not have, of categories it has.
+     *
+     * @return list<array<string, mixed>> see StandardTemplates::all()
      */
     public function missing(): array
     {
         $categories = $this->categoryIds->handle();
-        $taken = PmChecklist::query()->pluck('asset_category_id')->map(fn ($id) => $id === null ? 0 : (int) $id)->all();
-        $missing = [];
+        $codes = PmChecklist::query()->distinct()->pluck('code')->all();
 
-        foreach (StandardChecklists::all() as $prefix => $checklist) {
-            $categoryId = $prefix === '' ? null : ($categories[$prefix] ?? false);
-            if ($categoryId === false || in_array($categoryId ?? 0, $taken, true)) {
-                continue;
-            }
-            $missing[] = $checklist + ['code' => 'STD-'.($prefix === '' ? 'GENERAL' : $prefix), 'asset_category_id' => $categoryId];
-        }
-
-        return $missing;
+        return array_values(array_filter(StandardTemplates::all(), fn (array $standard) => ! in_array($standard['code'], $codes, true)
+            && collect($standard['needs'])->contains(fn (string $prefix) => $prefix === '' || isset($categories[$prefix]))));
     }
 }

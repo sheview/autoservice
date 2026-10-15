@@ -89,9 +89,10 @@ class PmReportData
                     ] : null,
                     'result' => $item->result,
                     'note' => $item->note,
-                    // Each question with its answer, its note and how it came out, in checklist order.
+                    // Each field (with its settings, for documents.partials.pm-field) with its answer, its
+                    // note and how it came out, in template order.
                     'checks' => array_map(fn (array $field) => [
-                        ...collect($field)->only(['key', 'label', 'type', 'section', 'unit', 'min', 'max'])->all(),
+                        ...$field,
                         'answer' => $answers[$field['key']] ?? null,
                         'remark' => $item->remarks[$field['key']] ?? null,
                         'verdict' => ChecklistItems::verdict($field, $answers[$field['key']] ?? null),

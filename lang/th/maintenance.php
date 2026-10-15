@@ -2,12 +2,29 @@
 
 return [
     'checklists' => [
-        'created' => 'สร้าง checklist เรียบร้อยแล้ว',
-        'updated' => 'บันทึก checklist เรียบร้อยแล้ว',
-        'deleted' => 'ลบ checklist เรียบร้อยแล้ว',
-        'category_taken' => 'หมวดนี้มี checklist อยู่แล้ว',
-        'general_taken' => 'มี checklist ทั่วไปอยู่แล้ว',
-        'standard_added' => 'เพิ่ม checklist มาตรฐาน :count ชุดแล้ว',
+        'created' => 'สร้าง Template เรียบร้อยแล้ว',
+        'updated' => 'บันทึกร่าง Template เรียบร้อยแล้ว',
+        'deleted' => 'ลบร่าง Template เรียบร้อยแล้ว',
+        'standard_added' => 'เพิ่ม Template มาตรฐาน :count ชุดแล้ว',
+    ],
+
+    'templates' => [
+        'not_draft' => 'Template ที่เผยแพร่แล้วแก้ไขไม่ได้ ให้สร้างเวอร์ชันใหม่',
+        'no_items' => 'Template ต้องมีอย่างน้อย 1 รายการ',
+        'published' => 'เผยแพร่ Template แล้ว งาน PM ที่เริ่มหลังจากนี้จะใช้เวอร์ชันนี้',
+        'copied' => 'คัดลอก Template แล้ว (ร่าง)',
+        'copy_name' => ':name (สำเนา)',
+        'tied_default' => 'ค่าตั้งต้น (ทุกอุปกรณ์ที่ไม่มี Template)',
+        'tied_catalog' => 'ยี่ห้อ / รุ่นที่เลือก',
+        'schema' => [
+            'options_required' => '":field" ต้องมีตัวเลือกอย่างน้อย 1 ตัว',
+            'rows_count' => '":field" ต้องมี 1 – :max แถว',
+            'columns_count' => '":field" ต้องมี 1 – :max คอลัมน์',
+            'rows_from' => '":field" นับแถวจากช่องตัวเลขที่อยู่ก่อนหน้าเท่านั้น',
+            'range' => '":field" ค่าต่ำสุดต้องไม่มากกว่าค่าสูงสุด',
+            'part_keys_unique' => '":field" รหัสแถว / คอลัมน์ซ้ำกัน',
+            'part_invalid' => '":field" แถว / คอลัมน์ต้องมีชื่อ และรหัสเป็น a-z 0-9 _ ขึ้นต้นด้วยตัวอักษร',
+        ],
     ],
 
     'plans' => [
@@ -114,8 +131,14 @@ return [
 
     // Field names for validation messages.
     'fields' => [
-        'name' => 'ชื่อ checklist',
+        'name' => 'ชื่อ Template',
+        'code' => 'รหัส Template',
+        'layout' => 'รูปแบบฟอร์ม',
+        'service_line' => 'สายงาน',
         'asset_category_id' => 'หมวดทรัพย์สิน',
+        'assignments.*.asset_category_id' => 'หมวดทรัพย์สิน',
+        'assignments.*.asset_brand_id' => 'ยี่ห้อ',
+        'assignments.*.asset_model_id' => 'รุ่น',
         'items' => 'รายการตรวจ',
         'items.*.key' => 'รหัสรายการตรวจ',
         'items.*.label' => 'หัวข้อที่ตรวจ',
