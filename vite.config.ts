@@ -25,9 +25,12 @@ export default defineConfig({
     ],
     // Testing on a phone over the LAN: set VITE_HMR_HOST in .env to this computer's IP (and APP_URL to
     // http://<that IP>:8000); without it the dev server stays on localhost as before.
-    server: env.VITE_HMR_HOST
-        ? { host: '0.0.0.0', hmr: { host: env.VITE_HMR_HOST }, cors: true }
-        : undefined,
+    server: {
+        ...(env.VITE_HMR_HOST ? { host: '0.0.0.0', hmr: { host: env.VITE_HMR_HOST }, cors: true } : {}),
+        // Files written there while the app runs (uploads, PDFs, logs) or opened elsewhere crash the
+        // watcher on Windows (EBUSY); nothing in them is part of the frontend.
+        watch: { ignored: ['**/docs/**', '**/storage/**', '**/vendor/**'] },
+    },
     resolve: {
         alias: {
             '@': path.resolve(__dirname, './resources/js'),

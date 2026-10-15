@@ -21,3 +21,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+
+# Customers' own PM forms (reference for the templates; not ours to publish)
+/docs/pm-forms/*.pdf
