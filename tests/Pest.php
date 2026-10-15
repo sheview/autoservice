@@ -28,6 +28,7 @@ use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /*
@@ -159,6 +160,37 @@ function createAsset(AssetCategory $category, array $attributes = []): Asset
         'name' => 'Asset',
         'status' => Asset::STATUS_IN_USE,
     ]);
+}
+
+/**
+ * Many assets of one category at once, inserted directly (for load tests: SaveAsset takes a few
+ * queries each), in the current tenant. Codes are "{prefix}-L0001"…; $attributes go on every row.
+ *
+ * @return list<int> their ids, in code order
+ */
+function seedPmAssets(AssetCategory $category, int $count, string $prefix, array $attributes = []): array
+{
+    $tenantId = app(TenantContext::class)->tenant()->id;
+    $now = now();
+    $rows = [];
+    for ($i = 1; $i <= $count; $i++) {
+        $rows[] = $attributes + [
+            'tenant_id' => $tenantId,
+            'ulid' => (string) Str::ulid(),
+            'category_id' => $category->id,
+            'asset_code' => sprintf('%s-L%04d', $prefix, $i),
+            'name' => sprintf('%s %d', $prefix, $i),
+            'status' => Asset::STATUS_IN_USE,
+            'specs' => '{}',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
+    }
+    foreach (array_chunk($rows, 200) as $chunk) {
+        Asset::query()->insert($chunk);
+    }
+
+    return Asset::query()->where('category_id', $category->id)->where('asset_code', 'like', $prefix.'-L%')->orderBy('asset_code')->pluck('id')->all();
 }
 
 /**

@@ -21,7 +21,7 @@ export interface DraftStore {
     save(target: DraftTarget, draft: PmItemDraft): Promise<string>;
 }
 
-const xsrfToken = () => decodeURIComponent(document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
+export const xsrfToken = () => decodeURIComponent(document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/)?.[1] ?? '');
 
 /** Sends the draft to the server (PmFieldController@draft). */
 export const serverDraftStore: DraftStore = {

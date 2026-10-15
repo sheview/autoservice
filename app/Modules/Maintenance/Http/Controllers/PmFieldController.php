@@ -9,10 +9,14 @@ use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Maintenance\Actions\CreatePmSignLink;
 use App\Modules\Maintenance\Actions\MarkPmVisitArrival;
 use App\Modules\Maintenance\Actions\MarkPmVisitDeparture;
+use App\Modules\Maintenance\Actions\PassPmItems;
 use App\Modules\Maintenance\Actions\PmInstrumentOptions;
 use App\Modules\Maintenance\Actions\PmSignSummary;
+use App\Modules\Maintenance\Actions\RecordPmItem;
 use App\Modules\Maintenance\Actions\SavePmItemDraft;
 use App\Modules\Maintenance\Http\Requests\PmItemDraftRequest;
+use App\Modules\Maintenance\Http\Requests\RecordPmItemRequest;
+use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmSignature;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
@@ -31,7 +35,9 @@ use Inertia\Response;
 
 /**
  * A work order on the technician's phone (or tablet): the equipment by floor and room, one piece of
- * equipment's form at a time, "arrived" / "left", and autosave of what is typed. Only who may do the
+ * equipment's form at a time — or, for templates laid out as a table (PC, Network), a row per piece
+ * saved as it is filled in, "ผ่านทั้งหมด" on many at once — "arrived" / "left", and autosave of what
+ * is typed. Only who may do the
  * work (perform: the technician given it, or a PM manager). Saving a result, photos and repair
  * tickets go through the work order's own routes (PmVisitController, PmPhotoController).
  */
@@ -46,17 +52,27 @@ class PmFieldController extends Controller
         $items = $visit->items()->orderBy('id')->get();
         $assets = $this->assetDetails->handle($items->pluck('asset_id')->all());
         $customer = collect($listCustomers->handle(withTrashed: true))->firstWhere('id', $visit->customer_id);
+        // The layout of each template, read once (the item keeps only a copy of the questions).
+        $layouts = PmChecklist::withTrashed()->whereIn('id', $items->pluck('pm_checklist_id')->filter()->unique()->values())->pluck('layout', 'id');
+        $layoutOf = fn (PmVisitItem $item) => $layouts[$item->pm_checklist_id] ?? PmChecklist::LAYOUT_PER_ASSET;
 
         return Inertia::render('Maintenance/Field/Visit', [
             'visit' => $this->visitSummary($visit) + ['customer' => $customer['name'] ?? null],
             'items' => $items->map(fn (PmVisitItem $item) => [
-                'id' => $item->id,
-                'result' => $item->result,
-                'has_draft' => $item->draft !== null,
+                ...$this->row($item),
+                'layout' => $layoutOf($item),
+                'template_code' => $item->template_code,
+                // only what it has: a work order can have hundreds of rows
                 'asset' => isset($assets[$item->asset_id])
-                    ? collect($assets[$item->asset_id])->only(['asset_code', 'name', 'brand', 'model', 'serial_number', 'property_no', 'location', 'floor', 'room'])->all()
+                    ? collect($assets[$item->asset_id])->only(['id', 'ulid', 'parent_asset_id', ...ChecklistItems::ASSET_SOURCES])->filter(fn ($value) => $value !== null && $value !== '')->all()
                     : null,
             ])->values(),
+            // The questions of each table template, once (not per row).
+            'tables' => (object) $items->filter(fn (PmVisitItem $item) => $layoutOf($item) === PmChecklist::LAYOUT_GROUPED_TABLE)
+                ->unique('template_code')
+                ->mapWithKeys(fn (PmVisitItem $item) => [$item->template_code => $item->checklist ?? []])
+                ->all(),
+            'notInspectedReasons' => PmVisitItem::NOT_INSPECTED_REASONS,
         ]);
     }
 
@@ -137,6 +153,41 @@ class PmFieldController extends Controller
     }
 
     /**
+     * A row of the table saved as it is filled in (fetch, JSON): the result and the answers of its
+     * columns, through RecordPmItem like the full form. What the row does not show (notes per
+     * question, the instrument, answers of other questions) is kept.
+     */
+    public function saveRow(RecordPmItemRequest $request, PmVisit $visit, PmVisitItem $item, RecordPmItem $record): JsonResponse
+    {
+        $data = $request->validated();
+        $record->handle($item, $request->user(), [
+            ...$data,
+            'answers' => [...($item->answers ?? []), ...($data['answers'] ?? [])],
+            'remarks' => $data['remarks'] ?? $item->remarks ?? [],
+            'instrument_id' => array_key_exists('instrument_id', $data) ? $data['instrument_id'] : $item->instrument_id,
+        ]);
+
+        return response()->json(['item' => $this->row($item->fresh())]);
+    }
+
+    /**
+     * "ผ่านทั้งหมด" for the rows the technician sees, or for one set (PassPmItems).
+     */
+    public function passAll(Request $request, PmVisit $visit, PassPmItems $pass): JsonResponse
+    {
+        Gate::authorize('perform', $visit);
+        $data = $request->validate(['item_ids' => ['required', 'array', 'max:2000'], 'item_ids.*' => ['integer']]);
+
+        $done = $pass->handle($visit, $request->user(), array_map('intval', $data['item_ids']));
+
+        return response()->json([
+            'items' => $visit->items()->whereIn('id', $done['passed'])->get()->map(fn (PmVisitItem $item) => $this->row($item))->values(),
+            'skipped' => $done['skipped'],
+            'message' => __('maintenance.field.passed_all', ['passed' => count($done['passed']), 'skipped' => count($done['skipped'])]),
+        ]);
+    }
+
+    /**
      * Autosave: answers the page sends while the technician types (fetch, JSON).
      */
     public function draft(PmItemDraftRequest $request, PmVisit $visit, PmVisitItem $item, SavePmItemDraft $saveDraft): JsonResponse
@@ -144,6 +195,20 @@ class PmFieldController extends Controller
         $savedAt = $saveDraft->handle($item, $request->validated());
 
         return response()->json(['saved_at' => $savedAt->toIso8601String()]);
+    }
+
+    /**
+     * What a row of the work order shows of its item: the autosaved answers over the recorded ones.
+     *
+     * @return array<string, mixed>
+     */
+    private function row(PmVisitItem $item): array
+    {
+        return [
+            ...$item->only(['id', 'result', 'note', 'not_inspected_reason']),
+            'answers' => $item->draft['answers'] ?? $item->answers ?? (object) [],
+            'has_draft' => $item->draft !== null,
+        ];
     }
 
     /**

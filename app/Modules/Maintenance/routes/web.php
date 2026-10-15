@@ -64,9 +64,11 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::post('pm-work/{visit}/arrive', [PmFieldController::class, 'arrive'])->name('field.arrive');
     Route::post('pm-work/{visit}/depart', [PmFieldController::class, 'depart'])->name('field.depart');
     Route::get('pm-work/{visit}/sign', [PmFieldController::class, 'sign'])->name('field.sign');
+    Route::post('pm-work/{visit}/pass-all', [PmFieldController::class, 'passAll'])->name('field.pass-all');
     Route::scopeBindings()->group(function () {
         Route::get('pm-work/{visit}/items/{item}', [PmFieldController::class, 'item'])->name('field.item');
         Route::put('pm-work/{visit}/items/{item}/draft', [PmFieldController::class, 'draft'])->name('field.draft');
+        Route::put('pm-work/{visit}/rows/{item}', [PmFieldController::class, 'saveRow'])->name('field.row');
     });
 
     Route::get('pm-settings', [PmSettingsController::class, 'edit'])->name('settings.edit');

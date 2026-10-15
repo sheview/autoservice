@@ -100,7 +100,40 @@ class PmReportDocument
             }
         }
 
-        return $sections;
+        return array_map(fn (array $section) => $section['layout'] === PmChecklist::LAYOUT_GROUPED_TABLE
+            ? ['layout' => $section['layout'], 'items' => $this->withParts($section['items'])]
+            : $section, $sections);
+    }
+
+    /**
+     * The rows of a table with each part (parent_asset_id: a PC's monitor) right under its main
+     * piece, marked as a part. Sheets kept from before parts were known keep their order.
+     *
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function withParts(array $items): array
+    {
+        $ids = array_filter(array_map(fn (array $item) => $item['asset']['id'] ?? null, $items));
+        $parts = [];
+        foreach ($items as $item) {
+            $parent = $item['asset']['parent_asset_id'] ?? null;
+            if ($parent !== null && in_array($parent, $ids, true)) {
+                $parts[$parent][] = ['part' => true] + $item;
+            }
+        }
+
+        $rows = [];
+        foreach ($items as $item) {
+            $parent = $item['asset']['parent_asset_id'] ?? null;
+            if ($parent !== null && in_array($parent, $ids, true)) {
+                continue;
+            }
+            $rows[] = $item;
+            array_push($rows, ...($parts[$item['asset']['id'] ?? 0] ?? []));
+        }
+
+        return $rows;
     }
 
     /** The footer of every page: the document, its version and "page x / y" (no Thai: no web fonts there). */

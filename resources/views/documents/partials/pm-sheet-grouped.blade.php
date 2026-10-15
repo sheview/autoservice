@@ -1,6 +1,6 @@
 {{--
     Equipment of a grouped_table template (PC, network): a row per piece, a column per field the
-    row can show (tables and photos are left out). The header row repeats on every page; rows do not
+    row can show (tables and photos are left out); a part (a PC's monitor) under its main piece. The header row repeats on every page; rows do not
     split across pages.
 --}}
 @php($schema = \App\Modules\Maintenance\Support\ChecklistItems::class)
@@ -23,7 +23,7 @@
             @php($answers = collect($item['checks'])->pluck('answer', 'key'))
             <tr>
                 <td class="center">{{ $i + 1 }}</td>
-                <td><span style="font-family: monospace">{{ $item['asset']['asset_code'] ?? '-' }}</span><br>{{ $item['asset']['name'] ?? '' }}</td>
+                <td style="{{ ($item['part'] ?? false) ? 'padding-left: 4mm' : '' }}">@if ($item['part'] ?? false)↳ @endif<span style="font-family: monospace">{{ $item['asset']['asset_code'] ?? '-' }}</span><br>{{ $item['asset']['name'] ?? '' }}</td>
                 @foreach ($columns as $column)
                     @php($value = $item['result'] === 'pending' ? null : ($answers[$column['key']] ?? null))
                     @php($red = $column['type'] === 'pass_fail' ? $value === 'fail' : (in_array($column['type'], ['number', 'measure'], true) && $schema::outOfRange($value, $column['min'] ?? null, $column['max'] ?? null)))

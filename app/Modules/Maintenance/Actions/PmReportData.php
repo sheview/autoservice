@@ -96,6 +96,9 @@ class PmReportData
                 return [
                     'id' => $item->id,
                     'asset' => $asset ? [
+                        'id' => $asset['id'],
+                        // a part (a PC's monitor) prints under its main piece
+                        'parent_asset_id' => $asset['parent_asset_id'] ?? null,
                         'asset_code' => $asset['asset_code'],
                         'name' => $asset['name'],
                         'category' => $categories[$asset['category_id']] ?? null,

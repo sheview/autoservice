@@ -2910,6 +2910,22 @@ return [
         'draft_failed' => 'บันทึกร่างไม่สำเร็จ จะลองใหม่เมื่อแก้ไขครั้งถัดไป',
         'draft_restored' => 'โหลดร่างที่ยังไม่ได้บันทึก (:time)',
         'all_done' => 'ตรวจครบทุกเครื่องแล้ว',
+        // The table of PC / Network equipment
+        'equipment_column' => 'อุปกรณ์',
+        'result_column' => 'ผล',
+        'pass_fail_short' => ['pass' => 'ปกติ', 'fail' => 'ผิดปกติ', 'na' => 'N/A'],
+        'row_results' => ['passed' => 'ผ่าน', 'failed' => 'ไม่ผ่าน', 'not_inspected' => 'ไม่ได้ตรวจ'],
+        'choose_reason' => 'เลือกเหตุผล',
+        'failed_note' => 'ระบุอาการที่พบ (จำเป็น)',
+        'note_optional' => 'หมายเหตุ (ถ้ามี)',
+        'row_details' => 'รายละเอียด รูปถ่าย และใบแจ้งซ่อม',
+        'row_failed' => 'บันทึกไม่สำเร็จ ลองใหม่อีกครั้ง',
+        'table_elsewhere' => 'บางข้อของ Template นี้กรอกในหน้ารายละเอียดของแต่ละเครื่อง',
+        'pass_rows' => 'ผ่านทั้งหมด (:count เครื่อง)',
+        'set' => 'ชุด :count ชิ้น',
+        'pass_set' => 'ผ่านทั้งชุด',
+        'go_to_code' => 'รหัสอุปกรณ์',
+        'scan_not_here' => 'ไม่พบ :code ในใบงานนี้',
     ],
 
     'pm_sign' => [
