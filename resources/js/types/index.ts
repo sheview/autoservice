@@ -17,6 +17,8 @@ export interface NavItem {
     isActive?: boolean;
     // The sidebar section it belongs to (null = above the sections).
     group?: string | null;
+    // Other pages it stands for (the tabs of its set): it is marked current on those too.
+    also?: string[];
 }
 
 export interface SharedData {

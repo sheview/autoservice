@@ -82,16 +82,18 @@ return [
         ['group' => 'reports', 'title' => 'nav.surveys', 'route' => 'survey.surveys.index', 'icon' => 'star', 'permission' => 'surveys.view', 'module' => 'survey'],
 
         ['group' => 'help', 'title' => 'nav.manuals', 'route' => 'document.manuals.index', 'icon' => 'book-open', 'permission' => 'manuals.view'],
-        ['group' => 'settings', 'title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'users.view'],
-        ['group' => 'settings', 'title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'roles.manage'],
-        ['group' => 'settings', 'title' => 'nav.branches', 'route' => 'tenancy.branches.index', 'icon' => 'map-pin', 'permission' => 'branches.view', 'company' => true],
-        ['group' => 'settings', 'title' => 'nav.repair_presets', 'route' => 'service.presets.edit', 'icon' => 'list-checks', 'permission' => 'company.manage', 'module' => 'service', 'company' => true],
-        ['group' => 'settings', 'title' => 'nav.server_rooms', 'route' => 'room-access.rooms.index', 'icon' => 'server', 'permission' => 'room-access.manage', 'module' => 'room_access', 'staff' => true, 'company' => true],
-        ['group' => 'settings', 'title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holidays.view', 'module' => 'service'],
-        ['group' => 'settings', 'title' => 'nav.company', 'route' => 'tenancy.company.edit', 'icon' => 'building', 'permission' => 'company.view', 'company' => true],
-        ['group' => 'settings', 'title' => 'nav.alerts', 'route' => 'platform.alerts.edit', 'icon' => 'bell', 'permission' => 'alerts.manage', 'company' => true],
-        ['group' => 'settings', 'title' => 'nav.company_shares', 'route' => 'platform.company-shares.index', 'icon' => 'share-2', 'permission' => 'company.manage', 'company' => true],
-        ['group' => 'settings', 'title' => 'nav.activity_log', 'route' => 'platform.activity-log', 'icon' => 'scroll-text', 'permission' => 'activity-log.view'],
+        // Settings: one sidebar entry ("ตั้งค่าระบบ", nav_sets.settings), the pages as tabs
+        // (ผู้ใช้และสิทธิ์ / บริษัท / งานบริการ / ระบบ) and sub-tabs.
+        ['group' => 'settings', 'tab' => 'settings.users', 'title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'users.view'],
+        ['group' => 'settings', 'tab' => 'settings.users', 'title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'roles.manage'],
+        ['group' => 'settings', 'tab' => 'settings.company', 'title' => 'nav.company', 'route' => 'tenancy.company.edit', 'icon' => 'building', 'permission' => 'company.view', 'company' => true],
+        ['group' => 'settings', 'tab' => 'settings.company', 'title' => 'nav.branches', 'route' => 'tenancy.branches.index', 'icon' => 'map-pin', 'permission' => 'branches.view', 'company' => true],
+        ['group' => 'settings', 'tab' => 'settings.company', 'title' => 'nav.holidays', 'route' => 'service.holidays.index', 'icon' => 'calendar-days', 'permission' => 'holidays.view', 'module' => 'service'],
+        ['group' => 'settings', 'tab' => 'settings.company', 'title' => 'nav.company_shares', 'route' => 'platform.company-shares.index', 'icon' => 'share-2', 'permission' => 'company.manage', 'company' => true],
+        ['group' => 'settings', 'tab' => 'settings.service', 'title' => 'nav.repair_presets', 'route' => 'service.presets.edit', 'icon' => 'list-checks', 'permission' => 'company.manage', 'module' => 'service', 'company' => true],
+        ['group' => 'settings', 'tab' => 'settings.service', 'title' => 'nav.server_rooms', 'route' => 'room-access.rooms.index', 'icon' => 'server', 'permission' => 'room-access.manage', 'module' => 'room_access', 'staff' => true, 'company' => true],
+        ['group' => 'settings', 'tab' => 'settings.system', 'title' => 'nav.alerts', 'route' => 'platform.alerts.edit', 'icon' => 'bell', 'permission' => 'alerts.manage', 'company' => true],
+        ['group' => 'settings', 'tab' => 'settings.system', 'title' => 'nav.activity_log', 'route' => 'platform.activity-log', 'icon' => 'scroll-text', 'permission' => 'activity-log.view'],
 
         ['group' => 'platform', 'title' => 'nav.tenants', 'route' => 'platform.impersonation.index', 'icon' => 'building-2', 'permission' => 'platform.impersonate'],
         ['group' => 'platform', 'title' => 'nav.linked_staff', 'route' => 'platform.linked-staff.index', 'icon' => 'users', 'permission' => 'platform.tenants'],

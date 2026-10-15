@@ -12,7 +12,8 @@ const props = defineProps<{
 const page = usePage<SharedData>();
 const { state } = useSidebar();
 
-const isActive = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`);
+const isAt = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`);
+const isActive = (item: NavItem) => [item.href, ...(item.also ?? [])].some(isAt);
 
 // Items in their sections, in the order the server sent them (a section with nothing the user may open is not there).
 const sections = computed(() =>
@@ -48,7 +49,7 @@ const toggle = (label: string) => {
     }
 };
 const isOpen = (section: { label: string | null; items: NavItem[] }) =>
-    section.label === null || state.value === 'collapsed' || !collapsed.value.includes(section.label) || section.items.some((i) => isActive(i.href));
+    section.label === null || state.value === 'collapsed' || !collapsed.value.includes(section.label) || section.items.some((i) => isActive(i));
 </script>
 
 <template>
@@ -69,7 +70,7 @@ const isOpen = (section: { label: string | null; items: NavItem[] }) =>
                 <!-- Bold, a size up from the default, 20px icons; the page open now in the brand's violet. -->
                 <SidebarMenuButton
                     as-child
-                    :is-active="isActive(item.href)"
+                    :is-active="isActive(item)"
                     :tooltip="item.title"
                     class="h-9 text-[15px] font-semibold text-foreground/85 data-[active=true]:bg-violet-50 data-[active=true]:font-semibold data-[active=true]:text-violet-700 dark:data-[active=true]:bg-violet-950 dark:data-[active=true]:text-violet-200 [&>svg]:size-5"
                 >

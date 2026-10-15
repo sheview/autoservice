@@ -533,6 +533,17 @@ return [
             'visits' => 'ใบงาน PM',
             'settings' => 'ตั้งค่า PM',
         ],
+        'settings' => [
+            'users' => 'ผู้ใช้และสิทธิ์',
+            'company' => 'บริษัท',
+            'service' => 'งานบริการ',
+            'system' => 'ระบบ',
+        ],
+    ],
+
+    // The sidebar entry of a tab set, when it is not named after its first page.
+    'nav_sets' => [
+        'settings' => 'ตั้งค่าระบบ',
     ],
 
     'nav_groups' => [

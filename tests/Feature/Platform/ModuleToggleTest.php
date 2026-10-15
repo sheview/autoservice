@@ -26,7 +26,7 @@ it('builds the sidebar from config, filtered by permission', function () {
                 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
                 'รายงาน', 'อะไหล่ที่เปลี่ยน/ส่งออก', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ',
                 'คู่มือ',
-                'ผู้ใช้งาน', 'บทบาทและสิทธิ์', 'สาขา', 'อาการและวิธีแก้', 'ห้อง Server', 'วันหยุด', 'ข้อมูลบริษัท', 'การแจ้งเตือน', 'แชร์ข้อมูลกับบริษัทอื่น', 'Log การใช้งาน',
+                'ผู้ใช้งาน', 'บทบาทและสิทธิ์', 'ข้อมูลบริษัท', 'สาขา', 'วันหยุด', 'แชร์ข้อมูลกับบริษัทอื่น', 'อาการและวิธีแก้', 'ห้อง Server', 'การแจ้งเตือน', 'Log การใช้งาน',
             ]));
 
     // each item carries its section
@@ -113,7 +113,7 @@ it('forbids a customer admin and an impersonating superadmin from switching modu
 it('puts the PM pages under four tabs, and gives a customer account only its reports', function () {
     $this->actingAs(userWithRole('admin_company'))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
         ->where('navigation', fn ($items) => collect($items)->whereNotNull('tab')->pluck('tab')->unique()->values()->all()
-            === ['pm.overview', 'pm.plans', 'pm.visits', 'pm.settings']));
+            === ['pm.overview', 'pm.plans', 'pm.visits', 'pm.settings', 'settings.users', 'settings.company', 'settings.service', 'settings.system']));
 
     $customer = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($customer)->get('/dashboard')->assertInertia(fn (Assert $page) => $page

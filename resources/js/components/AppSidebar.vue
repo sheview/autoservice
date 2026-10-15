@@ -8,6 +8,7 @@ let savedScroll = 0;
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { t } from '@/lib/i18n';
 import { type NavItem, type SharedData } from '@/types';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
@@ -99,7 +100,8 @@ const icons: Record<string, LucideIcon> = {
 
 // Built on the server from config/modules.php (permission + enabled modules).
 // Items of a tab set ("pm.overview", "pm.plans", ...) are one entry here, the first the user may open;
-// the others are tabs on top of the pages (ModuleTabs).
+// the others are tabs on top of the pages (ModuleTabs). A set named in nav_sets (settings) shows that
+// name and a gear instead of its first page's.
 const mainNavItems = computed<NavItem[]>(() => {
     const sets = new Set<string>();
     return page.props.navigation
@@ -110,7 +112,14 @@ const mainNavItems = computed<NavItem[]>(() => {
             sets.add(set);
             return true;
         })
-        .map((item) => ({ title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group }));
+        .map((item) => {
+            const set = item.tab?.split('.')[0];
+            const named = set ? t(`nav_sets.${set}`) : '';
+            const also = set ? page.props.navigation.filter((other) => other.tab?.split('.')[0] === set).map((other) => other.href) : [];
+            return named && named !== `nav_sets.${set}`
+                ? { title: named, href: item.href, icon: Settings, group: item.group, also }
+                : { title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group, also };
+        });
 });
 </script>
 
