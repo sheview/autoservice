@@ -90,7 +90,11 @@ class TicketController extends Controller
                 ? $this->customersOf($this->visibleCustomerIds($user))
                 : $this->customers(),
             'dueSoonHours' => SearchTickets::DUE_SOON_HOURS,
-            'can' => ['create' => $user->can('create', Ticket::class)],
+            'can' => [
+                'create' => $user->can('create', Ticket::class),
+                // The empty sheet to fill in by hand: staff only.
+                'blankForm' => $user->customer_id === null,
+            ],
         ]);
     }
 

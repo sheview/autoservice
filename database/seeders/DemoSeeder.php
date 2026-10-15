@@ -15,10 +15,11 @@ use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Actions\IssuePartToTicket;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
-use App\Modules\Maintenance\Actions\CompletePmVisit;
+use App\Modules\Maintenance\Actions\MovePmVisit;
 use App\Modules\Maintenance\Actions\RecordPmItem;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\StartPmVisit;
+use App\Modules\Maintenance\Actions\SubmitPmVisit;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
@@ -192,7 +193,8 @@ class DemoSeeder extends Seeder
         private SavePmPlan $savePmPlan,
         private StartPmVisit $startPmVisit,
         private RecordPmItem $recordPmItem,
-        private CompletePmVisit $completePmVisit,
+        private SubmitPmVisit $submitPmVisit,
+        private MovePmVisit $movePmVisit,
         private SavePart $savePart,
         private RecordStockMovement $recordStockMovement,
         private IssuePartToTicket $issuePartToTicket,
@@ -277,7 +279,7 @@ class DemoSeeder extends Seeder
         }
 
         $this->tickets($admin, $helpdesk, $technicians);
-        $this->maintenance($technicians);
+        $this->maintenance($admin, $technicians);
         $this->inventory($admin);
         $this->surveys();
     }
@@ -430,7 +432,7 @@ class DemoSeeder extends Seeder
      *
      * @param  Collection<int, User>  $technicians
      */
-    private function maintenance(Collection $technicians): void
+    private function maintenance(User $admin, Collection $technicians): void
     {
         $categories = AssetCategory::pluck('id', 'code_prefix');
         foreach (self::CHECKLISTS as $prefix => [$name, $items]) {
@@ -483,7 +485,15 @@ class DemoSeeder extends Seeder
                 }
 
                 if (! $current) {
-                    $this->completePmVisit->handle($visit, 'ทำ PM ครบทุกเครื่องตามแผน');
+                    // Handed in, checked and approved back then; published to the customer and closed.
+                    $this->submitPmVisit->handle($visit, $technician, [
+                        'summary' => 'ทำ PM ครบทุกเครื่องตามแผน',
+                        'technician_signature' => self::signature(),
+                    ]);
+                    foreach (['review', 'approve', 'publish', 'close'] as $step) {
+                        Carbon::setTestNow(now()->addHours(fake()->numberBetween(2, 20)));
+                        $this->movePmVisit->handle($visit->fresh(), $step, $admin);
+                    }
                 }
             }
         }
@@ -577,6 +587,26 @@ class DemoSeeder extends Seeder
         }
 
         return $specs;
+    }
+
+    /** A scribble standing in for a signature drawn on the screen (PNG data URL). */
+    public static function signature(): string
+    {
+        $image = imagecreatetruecolor(300, 100);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        $ink = imagecolorallocate($image, 20, 40, 120);
+        imagesetthickness($image, 3);
+        [$x, $y] = [20, 60];
+        foreach (range(1, 10) as $i) {
+            [$nx, $ny] = [$x + fake()->numberBetween(15, 30), fake()->numberBetween(25, 80)];
+            imageline($image, $x, $y, $nx, $ny, $ink);
+            [$x, $y] = [$nx, $ny];
+        }
+        ob_start();
+        imagepng($image);
+        imagedestroy($image);
+
+        return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
     }
 
     // First and last name only: faker th_TH may prefix titles like "Dr.".

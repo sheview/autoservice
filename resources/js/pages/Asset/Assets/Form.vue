@@ -12,7 +12,7 @@ import { similarBrand, type BrandUse } from '@/lib/similarBrand';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Plus, X } from 'lucide-vue-next';
-import { computed, nextTick, ref } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 interface SpecField {
     key: string;
@@ -73,6 +73,8 @@ const props = defineProps<{
     statuses: string[];
     // Creating only: "issued" and "loaned", the asset is already out with someone.
     handedOutStatuses: string[];
+    // Creating only: running contracts of each customer (by id) the user may put the new asset into.
+    customerContracts: Record<string, { id: number; contract_no: string; title: string; starts_on: string; ends_on: string; covering: boolean }[]>;
     brands: BrandUse[];
     subtypes: string[];
 }>();
@@ -124,7 +126,15 @@ const form = useForm({
     specs: { ...initialSpecs } as Record<string, string | number>,
     // New files, sent with the form.
     attachments: [] as File[],
+    // Creating only: contracts of the customer to put it into.
+    contract_ids: [] as number[],
 });
+
+// The chosen customer's contracts; the ones running today are ticked, so a new device is not left out of its MA.
+const contractChoices = computed(() =>
+    !props.asset && form.owner === 'customer' && form.customer_id ? (props.customerContracts[form.customer_id] ?? []) : [],
+);
+watch(contractChoices, (choices) => (form.contract_ids = choices.filter((c) => c.covering).map((c) => c.id)), { immediate: true });
 
 type AssetFormData = ReturnType<typeof form.data>;
 
@@ -280,6 +290,7 @@ const submit = () => {
         ...data,
         serials: data.serials.map((row) => row.value.trim()).filter((value) => value !== ''),
         customer_id: data.owner === 'customer' ? data.customer_id : null,
+        contract_ids: props.asset ? [] : data.contract_ids.filter((id) => contractChoices.value.some((c) => c.id === id)),
         quantity: requiresSerial.value ? null : data.quantity,
         unit: requiresSerial.value ? null : data.unit,
     });
@@ -443,6 +454,18 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                                 </option>
                             </select>
                             <InputError :message="form.errors.customer_id" />
+                        </div>
+
+                        <div v-if="contractChoices.length" class="grid content-start gap-2 sm:col-span-2">
+                            <Label>{{ t('contracts.add_new_to') }}</Label>
+                            <p class="text-xs text-muted-foreground">{{ t('contracts.add_new_to_hint') }}</p>
+                            <label v-for="c in contractChoices" :key="c.id" class="flex items-center gap-2 text-sm">
+                                <input v-model="form.contract_ids" type="checkbox" :value="c.id" class="size-4 rounded border-input" />
+                                <span class="font-mono text-xs">{{ c.contract_no }}</span>
+                                <span>{{ c.title }}</span>
+                                <span class="text-xs text-muted-foreground">{{ c.starts_on }} – {{ c.ends_on }}</span>
+                            </label>
+                            <InputError :message="form.errors.contract_ids" />
                         </div>
 
                         <div class="grid content-start gap-2 sm:col-start-1">

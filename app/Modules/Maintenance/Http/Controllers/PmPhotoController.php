@@ -25,19 +25,22 @@ class PmPhotoController extends Controller
     {
         Gate::authorize('perform', $visit);
 
-        $request->validate(
-            ['photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.self::MAX_KB]],
-            attributes: ['photo' => __('maintenance.fields.photo')],
-        );
+        $data = $request->validate([
+            'photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.self::MAX_KB],
+            'question' => ['nullable', 'string', 'max:40'],
+            'caption' => ['nullable', 'string', 'max:200'],
+        ], attributes: ['photo' => __('maintenance.fields.photo')]);
 
-        $addPhoto->handle($item, $request->file('photo'));
+        $addPhoto->handle($item, $request->file('photo'), $data['question'] ?? null, $data['caption'] ?? null);
 
         return back()->with('success', __('maintenance.photos.added'));
     }
 
-    public function show(PmVisit $visit, PmVisitItem $item, int $photo): StreamedResponse
+    public function show(Request $request, PmVisit $visit, PmVisitItem $item, int $photo): StreamedResponse
     {
         Gate::authorize('view', $visit);
+        // Customers get photos in the published report only, never from the work in the making.
+        abort_if($request->user()->customer_id !== null, 404);
 
         $media = $this->photo($item, $photo);
 

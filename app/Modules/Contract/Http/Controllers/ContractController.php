@@ -8,6 +8,7 @@ use App\Modules\Contract\Actions\DeleteContract;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Contract\Actions\SaveContract;
 use App\Modules\Contract\Actions\SearchContracts;
+use App\Modules\Contract\Exports\ContractsExport;
 use App\Modules\Contract\Http\Requests\ContractRequest;
 use App\Modules\Contract\Models\Contract;
 use App\Modules\Contract\Support\ContractPhase;
@@ -21,9 +22,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ContractController extends Controller
 {
+    public const EXPORT_PERMISSION = 'contracts.export';
+
     public function index(Request $request, SearchContracts $search, ListCustomers $listCustomers): Response
     {
         Gate::authorize('viewAny', Contract::class);
@@ -56,8 +61,25 @@ class ContractController extends Controller
             'customers' => $listCustomers->handle(user: $user, permission: 'contracts.view'),
             'phases' => ContractPhase::PHASES,
             'serviceWindows' => Contract::SERVICE_WINDOWS,
-            'can' => ['create' => $user->can('create', Contract::class)],
+            'can' => [
+                'create' => $user->can('create', Contract::class),
+                'import' => $user->can(ContractImportController::PERMISSION),
+                'export' => $user->can(self::EXPORT_PERMISSION),
+            ],
         ]);
+    }
+
+    /**
+     * The contracts of the list (same filters, same reach) as Excel.
+     */
+    public function export(Request $request, SearchContracts $search): BinaryFileResponse
+    {
+        Gate::authorize('viewAny', Contract::class);
+        abort_unless($request->user()->can(self::EXPORT_PERMISSION), 403);
+
+        $query = $search->handle(SearchContracts::filtersFrom($request), $request->user());
+
+        return Excel::download(new ContractsExport($query), 'contracts-'.now()->format('Ymd-His').'.xlsx');
     }
 
     public function create(Request $request, ListCustomers $listCustomers): Response

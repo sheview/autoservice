@@ -23,11 +23,13 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
      * @param  Builder<Asset>  $query
      * @param  array<string, string>  $specFields  key => label, one column each
      * @param  array<int, string>  $customerCodes  customer id => code
+     * @param  array<int, list<string>>  $contractNos  asset id => contract numbers (those the user may see)
      */
     public function __construct(
         private Builder $query,
         private array $specFields,
         private array $customerCodes = [],
+        private array $contractNos = [],
     ) {}
 
     public function query(): Builder
@@ -68,6 +70,7 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             Money::toBaht($asset->purchase_price),
             $asset->warranty_expires_at?->toDateString(),
             $asset->notes,
+            implode(AssetSheet::SERIAL_SEPARATOR, $this->contractNos[$asset->id] ?? []) ?: null,
         ];
 
         foreach (array_keys($this->specFields) as $key) {

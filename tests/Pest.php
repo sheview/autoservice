@@ -244,3 +244,11 @@ function checkWarranty(Ticket $ticket, User $actor, string $status = 'out_of_war
 {
     return app(CheckTicketWarranty::class)->handle($ticket, $actor, $status, null);
 }
+
+/**
+ * A signature as the signature pad sends it: a 1×1 PNG data URL.
+ */
+function signaturePng(): string
+{
+    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+}

@@ -46,9 +46,14 @@ class PermissionCatalog
     public const PERMISSIONS = [
         'dashboard' => ['view'],
         'tickets' => ['view', 'create', 'update', 'assign', 'close', 'delete', 'export', 'approve'],
-        'pm-visits' => ['view', 'create', 'update', 'complete', 'delete'],
+        // PM work orders: complete = do the work and hand it in; review = check what was handed in;
+        // approve = approve the report (or send it back); publish = make it the customer's report and close.
+        'pm-visits' => ['view', 'create', 'update', 'complete', 'review', 'approve', 'publish', 'delete'],
         'pm-plans' => ['view', 'create', 'update', 'delete'],
         'pm-checklists' => ['view', 'manage'],
+        // Approved PM reports: view = the report pages and PDFs; share = make and revoke customers' links.
+        'pm-reports' => ['view', 'share'],
+        'pm-settings' => ['manage'],
         // Free IP / IP management: run = find, reserve, give out and release addresses;
         // manage = keep networks and subnets, exclude addresses.
         'ip-check' => ['view', 'run', 'manage'],
@@ -60,7 +65,7 @@ class PermissionCatalog
         'asset-categories' => ['view', 'manage'],
         'labels' => ['view', 'print'],
         'customers' => ['view', 'create', 'update', 'delete'],
-        'contracts' => ['view', 'create', 'update', 'delete'],
+        'contracts' => ['view', 'create', 'update', 'delete', 'import', 'export'],
         // issue = take parts (to a ticket, or on a part issue/loan form); serials = part categories and
         // which parts are followed piece by piece by serial number (admin only by default).
         'parts' => ['view', 'create', 'update', 'delete', 'issue', 'import', 'export', 'serials'],
@@ -97,6 +102,11 @@ class PermissionCatalog
         'dashboard' => [null, null],
         'tickets' => ['service', 'service'],
         'room-access' => ['service', 'room_access'],
+        'pm-visits' => ['pm', 'maintenance'],
+        'pm-plans' => ['pm', 'maintenance'],
+        'pm-checklists' => ['pm', 'maintenance'],
+        'pm-reports' => ['pm', 'maintenance'],
+        'pm-settings' => ['pm', 'maintenance'],
         'ip-check' => ['service', 'asset'],
         'assets' => ['assets', 'asset'],
         'asset-checkouts' => ['assets', 'asset'],
@@ -125,7 +135,7 @@ class PermissionCatalog
      * Resources whose menu was taken off the sidebar: left off the roles matrix too. Their
      * permissions still exist and grants already held are kept (the pages still check them).
      */
-    public const NO_MENU = ['pm-visits', 'pm-plans', 'pm-checklists'];
+    public const NO_MENU = [];
 
     public const SUPERADMIN = 'superadmin';
 
@@ -151,7 +161,7 @@ class PermissionCatalog
                 'platform.impersonate',
                 'dashboard.view', 'branches.view',
                 'tickets.view', 'tickets.create', 'tickets.update', 'tickets.assign',
-                'pm-visits.view', 'pm-visits.update', 'pm-plans.view', 'pm-plans.update', 'pm-checklists.view',
+                'pm-visits.view', 'pm-visits.update', 'pm-visits.review', 'pm-plans.view', 'pm-plans.update', 'pm-checklists.view', 'pm-reports.view', 'pm-reports.share',
                 'ip-check.view', 'ip-check.run',
                 'assets.view', 'assets.move', 'asset-checkouts.view', 'asset-checkouts.create', 'asset-checkouts.fulfill', 'asset-checkouts.return', 'asset-categories.view', 'labels.view',
                 'customers.view', 'contracts.view',
@@ -199,9 +209,10 @@ class PermissionCatalog
                 'dashboard.view' => 'all',
                 'tickets.view' => 'all', 'tickets.create' => 'all', 'tickets.update' => 'all', 'tickets.assign' => 'all',
                 'tickets.close' => 'all', 'tickets.export' => 'all',
-                'pm-visits.view' => 'all', 'pm-visits.create' => 'all', 'pm-visits.update' => 'all',
+                'pm-visits.view' => 'all', 'pm-visits.create' => 'all', 'pm-visits.update' => 'all', 'pm-visits.review' => 'all',
                 'pm-plans.view' => 'all', 'pm-plans.create' => 'all', 'pm-plans.update' => 'all',
                 'pm-checklists.view' => 'all',
+                'pm-reports.view' => 'all', 'pm-reports.share' => 'all',
                 'ip-check.view' => 'all', 'ip-check.run' => 'all', 'ip-check.manage' => 'all',
                 'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.export' => 'all', 'assets.move' => 'all',
                 'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.fulfill' => 'all', 'asset-checkouts.return' => 'all',
@@ -279,7 +290,7 @@ class PermissionCatalog
                 'tickets.view' => 'customer', 'tickets.create' => 'customer',
                 // Not in permissions.json: confirming a repair is done, kept from before.
                 'tickets.approve' => 'customer',
-                'pm-visits.view' => 'customer', 'pm-plans.view' => 'customer',
+                'pm-visits.view' => 'customer', 'pm-plans.view' => 'customer', 'pm-reports.view' => 'customer',
                 'assets.view' => 'customer',
                 'contracts.view' => 'customer',
                 'reports.view' => 'customer',

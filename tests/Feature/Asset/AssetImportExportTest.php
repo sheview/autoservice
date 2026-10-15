@@ -132,7 +132,7 @@ it('exports the filtered list and imports the same file back as updates', functi
     expect($rows[0])->toBe([
         'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'ประเภทย่อย', 'Serial Number', 'จำนวน', 'หน่วย',
         'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'IP Address', 'MAC Address', 'ผู้ใช้งานประจำเครื่อง', 'แผนก',
-        'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
+        'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'สัญญา MA (เลขที่)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
     ])
         ->and(count($rows))->toBe(2)
         ->and($rows[1][1])->toBe('Spare PC')

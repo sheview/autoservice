@@ -9,6 +9,7 @@ use App\Modules\Asset\Models\AssetImport;
 use App\Modules\Asset\Models\AssetSerial;
 use App\Modules\Asset\Support\AssetSheet;
 use App\Modules\Asset\Support\SpecFields;
+use App\Modules\Contract\Actions\AddAssetToContracts;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
@@ -25,7 +26,8 @@ use Throwable;
  *
  * A row whose asset_code already exists updates that asset; any other row creates a new asset
  * (an empty asset_code gets the next code of the category). A bad row is skipped and reported
- * with its Excel row number; the other rows are still imported.
+ * with its Excel row number; the other rows are still imported. Contract numbers in the row put
+ * the asset into those contracts (never out of others).
  */
 class ImportAssets
 {
@@ -46,18 +48,24 @@ class ImportAssets
     /** @var array<string, int> lower(customer code) and lower(name) => customer id */
     private array $customers = [];
 
+    /** @var array<string, array{id: int, customer_id: int}>|null lower(contract no) => contract rows may put their asset into; null = column ignored */
+    private ?array $contracts = null;
+
     public function __construct(
         private SaveAsset $saveAsset,
         private ListCustomers $listCustomers,
+        private AddAssetToContracts $addToContracts,
         private Modules $modules,
     ) {}
 
     /**
      * @param  bool  $allBranches  whether the uploader may write assets of every branch
      * @param  int|null  $ownBranchId  the uploader's branch (used when $allBranches is false)
+     * @param  array<string, array{id: int, customer_id: int}>|null  $contracts  see $this->contracts (StartAssetImport)
      */
-    public function handle(AssetImport $import, bool $allBranches, ?int $ownBranchId): void
+    public function handle(AssetImport $import, bool $allBranches, ?int $ownBranchId, ?array $contracts = null): void
     {
+        $this->contracts = $contracts;
         $import->update(['status' => AssetImport::STATUS_PROCESSING]);
 
         try {
@@ -243,6 +251,23 @@ class ImportAssets
             $messages[] = __('asset.assets.serial_taken', ['serial' => $serial, 'code' => $assetCode]);
         }
 
+        // Contracts to put it into: only added, never taken out (an empty cell changes nothing).
+        $contractIds = [];
+        if ($this->contracts !== null) {
+            $customerId = array_key_exists('customer_id', $data) ? $data['customer_id'] : $existing?->customer_id;
+            $customerId = $customerId === null ? null : (int) $customerId;
+            foreach (AssetSheet::serials($values['contracts'] ?? null) as $number) {
+                $contract = $this->contracts[mb_strtolower($number)] ?? null;
+                $messages[] = match (true) {
+                    $contract === null => __('asset.imports.unknown_contract', ['value' => $number]),
+                    $contract['customer_id'] !== $customerId => __('asset.imports.contract_other_customer', ['value' => $number]),
+                    default => null,
+                };
+                $contractIds[] = $contract['id'] ?? null;
+            }
+            $messages = array_filter($messages);
+        }
+
         if ($messages !== []) {
             return array_values(array_unique($messages));
         }
@@ -251,7 +276,10 @@ class ImportAssets
         if (($data['quantity'] ?? null) === null) {
             unset($data['quantity']);
         }
-        $this->saveAsset->handle($existing, $data, $serials);
+        DB::transaction(function () use ($existing, $data, $serials, $contractIds) {
+            $asset = $this->saveAsset->handle($existing, $data, $serials);
+            $this->addToContracts->handle($asset->id, array_values(array_unique($contractIds)));
+        });
 
         return $existing ? 'updated_rows' : 'created_rows';
     }

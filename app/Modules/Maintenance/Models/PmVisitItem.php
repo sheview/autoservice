@@ -15,6 +15,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  *
  * @property list<array{key: string, label: string, type: string}> $checklist
  * @property array<string, bool|string|float|null> $answers
+ * @property array<string, string>|null $remarks a note per question, by key
  */
 class PmVisitItem extends Model implements HasMedia
 {
@@ -35,7 +36,7 @@ class PmVisitItem extends Model implements HasMedia
     /** Results a technician can record. */
     public const RESULTS = [self::RESULT_OK, self::RESULT_ISSUE, self::RESULT_SKIPPED];
 
-    protected $fillable = ['asset_id', 'pm_checklist_id', 'checklist', 'result', 'answers', 'note', 'ticket_id', 'checked_by', 'checked_at'];
+    protected $fillable = ['asset_id', 'pm_checklist_id', 'checklist', 'result', 'answers', 'remarks', 'note', 'ticket_id', 'checked_by', 'checked_at'];
 
     protected $attributes = [
         'result' => self::RESULT_PENDING,
@@ -48,6 +49,7 @@ class PmVisitItem extends Model implements HasMedia
         return [
             'checklist' => 'array',
             'answers' => 'array',
+            'remarks' => 'array',
             'checked_at' => 'datetime',
         ];
     }

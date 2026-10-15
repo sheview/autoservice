@@ -2,13 +2,33 @@
 
 use App\Modules\Maintenance\Http\Controllers\PmCalendarController;
 use App\Modules\Maintenance\Http\Controllers\PmChecklistController;
+use App\Modules\Maintenance\Http\Controllers\PmCustomerReportController;
+use App\Modules\Maintenance\Http\Controllers\PmDashboardController;
+use App\Modules\Maintenance\Http\Controllers\PmEquipmentController;
 use App\Modules\Maintenance\Http\Controllers\PmPhotoController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanController;
+use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
+use App\Modules\Maintenance\Http\Controllers\PmSettingsController;
+use App\Modules\Maintenance\Http\Controllers\PmSharedReportController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitPdfController;
+use App\Modules\Maintenance\Http\Controllers\PmWorkOrderController;
 use Illuminate\Support\Facades\Route;
 
+// A customer's PM report link, without signing in (PmSharedReportController): on the company's
+// host, or on the shared host with the company code in the path.
+Route::middleware('throttle:track-link')->group(function () {
+    Route::get('pm-report/{token}', [PmSharedReportController::class, 'showOnHost'])->name('maintenance.shared.show');
+    Route::get('pm-report/{token}/pdf', [PmSharedReportController::class, 'pdfOnHost'])->name('maintenance.shared.pdf');
+    Route::get('pm-report/{token}/equipment/{item}/pdf', [PmSharedReportController::class, 'pdfOnHost'])->whereNumber('item')->name('maintenance.shared.equipment');
+    Route::get('t/{code}/pm-report/{token}', [PmSharedReportController::class, 'showOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.shared.show.path');
+    Route::get('t/{code}/pm-report/{token}/pdf', [PmSharedReportController::class, 'pdfOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.shared.pdf.path');
+    Route::get('t/{code}/pm-report/{token}/equipment/{item}/pdf', [PmSharedReportController::class, 'pdfOnPath'])
+        ->where('code', '[0-9]{1,10}')->whereNumber('item')->name('maintenance.shared.equipment.path');
+});
+
 Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance.')->group(function () {
+    Route::post('pm-checklists/standard', [PmChecklistController::class, 'addStandard'])->name('checklists.standard');
     Route::resource('pm-checklists', PmChecklistController::class)->except(['show'])
         ->names('checklists')->parameters(['pm-checklists' => 'checklist']);
 
@@ -16,14 +36,28 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
         ->names('plans')->parameters(['pm-plans' => 'plan']);
 
     Route::get('pm-calendar', [PmCalendarController::class, 'index'])->name('calendar');
+    Route::get('pm-dashboard', [PmDashboardController::class, 'dashboard'])->name('dashboard');
+    Route::get('pm-reports', [PmDashboardController::class, 'reports'])->name('reports.index');
+    Route::get('pm-equipment', [PmEquipmentController::class, 'index'])->name('equipment.index');
+    Route::get('pm-customer-reports', [PmCustomerReportController::class, 'index'])->name('customer-reports.index');
+    Route::get('pm-settings', [PmSettingsController::class, 'edit'])->name('settings.edit');
+    Route::put('pm-settings', [PmSettingsController::class, 'update'])->name('settings.update');
 
+    // Before the resource, or "create" would be taken for a work order.
+    Route::get('pm-visits/create', [PmWorkOrderController::class, 'create'])->name('visits.create');
+    Route::post('pm-visits', [PmWorkOrderController::class, 'store'])->name('visits.store');
+    Route::post('pm-visits/{visit}/items', [PmWorkOrderController::class, 'addItems'])->name('visits.items.store');
+    Route::delete('pm-visits/{visit}/items/{item}', [PmWorkOrderController::class, 'removeItem'])->scopeBindings()->name('visits.items.destroy');
     Route::resource('pm-visits', PmVisitController::class)->only(['index', 'show', 'update'])
         ->names('visits')->parameters(['pm-visits' => 'visit']);
-    Route::get('pm-visits/{visit}/pdf', PmVisitPdfController::class)->name('visits.pdf');
+    Route::get('pm-visits/{visit}/pdf', [PmVisitPdfController::class, 'consolidated'])->name('visits.pdf');
+    Route::get('pm-visits/{visit}/equipment/{item}/pdf', [PmVisitPdfController::class, 'equipment'])->whereNumber('item')->name('visits.equipment.pdf');
     Route::post('pm-visits/{visit}/start', [PmVisitController::class, 'start'])->name('visits.start');
-    Route::post('pm-visits/{visit}/complete', [PmVisitController::class, 'complete'])->name('visits.complete');
-    Route::post('pm-visits/{visit}/cancel', [PmVisitController::class, 'cancel'])->name('visits.cancel');
+    Route::post('pm-visits/{visit}/submit', [PmVisitController::class, 'submit'])->name('visits.submit');
+    Route::post('pm-visits/{visit}/move', [PmVisitController::class, 'move'])->name('visits.move');
+    Route::post('pm-visits/{visit}/shares', [PmReportShareController::class, 'store'])->name('visits.shares.store');
     Route::scopeBindings()->group(function () {
+        Route::delete('pm-visits/{visit}/shares/{share}', [PmReportShareController::class, 'destroy'])->whereNumber('share')->name('visits.shares.destroy');
         Route::put('pm-visits/{visit}/items/{item}', [PmVisitController::class, 'recordItem'])->name('visits.items.update');
         Route::post('pm-visits/{visit}/items/{item}/ticket', [PmVisitController::class, 'openTicket'])->name('visits.items.ticket');
         Route::post('pm-visits/{visit}/items/{item}/photos', [PmPhotoController::class, 'store'])->name('visits.items.photos.store');

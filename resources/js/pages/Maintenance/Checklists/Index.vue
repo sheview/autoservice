@@ -32,7 +32,11 @@ const props = defineProps<{
     filters: Filters;
     categories: { id: number; name: string }[];
     can: { create: boolean; update: boolean; delete: boolean };
+    // Standard checklists the company does not have yet (names).
+    standardMissing: string[];
 }>();
+
+const addStandard = () => router.post(route('maintenance.checklists.standard'), {}, { preserveScroll: true });
 
 const page = usePage<SharedData>();
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('pm_checklists.title'), href: route('maintenance.checklists.index') }];
@@ -68,6 +72,16 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
             </p>
+
+            <!-- Standard checklists not added yet: add them all in one go, then change them as you like -->
+            <div v-if="standardMissing.length" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4">
+                <div class="min-w-0 space-y-1">
+                    <p class="text-sm font-medium">{{ t('pm_checklists.standard_title', { count: standardMissing.length }) }}</p>
+                    <p class="text-xs text-muted-foreground">{{ standardMissing.join(' · ') }}</p>
+                    <p class="text-xs text-muted-foreground">{{ t('pm_checklists.standard_hint') }}</p>
+                </div>
+                <Button variant="outline" @click="addStandard">{{ t('pm_checklists.standard_add') }}</Button>
+            </div>
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('pm_checklists.search_placeholder')" />

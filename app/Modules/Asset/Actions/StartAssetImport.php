@@ -4,9 +4,12 @@ namespace App\Modules\Asset\Actions;
 
 use App\Modules\Asset\Jobs\ImportAssetsJob;
 use App\Modules\Asset\Models\AssetImport;
+use App\Modules\Contract\Actions\EditableContracts;
+use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
@@ -16,7 +19,12 @@ use Illuminate\Support\Str;
  */
 class StartAssetImport
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(
+        private TenantContext $context,
+        private Modules $modules,
+        private ListCustomers $listCustomers,
+        private EditableContracts $editableContracts,
+    ) {}
 
     public function handle(User $user, UploadedFile $file): AssetImport
     {
@@ -32,8 +40,33 @@ class StartAssetImport
             'file_path' => $path,
         ]);
 
-        ImportAssetsJob::dispatch($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id);
+        ImportAssetsJob::dispatch($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id, $this->contracts($user));
 
         return $import;
+    }
+
+    /**
+     * The contracts the file may put assets into, decided now like the branch scope (the uploader
+     * may be an impersonating superadmin, not a user of this tenant): the contracts the uploader
+     * may change, ended ones too as on the contract page (an exported file lists them), by
+     * lower(contract number). Null = the contract column is ignored.
+     *
+     * @return array<string, array{id: int, customer_id: int}>|null
+     */
+    private function contracts(User $user): ?array
+    {
+        if (! $this->modules->enabled('contract') || ! $user->can('contracts.update')) {
+            return null;
+        }
+
+        $contracts = [];
+        $customerIds = array_column($this->listCustomers->handle(), 'id');
+        foreach ($this->editableContracts->handle($user, $customerIds, runningOnly: false) as $customerId => $list) {
+            foreach ($list as $contract) {
+                $contracts[mb_strtolower($contract['contract_no'])] = ['id' => $contract['id'], 'customer_id' => (int) $customerId];
+            }
+        }
+
+        return $contracts;
     }
 }

@@ -70,6 +70,8 @@ class HandleInertiaRequests extends Middleware
                 // A customer's report from a QR code: made (its number), or a job already running.
                 'reported' => fn () => $request->session()->get('reported'),
                 'already' => fn () => $request->session()->get('already'),
+                // A customer's PM report link just made: the only time it is shown (its token is stored hashed).
+                'share_url' => fn () => $request->session()->get('share_url'),
             ],
             // The company's subscription, for the warning popup and banner. Customer accounts are
             // not told about their MA company's contract with the platform.

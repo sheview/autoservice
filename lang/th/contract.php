@@ -58,6 +58,42 @@ return [
         'resolve_hours' => 'เวลาแก้ไข',
     ],
 
+    'statuses' => [
+        'draft' => 'ร่าง',
+        'active' => 'ใช้งาน',
+        'cancelled' => 'ยกเลิก',
+    ],
+
+    // Headings of the contract Excel file (ContractSheet).
+    'columns' => [
+        'contract_no' => 'เลขที่สัญญา',
+        'customer_code' => 'รหัสลูกค้า',
+        'title' => 'ชื่อสัญญา',
+        'status' => 'สถานะ',
+        'starts_on' => 'วันเริ่มสัญญา',
+        'ends_on' => 'วันสิ้นสุดสัญญา',
+        'value' => 'มูลค่าสัญญา (บาท)',
+        'service_window' => 'ช่วงเวลาให้บริการ',
+        'pm_interval_months' => 'รอบ PM (เดือน)',
+        'notify_days_before' => 'แจ้งเตือนก่อนหมดอายุ (วัน)',
+        'notes' => 'หมายเหตุ',
+        'sla_response' => 'ตอบสนอง :priority (ชม.)',
+        'sla_resolve' => 'แก้ไข :priority (ชม.)',
+    ],
+
+    'imports' => [
+        'file' => 'ไฟล์ Excel',
+        'unreadable' => 'อ่านไฟล์ไม่ได้ กรุณาตรวจสอบว่าเป็นไฟล์ Excel หรือ CSV ที่ถูกต้อง',
+        'missing_headings' => 'ไม่พบหัวคอลัมน์ "เลขที่สัญญา" ในแถวแรก กรุณาใช้ไฟล์ต้นแบบ',
+        'too_many_rows' => 'ไฟล์มีข้อมูลเกิน :max แถว กรุณาแบ่งเป็นหลายไฟล์',
+        'number_deleted' => 'เลขที่สัญญา ":no" เป็นของสัญญาที่ถูกลบไปแล้ว ใช้ซ้ำไม่ได้',
+        'not_allowed' => 'คุณไม่มีสิทธิ์แก้ไขหรือเพิ่มสัญญา ":no"',
+        'unknown_customer' => 'ไม่พบลูกค้ารหัส ":code"',
+        'customer_not_allowed' => 'คุณไม่มีสิทธิ์ทำสัญญาให้ลูกค้ารหัส ":code"',
+        'unknown_status' => 'ไม่รู้จักสถานะ ":value" (ใช้ ร่าง / ใช้งาน / ยกเลิก)',
+        'unknown_service_window' => 'ไม่รู้จักช่วงเวลาให้บริการ ":value" (ใช้ 8x5 / 12x6 / 24x7)',
+    ],
+
     'priorities' => [
         'critical' => 'วิกฤต',
         'high' => 'สูง',

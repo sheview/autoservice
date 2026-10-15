@@ -1,8 +1,15 @@
 <?php
 
+use App\Modules\Asset\Models\Asset;
+use App\Modules\Asset\Models\AssetImport;
+use App\Modules\Contract\Actions\AddContractAssets;
 use App\Modules\Tenancy\Models\Branch;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 beforeEach(function () {
     $this->admin = userWithRole('admin_company');
@@ -98,4 +105,111 @@ it('keeps asset exports and imports in step with the customer column', function 
     $rows = Excel::toCollection(null, $response->getFile()->getPathname())->first();
 
     expect($rows[1][4])->toBe('ACME');
+});
+
+it('puts an asset into a running contract of its customer from the asset page, and takes it out', function () {
+    $ended = createContract($this->customer, ['contract_no' => 'MA-OLD', 'starts_on' => now()->subYears(2)->toDateString(), 'ends_on' => now()->subYear()->toDateString()]);
+    $draft = createContract($this->customer, ['contract_no' => 'MA-DRAFT', 'status' => 'draft']);
+    createContract(createCustomer(), ['contract_no' => 'MA-BETA']);
+    app(AddContractAssets::class)->handle($ended, [$this->mine->id]);
+
+    // Offers only running contracts of its own customer that it is not in; the ended one it is in may be left.
+    $this->actingAs($this->admin)->get("/assets/{$this->mine->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('contractEdit.joinable', fn ($rows) => collect($rows)->pluck('contract_no')->all() === ['MA-1'])
+        ->where('contractEdit.removable', [$ended->id]));
+
+    $this->actingAs($this->admin)->post("/contracts/{$this->contract->id}/assets", ['asset_ids' => [$this->mine->id]])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->delete("/contracts/{$ended->id}/assets/{$this->mine->id}")->assertSessionHasNoErrors();
+
+    $this->actingAs($this->admin)->get("/assets/{$this->mine->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('contracts', fn ($rows) => collect($rows)->pluck('contract_no')->all() === ['MA-1'])
+        ->where('contractEdit.joinable', [])
+        ->where('contractEdit.removable', [$this->contract->id]));
+    expect($draft->contractAssets()->count())->toBe(0);
+
+    // Who may only look at contracts sees them, without the controls.
+    $this->actingAs(userWithRole('helpdesk'))->get("/assets/{$this->mine->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('contracts', fn ($rows) => count($rows) === 1)
+        ->where('contractEdit', null));
+    // A company asset has no customer, so no contract to offer.
+    $own = createAsset($this->category, ['name' => 'Our PC']);
+    $this->actingAs($this->admin)->get("/assets/{$own->ulid}")->assertInertia(fn (Assert $page) => $page->where('contractEdit', null));
+});
+
+it('puts a new asset into the contracts ticked on the form, only running ones of its customer', function () {
+    $beta = createCustomer(['code' => 'BETA']);
+    $betaContract = createContract($beta, ['contract_no' => 'MA-BETA']);
+    $ended = createContract($this->customer, ['contract_no' => 'MA-OLD', 'starts_on' => now()->subYears(2)->toDateString(), 'ends_on' => now()->subYear()->toDateString()]);
+    $payload = fn (array $contractIds) => [
+        'category_id' => $this->category->id, 'name' => 'New Acme AP', 'status' => 'in_use', 'owner' => 'customer',
+        'customer_id' => $this->customer->id, 'location' => 'ชั้น 2', 'contract_ids' => $contractIds,
+    ];
+
+    $this->actingAs($this->admin)->get('/assets/create')->assertInertia(fn (Assert $page) => $page
+        ->where("customerContracts.{$this->customer->id}", fn ($rows) => collect($rows)->pluck('contract_no')->all() === ['MA-1']));
+
+    // Another customer's contract, an ended one: refused, and nothing is created.
+    foreach ([$betaContract->id, $ended->id] as $id) {
+        $this->actingAs($this->admin)->post('/assets', $payload([$id]))->assertSessionHasErrors('contract_ids');
+    }
+    expect(Asset::where('name', 'New Acme AP')->exists())->toBeFalse();
+
+    $this->actingAs($this->admin)->post('/assets', $payload([$this->contract->id]))->assertSessionHasNoErrors();
+    $asset = Asset::where('name', 'New Acme AP')->sole();
+    expect($this->contract->contractAssets()->pluck('asset_id')->all())->toBe([$asset->id]);
+
+    // Editing does not take contracts: those are changed on the asset or contract page.
+    $this->actingAs($this->admin)->put("/assets/{$asset->ulid}", $payload([$this->contract->id]))->assertSessionHasErrors('contract_ids');
+});
+
+it('keeps contracts of another company out of the asset form', function () {
+    $theirContract = asTenant(createTenant('other'), fn () => createContract(createCustomer(), ['contract_no' => 'MA-THEIRS']));
+
+    $this->actingAs($this->admin)->post('/assets', [
+        'category_id' => $this->category->id, 'name' => 'Sneaky', 'status' => 'in_use', 'owner' => 'customer',
+        'customer_id' => $this->customer->id, 'location' => 'ชั้น 2', 'contract_ids' => [$theirContract->id],
+    ])->assertSessionHasErrors('contract_ids');
+    expect(Asset::where('name', 'Sneaky')->exists())->toBeFalse();
+});
+
+it('exports the contracts of each asset and imports contract numbers as additions only', function () {
+    Storage::fake('local');
+    $beta = createContract(createCustomer(['code' => 'BETA']), ['contract_no' => 'MA-BETA']);
+    $ended = createContract($this->customer, ['contract_no' => 'MA-OLD', 'starts_on' => now()->subYears(2)->toDateString(), 'ends_on' => now()->subYear()->toDateString()]);
+    app(AddContractAssets::class)->handle($ended, [$this->mine->id]);
+    app(AddContractAssets::class)->handle($this->contract, [$this->mine->id]);
+
+    $response = $this->actingAs($this->admin)->get('/assets/export?search=Acme+Switch')->assertOk();
+    $rows = Excel::toCollection(null, $response->getFile()->getPathname())->first();
+    expect($rows[0][22])->toBe('สัญญา MA (เลขที่)')
+        ->and($rows[1][22])->toBe('MA-OLD, MA-1');
+
+    $spreadsheet = new Spreadsheet;
+    $spreadsheet->getActiveSheet()->fromArray([
+        ['asset_code', 'name', 'category', 'customer', 'status', 'location', 'contracts'],
+        // An empty cell takes it out of nothing.
+        [$this->mine->asset_code, 'Acme Switch', $this->category->name, 'ACME', 'in_use', 'ชั้น 1', null],
+        [$this->alsoMine->asset_code, 'Acme Router', $this->category->name, 'ACME', 'in_use', 'ชั้น 1', 'ma-1, MA-OLD'],
+        [null, 'Acme New AP', $this->category->name, 'ACME', 'in_use', 'ชั้น 2', 'MA-1'],
+        [null, 'Wrong customer', $this->category->name, 'ACME', 'in_use', 'ชั้น 2', 'MA-BETA'],
+        [null, 'Unknown contract', $this->category->name, 'ACME', 'in_use', 'ชั้น 2', 'MA-NOPE'],
+    ], null, 'A1', true);
+    $path = tempnam(sys_get_temp_dir(), 'assets').'.xlsx';
+    (new Xlsx($spreadsheet))->save($path);
+
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => new UploadedFile($path, 'assets.xlsx', null, null, true)])->assertSessionHasNoErrors();
+
+    $import = AssetImport::latest('id')->first();
+    $newAp = Asset::where('name', 'Acme New AP')->sole();
+    expect($import->only(['created_rows', 'updated_rows', 'failed_rows']))->toBe(['created_rows' => 1, 'updated_rows' => 2, 'failed_rows' => 2])
+        ->and(collect($import->errors)->pluck('messages')->flatten()->all())->toBe([
+            'สัญญา "MA-BETA" เป็นของลูกค้ารายอื่น ทรัพย์สินต้องเป็นของลูกค้าเจ้าของสัญญา',
+            'ไม่พบสัญญา "MA-NOPE" หรือคุณไม่มีสิทธิ์แก้ไขสัญญานี้',
+        ])
+        ->and($this->contract->contractAssets()->pluck('asset_id')->sort()->values()->all())
+        ->toBe(collect([$this->mine->id, $this->alsoMine->id, $newAp->id])->sort()->values()->all())
+        ->and($ended->contractAssets()->pluck('asset_id')->sort()->values()->all())
+        ->toBe(collect([$this->mine->id, $this->alsoMine->id])->sort()->values()->all())
+        ->and($beta->contractAssets()->count())->toBe(0)
+        ->and(Asset::where('name', 'Wrong customer')->exists())->toBeFalse();
 });

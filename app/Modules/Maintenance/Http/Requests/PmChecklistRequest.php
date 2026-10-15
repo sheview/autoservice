@@ -3,13 +3,14 @@
 namespace App\Modules\Maintenance\Http\Requests;
 
 use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Support\ChecklistItems;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class PmChecklistRequest extends FormRequest
 {
-    public const MAX_ITEMS = 50;
+    public const MAX_ITEMS = ChecklistItems::MAX_ITEMS;
 
     public function authorize(): bool
     {
@@ -32,7 +33,12 @@ class PmChecklistRequest extends FormRequest
             'items' => ['required', 'array', 'min:1', 'max:'.self::MAX_ITEMS],
             'items.*.key' => ['required', 'string', 'regex:/^[a-z][a-z0-9_]{0,39}$/', 'distinct'],
             'items.*.label' => ['required', 'string', 'max:200'],
-            'items.*.type' => ['required', Rule::in(PmChecklist::ITEM_TYPES)],
+            'items.*.type' => ['required', Rule::in(ChecklistItems::TYPES)],
+            'items.*.section' => ['nullable', 'string', 'max:100'],
+            'items.*.unit' => ['nullable', 'string', 'max:20'],
+            'items.*.min' => ['nullable', 'numeric', 'between:-999999,999999'],
+            'items.*.max' => ['nullable', 'numeric', 'between:-999999,999999', 'gte:items.*.min'],
+            'items.*.required' => ['boolean'],
         ];
     }
 

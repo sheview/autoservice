@@ -74,6 +74,7 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::delete('assets/{asset}/attachments/{attachment}', [AssetAttachmentController::class, 'destroy'])
         ->whereNumber('attachment')->name('assets.attachments.destroy');
 
+    Route::post('asset-categories/standard', [AssetCategoryController::class, 'addStandard'])->name('categories.standard');
     Route::resource('asset-categories', AssetCategoryController::class)
         ->except(['show'])
         ->parameters(['asset-categories' => 'category'])

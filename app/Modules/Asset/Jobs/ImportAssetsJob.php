@@ -29,6 +29,8 @@ class ImportAssetsJob implements ShouldQueue
         public int $importId,
         public bool $allBranches,
         public ?int $ownBranchId,
+        // Contracts the file may put assets into (StartAssetImport); null = contract column ignored.
+        public ?array $contracts = null,
     ) {}
 
     public function handle(ImportAssets $importAssets, CauserResolver $causer): void
@@ -44,7 +46,7 @@ class ImportAssetsJob implements ShouldQueue
         }
 
         try {
-            $importAssets->handle($import, $this->allBranches, $this->ownBranchId);
+            $importAssets->handle($import, $this->allBranches, $this->ownBranchId, $this->contracts);
         } finally {
             // The resolver is a singleton; do not leak the causer into the worker's next job.
             $causer->setCauser(null);

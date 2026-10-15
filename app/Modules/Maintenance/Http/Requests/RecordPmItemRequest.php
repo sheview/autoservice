@@ -3,6 +3,7 @@
 namespace App\Modules\Maintenance\Http\Requests;
 
 use App\Modules\Maintenance\Models\PmVisitItem;
+use App\Modules\Maintenance\Support\ChecklistItems;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -24,12 +25,16 @@ class RecordPmItemRequest extends FormRequest
             'result' => ['required', Rule::in(PmVisitItem::RESULTS)],
             'answers' => ['array'],
             'note' => [Rule::requiredIf($this->input('result') === PmVisitItem::RESULT_ISSUE), 'nullable', 'string', 'max:5000'],
+            // A note per question, by key.
+            'remarks' => ['nullable', 'array'],
+            'remarks.*' => ['nullable', 'string', 'max:1000'],
         ];
 
         foreach ($item->checklist as $field) {
             $rules["answers.{$field['key']}"] = match ($field['type']) {
                 'check' => ['nullable', 'boolean'],
-                'number' => ['nullable', 'numeric', 'between:-999999,999999'],
+                'number', 'measure' => ['nullable', 'numeric', 'between:-999999,999999'],
+                'pass_fail' => ['nullable', Rule::in(ChecklistItems::PASS_FAIL)],
                 default => ['nullable', 'string', 'max:500'],
             };
         }

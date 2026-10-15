@@ -4,9 +4,15 @@ import { t } from '@/lib/i18n';
 defineProps<{ status: string; overdue?: boolean }>();
 
 const classes: Record<string, string> = {
+    draft: 'bg-muted text-muted-foreground',
     scheduled: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-200',
     in_progress: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
-    completed: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+    revision_required: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200',
+    submitted: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200',
+    pending_approval: 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-200',
+    approved: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+    published: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200',
+    closed: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
     cancelled: 'bg-muted text-muted-foreground line-through',
 };
 </script>

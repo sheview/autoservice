@@ -3,6 +3,7 @@
 namespace App\Modules\Service\Actions;
 
 use App\Modules\Asset\Actions\LoansDueFor;
+use App\Modules\Contract\Actions\ContractMilestones;
 use App\Modules\Identity\Models\User;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Models\PersonalEvent;
@@ -11,13 +12,13 @@ use Carbon\CarbonImmutable;
 
 /**
  * A person's "my work": the tickets they are assigned (on their appointment day, else when the
- * fix is due, else when opened), what they borrowed and must give back, and their own appointments
- * — on a month calendar, and as a to-do list of what is still open (overdue / today / this week / later).
+ * fix is due, else when opened), what they borrowed and must give back, their own appointments,
+ * and the days the contracts they may see start and end — on a month calendar, and as a to-do list of what is still open (overdue / today / this week / later).
  * Dates are days in the app's time zone (Y-m-d), so the page needs no time zone sums.
  */
 class MyWork
 {
-    public function __construct(private LoansDueFor $loansDueFor, private Modules $modules) {}
+    public function __construct(private LoansDueFor $loansDueFor, private ContractMilestones $contractMilestones, private Modules $modules) {}
 
     /**
      * @param  CarbonImmutable  $from  first day shown on the calendar
@@ -103,7 +104,25 @@ class MyWork
                 'href' => null,
             ]);
 
-        $all = $tickets->concat($loans)->concat($personal);
+        // The days the contracts they may see start and end: on the calendar only, nothing to do.
+        $contracts = $this->modules->enabled('contract')
+            ? collect($this->contractMilestones->handle($user, $from, $to))->map(fn (array $contract) => [
+                'key' => "contract-{$contract['milestone']}-{$contract['id']}",
+                'kind' => 'contract',
+                'title' => $contract['contract_no'].' '.($contract['customer'] ?? $contract['title']),
+                'date' => $contract['date'],
+                'time' => null,
+                'when' => "contract_{$contract['milestone']}",
+                'status' => null,
+                'priority' => null,
+                'open' => false,
+                'overdue' => false,
+                'notes' => $contract['title'],
+                'href' => $contract['href'],
+            ])
+            : collect();
+
+        $all = $tickets->concat($loans)->concat($personal)->concat($contracts);
         $inRange = fn (array $e) => $e['date'] >= $from->toDateString() && $e['date'] <= $to->toDateString();
 
         return [

@@ -7,6 +7,7 @@ use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetSerial;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Support\SpecFields;
+use App\Modules\Contract\Actions\EditableContracts;
 use App\Modules\Document\Support\Attachments;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -118,6 +119,9 @@ class AssetRequest extends FormRequest
             ...SpecFields::rules($this->category()?->spec_fields ?? []),
             // Files attached when saving (more can be added on the asset page).
             ...Attachments::rules(),
+            // Creating only: contracts of its customer to put it into (checked in after()).
+            'contract_ids' => [$asset ? 'prohibited' : 'nullable', 'array', 'max:20'],
+            'contract_ids.*' => ['integer', 'distinct'],
         ];
     }
 
@@ -144,6 +148,7 @@ class AssetRequest extends FormRequest
             'serials.*' => __('asset.columns.serial_number'),
             'holder_name' => __('asset.fields.holder_name'),
             'handed_out_on' => __('asset.fields.handed_out_on'),
+            'contract_ids' => __('asset.fields.contracts'),
             ...Attachments::attributes(),
             ...SpecFields::labels($this->category()?->spec_fields ?? []),
         ];
@@ -183,6 +188,7 @@ class AssetRequest extends FormRequest
                 }
             },
             fn (Validator $validator) => $this->checkSerialsTaken($validator),
+            fn (Validator $validator) => $this->checkContracts($validator),
             function (Validator $validator) {
                 $user = $this->user();
                 $permission = $this->route('asset') instanceof Asset ? 'assets.update' : 'assets.create';
@@ -208,7 +214,7 @@ class AssetRequest extends FormRequest
     public function assetData(): array
     {
         $data = collect($this->validated())
-            ->except(['serials', 'attachments', 'owner', 'holder_name', 'handed_out_on'])
+            ->except(['serials', 'attachments', 'owner', 'holder_name', 'handed_out_on', 'contract_ids'])
             ->all();
         $data['purchase_price'] = Money::toSatang($data['purchase_price'] ?? null);
 
@@ -226,6 +232,16 @@ class AssetRequest extends FormRequest
     }
 
     /**
+     * Contracts to put the new asset into (checked: running contracts of its customer the user may change).
+     *
+     * @return list<int>
+     */
+    public function contractIds(): array
+    {
+        return array_map('intval', $this->validated('contract_ids') ?? []);
+    }
+
+    /**
      * The person who has the asset already (status "issued" or "loaned"), or null.
      *
      * @return array{type: string, borrower_name: string, on: string}|null
@@ -239,6 +255,26 @@ class AssetRequest extends FormRequest
             'borrower_name' => $this->validated('holder_name'),
             'on' => $this->validated('handed_out_on'),
         ];
+    }
+
+    /**
+     * Only running contracts of the asset's own customer that the user may change (EditableContracts).
+     */
+    private function checkContracts(Validator $validator): void
+    {
+        $ids = $this->input('contract_ids');
+        if (! is_array($ids) || $ids === [] || $validator->errors()->hasAny(['contract_ids', 'contract_ids.*'])) {
+            return;
+        }
+
+        $customerId = $this->input('owner') === 'customer' ? (int) $this->input('customer_id') : null;
+        $allowed = $customerId
+            ? array_column(app(EditableContracts::class)->handle($this->user(), [$customerId])[$customerId] ?? [], 'id')
+            : [];
+
+        if (array_diff(array_map('intval', $ids), $allowed) !== []) {
+            $validator->errors()->add('contract_ids', __('asset.assets.contract_not_allowed'));
+        }
     }
 
     /**

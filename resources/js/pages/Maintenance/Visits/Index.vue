@@ -3,6 +3,7 @@ import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
 import PmVisitViewSwitch from '@/components/PmVisitViewSwitch.vue';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -44,6 +45,7 @@ const props = defineProps<{
     statuses: string[];
     customers: { id: number; code: string; name: string }[];
     assignees: { id: number; name: string }[];
+    can: { create: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -76,7 +78,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('pm_visits.title')" :description="t('pm_visits.description')" />
-                <PmVisitViewSwitch current="list" />
+                <div class="flex flex-wrap items-center gap-2">
+                    <PmVisitViewSwitch current="list" />
+                    <Button v-if="can.create" as-child>
+                        <Link :href="route('maintenance.visits.create')">{{ t('pm_visits.create') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

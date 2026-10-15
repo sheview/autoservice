@@ -2,20 +2,25 @@
 
 namespace App\Modules\Platform\Actions;
 
+use App\Modules\Asset\Actions\AddStandardCategories;
 use App\Modules\Identity\Actions\SaveUser;
+use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Support\Facades\DB;
 
 /**
- * A new customer company: the tenant (its default roles are seeded by TenantCreated) and its
- * first admin account, who then sets up branches, users and the rest.
+ * A new customer company: the tenant (its default roles are seeded by TenantCreated), its
+ * first admin account and the standard asset categories; the admin then sets up branches,
+ * users and the rest.
  */
 class CreateTenant
 {
     public function __construct(
         private TenantContext $context,
         private SaveUser $saveUser,
+        private AddStandardCategories $addStandardCategories,
+        private AddStandardChecklists $addStandardChecklists,
     ) {}
 
     /**
@@ -34,12 +39,17 @@ class CreateTenant
                 'subscription_ends_on' => $data['subscription_ends_on'] ?? null,
             ]);
 
-            $this->context->run($tenant, fn () => $this->saveUser->handle(null, [
-                'name' => $data['admin_name'],
-                'email' => $data['admin_email'],
-                'password' => $data['admin_password'],
-                'role' => 'admin_company',
-            ]));
+            $this->context->run($tenant, function () use ($data) {
+                $this->saveUser->handle(null, [
+                    'name' => $data['admin_name'],
+                    'email' => $data['admin_email'],
+                    'password' => $data['admin_password'],
+                    'role' => 'admin_company',
+                ]);
+                // A ready set of asset categories and their PM checklists, which the company then changes as it likes.
+                $this->addStandardCategories->handle();
+                $this->addStandardChecklists->handle();
+            });
 
             return $tenant;
         });

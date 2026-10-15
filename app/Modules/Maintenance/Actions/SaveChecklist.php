@@ -3,14 +3,16 @@
 namespace App\Modules\Maintenance\Actions;
 
 use App\Modules\Maintenance\Models\PmChecklist;
+use App\Modules\Maintenance\Support\ChecklistItems;
 
 /**
- * Creates or updates a PM checklist. Rounds already started keep their own copy of the items.
+ * Creates or updates a PM checklist (its questions, ChecklistItems). Work orders already started
+ * keep their own copy of the questions.
  */
 class SaveChecklist
 {
     /**
-     * @param  array{name: string, asset_category_id?: int|null, items?: list<array{key: string, label: string, type: string}>}  $data  validated
+     * @param  array{name: string, asset_category_id?: int|null, items?: list<array<string, mixed>>}  $data  validated
      */
     public function handle(?PmChecklist $checklist, array $data): PmChecklist
     {
@@ -18,10 +20,7 @@ class SaveChecklist
         $checklist->fill([
             'name' => $data['name'],
             'asset_category_id' => $data['asset_category_id'] ?? null,
-            'items' => array_values(array_map(
-                fn (array $item) => ['key' => $item['key'], 'label' => $item['label'], 'type' => $item['type']],
-                $data['items'] ?? [],
-            )),
+            'items' => ChecklistItems::clean($data['items'] ?? []),
         ]);
         $checklist->save();
 

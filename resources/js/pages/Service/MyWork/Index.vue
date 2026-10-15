@@ -14,7 +14,7 @@ import { computed, ref } from 'vue';
 
 interface WorkItem {
     key: string;
-    kind: 'ticket' | 'loan' | 'personal';
+    kind: 'ticket' | 'loan' | 'personal' | 'contract';
     id?: number;
     title: string;
     date: string;
@@ -88,17 +88,26 @@ const buckets = computed(() => [
     { key: 'later', items: props.todo.filter((i) => !i.overdue && i.date > weekEnd.value) },
 ]);
 
-// --- colours: few, by kind; an overdue job stands out ---
-const chipClass = (item: WorkItem) =>
-    item.overdue
-        ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'
-        : {
-              ticket: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100',
-              loan: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100',
-              personal: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
-          }[item.kind];
-const dotClass = (item: WorkItem) =>
-    item.overdue ? 'bg-red-500' : { ticket: 'bg-sky-500', loan: 'bg-amber-500', personal: 'bg-emerald-500' }[item.kind];
+// --- colours: few, by kind (a contract's start and end apart); an overdue job stands out ---
+const tones = ['ticket', 'loan', 'personal', 'contract_start', 'contract_end'] as const;
+type Tone = (typeof tones)[number];
+const toneOf = (item: WorkItem): Tone => (item.kind === 'contract' ? (item.when as Tone) : item.kind);
+const toneChip: Record<Tone, string> = {
+    ticket: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100',
+    loan: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100',
+    personal: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
+    contract_start: 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-100',
+    contract_end: 'bg-pink-100 text-pink-900 dark:bg-pink-950 dark:text-pink-100',
+};
+const toneDot: Record<Tone, string> = {
+    ticket: 'bg-sky-500',
+    loan: 'bg-amber-500',
+    personal: 'bg-emerald-500',
+    contract_start: 'bg-violet-500',
+    contract_end: 'bg-pink-500',
+};
+const chipClass = (item: WorkItem) => (item.overdue ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200' : toneChip[toneOf(item)]);
+const dotClass = (item: WorkItem) => (item.overdue ? 'bg-red-500' : toneDot[toneOf(item)]);
 
 // --- own appointments ---
 const editing = ref<WorkItem | 'new' | null>(null);
@@ -276,7 +285,9 @@ const timeText = (item: WorkItem) =>
                                         class="truncate rounded px-1 py-0.5 text-xs leading-tight"
                                         :class="chipClass(item)"
                                     >
-                                        <template v-if="item.time">{{ item.time }} </template>{{ item.title }}
+                                        <template v-if="item.time">{{ item.time }} </template
+                                        ><template v-else-if="item.kind === 'contract'">{{ t(`my_work.when.${item.when}`) }} · </template
+                                        >{{ item.title }}
                                     </div>
                                     <div v-if="(byDay[day] ?? []).length > 3" class="px-1 text-xs text-muted-foreground">
                                         {{ t('my_work.more', { count: (byDay[day] ?? []).length - 3 }) }}
@@ -288,12 +299,9 @@ const timeText = (item: WorkItem) =>
 
                     <!-- Legend -->
                     <div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span v-for="kind in ['ticket', 'loan', 'personal'] as const" :key="kind" class="flex items-center gap-1.5">
-                            <span
-                                class="size-2.5 rounded-full"
-                                :class="{ ticket: 'bg-sky-500', loan: 'bg-amber-500', personal: 'bg-emerald-500' }[kind]"
-                            />
-                            {{ t(`my_work.kinds.${kind}`) }}
+                        <span v-for="tone in tones" :key="tone" class="flex items-center gap-1.5">
+                            <span class="size-2.5 rounded-full" :class="toneDot[tone]" />
+                            {{ t(tone.startsWith('contract_') ? `my_work.when.${tone}` : `my_work.kinds.${tone}`) }}
                         </span>
                         <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-red-500" />{{ t('my_work.overdue') }}</span>
                     </div>

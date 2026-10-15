@@ -78,17 +78,19 @@ it('records results per asset and closes the round once every asset has one', fu
     $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", ['result' => 'issue'])
         ->assertSessionHasErrors('note');
 
-    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/complete")->assertSessionHasErrors('visit');
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/submit", ['technician_signature' => signaturePng()])->assertSessionHasErrors('visit');
 
     $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", [
         'result' => 'issue', 'answers' => ['look' => 'ลูกยางดึงกระดาษสึก'], 'note' => 'ดึงกระดาษไม่เข้า',
     ])->assertSessionHasNoErrors();
 
-    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/complete", ['summary' => 'เรียบร้อย'])->assertSessionHasNoErrors();
-    expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_COMPLETED)
+    // the company asks for the technician's signature (PmSettings default)
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/submit", ['summary' => 'เรียบร้อย'])->assertSessionHasErrors('technician_signature');
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/submit", ['summary' => 'เรียบร้อย', 'technician_signature' => signaturePng()])->assertSessionHasNoErrors();
+    expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_SUBMITTED)
         ->and($this->visit->fresh()->summary)->toBe('เรียบร้อย');
 
-    // a closed round is read only
+    // handed-in work is read only
     $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$printerItem->id}", ['result' => 'ok'])
         ->assertSessionHasErrors('visit');
 
@@ -135,7 +137,7 @@ it('lets only the assignee or a PM manager work on a round', function () {
     $this->actingAs($this->tech)->get("/pm-visits/{$this->visit->ulid}")
         ->assertInertia(fn (Assert $page) => $page->where('can.start', true)->where('can.update', true));
     $this->actingAs($otherTech)->post("/pm-visits/{$this->visit->ulid}/start")->assertForbidden();
-    $this->actingAs($otherTech)->post("/pm-visits/{$this->visit->ulid}/cancel", ['reason' => 'x'])->assertForbidden();
+    $this->actingAs($otherTech)->post("/pm-visits/{$this->visit->ulid}/move", ['action' => 'cancel', 'note' => 'x'])->assertForbidden();
 
     // helpdesk re-assigns and schedules; it does not perform PM
     $this->actingAs($this->helpdesk)->put("/pm-visits/{$this->visit->ulid}", ['scheduled_on' => '2026-03-20', 'assignee_id' => $otherTech->id])
@@ -144,12 +146,12 @@ it('lets only the assignee or a PM manager work on a round', function () {
     $this->actingAs($this->helpdesk)->post("/pm-visits/{$this->visit->ulid}/start")->assertForbidden();
 
     $this->actingAs($otherTech)->post("/pm-visits/{$this->visit->ulid}/start")->assertSessionHasNoErrors();
-    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/complete")->assertForbidden();
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/submit")->assertForbidden();
 });
 
 it('cancels a round with a reason', function () {
-    $this->actingAs($this->helpdesk)->post("/pm-visits/{$this->visit->ulid}/cancel")->assertSessionHasErrors('reason');
-    $this->actingAs($this->helpdesk)->post("/pm-visits/{$this->visit->ulid}/cancel", ['reason' => 'ลูกค้าปิดปรับปรุงสำนักงาน'])
+    $this->actingAs($this->helpdesk)->post("/pm-visits/{$this->visit->ulid}/move", ['action' => 'cancel'])->assertSessionHasErrors('note');
+    $this->actingAs($this->helpdesk)->post("/pm-visits/{$this->visit->ulid}/move", ['action' => 'cancel', 'note' => 'ลูกค้าปิดปรับปรุงสำนักงาน'])
         ->assertSessionHasNoErrors();
 
     expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_CANCELLED)

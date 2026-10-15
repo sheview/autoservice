@@ -2,6 +2,7 @@
 
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Identity\Models\User;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Models\PersonalEvent;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -97,4 +98,31 @@ it('keeps an appointment after 2038 instead of failing the save', function () {
 
     $this->actingAs($this->tech)->post("/tickets/{$visit->ulid}/appointment", ['appointment_at' => '2040-05-01T10:00'])->assertSessionHasNoErrors();
     expect($visit->fresh()->appointment_at->format('Y-m-d H:i'))->toBe('2040-05-01 10:00');
+});
+
+it('shows when the contracts the user may see start and end, never drafts or another company\'s', function () {
+    $acme = createCustomer(['code' => 'ACME', 'name' => 'Acme']);
+    $starting = createContract($acme, ['contract_no' => 'MA-START', 'starts_on' => '2026-06-20', 'ends_on' => '2027-06-19']);
+    $ending = createContract($acme, ['contract_no' => 'MA-END', 'starts_on' => '2025-06-26', 'ends_on' => '2026-06-25']);
+    createContract($acme, ['contract_no' => 'MA-LATER', 'starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
+    createContract($acme, ['contract_no' => 'MA-DRAFT', 'status' => 'draft', 'starts_on' => '2026-06-15', 'ends_on' => '2027-06-14']);
+    $theirs = asTenant(createTenant('other'), fn () => createContract(createCustomer(), ['contract_no' => 'MA-THEIRS', 'starts_on' => '2026-06-15']));
+
+    $contracts = fn (User $user) => $this->actingAs($user)->get('/my-work')->assertOk()->viewData('page')['props']['events'];
+    $milestones = fn (User $user) => collect($contracts($user))->where('kind', 'contract')->map(fn ($e) => [$e['date'], $e['when'], $e['title']])->values()->all();
+
+    // An admin sees every contract of the company: on the calendar only, not in the to-do list.
+    expect($milestones(userWithRole('admin_company')))->toBe([
+        ['2026-06-20', 'contract_start', 'MA-START Acme'],
+        ['2026-06-25', 'contract_end', 'MA-END Acme'],
+    ]);
+    expect(collect($contracts(userWithRole('admin_company')))->firstWhere('when', 'contract_start')['href'])
+        ->toBe(route('contract.contracts.show', $starting));
+
+    // A technician (scope project) sees only the projects of their team.
+    expect($milestones($this->tech))->toBe([]);
+    $this->actingAs(userWithRole('admin_company'))->put("/contracts/{$ending->id}/members", ['user_ids' => [$this->tech->id]])->assertSessionHasNoErrors();
+    expect($milestones($this->tech))->toBe([['2026-06-25', 'contract_end', 'MA-END Acme']]);
+    $this->actingAs($this->tech)->get('/my-work')->assertInertia(fn (Assert $page) => $page->where('todo', []));
+    expect($theirs->contract_no)->toBe('MA-THEIRS');
 });

@@ -22,6 +22,8 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
     Route::post('my-work/events', [MyWorkController::class, 'store'])->name('my-work.events.store');
     Route::put('my-work/events/{event}', [MyWorkController::class, 'update'])->whereNumber('event')->name('my-work.events.update');
     Route::delete('my-work/events/{event}', [MyWorkController::class, 'destroy'])->whereNumber('event')->name('my-work.events.destroy');
+    // Before the resource, or "blank-form" would be taken for a ticket.
+    Route::get('tickets/blank-form', [TicketPrintController::class, 'blank'])->name('tickets.blank-form');
     Route::resource('tickets', TicketController::class)->except(['destroy']);
     Route::get('tickets/{ticket}/print', [TicketPrintController::class, 'show'])->name('tickets.print');
     Route::get('tickets/{ticket}/pdf', [TicketPrintController::class, 'pdf'])->name('tickets.pdf');

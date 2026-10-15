@@ -3,6 +3,7 @@
 use App\Modules\Contract\Http\Controllers\ContractAssetController;
 use App\Modules\Contract\Http\Controllers\ContractController;
 use App\Modules\Contract\Http\Controllers\ContractDocumentController;
+use App\Modules\Contract\Http\Controllers\ContractImportController;
 use App\Modules\Contract\Http\Controllers\ContractMemberController;
 use App\Modules\Contract\Http\Controllers\CustomerAttachmentController;
 use App\Modules\Contract\Http\Controllers\CustomerController;
@@ -21,6 +22,11 @@ Route::middleware(['auth', 'verified', 'module:contract'])->name('contract.')->g
     Route::put('customers/{customer}/sites/{site}', [CustomerSiteController::class, 'update'])->whereNumber('site')->name('customers.sites.update');
     Route::delete('customers/{customer}/sites/{site}', [CustomerSiteController::class, 'destroy'])->whereNumber('site')->name('customers.sites.destroy');
 
+    // Before the resource, so "export" / "import" are not taken as a contract id.
+    Route::get('contracts/export', [ContractController::class, 'export'])->name('contracts.export');
+    Route::get('contracts/import', [ContractImportController::class, 'create'])->name('contracts.import');
+    Route::post('contracts/import', [ContractImportController::class, 'store'])->name('contracts.import.store');
+    Route::get('contracts/import/template', [ContractImportController::class, 'template'])->name('contracts.import.template');
     Route::resource('contracts', ContractController::class);
 
     Route::post('contracts/{contract}/assets', [ContractAssetController::class, 'store'])->name('contracts.assets.store');

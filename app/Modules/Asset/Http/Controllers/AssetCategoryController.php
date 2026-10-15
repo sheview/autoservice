@@ -3,6 +3,7 @@
 namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\AddStandardCategories;
 use App\Modules\Asset\Actions\DeleteAssetCategory;
 use App\Modules\Asset\Actions\SaveAssetCategory;
 use App\Modules\Asset\Http\Requests\AssetCategoryRequest;
@@ -62,7 +63,20 @@ class AssetCategoryController extends Controller
                 'update' => $user->can('asset-categories.manage'),
                 'delete' => $user->can('asset-categories.manage'),
             ],
+            // Standard categories the company does not have yet (names), offered to add in one go.
+            'standardMissing' => $user->can('create', AssetCategory::class)
+                ? array_column(app(AddStandardCategories::class)->missing(), 'name')
+                : [],
         ]);
+    }
+
+    public function addStandard(AddStandardCategories $addStandard): RedirectResponse
+    {
+        Gate::authorize('create', AssetCategory::class);
+
+        $added = $addStandard->handle();
+
+        return back()->with('success', __('asset.categories.standard_added', ['count' => $added]));
     }
 
     public function create(): Response

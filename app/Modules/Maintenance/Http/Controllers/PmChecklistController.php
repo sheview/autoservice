@@ -4,6 +4,7 @@ namespace App\Modules\Maintenance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\CategoryNames;
+use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Maintenance\Actions\SaveChecklist;
 use App\Modules\Maintenance\Actions\SearchChecklists;
 use App\Modules\Maintenance\Http\Requests\PmChecklistRequest;
@@ -42,7 +43,20 @@ class PmChecklistController extends Controller
                 'update' => $user->can('pm-checklists.manage'),
                 'delete' => $user->can('pm-checklists.manage'),
             ],
+            // Standard checklists the company does not have yet (names), offered to add in one go.
+            'standardMissing' => $user->can('create', PmChecklist::class)
+                ? array_column(app(AddStandardChecklists::class)->missing(), 'name')
+                : [],
         ]);
+    }
+
+    public function addStandard(AddStandardChecklists $addStandard): RedirectResponse
+    {
+        Gate::authorize('create', PmChecklist::class);
+
+        $added = $addStandard->handle();
+
+        return back()->with('success', __('maintenance.checklists.standard_added', ['count' => $added]));
     }
 
     public function create(): Response

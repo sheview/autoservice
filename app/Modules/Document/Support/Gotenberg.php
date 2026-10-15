@@ -25,18 +25,25 @@ class Gotenberg
     ];
 
     /**
+     * $footer: a small HTML page printed at the bottom of every page (Chromium fills the elements
+     * of class "pageNumber" and "totalPages"); it has no access to the web fonts of the page.
+     *
      * @return string the PDF bytes
      *
      * @throws PdfUnavailable when Gotenberg cannot be reached or refuses the page
      */
-    public function htmlToPdf(string $html): string
+    public function htmlToPdf(string $html, ?string $footer = null): string
     {
         $url = rtrim((string) config('services.gotenberg.url'), '/').'/forms/chromium/convert/html';
 
         try {
-            $response = Http::timeout((int) config('services.gotenberg.timeout', 30))
-                ->attach('files', $html, 'index.html', ['Content-Type' => 'text/html'])
-                ->post($url, self::PAGE);
+            $request = Http::timeout((int) config('services.gotenberg.timeout', 30))
+                ->attach('files', $html, 'index.html', ['Content-Type' => 'text/html']);
+            if ($footer !== null) {
+                $request = $request->attach('files', $footer, 'footer.html', ['Content-Type' => 'text/html']);
+            }
+            // The footer needs room below the page's content.
+            $response = $request->post($url, $footer !== null ? ['marginBottom' => '0.7'] + self::PAGE : self::PAGE);
         } catch (ConnectionException $e) {
             report($e);
 

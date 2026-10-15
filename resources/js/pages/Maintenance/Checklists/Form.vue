@@ -10,11 +10,17 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Trash2 } from 'lucide-vue-next';
 
-interface ChecklistItem {
+// A type alias (not an interface), so useForm accepts it as form data.
+type ChecklistItem = {
     key: string;
     label: string;
     type: string;
-}
+    section?: string;
+    unit?: string;
+    min?: number | string | null;
+    max?: number | string | null;
+    required?: boolean;
+};
 
 const props = defineProps<{
     checklist: { id: number; name: string; asset_category_id: number | null; items: ChecklistItem[] } | null;
@@ -31,16 +37,29 @@ const breadcrumbs: BreadcrumbItem[] = [
 const form = useForm({
     name: props.checklist?.name ?? '',
     asset_category_id: props.checklist?.asset_category_id ?? null,
-    items: (props.checklist?.items ?? [{ key: 'item_1', label: '', type: 'check' }]).map((item) => ({ ...item })),
+    items: (props.checklist?.items ?? [{ key: 'item_1', label: '', type: 'pass_fail' }]).map((item) => ({
+        section: '',
+        unit: '',
+        min: null,
+        max: null,
+        required: false,
+        ...item,
+    })) as ChecklistItem[],
 });
 
 // A new item gets a free key like item_3; it can be changed.
 const addItem = () => {
     let n = form.items.length + 1;
     while (form.items.some((item) => item.key === `item_${n}`)) n++;
-    form.items.push({ key: `item_${n}`, label: '', type: 'check' });
+    // The new question stays in the section of the one above it.
+    const section = form.items[form.items.length - 1]?.section ?? '';
+    form.items.push({ key: `item_${n}`, label: '', type: 'pass_fail', section, unit: '', min: null, max: null, required: false });
 };
 const removeItem = (index: number) => form.items.splice(index, 1);
+const moveItem = (index: number, by: number) => {
+    const [item] = form.items.splice(index, 1);
+    form.items.splice(index + by, 0, item);
+};
 
 const submit = () => {
     if (props.checklist) {
@@ -86,24 +105,28 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
 
                     <div v-for="(item, index) in form.items" :key="index" class="grid gap-4 rounded-md border p-4 sm:grid-cols-12">
-                        <div class="grid content-start gap-2 sm:col-span-5">
+                        <div class="grid content-start gap-2 sm:col-span-3">
+                            <Label :for="`item_section_${index}`">{{ t('pm_checklists.item_section') }}</Label>
+                            <Input :id="`item_section_${index}`" v-model="item.section" :placeholder="t('pm_checklists.item_section_placeholder')" />
+                            <InputError :message="itemError(index, 'section')" />
+                        </div>
+                        <div class="grid content-start gap-2 sm:col-span-4">
                             <Label :for="`item_label_${index}`">{{ t('pm_checklists.item_label') }}</Label>
                             <Input :id="`item_label_${index}`" v-model="item.label" required />
                             <InputError :message="itemError(index, 'label')" />
                         </div>
-                        <div class="grid content-start gap-2 sm:col-span-3">
-                            <Label :for="`item_key_${index}`">{{ t('pm_checklists.item_key') }}</Label>
-                            <Input :id="`item_key_${index}`" v-model="item.key" class="font-mono" required pattern="[a-z][a-z0-9_]*" />
-                            <p class="text-xs text-muted-foreground">{{ t('pm_checklists.item_key_hint') }}</p>
-                            <InputError :message="itemError(index, 'key')" />
-                        </div>
-                        <div class="grid content-start gap-2 sm:col-span-3">
+                        <div class="grid content-start gap-2 sm:col-span-2">
                             <Label :for="`item_type_${index}`">{{ t('pm_checklists.item_type') }}</Label>
                             <select :id="`item_type_${index}`" v-model="item.type" :class="selectClass">
                                 <option v-for="type in itemTypes" :key="type" :value="type">{{ t(`pm_checklists.item_types.${type}`) }}</option>
                             </select>
                         </div>
-                        <div class="flex items-start justify-end sm:col-span-1">
+                        <div class="grid content-start gap-2 sm:col-span-2">
+                            <Label :for="`item_key_${index}`">{{ t('pm_checklists.item_key') }}</Label>
+                            <Input :id="`item_key_${index}`" v-model="item.key" class="font-mono" required pattern="[a-z][a-z0-9_]*" />
+                            <InputError :message="itemError(index, 'key')" />
+                        </div>
+                        <div class="flex items-start justify-end gap-1 sm:col-span-1">
                             <Button
                                 type="button"
                                 variant="ghost"
@@ -114,6 +137,45 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             >
                                 <Trash2 class="h-4 w-4" />
                             </Button>
+                        </div>
+
+                        <!-- A reading: its unit and the range it should be in -->
+                        <template v-if="item.type === 'measure'">
+                            <div class="grid content-start gap-2 sm:col-span-3 sm:col-start-4">
+                                <Label :for="`item_unit_${index}`">{{ t('pm_checklists.item_unit') }}</Label>
+                                <Input :id="`item_unit_${index}`" v-model="item.unit" :placeholder="t('pm_checklists.item_unit_placeholder')" />
+                            </div>
+                            <div class="grid content-start gap-2 sm:col-span-2">
+                                <Label :for="`item_min_${index}`">{{ t('pm_checklists.item_min') }}</Label>
+                                <Input :id="`item_min_${index}`" v-model="item.min as string" type="number" step="any" />
+                            </div>
+                            <div class="grid content-start gap-2 sm:col-span-2">
+                                <Label :for="`item_max_${index}`">{{ t('pm_checklists.item_max') }}</Label>
+                                <Input :id="`item_max_${index}`" v-model="item.max as string" type="number" step="any" />
+                                <InputError :message="itemError(index, 'max')" />
+                            </div>
+                        </template>
+                        <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-12" :class="{ 'sm:col-span-12': item.type !== 'measure' }">
+                            <label class="flex items-center gap-2">
+                                <input v-model="item.required" type="checkbox" class="size-4 rounded border-input" />
+                                {{ t('pm_checklists.item_required') }}
+                            </label>
+                            <button
+                                type="button"
+                                class="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                                :disabled="index === 0"
+                                @click="moveItem(index, -1)"
+                            >
+                                ↑ {{ t('pm_checklists.move_up') }}
+                            </button>
+                            <button
+                                type="button"
+                                class="text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+                                :disabled="index === form.items.length - 1"
+                                @click="moveItem(index, 1)"
+                            >
+                                ↓ {{ t('pm_checklists.move_down') }}
+                            </button>
                         </div>
                     </div>
 

@@ -3,10 +3,13 @@
 @php($warranty = $ticket['warranty'])
 @php($report = $ticket['report'])
 @php($blank = str_repeat('.', 40))
+{{-- An empty sheet to fill in by hand (BlankTicketSheet): its choices as boxes to tick, no number yet. --}}
+@php($form = $blank_form ?? null)
+@php($box = fn (string $label) => '<span style="white-space: nowrap"><span class="checkbox"></span> '.e($label).'</span>')
 {{-- Same layout as resources/js/pages/Service/Tickets/Print.vue (printed from the browser): change both together. --}}
 @extends('documents.layout')
 
-@section('title', __('ui.ticket_print.title').' '.$ticket['ticket_no'])
+@section('title', __('ui.ticket_print.title').($form ? '' : ' '.$ticket['ticket_no']))
 
 @section('content')
     <style>
@@ -25,6 +28,13 @@
         .checkbox { display: inline-block; width: 11px; height: 11px; border: 1px solid #000; text-align: center; line-height: 10px; font-size: 8.5pt; vertical-align: -1px; }
         .rating-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px 20px; font-size: 9.5pt; }
         .footer { margin-top: 10px; }
+        @if ($form)
+            /* The blank sheet has more lines to write on: a little less space between parts keeps it on one A4 page. */
+            .sheet section { margin-top: 5px; }
+            .sheet .signatures { margin-top: 4px; }
+            .sheet .times { margin-top: 5px; }
+            .footer { margin-top: 6px; }
+        @endif
     </style>
 
     <div class="sheet">
@@ -39,10 +49,17 @@
                 </div>
             </div>
             <div style="display: flex; gap: 10px; align-items: flex-start">
-                <div>
-                    <div class="doc-no">{{ $ticket['ticket_no'] }}</div>
-                    <div class="muted" style="text-align: right">{{ __('ui.tickets.statuses.'.$ticket['status']) }}</div>
-                </div>
+                @if ($form)
+                    <div style="text-align: right">
+                        <div class="doc-no">{{ __('document.ticket.blank_no') }}</div>
+                        <div class="muted" style="font-size: 8pt">{{ __('document.ticket.blank_no_hint') }}</div>
+                    </div>
+                @else
+                    <div>
+                        <div class="doc-no">{{ $ticket['ticket_no'] }}</div>
+                        <div class="muted" style="text-align: right">{{ __('ui.tickets.statuses.'.$ticket['status']) }}</div>
+                    </div>
+                @endif
                 @if ($tracking)
                     {{-- At least 2.5 cm: it scans from small paper, printed in black and white. --}}
                     <div style="width: 28mm; text-align: center">
@@ -57,7 +74,7 @@
             @foreach (['opened_at' => 'created_at', 'responded_at' => 'responded_at', 'resolved_at' => 'resolved_at', 'closed_at' => 'closed_at'] as $label => $field)
                 <div class="box">
                     <div class="muted">{{ __('ui.ticket_print.'.$label) }}</div>
-                    <div>{{ $date($ticket[$field]) }}</div>
+                    <div>{{ $form ? __('document.ticket.blank_datetime') : $date($ticket[$field]) }}</div>
                 </div>
             @endforeach
         </div>
@@ -70,9 +87,15 @@
                 <div class="fact"><span class="label">{{ __('ui.ticket_print.contact_phone') }}</span><span class="value">{{ $ticket['contact_phone'] }}</span></div>
                 <div class="fact"><span class="label">{{ __('ui.ticket_print.organization') }}</span><span class="value">{{ collect([$ticket['customer'], $ticket['department']])->filter()->implode(' · ') }}</span></div>
                 <div class="fact"><span class="label">{{ __('document.ticket.branch') }}</span><span class="value">{{ $ticket['branch'] }}</span></div>
-                <div class="fact"><span class="label">{{ __('document.ticket.contract') }}</span><span class="value">{{ $ticket['contract_no'] ?? __('document.ticket.out_of_contract') }}</span></div>
-                <div class="fact"><span class="label">{{ __('document.ticket.source') }}</span><span class="value">{{ __('ui.tickets.sources.'.$ticket['source']) }}</span></div>
-                <div class="fact"><span class="label">{{ __('document.ticket.priority') }}</span><span class="value">{{ __('ui.tickets.priorities.'.$ticket['priority']) }}</span></div>
+                @if ($form)
+                    <div class="fact" style="grid-column: span 2"><span class="label">{{ __('document.ticket.contract') }}</span><span class="value">{!! $box(__('document.ticket.in_contract_no')) !!} &nbsp; {!! $box(__('document.ticket.out_of_contract')) !!}</span></div>
+                    <div class="fact" style="grid-column: span 2"><span class="label">{{ __('document.ticket.source') }}</span><span class="value">{!! collect($form['sources'])->map(fn ($s) => $box(__('ui.tickets.sources.'.$s)))->implode(' &nbsp; ') !!} &nbsp; {!! $box(__('document.ticket.other')) !!}</span></div>
+                    <div class="fact"><span class="label">{{ __('document.ticket.priority') }}</span><span class="value">{!! collect($form['priorities'])->map(fn ($p) => $box(__('ui.tickets.priorities.'.$p)))->implode(' &nbsp; ') !!}</span></div>
+                @else
+                    <div class="fact"><span class="label">{{ __('document.ticket.contract') }}</span><span class="value">{{ $ticket['contract_no'] ?? __('document.ticket.out_of_contract') }}</span></div>
+                    <div class="fact"><span class="label">{{ __('document.ticket.source') }}</span><span class="value">{{ __('ui.tickets.sources.'.$ticket['source']) }}</span></div>
+                    <div class="fact"><span class="label">{{ __('document.ticket.priority') }}</span><span class="value">{{ __('ui.tickets.priorities.'.$ticket['priority']) }}</span></div>
+                @endif
                 <div class="fact"><span class="label">{{ __('document.ticket.assignee') }}</span><span class="value">{{ $ticket['assignee'] }}</span></div>
             </div>
         </section>
@@ -81,7 +104,9 @@
         <section>
             <h2>
                 {{ __('ui.ticket_print.device') }}
-                <span class="muted" style="font-weight: normal; font-size: 9pt">({{ __($device['registered'] ? 'ui.tickets.device_registered_badge' : 'ui.tickets.device_unregistered_badge') }})</span>
+                @unless ($form)
+                    <span class="muted" style="font-weight: normal; font-size: 9pt">({{ __($device['registered'] ? 'ui.tickets.device_registered_badge' : 'ui.tickets.device_unregistered_badge') }})</span>
+                @endunless
             </h2>
             <div class="facts">
                 <div class="fact"><span class="label">{{ __('ui.tickets.device_name') }}</span><span class="value">{{ $ticket['asset'] ? $ticket['asset']['asset_code'].' '.$ticket['asset']['name'] : $device['name'] }}</span></div>
@@ -130,7 +155,7 @@
             <h2>{{ __('ui.ticket_print.staff_section') }}</h2>
             <div class="fact"><span class="label">{{ __('ui.ticket_print.cause') }}</span><span class="value pre">{{ $report['cause'] }}</span></div>
             <div class="muted" style="margin-top: 4px">{{ __('ui.ticket_print.work_done') }}</div>
-            <div class="box" style="min-height: 26mm">
+            <div class="box" style="min-height: {{ $form ? 21 : 26 }}mm">
                 @foreach ($notes as $note)
                     <div style="margin-bottom: 3px">
                         <span class="muted" style="font-size: 9pt">{{ $date($note['at']) }} · {{ $note['user_name'] ?? __('ui.common.system') }}</span>
@@ -165,7 +190,7 @@
                             <td class="num">{{ $part['quantity'] }} {{ $part['unit'] }}</td>
                         </tr>
                     @empty
-                        @for ($row = 0; $row < 2; $row++)
+                        @for ($row = 0; $row < ($form ? 3 : 2); $row++)
                             <tr><td style="height: 20px"></td><td></td><td></td><td></td><td></td></tr>
                         @endfor
                     @endforelse

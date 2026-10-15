@@ -36,7 +36,11 @@ const props = defineProps<{
     serviceLines: string[];
     assetTypes: string[];
     can: { create: boolean; update: boolean; delete: boolean };
+    // Standard categories the company does not have yet (names).
+    standardMissing: string[];
 }>();
+
+const addStandard = () => router.post(route('asset.categories.standard'), {}, { preserveScroll: true });
 
 const page = usePage<SharedData>();
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('asset_categories.title'), href: route('asset.categories.index') }];
@@ -82,6 +86,16 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ page.props.flash.success }}
             </p>
             <InputError :message="(page.props.errors as Record<string, string>).category" />
+
+            <!-- Standard categories not added yet: add them all in one go, then change them as you like -->
+            <div v-if="standardMissing.length" class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4">
+                <div class="min-w-0 space-y-1">
+                    <p class="text-sm font-medium">{{ t('asset_categories.standard_title', { count: standardMissing.length }) }}</p>
+                    <p class="text-xs text-muted-foreground">{{ standardMissing.join(' · ') }}</p>
+                    <p class="text-xs text-muted-foreground">{{ t('asset_categories.standard_hint') }}</p>
+                </div>
+                <Button variant="outline" @click="addStandard">{{ t('asset_categories.standard_add') }}</Button>
+            </div>
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('asset_categories.search_placeholder')" />

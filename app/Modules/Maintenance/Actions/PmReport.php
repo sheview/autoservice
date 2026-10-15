@@ -24,7 +24,7 @@ class PmReport
             ->when($customerId !== null, fn ($q) => $q->where('customer_id', $customerId))
             ->get(['id', 'status', 'due_on', 'completed_at']);
 
-        $completed = $visits->where('status', PmVisit::STATUS_COMPLETED);
+        $completed = $visits->whereIn('status', PmVisit::DONE_STATUSES);
         $cancelled = $visits->where('status', PmVisit::STATUS_CANCELLED)->count();
         $overdue = $visits->filter(fn (PmVisit $visit) => $visit->isOverdue())->count();
         $open = $visits->filter(fn (PmVisit $visit) => $visit->isOpen());
@@ -40,7 +40,7 @@ class PmReport
             'due' => $visits->count(),
             'completed' => $completed->count(),
             'on_time' => $completed->filter(fn (PmVisit $visit) => $visit->completed_at?->toDateString() <= $visit->due_on->toDateString())->count(),
-            'in_progress' => $open->where('status', PmVisit::STATUS_IN_PROGRESS)->count(),
+            'in_progress' => $open->whereIn('status', PmVisit::WORKING_STATUSES)->count(),
             'overdue' => $overdue,
             'scheduled' => $open->where('status', PmVisit::STATUS_SCHEDULED)->count(),
             'cancelled' => $cancelled,

@@ -3,6 +3,7 @@ import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import ContractPhaseBadge from '@/components/ContractPhaseBadge.vue';
 import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
 import ItemRequestsPanel from '@/components/ItemRequestsPanel.vue';
 import PhotoSlots from '@/components/PhotoSlots.vue';
 import PmResultBadge from '@/components/PmResultBadge.vue';
@@ -16,9 +17,10 @@ import type { BreadcrumbItem, SharedData } from '@/types';
 import type { ItemRequestsPanelData } from '@/types/checkout';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Barcode, Plus } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 interface AssetDetail {
+    id: number;
     ulid: string;
     asset_code: string;
     name: string;
@@ -91,6 +93,11 @@ const props = defineProps<{
     attachments: Attachment[];
     history: HistoryEntry[];
     contracts: AssetContract[] | null;
+    // null = the user cannot put it into or take it out of contracts here.
+    contractEdit: {
+        joinable: { id: number; contract_no: string; title: string; starts_on: string; ends_on: string; phase: string }[];
+        removable: number[];
+    } | null;
     tickets: { ulid: string; ticket_no: string; title: string; status: string; priority: string; created_at: string }[] | null;
     // Parts put in and taken out on its jobs (pieces by serial, and pieces noted as removed).
     partHistory:
@@ -122,6 +129,20 @@ const destroy = () => {
         router.delete(route('asset.assets.destroy', props.asset.ulid));
     }
 };
+
+// --- put it into / take it out of contracts (the contract page's own routes) ---
+const joinId = ref<number | ''>('');
+const contractError = computed(() => (page.props.errors as Record<string, string>).asset_ids);
+const joinContract = () =>
+    joinId.value &&
+    router.post(
+        route('contract.contracts.assets.store', joinId.value),
+        { asset_ids: [props.asset.id] },
+        { preserveScroll: true, onSuccess: () => (joinId.value = '') },
+    );
+const leaveContract = (contract: AssetContract) =>
+    confirm(t('contracts.confirm_remove_from', { no: contract.contract_no })) &&
+    router.delete(route('contract.contracts.assets.destroy', [contract.id, props.asset.id]), { preserveScroll: true });
 
 const money = (baht: string | null) =>
     baht === null ? t('common.none') : Number(baht).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -312,7 +333,9 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                     <li v-for="(entry, i) in partHistory" :key="i" class="flex flex-wrap items-center justify-between gap-2 px-4 py-2">
                         <span>
                             {{ t(`part_history.${entry.kind}`, { part: entry.part, serial: entry.serial ?? '-', date: dateTime(entry.at) }) }}
-                            <span v-if="entry.disposition" class="ml-1 text-xs text-muted-foreground">({{ t(`close.dispositions.${entry.disposition}`) }})</span>
+                            <span v-if="entry.disposition" class="ml-1 text-xs text-muted-foreground"
+                                >({{ t(`close.dispositions.${entry.disposition}`) }})</span
+                            >
                             <span v-if="entry.problem" class="block text-xs text-muted-foreground">{{ entry.problem }}</span>
                         </span>
                         <span class="flex items-center gap-2 text-xs text-muted-foreground">
@@ -368,10 +391,35 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                                 >{{ contract.starts_on }} – {{ contract.ends_on }} · {{ contract.service_window }}</span
                             >
                         </span>
-                        <ContractPhaseBadge :phase="contract.phase" />
+                        <span class="flex items-center gap-3">
+                            <ContractPhaseBadge :phase="contract.phase" />
+                            <button
+                                v-if="contractEdit?.removable.includes(contract.id)"
+                                type="button"
+                                class="text-xs text-red-700 underline-offset-4 hover:underline dark:text-red-400"
+                                @click="leaveContract(contract)"
+                            >
+                                {{ t('contracts.remove') }}
+                            </button>
+                        </span>
                     </li>
                 </ul>
                 <p v-else class="text-sm text-muted-foreground">{{ t('contracts.no_asset_contracts') }}</p>
+                <div v-if="contractEdit" class="flex flex-wrap items-center gap-2">
+                    <template v-if="contractEdit.joinable.length">
+                        <select v-model="joinId" class="h-9 min-w-0 max-w-full rounded-md border border-input bg-transparent px-3 text-sm sm:w-96">
+                            <option value="">{{ t('contracts.pick_contract') }}</option>
+                            <option v-for="c in contractEdit.joinable" :key="c.id" :value="c.id">
+                                {{ c.contract_no }} {{ c.title }} ({{ c.starts_on }} – {{ c.ends_on }})
+                            </option>
+                        </select>
+                        <Button size="sm" variant="outline" :disabled="!joinId" @click="joinContract"
+                            ><Plus class="h-4 w-4" />{{ t('contracts.add_to_contract') }}</Button
+                        >
+                    </template>
+                    <p v-else class="text-xs text-muted-foreground">{{ t('contracts.no_joinable') }}</p>
+                </div>
+                <InputError :message="contractError" />
             </section>
 
             <section v-if="asset.notes" class="space-y-2">

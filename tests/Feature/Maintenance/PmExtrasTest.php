@@ -100,7 +100,7 @@ it('keeps site photos of an asset while the round runs, served only through the 
 
     // a closed round keeps its photos
     $this->actingAs($this->tech)->post($url, ['photo' => UploadedFile::fake()->image('after.jpg')]);
-    $visit->update(['status' => PmVisit::STATUS_COMPLETED]);
+    $visit->update(['status' => PmVisit::STATUS_CLOSED]);
     $this->actingAs($this->tech)->delete("{$url}/".Media::first()->id)->assertSessionHasErrors('photo');
     $this->actingAs($this->tech)->post($url, ['photo' => UploadedFile::fake()->image('late.jpg')])->assertSessionHasErrors('photo');
 });
@@ -117,16 +117,17 @@ it('shows a customer account the PM rounds of its own customer only, read only',
 
     $customerUser = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
 
+    // The only PM menu a customer account has: the reports given to its customer.
     $this->actingAs($customerUser)->get('/dashboard')
         ->assertInertia(fn (Assert $page) => $page->where('navigation', fn ($items) => collect($items)->pluck('href')
-            ->filter(fn ($href) => str_contains($href, '/pm-'))->values()->all() === []));
+            ->filter(fn ($href) => str_contains($href, '/pm-'))->map(fn ($href) => parse_url($href, PHP_URL_PATH))->values()->all() === ['/pm-customer-reports']));
 
     $this->actingAs($customerUser)->get('/pm-visits?status=all')
         ->assertInertia(fn (Assert $page) => $page->where('visits.total', 4)->where('customers', [])->where('assignees', []));
     $this->actingAs($customerUser)->get("/pm-visits/{$mine->ulid}")
         ->assertInertia(fn (Assert $page) => $page
             ->where('visit.plan.can_view', true)
-            ->where('can', ['update' => false, 'start' => false, 'perform' => false, 'cancel' => false, 'openTicket' => false]));
+            ->where('can', ['update' => false, 'start' => false, 'perform' => false, 'cancel' => false, 'openTicket' => false, 'editItems' => false, 'share' => false]));
     $this->actingAs($customerUser)->get("/pm-visits/{$theirs->ulid}")->assertForbidden();
     $this->actingAs($customerUser)->get('/pm-calendar?month=2026-06')
         ->assertInertia(fn (Assert $page) => $page->has('visits', 1));
@@ -135,7 +136,7 @@ it('shows a customer account the PM rounds of its own customer only, read only',
     $this->actingAs($customerUser)->get("/pm-plans/{$this->plan->id}")->assertOk();
     $this->actingAs($customerUser)->get("/pm-plans/{$otherPlan->id}")->assertForbidden();
     $this->actingAs($customerUser)->get('/pm-checklists')->assertForbidden();
-    $this->actingAs($customerUser)->post("/pm-visits/{$mine->ulid}/complete")->assertForbidden();
+    $this->actingAs($customerUser)->post("/pm-visits/{$mine->ulid}/submit")->assertForbidden();
 });
 
 // --- calendar ----------------------------------------------------------------------

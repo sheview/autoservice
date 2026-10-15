@@ -18,14 +18,16 @@ class RenderPdf
 
     /**
      * @param  array<string, mixed>  $data
+     * @param  string|null  $footer  HTML printed on every page (page numbers), see Gotenberg::htmlToPdf()
+     * @param  bool  $download  ask the browser to save the file rather than show it
      */
-    public function handle(string $view, array $data, string $fileName): Response
+    public function handle(string $view, array $data, string $fileName, ?string $footer = null, bool $download = false): Response
     {
-        $pdf = $this->gotenberg->htmlToPdf(view($view, $data)->render());
+        $pdf = $this->gotenberg->htmlToPdf(view($view, $data)->render(), $footer);
 
         return response($pdf, 200, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="'.addslashes($fileName).'"',
+            'Content-Disposition' => ($download ? 'attachment' : 'inline').'; filename="'.addslashes($fileName).'"',
             'Cache-Control' => 'private, no-store',
         ]);
     }

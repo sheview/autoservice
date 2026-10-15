@@ -5,6 +5,7 @@ namespace App\Modules\Service\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
+use App\Modules\Service\Actions\BlankTicketSheet;
 use App\Modules\Service\Actions\TicketSheet;
 use App\Modules\Service\Models\Ticket;
 use Illuminate\Http\RedirectResponse;
@@ -25,6 +26,19 @@ class TicketPrintController extends Controller
         Gate::authorize('view', $ticket);
 
         return Inertia::render('Service/Tickets/Print', $sheet->handle($ticket, $request->user()));
+    }
+
+    /** An empty job sheet to fill in by hand away from the system: staff who see tickets. */
+    public function blank(Request $request, BlankTicketSheet $sheet, RenderPdf $renderPdf): HttpResponse|RedirectResponse
+    {
+        Gate::authorize('tickets.view');
+        abort_if($request->user()->customer_id !== null, 403);
+
+        try {
+            return $renderPdf->handle('documents.ticket', $sheet->handle(), 'blank-ticket-form.pdf');
+        } catch (PdfUnavailable) {
+            return back()->with('error', __('document.unavailable'));
+        }
     }
 
     public function pdf(Request $request, Ticket $ticket, TicketSheet $sheet, RenderPdf $renderPdf): HttpResponse|RedirectResponse

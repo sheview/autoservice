@@ -18,7 +18,10 @@ use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\CheckoutItem;
+use App\Modules\Contract\Actions\AddAssetToContracts;
+use App\Modules\Contract\Actions\ContractNumbersByAsset;
 use App\Modules\Contract\Actions\ContractsForAsset;
+use App\Modules\Contract\Actions\EditableContracts;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\AddAttachments;
 use App\Modules\Document\Support\Attachments;
@@ -37,6 +40,7 @@ use App\Modules\Service\Actions\TicketsForAsset;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -142,15 +146,20 @@ class AssetController extends Controller
         ]);
     }
 
-    public function store(AssetRequest $request, CreateAsset $createAsset): RedirectResponse
+    public function store(AssetRequest $request, CreateAsset $createAsset, AddAssetToContracts $addToContracts): RedirectResponse
     {
-        $asset = $createAsset->handle(
-            $request->assetData(),
-            $request->serials(),
-            $request->attachments(),
-            $request->handedOut(),
-            $request->user(),
-        );
+        $asset = DB::transaction(function () use ($request, $createAsset, $addToContracts) {
+            $asset = $createAsset->handle(
+                $request->assetData(),
+                $request->serials(),
+                $request->attachments(),
+                $request->handedOut(),
+                $request->user(),
+            );
+            $addToContracts->handle($asset->id, $request->contractIds());
+
+            return $asset;
+        });
 
         return redirect()->route('asset.assets.show', $asset)->with('success', __('asset.assets.created', ['code' => $asset->asset_code]));
     }
@@ -188,7 +197,7 @@ class AssetController extends Controller
 
         $asset->load(['category', 'branch:id,name', 'serials']);
         $user = $request->user();
-        $showContracts = $this->modules->enabled('contract') && $user->can('contracts.view');
+        $contracts = $this->modules->enabled('contract') && $user->can('contracts.view') ? $contractsForAsset->handle($asset->id) : null;
         $serviceOn = $this->modules->enabled('service');
         $available = max(0, (int) $asset->quantity - ($heldQuantities->handle([$asset->id])[$asset->id] ?? 0));
 
@@ -199,7 +208,7 @@ class AssetController extends Controller
             'ipPage' => $ip ? route('asset.ip-check.ips.show', ['subnet' => (int) explode(':', $ip['key'])[0], 'ip' => $ip['ip']]) : null,
             'asset' => [
                 ...$asset->only([
-                    'ulid', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit', 'property_no', 'status',
+                    'id', 'ulid', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit', 'property_no', 'status',
                     'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes',
                 ]),
                 'serials' => $asset->serials->pluck('serial_number'),
@@ -220,7 +229,9 @@ class AssetController extends Controller
             'photos' => PhotoSlots::list($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
             'attachments' => Attachments::list($asset, $asset->attachmentCollection(), fn (int $id) => route('asset.assets.attachments.show', [$asset, $id])),
             // null = the user cannot see contracts here (module off or no contracts.view)
-            'contracts' => $showContracts ? $contractsForAsset->handle($asset->id) : null,
+            'contracts' => $contracts,
+            // null = the user cannot put it into or take it out of contracts here
+            'contractEdit' => $contracts !== null && $asset->customer_id !== null ? $this->contractEdit($user, $asset, $contracts) : null,
             // null = the user cannot see tickets here (module off or no tickets.view)
             'tickets' => $serviceOn && $user->can('tickets.view') ? $ticketsForAsset->handle($asset->id) : null,
             // null = the user cannot see PM rounds here (module off or no pm-visits.view)
@@ -241,6 +252,24 @@ class AssetController extends Controller
                 'printLabel' => $this->modules->enabled('labeling') && $user->can('labels.print'),
             ],
         ]);
+    }
+
+    /**
+     * Contracts of the asset's customer it may be put into (running, not in yet) and those it may
+     * be taken out of: the ones the user may change (EditableContracts), as on the contract page.
+     *
+     * @param  list<array{id: int}>  $contracts  the contracts it is in
+     * @return array{joinable: list<array<string, mixed>>, removable: list<int>}|null
+     */
+    private function contractEdit(User $user, Asset $asset, array $contracts): ?array
+    {
+        $editable = app(EditableContracts::class);
+        $customerId = (int) $asset->customer_id;
+        $in = array_column($contracts, 'id');
+        $removable = array_values(array_intersect($in, array_column($editable->handle($user, [$customerId], runningOnly: false)[$customerId] ?? [], 'id')));
+        $joinable = array_values(array_filter($editable->handle($user, [$customerId])[$customerId] ?? [], fn (array $c) => ! in_array($c['id'], $in, true)));
+
+        return $user->can('contracts.update') && $user->can('assets.view') ? ['joinable' => $joinable, 'removable' => $removable] : null;
     }
 
     public function edit(Request $request, Asset $asset): Response
@@ -276,7 +305,9 @@ class AssetController extends Controller
 
         $query = $search->handle($request->user(), SearchAssets::filtersFrom($request));
 
-        return Excel::download($this->sheet($query), 'assets-'.now()->format('Ymd-His').'.xlsx');
+        $contractNos = $this->modules->enabled('contract') ? app(ContractNumbersByAsset::class)->handle($request->user()) : [];
+
+        return Excel::download($this->sheet($query, $contractNos), 'assets-'.now()->format('Ymd-His').'.xlsx');
     }
 
     /**
@@ -289,7 +320,7 @@ class AssetController extends Controller
         return Excel::download($this->sheet(Asset::query()->whereRaw('false')), 'asset-import-template.xlsx');
     }
 
-    private function sheet($query): AssetsExport
+    private function sheet($query, array $contractNos = []): AssetsExport
     {
         // Spec fields of every category (key => label), one Excel column each.
         $specFields = AssetCategory::orderBy('name')->get(['spec_fields'])
@@ -300,7 +331,7 @@ class AssetController extends Controller
 
         $customerCodes = collect($this->customers(withTrashed: true))->pluck('code', 'id')->all();
 
-        return new AssetsExport($query, $specFields, $customerCodes);
+        return new AssetsExport($query, $specFields, $customerCodes, $contractNos);
     }
 
     private function formProps(User $user, ?Asset $asset): array
@@ -319,6 +350,10 @@ class AssetController extends Controller
             'statuses' => Asset::STATUSES,
             // Creating only: the asset is already out with someone.
             'handedOutStatuses' => $asset ? [] : array_keys(AssetRequest::HANDED_OUT),
+            // Creating only: running contracts of each customer the user may put the new asset into.
+            'customerContracts' => $asset || ! $this->modules->enabled('contract')
+                ? (object) []
+                : (object) app(EditableContracts::class)->handle($user, array_column($this->customers(), 'id')),
             ...$this->suggestions->handle(),
         ];
     }

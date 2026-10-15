@@ -6,6 +6,7 @@ use App\Modules\Maintenance\Actions\StartPmVisit;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\AssignTicket;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
@@ -22,13 +23,13 @@ beforeEach(function () {
     $this->asset = createAsset(createAssetCategory(), ['name' => 'Core switch', 'customer_id' => $this->customer->id]);
 });
 
-/** The HTML page sent to Gotenberg by the last request. */
+/** The HTML page sent to Gotenberg by the last request (not its footer). */
 function sentHtml(): string
 {
     $html = '';
     Http::assertSent(function (HttpRequest $request) use (&$html) {
         foreach ($request->data() as $part) {
-            if (($part['name'] ?? null) === 'files') {
+            if (($part['name'] ?? null) === 'files' && ($part['filename'] ?? null) === 'index.html') {
                 $html = $part['contents'];
             }
         }
@@ -110,4 +111,33 @@ it('only makes documents the user may see', function () {
     $this->actingAs($this->helpdesk)->get("/tickets/{$theirs->ulid}/pdf")->assertNotFound();
 
     Http::assertNothingSent();
+});
+
+it('gives staff an empty job sheet to fill in by hand, with the company and boxes to tick', function () {
+    Http::fake(['gotenberg.test:3000/*' => Http::response('%PDF-1.7 blank', 200)]);
+    openTicket($this->helpdesk, ['title' => 'Real job', 'customer_id' => $this->customer->id]);
+
+    $this->actingAs($this->tech)->get('/tickets/blank-form')->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf')
+        ->assertHeader('Content-Disposition', 'inline; filename="blank-ticket-form.pdf"');
+
+    $html = sentHtml();
+    expect($html)
+        ->toContain(app(TenantContext::class)->tenant()->name)
+        ->toContain('TK ......')
+        ->toContain('(กรอกเลขที่ใบงานหลังบันทึกเข้าระบบ)')
+        ->toContain('ในสัญญา เลขที่')
+        ->toContain('วิกฤต')->toContain('โทรศัพท์')
+        // Nothing of a real ticket on it.
+        ->not->toContain('Real job')
+        ->not->toContain('TK0');
+
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => $this->customer->id]))->get('/tickets/blank-form')->assertForbidden();
+});
+
+it('says so when the empty job sheet cannot be made', function () {
+    Http::fake(fn () => throw new ConnectionException('refused'));
+
+    $this->actingAs($this->tech)->from('/tickets')->get('/tickets/blank-form')
+        ->assertRedirect('/tickets')->assertSessionHas('error', __('document.unavailable'));
 });

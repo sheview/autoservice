@@ -20,6 +20,7 @@ return [
         'warranty_before_purchase' => 'วันหมดประกันต้องไม่ก่อนวันที่ซื้อ',
         'ip_invalid' => 'IP Address ไม่ถูกต้อง เช่น 192.168.1.10',
         'mac_invalid' => 'MAC Address ไม่ถูกต้อง เช่น AA:BB:CC:DD:EE:FF',
+        'contract_not_allowed' => 'เลือกได้เฉพาะสัญญาที่มีผลอยู่หรือยังไม่เริ่มของลูกค้าเจ้าของทรัพย์สิน ที่คุณมีสิทธิ์แก้ไข',
     ],
 
     // Form fields that are not Excel columns.
@@ -28,6 +29,7 @@ return [
         'customer' => 'ลูกค้า',
         'holder_name' => 'ผู้ใช้งาน',
         'handed_out_on' => 'วันที่เบิก/ยืม',
+        'contracts' => 'สัญญา MA',
     ],
 
     // Issue/loan requests with lines (checkout-schema.md).
@@ -93,6 +95,7 @@ return [
         'created' => 'เพิ่มหมวดทรัพย์สินเรียบร้อยแล้ว',
         'updated' => 'บันทึกหมวดทรัพย์สินเรียบร้อยแล้ว',
         'deleted' => 'ลบหมวดทรัพย์สินเรียบร้อยแล้ว',
+        'standard_added' => 'เพิ่มหมวดมาตรฐาน :count หมวดแล้ว',
         'in_use' => 'ลบไม่ได้ เพราะยังมีทรัพย์สินอยู่ในหมวดนี้',
         'fields' => [
             'name' => 'ชื่อหมวด',
@@ -115,6 +118,8 @@ return [
         'unknown_category' => 'ไม่พบหมวด ":value"',
         'unknown_branch' => 'ไม่พบสาขา ":value"',
         'unknown_customer' => 'ไม่พบลูกค้า ":value"',
+        'unknown_contract' => 'ไม่พบสัญญา ":value" หรือคุณไม่มีสิทธิ์แก้ไขสัญญานี้',
+        'contract_other_customer' => 'สัญญา ":value" เป็นของลูกค้ารายอื่น ทรัพย์สินต้องเป็นของลูกค้าเจ้าของสัญญา',
         'branch_not_allowed' => 'คุณนำเข้าทรัพย์สินได้เฉพาะสาขาของตัวเอง',
         'code_deleted' => 'รหัส :code เป็นของทรัพย์สินที่ถูกลบไปแล้ว ใช้ซ้ำไม่ได้',
     ],
@@ -143,6 +148,7 @@ return [
         'purchase_price' => 'ราคาซื้อ (บาท)',
         'warranty_expires_at' => 'วันหมดประกัน',
         'notes' => 'หมายเหตุ',
+        'contracts' => 'สัญญา MA (เลขที่)',
     ],
 
     // IP management (เช็ค IP ว่าง)

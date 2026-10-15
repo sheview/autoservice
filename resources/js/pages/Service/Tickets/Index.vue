@@ -47,7 +47,7 @@ const props = defineProps<{
     priorities: string[];
     customers: { id: number; code: string; name: string }[];
     dueSoonHours: number;
-    can: { create: boolean };
+    can: { create: boolean; blankForm: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -80,9 +80,17 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('tickets.title')" :description="t('tickets.description')" />
-                <Button v-if="can.create" as-child>
-                    <Link :href="route('service.tickets.create')">{{ t('tickets.create') }}</Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <!-- An empty job sheet to fill in by hand away from the system -->
+                    <Button v-if="can.blankForm" variant="outline" as-child>
+                        <a :href="route('service.tickets.blank-form')" target="_blank" rel="noopener" :title="t('tickets.blank_form_hint')">{{
+                            t('tickets.blank_form')
+                        }}</a>
+                    </Button>
+                    <Button v-if="can.create" as-child>
+                        <Link :href="route('service.tickets.create')">{{ t('tickets.create') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

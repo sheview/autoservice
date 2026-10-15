@@ -18,6 +18,8 @@ class AssetSheet
     public const COLUMNS = [
         'asset_code', 'name', 'category', 'branch', 'customer', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit',
         'property_no', 'status', 'location', 'ip_address', 'mac_address', 'used_by', 'department', 'purchased_at', 'purchase_price', 'warranty_expires_at', 'notes',
+        // Contract numbers it is in (Contract module). Importing only adds to contracts, never takes it out.
+        'contracts',
     ];
 
     /** Several serial numbers of one asset share a cell, one per line or separated by commas. */

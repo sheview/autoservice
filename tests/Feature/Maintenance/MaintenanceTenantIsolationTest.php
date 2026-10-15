@@ -44,7 +44,7 @@ it('keeps checklists, plans, rounds and their numbers per tenant', function () {
     $this->actingAs($admin)->get("/pm-plans/{$theirPlan->id}")->assertNotFound();
     $this->actingAs($admin)->delete("/pm-plans/{$theirPlan->id}")->assertNotFound();
     $this->actingAs($admin)->get("/pm-visits/{$theirVisit->ulid}")->assertNotFound();
-    $this->actingAs($admin)->post("/pm-visits/{$theirVisit->ulid}/cancel", ['reason' => 'x'])->assertNotFound();
+    $this->actingAs($admin)->post("/pm-visits/{$theirVisit->ulid}/move", ['action' => 'cancel', 'note' => 'x'])->assertNotFound();
     $this->actingAs($admin)->put("/pm-checklists/{$theirChecklist->id}", ['name' => 'x', 'items' => []])->assertNotFound();
     // an item of another tenant, even under my own round
     $this->actingAs($admin)->put("/pm-visits/{$myVisit->ulid}/items/{$theirItem->id}", ['result' => 'ok'])->assertNotFound();
