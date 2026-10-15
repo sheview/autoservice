@@ -86,3 +86,21 @@ it('leaves office use out of the customer\'s copy, and shows the same HTML on sc
 
     $this->actingAs(userWithRole('technician', tenant: createTenant('other')))->get("{$this->url}/sheet")->assertNotFound();
 });
+
+it('prints from the browser without the PDF service: the whole sheet, one piece of equipment, or the customer\'s copy', function () {
+    $print = $this->actingAs($this->admin)->get("{$this->url}/sheet?print=1")->assertOk()->getContent();
+    expect($print)->toContain('window.print()')->toContain('class="sign-block"')->toContain('Response Time (Office Use Only)')
+        ->and(substr_count($print, 'class="page"'))->toBe(3);
+
+    // one piece of equipment: its page only, no summary
+    $ups = $this->visit->items()->orderBy('id')->first();
+    $one = $this->actingAs($this->admin)->get("{$this->url}/sheet?print=1&item={$ups->id}")->assertOk()->getContent();
+    expect($one)->toContain('window.print()')->toContain('UPS ชั้น 2')->not->toContain('UPS ชั้น 3')->not->toContain('PC บัญชี 1');
+
+    // the customer's copy: no office use
+    expect($this->actingAs($this->admin)->get("{$this->url}/sheet?print=1&copy=customer")->getContent())
+        ->not->toContain('Response Time (Office Use Only)')->toContain('สำเนาลูกค้า');
+
+    Http::assertNothingSent();
+    $this->actingAs(userWithRole('technician'))->get("{$this->url}/sheet?print=1")->assertForbidden();
+});

@@ -15,7 +15,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * "ออกรายงานสรุปรอบ": the approved work orders of a customer or a plan within a period as one PDF
- * (PmRoundReport). Staff who may see PM reports.
+ * (PmRoundReport) — or, with ?print=1, as one page that opens the browser's print dialog (no PDF
+ * service needed). Staff who may see PM reports.
  */
 class PmRoundReportController extends Controller
 {
@@ -34,13 +35,22 @@ class PmRoundReportController extends Controller
             Gate::authorize('view', PmPlan::findOrFail($data['plan']));
         }
 
+        $filters = [
+            'customer_id' => $data['customer_id'] ?? null,
+            'plan_id' => $data['plan'] ?? null,
+            'from' => $data['from'],
+            'to' => $data['to'],
+        ];
+
         try {
-            $made = $report->handle([
-                'customer_id' => $data['customer_id'] ?? null,
-                'plan_id' => $data['plan'] ?? null,
-                'from' => $data['from'],
-                'to' => $data['to'],
-            ]);
+            if ($request->boolean('print')) {
+                $printable = $report->printable($filters);
+
+                return response()->view('documents.pm-round-print', [
+                    'cover' => $printable['cover'], 'sheets' => $printable['sheets'], 'forBrowser' => true,
+                ]);
+            }
+            $made = $report->handle($filters);
         } catch (ValidationException $e) {
             return back()->with('error', collect($e->errors())->flatten()->first());
         } catch (PdfUnavailable) {

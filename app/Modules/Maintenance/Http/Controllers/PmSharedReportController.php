@@ -103,8 +103,14 @@ class PmSharedReportController extends Controller
 
         ['visit' => $visit, 'version' => $version] = $found;
 
-        return $this->context->run($tenant, function () use ($visit, $version, $itemId, $download) {
+        $print = ! $download && $request->boolean('print');
+
+        return $this->context->run($tenant, function () use ($visit, $version, $itemId, $download, $print) {
             $data = $this->document->handle($visit, $version, $itemId, customerCopy: true);
+            // Printed from the browser: the same sheet, without the PDF service.
+            if ($print) {
+                return response()->view('documents.pm-sheet', [...$data, 'forBrowser' => true]);
+            }
             $assetCode = $itemId !== null ? ($data['items'][0]['asset']['asset_code'] ?? null) : null;
 
             try {

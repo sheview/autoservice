@@ -165,3 +165,20 @@ it('lets only who may share make links, and lists published reports to who may s
         ->assertInertia(fn (Assert $page) => $page->where('reports.total', 1));
     $this->actingAs($this->tech)->get('/pm-customer-reports')->assertForbidden();
 });
+
+it('lets the customer print the shared report from the browser, even when downloading is off', function () {
+    ($this->move)($this->admin, 'publish');
+    $path = ($this->share)(['allow_download' => false]);
+    ($this->guest)();
+    Http::fake(['gotenberg.test:3000/*' => Http::response('%PDF-1.7 shared', 200)]);
+
+    $page = $this->get("{$path}/pdf?print=1")->assertOk()->assertHeader('Content-Type', 'text/html; charset=UTF-8')->getContent();
+    expect($page)->toContain('window.print()')->toContain('UPS Alpha')->not->toContain('Response Time (Office Use Only)');
+    $itemId = $this->visit->items()->value('id');
+    expect($this->get("{$path}/equipment/{$itemId}/pdf?print=1")->assertOk()->getContent())->toContain('window.print()');
+    Http::assertNothingSent();
+    expect(PmVisitEvent::where('type', 'share_viewed')->count())->toBe(2);
+
+    $this->travelTo('2026-02-18 00:00:01');
+    $this->get("{$path}/pdf?print=1")->assertNotFound();
+});

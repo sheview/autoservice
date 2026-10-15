@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp, FileDown } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, FileDown, Printer } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface VisitRow {
@@ -111,6 +111,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     class="shadow-xs inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm hover:bg-muted"
                 >
                     <FileDown class="h-4 w-4" />{{ t('pm_reports.round_report') }}
+                </a>
+                <a
+                    v-if="filters.customer_id"
+                    :href="route('maintenance.reports.round', { customer_id: filters.customer_id, from: filters.from, to: filters.to, print: 1 })"
+                    target="_blank"
+                    rel="noopener"
+                    class="shadow-xs inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm hover:bg-muted"
+                >
+                    <Printer class="h-4 w-4" />{{ t('pm_reports.round_print') }}
                 </a>
                 <span v-else class="self-center text-xs text-muted-foreground">{{ t('pm_reports.round_report_hint') }}</span>
             </div>

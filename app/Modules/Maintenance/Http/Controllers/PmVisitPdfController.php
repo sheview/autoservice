@@ -34,17 +34,18 @@ class PmVisitPdfController extends Controller
     }
 
     /**
-     * The same sheet as HTML in the browser ("view"): works without the PDF service, prints from the
-     * browser, and shows the status badge on screen only.
+     * The same sheet as HTML in the browser ("view"): works without the PDF service, and shows the
+     * status badge on screen only. ?print=1 opens the browser's print dialog ("พิมพ์"); ?item= the
+     * sheet of one piece of equipment.
      */
     public function sheet(Request $request, PmVisit $visit): HttpResponse
     {
         Gate::authorize('view', $visit);
 
         $version = $this->versionFor->handle($visit, $request->user(), $request->integer('version') ?: null);
-        $data = $this->document->handle($visit, $version, null, $this->customerCopy($request), screen: true);
+        $data = $this->document->handle($visit, $version, $request->integer('item') ?: null, $this->customerCopy($request), screen: true);
 
-        return response()->view('documents.pm-sheet', [...$data, 'forBrowser' => true, 'autoPrint' => false]);
+        return response()->view('documents.pm-sheet', [...$data, 'forBrowser' => true, 'autoPrint' => $request->boolean('print')]);
     }
 
     private function render(Request $request, PmVisit $visit, ?int $itemId): HttpResponse|RedirectResponse

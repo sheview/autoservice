@@ -14,6 +14,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
+import { Printer } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 interface Signature {
@@ -210,6 +211,20 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 <div class="flex flex-wrap gap-2">
                     <Button variant="outline" as-child>
                         <a :href="route('maintenance.visits.pdf', visit.ulid)" target="_blank" rel="noopener">{{ t('pm_visits.pdf') }}</a>
+                    </Button>
+                    <!-- Printed from the browser: works without the PDF service -->
+                    <Button variant="outline" as-child>
+                        <a :href="route('maintenance.visits.sheet', { visit: visit.ulid, print: 1 })" target="_blank" rel="noopener"
+                            ><Printer class="mr-1.5 h-4 w-4" />{{ t('pm_visits.print') }}</a
+                        >
+                    </Button>
+                    <Button variant="outline" as-child>
+                        <a
+                            :href="route('maintenance.visits.sheet', { visit: visit.ulid, print: 1, copy: 'customer' })"
+                            target="_blank"
+                            rel="noopener"
+                            >{{ t('pm_visits.print_customer') }}</a
+                        >
                     </Button>
                     <Button v-if="can.start || can.perform" variant="outline" as-child>
                         <Link :href="route('maintenance.field.visit', visit.ulid)">{{ t('pm_visits.field_page') }}</Link>
@@ -492,6 +507,13 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                 rel="noopener"
                                 class="text-xs text-primary underline-offset-4 hover:underline"
                                 >PDF</a
+                            >
+                            <a
+                                :href="route('maintenance.visits.sheet', { visit: visit.ulid, version: version.version, print: 1 })"
+                                target="_blank"
+                                rel="noopener"
+                                class="ml-3 text-xs text-primary underline-offset-4 hover:underline"
+                                >{{ t('pm_visits.print') }}</a
                             >
                         </li>
                     </ul>

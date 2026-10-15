@@ -70,6 +70,14 @@ const destroy = () => {
                             >{{ t('pm_plans.round_report') }}</a
                         >
                     </Button>
+                    <Button variant="outline" as-child>
+                        <a
+                            :href="route('maintenance.reports.round', { plan: plan.id, from: plan.starts_on, to: plan.ends_on, print: 1 })"
+                            target="_blank"
+                            rel="noopener"
+                            >{{ t('pm_plans.round_print') }}</a
+                        >
+                    </Button>
                     <Button v-if="can.update" variant="outline" as-child>
                         <Link :href="route('maintenance.plans.edit', plan.id)">{{ t('common.edit') }}</Link>
                     </Button>

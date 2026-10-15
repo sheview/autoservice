@@ -14,7 +14,7 @@ import { passRows, type RowItem } from '@/lib/pmRows';
 import type { Answer, TemplateField } from '@/lib/pmTemplate';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ChevronRight, LogIn, LogOut, MapPin } from 'lucide-vue-next';
+import { ChevronRight, LogIn, LogOut, MapPin, Printer } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 
 interface FieldVisit {
@@ -320,9 +320,16 @@ const errors = computed(() => page.props.errors as Record<string, string>);
                 </ul>
             </section>
 
-            <Button variant="outline" class="h-12 w-full" as-child>
-                <Link :href="route('maintenance.field.sign', visit.ulid)">{{ t('pm_field.submit') }}</Link>
-            </Button>
+            <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+                <Button variant="outline" class="h-12" as-child>
+                    <Link :href="route('maintenance.field.sign', visit.ulid)">{{ t('pm_field.submit') }}</Link>
+                </Button>
+                <Button variant="outline" class="h-12" as-child>
+                    <a :href="route('maintenance.visits.sheet', { visit: visit.ulid, print: 1 })" target="_blank" rel="noopener"
+                        ><Printer class="mr-1.5 h-4 w-4" />{{ t('pm_field.print') }}</a
+                    >
+                </Button>
+            </div>
         </div>
     </AppLayout>
 </template>

@@ -9,7 +9,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { FileText, QrCode } from 'lucide-vue-next';
+import { FileText, Printer, QrCode } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /**
@@ -61,11 +61,18 @@ const errors = computed(() => page.props.errors as Record<string, string>);
         <div class="mx-auto max-w-2xl space-y-5 p-4 pb-24">
             <div class="flex flex-wrap items-center justify-between gap-2">
                 <h1 class="text-lg font-semibold">{{ t('pm_sign.title') }}</h1>
-                <Button variant="outline" size="sm" as-child>
-                    <a :href="route('maintenance.visits.sheet', visit.ulid)" target="_blank" rel="noopener"
-                        ><FileText class="mr-1 h-4 w-4" />{{ t('pm_sign.sheet') }}</a
-                    >
-                </Button>
+                <div class="flex gap-2">
+                    <Button variant="outline" size="sm" as-child>
+                        <a :href="route('maintenance.visits.sheet', visit.ulid)" target="_blank" rel="noopener"
+                            ><FileText class="mr-1 h-4 w-4" />{{ t('pm_sign.sheet') }}</a
+                        >
+                    </Button>
+                    <Button variant="outline" size="sm" as-child>
+                        <a :href="route('maintenance.visits.sheet', { visit: visit.ulid, print: 1 })" target="_blank" rel="noopener"
+                            ><Printer class="mr-1 h-4 w-4" />{{ t('pm_visits.print') }}</a
+                        >
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

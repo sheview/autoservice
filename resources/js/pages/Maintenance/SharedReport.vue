@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { Head } from '@inertiajs/vue3';
-import { Download, FileText, ShieldCheck } from 'lucide-vue-next';
+import { Download, FileText, Printer, ShieldCheck } from 'lucide-vue-next';
 
 // A customer's link to a published PM report: no sign-in, so no app layout or navigation. Not found reads like any other.
 defineProps<{
@@ -76,6 +76,11 @@ defineProps<{
                             <Button variant="outline" as-child>
                                 <a :href="report.pdf" target="_blank" rel="noopener"><FileText class="h-4 w-4" />{{ t('pm_shared.open_pdf') }}</a>
                             </Button>
+                            <Button variant="outline" as-child>
+                                <a :href="`${report.pdf}?print=1`" target="_blank" rel="noopener"
+                                    ><Printer class="h-4 w-4" />{{ t('pm_shared.print') }}</a
+                                >
+                            </Button>
                             <Button v-if="report.allow_download" as-child>
                                 <a :href="`${report.pdf}?download=1`"><Download class="h-4 w-4" />{{ t('pm_shared.download_pdf') }}</a>
                             </Button>
@@ -103,6 +108,13 @@ defineProps<{
                                 <a :href="item.pdf" target="_blank" rel="noopener" class="text-xs text-primary underline-offset-4 hover:underline">{{
                                     t('pm_shared.equipment_pdf')
                                 }}</a>
+                                <a
+                                    :href="`${item.pdf}?print=1`"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="text-xs text-primary underline-offset-4 hover:underline"
+                                    >{{ t('pm_shared.print') }}</a
+                                >
                             </div>
                         </li>
                     </ul>

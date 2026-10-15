@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
  * The round report for the customer: the approved work orders of a customer (or of one plan) due
  * within a period (by due date, as the PM report page), as one PDF — a cover listing them with their results, then each one's sheet
  * (the version given to the customer, else the newest approved; the customer's copy), joined by
- * the PDF service.
+ * the PDF service — or all of it as one page to print from the browser (printable).
  */
 class PmRoundReport
 {
@@ -33,6 +33,28 @@ class PmRoundReport
      * @throws ValidationException when no approved work order falls within
      */
     public function handle(array $filters): array
+    {
+        $report = $this->printable($filters);
+
+        $pdfs = [$this->gotenberg->htmlToPdf(view('documents.pm-round-cover', $report['cover'])->render())];
+        foreach ($report['sheets'] as $i => $sheet) {
+            [$visit, $version] = $report['documents'][$i];
+            $pdfs[] = $this->gotenberg->htmlToPdf(view('documents.pm-sheet', $sheet)->render(), $this->document->footer($visit, $version));
+        }
+
+        return ['pdf' => $this->gotenberg->mergePdfs($pdfs), 'file' => $report['file'], 'count' => count($report['sheets'])];
+    }
+
+    /**
+     * The report's data: the cover (documents.pm-round-cover-body) and each work order's sheet
+     * (PmReportDocument), as pm-round-print shows them.
+     *
+     * @param  array{customer_id?: int|null, plan_id?: int|null, from: string, to: string}  $filters
+     * @return array{cover: array<string, mixed>, sheets: list<array<string, mixed>>, documents: list<array{0: PmVisit, 1: mixed}>, file: string}
+     *
+     * @throws ValidationException when no approved work order falls within
+     */
+    public function printable(array $filters): array
     {
         $visits = PmVisit::query()
             ->whereIn('status', PmVisit::REPORTED_STATUSES)
@@ -59,7 +81,7 @@ class PmRoundReport
         $tenant = $this->context->tenant();
         $logo = $tenant?->getFirstMedia(CompanyProfile::LOGO);
 
-        $pdfs = [$this->gotenberg->htmlToPdf(view('documents.pm-round-cover', [
+        $cover = [
             'company' => $tenant?->name,
             'logo' => $logo ? 'data:'.$logo->mime_type.';base64,'.base64_encode(stream_get_contents($logo->stream())) : null,
             'customer' => $customer,
@@ -77,18 +99,18 @@ class PmRoundReport
                 'not_inspected' => $visit->not_inspected_count,
                 'signed' => $visit->locked_at !== null,
             ])->all(),
-        ])->render())];
+        ];
 
+        $sheets = [];
+        $documents = [];
         foreach ($visits as $visit) {
             $version = $visit->versions()->where('version', $visit->published_version ?: $visit->current_version)->first();
-            $pdfs[] = $this->gotenberg->htmlToPdf(
-                view('documents.pm-sheet', $this->document->handle($visit, $version, null, customerCopy: true))->render(),
-                $this->document->footer($visit, $version),
-            );
+            $sheets[] = $this->document->handle($visit, $version, null, customerCopy: true);
+            $documents[] = [$visit, $version];
         }
 
         $name = preg_replace('/[^A-Za-z0-9_.-]+/', '-', 'PM-round-'.($customers[$customerId]['code'] ?? 'all').'-'.$filters['from'].'-'.$filters['to']);
 
-        return ['pdf' => $this->gotenberg->mergePdfs($pdfs), 'file' => $name.'.pdf', 'count' => $visits->count()];
+        return ['cover' => $cover, 'sheets' => $sheets, 'documents' => $documents, 'file' => $name.'.pdf'];
     }
 }

@@ -159,6 +159,14 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
                     class="text-xs text-primary underline-offset-4 hover:underline"
                     >{{ t('pm_visits.equipment_pdf') }}</a
                 >
+                <a
+                    v-if="item.result !== 'pending'"
+                    :href="route('maintenance.visits.sheet', { visit: visitUlid, item: item.id, print: 1 })"
+                    target="_blank"
+                    rel="noopener"
+                    class="text-xs text-primary underline-offset-4 hover:underline"
+                    >{{ t('pm_visits.print') }}</a
+                >
                 <button
                     v-if="item.removable"
                     type="button"

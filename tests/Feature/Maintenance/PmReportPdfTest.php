@@ -188,6 +188,21 @@ it('joins the approved work orders of a customer within a period into one PDF, a
         ->assertSessionHasErrors('customer_id');
 });
 
+it('prints the round report from the browser: the cover, then each approved sheet, without the PDF service', function () {
+    $query = ['customer_id' => $this->customer->id, 'from' => '2026-01-01', 'to' => '2026-12-31', 'print' => 1];
+    $this->actingAs($this->helpdesk)->from('/pm-reports')->get(route('maintenance.reports.round', $query))
+        ->assertRedirect('/pm-reports')->assertSessionHas('error', __('maintenance.round_report.empty'));
+
+    ($this->approve)();
+    $page = $this->actingAs($this->helpdesk)->get(route('maintenance.reports.round', $query))->assertOk()->getContent();
+    expect($page)->toContain('window.print()')->toContain('รายงานสรุปการบำรุงรักษาเชิงป้องกัน')
+        ->and(substr_count($page, 'class="round-sheet"'))->toBe(1)
+        ->and(strpos($page, 'รายงานสรุปการบำรุงรักษาเชิงป้องกัน'))->toBeLessThan(strpos($page, 'UPS Alpha'))
+        // the customer's copy
+        ->and($page)->not->toContain('Response Time (Office Use Only)');
+    Http::assertNothingSent();
+});
+
 it('says so when the PDF service cannot join the round report', function () {
     ($this->approve)();
     // another host: the fakes of beforeEach answer every request to the first one

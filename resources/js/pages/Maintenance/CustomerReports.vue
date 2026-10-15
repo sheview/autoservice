@@ -124,6 +124,13 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                     class="text-primary underline-offset-4 hover:underline"
                                     >{{ t('pm_customer_reports.open', { version: report.published_version }) }}</a
                                 >
+                                <a
+                                    :href="route('maintenance.visits.sheet', { visit: report.ulid, print: 1 })"
+                                    target="_blank"
+                                    rel="noopener"
+                                    class="ml-3 text-primary underline-offset-4 hover:underline"
+                                    >{{ t('pm_visits.print') }}</a
+                                >
                             </td>
                         </tr>
                         <tr v-if="reports.data.length === 0">
