@@ -12,6 +12,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Reporting\Exports\ReportSheet;
 use App\Modules\Reporting\Support\ReportPeriod;
 use App\Modules\RoomAccess\Actions\RoomCalendar;
+use App\Modules\RoomAccess\Actions\RoomOptions;
 use App\Modules\RoomAccess\Actions\RoomVisitReport;
 use App\Modules\RoomAccess\Models\RoomAccessRequest;
 use App\Modules\RoomAccess\Models\ServerRoom;
@@ -138,10 +139,6 @@ class RoomReportController extends Controller
     /** @return list<array{ulid: string, name: string, customer: string}> */
     private function rooms(): array
     {
-        $customers = app(CustomerLabelNames::class)->handle();
-
-        return ServerRoom::query()->orderBy('name')->get()
-            ->map(fn (ServerRoom $room) => ['ulid' => $room->ulid, 'name' => $room->name, 'customer' => $customers[$room->customer_id] ?? '-'])
-            ->sortBy(fn (array $room) => $room['customer'].' '.$room['name'])->values()->all();
+        return app(RoomOptions::class)->handle();
     }
 }

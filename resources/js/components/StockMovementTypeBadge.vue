@@ -10,6 +10,7 @@ const classes: Record<string, string> = {
     spare: 'bg-teal-100 text-teal-800 dark:bg-teal-950 dark:text-teal-200',
     return: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200',
     adjust: 'bg-muted text-foreground',
+    void: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
 };
 </script>
 

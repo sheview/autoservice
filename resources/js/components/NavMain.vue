@@ -67,12 +67,12 @@ const isOpen = (section: { label: string | null; items: NavItem[] }) =>
         </SidebarGroupLabel>
         <SidebarMenu v-show="isOpen(section)">
             <SidebarMenuItem v-for="item in section.items" :key="item.href">
-                <!-- Bold, a size up from the default, 20px icons; the page open now in the brand's violet. -->
+                <!-- Bold, a size up from the default, 20px icons; the page open now as a violet pill, as the logo. -->
                 <SidebarMenuButton
                     as-child
                     :is-active="isActive(item)"
                     :tooltip="item.title"
-                    class="h-9 text-[15px] font-semibold text-foreground/85 data-[active=true]:bg-violet-50 data-[active=true]:font-semibold data-[active=true]:text-violet-700 dark:data-[active=true]:bg-violet-950 dark:data-[active=true]:text-violet-200 [&>svg]:size-5"
+                    class="h-9 text-[15px] font-semibold text-sidebar-foreground/90 data-[active=true]:bg-gradient-to-r data-[active=true]:from-violet-500 data-[active=true]:to-indigo-500 data-[active=true]:font-semibold data-[active=true]:text-white data-[active=true]:shadow-md data-[active=true]:shadow-black/25 [&>svg]:size-5"
                 >
                     <Link :href="item.href">
                         <component :is="item.icon" />

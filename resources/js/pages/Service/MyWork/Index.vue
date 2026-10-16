@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import StatTile from '@/components/StatTile.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +10,24 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { ChevronLeft, ChevronRight, CircleCheck, Lock, Plus } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import {
+    AlarmClock,
+    CalendarCheck,
+    CalendarDays,
+    ChevronLeft,
+    ChevronRight,
+    CircleCheck,
+    ClipboardList,
+    Lock,
+    Plus,
+    Server,
+    UserRound,
+} from 'lucide-vue-next';
+import { computed, reactive, ref } from 'vue';
 
 interface WorkItem {
     key: string;
-    kind: 'ticket' | 'pm' | 'loan' | 'personal' | 'contract';
+    kind: 'ticket' | 'pm' | 'loan' | 'personal' | 'contract' | 'pm_projected' | 'room';
     id?: number;
     title: string;
     date: string;
@@ -40,7 +53,18 @@ const props = defineProps<{
     from: string;
     to: string;
     today: string;
+    // The calendar's views the user may open (mine, the team's PM, the server rooms) and the one shown.
+    views: ('mine' | 'pm' | 'room')[];
+    view: 'mine' | 'pm' | 'room';
+    filters: { customer_id: number | null; assignee: string | null; room: string | null };
     events: WorkItem[];
+    // Days to note on the rooms' view: holidays and freeze periods.
+    marks: Record<string, { holiday?: string; freeze?: string }>;
+    options: {
+        customers?: { id: number; name: string }[];
+        assignees?: { id: number; name: string }[];
+        rooms?: { ulid: string; name: string; customer: string }[];
+    };
     todo: WorkItem[];
 }>();
 
@@ -63,7 +87,20 @@ const shiftMonth = (by: number) => {
     d.setMonth(d.getMonth() + by);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
-const go = (month: string | null) => router.get(route('service.my-work'), month ? { month } : {}, { preserveScroll: true, preserveState: true });
+// The month, view and its filters travel together.
+const filters = reactive({ ...props.filters });
+const query = (month: string | null, view: string) => {
+    const q: Record<string, string | number> = {};
+    if (month) q.month = month;
+    if (view !== 'mine') q.view = view;
+    if (view === 'pm' && filters.customer_id) q.customer_id = filters.customer_id;
+    if (view === 'pm' && filters.assignee) q.assignee = filters.assignee;
+    if (view === 'room' && filters.room) q.room = filters.room;
+    return q;
+};
+const go = (month: string | null, view: string = props.view) =>
+    router.get(route('service.my-work'), query(month, view), { preserveScroll: true, preserveState: true });
+const viewIcons = { mine: UserRound, pm: ClipboardList, room: Server } as const;
 
 // --- the calendar grid: whole weeks from `from` to `to` ---
 const days = computed(() => {
@@ -71,9 +108,16 @@ const days = computed(() => {
     for (let d = props.from; d <= props.to; d = addDays(d, 1)) list.push(d);
     return list;
 });
+// Kinds switched off on the legend.
+const hidden = ref<string[]>([]);
+const toggleTone = (tone: string) => (hidden.value = hidden.value.includes(tone) ? hidden.value.filter((x) => x !== tone) : [...hidden.value, tone]);
+// An item lasting several days (a room booking, an appointment) is on each of them.
 const byDay = computed(() => {
     const map: Record<string, WorkItem[]> = {};
-    for (const e of props.events) (map[e.date] ??= []).push(e);
+    for (const e of props.events) {
+        if (hidden.value.includes(toneOf(e))) continue;
+        for (let d = e.date; d <= (e.end_date ?? e.date) && d <= props.to; d = addDays(d, 1)) (map[d] ??= []).push(e);
+    }
     return map;
 });
 const inMonth = (date: string) => date.startsWith(props.month);
@@ -82,6 +126,11 @@ const selected = ref<string>(props.today.startsWith(props.month) ? props.today :
 const selectedItems = computed(() => byDay.value[selected.value] ?? []);
 
 // --- to-do buckets ---
+const glance = {
+    overdue: { icon: AlarmClock, tone: 'rose' },
+    today: { icon: CalendarCheck, tone: 'violet' },
+    week: { icon: CalendarDays, tone: 'teal' },
+} as const;
 const weekEnd = computed(() => addDays(props.today, 7));
 const buckets = computed(() => [
     { key: 'overdue', items: props.todo.filter((i) => i.overdue) },
@@ -91,8 +140,15 @@ const buckets = computed(() => [
 ]);
 
 // --- colours: few, by kind (a contract's start and end apart); an overdue job stands out ---
-const tones = ['ticket', 'pm', 'loan', 'personal', 'contract_start', 'contract_end'] as const;
-type Tone = (typeof tones)[number];
+type Tone = 'ticket' | 'pm' | 'loan' | 'personal' | 'contract_start' | 'contract_end' | 'pm_projected' | 'room';
+// The legend shows the kinds this view can have.
+const tones = computed<Tone[]>(() =>
+    props.view === 'pm'
+        ? ['pm', 'pm_projected']
+        : props.view === 'room'
+          ? ['room']
+          : ['ticket', 'pm', 'loan', 'personal', 'contract_start', 'contract_end'],
+);
 const toneOf = (item: WorkItem): Tone => (item.kind === 'contract' ? (item.when as Tone) : item.kind);
 const toneChip: Record<Tone, string> = {
     ticket: 'bg-sky-100 text-sky-900 dark:bg-sky-950 dark:text-sky-100',
@@ -101,6 +157,8 @@ const toneChip: Record<Tone, string> = {
     personal: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
     contract_start: 'bg-violet-100 text-violet-900 dark:bg-violet-950 dark:text-violet-100',
     contract_end: 'bg-pink-100 text-pink-900 dark:bg-pink-950 dark:text-pink-100',
+    pm_projected: 'border border-dashed border-slate-300 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300',
+    room: 'bg-indigo-100 text-indigo-900 dark:bg-indigo-950 dark:text-indigo-100',
 };
 const toneDot: Record<Tone, string> = {
     ticket: 'bg-sky-500',
@@ -109,6 +167,8 @@ const toneDot: Record<Tone, string> = {
     personal: 'bg-emerald-500',
     contract_start: 'bg-violet-500',
     contract_end: 'bg-pink-500',
+    pm_projected: 'bg-slate-400',
+    room: 'bg-indigo-500',
 };
 const chipClass = (item: WorkItem) => (item.overdue ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200' : toneChip[toneOf(item)]);
 const dotClass = (item: WorkItem) => (item.overdue ? 'bg-red-500' : toneDot[toneOf(item)]);
@@ -162,21 +222,16 @@ const timeText = (item: WorkItem) =>
             </p>
 
             <!-- At a glance -->
-            <div class="grid grid-cols-3 gap-3 sm:max-w-xl">
-                <div
+            <div class="grid gap-3 sm:max-w-3xl sm:grid-cols-3">
+                <StatTile
                     v-for="b in buckets.slice(0, 3)"
                     :key="b.key"
-                    class="rounded-lg border p-3"
-                    :class="b.key === 'overdue' && b.items.length ? 'border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40' : ''"
-                >
-                    <div class="text-sm text-muted-foreground">{{ t(`my_work.${b.key}`) }}</div>
-                    <div
-                        class="text-2xl font-semibold tabular-nums"
-                        :class="{ 'text-red-700 dark:text-red-400': b.key === 'overdue' && b.items.length }"
-                    >
-                        {{ b.items.length }}
-                    </div>
-                </div>
+                    :label="t(`my_work.${b.key}`)"
+                    :value="b.items.length"
+                    :icon="glance[b.key as keyof typeof glance].icon"
+                    :tone="glance[b.key as keyof typeof glance].tone"
+                    :alert="b.key === 'overdue' && b.items.length > 0"
+                />
             </div>
 
             <div class="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr]">
@@ -247,6 +302,55 @@ const timeText = (item: WorkItem) =>
 
                 <!-- Calendar -->
                 <section class="order-1 space-y-4 lg:order-2">
+                    <!-- One calendar: whose work it shows -->
+                    <div v-if="views.length > 1" class="flex flex-wrap items-center gap-3">
+                        <div class="inline-flex rounded-lg border bg-muted/40 p-1" role="tablist" :aria-label="t('my_work.view_label')">
+                            <button
+                                v-for="v in views"
+                                :key="v"
+                                type="button"
+                                role="tab"
+                                :aria-selected="view === v"
+                                class="flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition"
+                                :class="
+                                    view === v ? 'bg-background font-semibold text-primary shadow-sm' : 'text-muted-foreground hover:text-foreground'
+                                "
+                                @click="go(month, v)"
+                            >
+                                <component :is="viewIcons[v]" class="h-4 w-4" />{{ t(`my_work.views.${v}`) }}
+                            </button>
+                        </div>
+                        <template v-if="view === 'pm'">
+                            <select
+                                v-model="filters.customer_id"
+                                class="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                                @change="go(month)"
+                            >
+                                <option :value="null">{{ t('my_work.all_customers') }}</option>
+                                <option v-for="c in options.customers ?? []" :key="c.id" :value="c.id">{{ c.name }}</option>
+                            </select>
+                            <select
+                                v-model="filters.assignee"
+                                class="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                                @change="go(month)"
+                            >
+                                <option :value="null">{{ t('my_work.all_assignees') }}</option>
+                                <option value="me">{{ t('my_work.assignee_me') }}</option>
+                                <option value="none">{{ t('my_work.assignee_none') }}</option>
+                                <option v-for="a in options.assignees ?? []" :key="a.id" :value="String(a.id)">{{ a.name }}</option>
+                            </select>
+                        </template>
+                        <select
+                            v-if="view === 'room'"
+                            v-model="filters.room"
+                            class="h-9 rounded-md border border-input bg-transparent px-2 text-sm"
+                            @change="go(month)"
+                        >
+                            <option :value="null">{{ t('my_work.all_rooms') }}</option>
+                            <option v-for="r in options.rooms ?? []" :key="r.ulid" :value="r.ulid">{{ r.customer }} · {{ r.name }}</option>
+                        </select>
+                    </div>
+
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <div class="flex items-center gap-1">
                             <Button size="icon" variant="ghost" :aria-label="t('my_work.prev')" @click="go(shiftMonth(-1))"
@@ -258,7 +362,7 @@ const timeText = (item: WorkItem) =>
                             /></Button>
                             <Button size="sm" variant="outline" class="ml-2" @click="go(null)">{{ t('my_work.this_month') }}</Button>
                         </div>
-                        <Button size="sm" @click="openNew(selected)"><Plus class="h-4 w-4" />{{ t('my_work.add') }}</Button>
+                        <Button v-if="view === 'mine'" size="sm" @click="openNew(selected)"><Plus class="h-4 w-4" />{{ t('my_work.add') }}</Button>
                     </div>
 
                     <div class="overflow-hidden rounded-lg border">
@@ -273,10 +377,12 @@ const timeText = (item: WorkItem) =>
                                 class="group relative min-h-16 border-b border-r p-1 text-left align-top transition hover:bg-muted/40 sm:min-h-28 sm:p-1.5 [&:nth-child(7n)]:border-r-0"
                                 :class="[
                                     !inMonth(day) && 'bg-muted/20 text-muted-foreground',
+                                    marks[day]?.holiday && 'bg-red-50 dark:bg-red-950/30',
+                                    marks[day]?.freeze && !marks[day]?.holiday && 'bg-amber-50 dark:bg-amber-950/30',
                                     selected === day && 'bg-primary/5 ring-2 ring-inset ring-primary',
                                 ]"
                                 @click="selected = day"
-                                @dblclick="openNew(day)"
+                                @dblclick="view === 'mine' && openNew(day)"
                             >
                                 <span
                                     class="inline-flex size-6 items-center justify-center rounded-full text-xs sm:text-sm"
@@ -284,6 +390,9 @@ const timeText = (item: WorkItem) =>
                                 >
                                     {{ Number(day.slice(8)) }}
                                 </span>
+                                <span v-if="marks[day]?.holiday" class="ml-1 hidden truncate text-[10px] text-red-700 dark:text-red-400 sm:inline">{{
+                                    marks[day].holiday
+                                }}</span>
                                 <!-- Phone: dots; wider: the first few items -->
                                 <div class="mt-1 flex flex-wrap gap-0.5 sm:hidden">
                                     <span
@@ -314,10 +423,22 @@ const timeText = (item: WorkItem) =>
 
                     <!-- Legend -->
                     <div class="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                        <span v-for="tone in tones" :key="tone" class="flex items-center gap-1.5">
+                        <button
+                            v-for="tone in tones"
+                            :key="tone"
+                            type="button"
+                            class="flex items-center gap-1.5 rounded px-1 hover:bg-muted"
+                            :class="{ 'line-through opacity-50': hidden.includes(tone) }"
+                            :title="t('my_work.legend_hint')"
+                            @click="toggleTone(tone)"
+                        >
                             <span class="size-2.5 rounded-full" :class="toneDot[tone]" />
                             {{ t(tone.startsWith('contract_') ? `my_work.when.${tone}` : `my_work.kinds.${tone}`) }}
-                        </span>
+                        </button>
+                        <template v-if="view === 'room'">
+                            <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-red-200" />{{ t('my_work.holiday') }}</span>
+                            <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-sm bg-amber-200" />{{ t('my_work.freeze') }}</span>
+                        </template>
                         <span class="flex items-center gap-1.5"><span class="size-2.5 rounded-full bg-red-500" />{{ t('my_work.overdue') }}</span>
                     </div>
 
@@ -325,8 +446,16 @@ const timeText = (item: WorkItem) =>
                     <div class="space-y-3 rounded-lg border p-4">
                         <div class="flex items-center justify-between gap-2">
                             <h4 class="font-semibold">{{ dayLabel(selected) }}</h4>
-                            <Button size="sm" variant="outline" @click="openNew(selected)"><Plus class="h-4 w-4" />{{ t('my_work.add') }}</Button>
+                            <Button v-if="view === 'mine'" size="sm" variant="outline" @click="openNew(selected)"
+                                ><Plus class="h-4 w-4" />{{ t('my_work.add') }}</Button
+                            >
                         </div>
+                        <p v-if="marks[selected]?.holiday" class="text-sm text-red-700 dark:text-red-400">
+                            {{ t('my_work.holiday') }}: {{ marks[selected].holiday }}
+                        </p>
+                        <p v-if="marks[selected]?.freeze" class="text-sm text-amber-700 dark:text-amber-400">
+                            {{ t('my_work.freeze') }}: {{ marks[selected].freeze }}
+                        </p>
                         <p v-if="!selectedItems.length && !editing" class="text-sm text-muted-foreground">{{ t('my_work.no_events') }}</p>
                         <ul class="space-y-2">
                             <li

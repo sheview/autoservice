@@ -29,13 +29,16 @@ class StockMovement extends Model
 
     public const TYPE_ADJUST = 'adjust';
 
-    public const TYPES = [self::TYPE_RECEIVE, self::TYPE_ISSUE, self::TYPE_LOAN, self::TYPE_SPARE, self::TYPE_RETURN, self::TYPE_ADJUST];
+    /** A receipt cancelled (VoidStockReceipt): its stock taken back out; "voids_id" is the receipt. */
+    public const TYPE_VOID = 'void';
+
+    public const TYPES = [self::TYPE_RECEIVE, self::TYPE_ISSUE, self::TYPE_LOAN, self::TYPE_SPARE, self::TYPE_RETURN, self::TYPE_ADJUST, self::TYPE_VOID];
 
     /** Types that take stock out, on the part page or for a ticket. */
     public const OUT_TYPES = [self::TYPE_ISSUE, self::TYPE_LOAN, self::TYPE_SPARE];
 
-    /** Types entered on the part page. */
-    public const MANUAL_TYPES = self::TYPES;
+    /** Types entered on the part page (a void only cancels a receipt, VoidStockReceipt). */
+    public const MANUAL_TYPES = [self::TYPE_RECEIVE, self::TYPE_ISSUE, self::TYPE_LOAN, self::TYPE_SPARE, self::TYPE_RETURN, self::TYPE_ADJUST];
 
     /**
      * The permission entering a movement of this type on the part page needs: writing the
@@ -47,7 +50,7 @@ class StockMovement extends Model
         return 'stock-movements.create';
     }
 
-    protected $fillable = ['type', 'quantity', 'balance_after', 'unit_cost', 'ticket_id', 'reference', 'note', 'user_id', 'user_name'];
+    protected $fillable = ['type', 'quantity', 'balance_after', 'unit_cost', 'ticket_id', 'voids_id', 'reference', 'note', 'user_id', 'user_name'];
 
     protected function casts(): array
     {

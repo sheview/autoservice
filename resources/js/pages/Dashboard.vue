@@ -2,6 +2,7 @@
 import ColumnChart from '@/components/ColumnChart.vue';
 import PlatformOverview from '@/components/PlatformOverview.vue';
 import StarRating from '@/components/StarRating.vue';
+import StatTile, { type StatTone } from '@/components/StatTile.vue';
 import TicketPriorityBadge from '@/components/TicketPriorityBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,8 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { AlarmClock, CalendarCheck, CalendarClock, FileWarning, Inbox, PackageX, UserCheck, UserX } from 'lucide-vue-next';
+import type { Component } from 'vue';
 import { computed, ref } from 'vue';
 
 // The home page: what needs attention now. Each card is null when the user may not see it.
@@ -51,6 +54,18 @@ interface Tile {
     href: string;
     alert?: boolean;
 }
+
+// Each figure's colour and icon.
+const LOOK: Record<string, { icon: Component; tone: StatTone }> = {
+    open: { icon: Inbox, tone: 'violet' },
+    mine: { icon: UserCheck, tone: 'blue' },
+    breached: { icon: AlarmClock, tone: 'orange' },
+    unassigned: { icon: UserX, tone: 'amber' },
+    pm_overdue: { icon: CalendarClock, tone: 'rose' },
+    pm_month: { icon: CalendarCheck, tone: 'teal' },
+    contracts: { icon: FileWarning, tone: 'indigo' },
+    parts: { icon: PackageX, tone: 'sky' },
+};
 
 // One tile per figure; a figure that needs action now is highlighted when above zero.
 const tiles = computed<Tile[]>(() => {
@@ -184,16 +199,16 @@ const charts = computed(() => {
             </div>
 
             <div v-if="tiles.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <Link
+                <StatTile
                     v-for="tile in tiles"
                     :key="tile.key"
                     :href="tile.href"
-                    class="rounded-md border p-4 transition-colors hover:bg-muted/40"
-                    :class="{ 'border-red-300 dark:border-red-900': tile.alert }"
-                >
-                    <p class="text-xs text-muted-foreground">{{ tile.label }}</p>
-                    <p class="text-2xl font-semibold" :class="{ 'text-red-700 dark:text-red-400': tile.alert }">{{ tile.value }}</p>
-                </Link>
+                    :label="tile.label"
+                    :value="tile.value"
+                    :icon="LOOK[tile.key]?.icon"
+                    :tone="LOOK[tile.key]?.tone"
+                    :alert="tile.alert"
+                />
             </div>
 
             <section v-if="trends && charts" class="space-y-3">

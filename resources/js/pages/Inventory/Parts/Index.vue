@@ -3,6 +3,7 @@ import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
 import SerialHits, { type SerialHit } from '@/components/SerialHits.vue';
+import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
@@ -10,7 +11,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, Package, PackageMinus, PackageSearch, PackageX } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface PartRow {
@@ -42,14 +43,26 @@ const props = defineProps<{
     filters: Filters;
     statuses: string[];
     stockLevels: string[];
+    stats: { active: number; stock_value: string | null; low: number; out: number; out_this_month: number };
     serialHits: SerialHit[];
-    can: { create: boolean; update: boolean; delete: boolean; import: boolean; export: boolean; categories: boolean; receive: boolean };
+    can: {
+        create: boolean;
+        update: boolean;
+        delete: boolean;
+        import: boolean;
+        export: boolean;
+        categories: boolean;
+        receive: boolean;
+        movements: boolean;
+    };
 }>();
 
 const page = usePage<SharedData>();
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('parts.title'), href: route('inventory.parts.index') }];
 
 const filters = useListFilters('inventory.parts.index', props.filters);
+
+const stockValue = computed(() => Number(props.stats.stock_value ?? 0).toLocaleString('th-TH', { minimumFractionDigits: 2 }));
 
 const sortBy = (column: string) => {
     filters.direction = filters.sort === column && filters.direction === 'asc' ? 'desc' : 'asc';
@@ -105,6 +118,40 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <Link :href="route('inventory.parts.create')">{{ t('parts.create') }}</Link>
                     </Button>
                 </div>
+            </div>
+
+            <!-- Click a figure to list those parts (or this month's movements) -->
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <StatTile
+                    :label="t('parts.stats.active')"
+                    :value="stats.active"
+                    :icon="Package"
+                    tone="violet"
+                    :hint="t('parts.stats.stock_value', { value: stockValue })"
+                    :href="route('inventory.parts.index', { status: 'active' })"
+                />
+                <StatTile
+                    :label="t('parts.stats.low')"
+                    :value="stats.low"
+                    :icon="PackageSearch"
+                    tone="amber"
+                    :href="route('inventory.parts.index', { stock: 'low' })"
+                />
+                <StatTile
+                    :label="t('parts.stats.out')"
+                    :value="stats.out"
+                    :icon="PackageX"
+                    tone="rose"
+                    :alert="stats.out > 0"
+                    :href="route('inventory.parts.index', { stock: 'out' })"
+                />
+                <StatTile
+                    :label="t('parts.stats.out_this_month')"
+                    :value="stats.out_this_month"
+                    :icon="PackageMinus"
+                    tone="blue"
+                    :href="can.movements ? route('inventory.movements.index', { type: 'issue' }) : undefined"
+                />
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppLogoIcon from '@/components/AppLogoIcon.vue';
 import { t } from '@/lib/i18n';
 import type { SharedData } from '@/types';
 import { usePage } from '@inertiajs/vue3';
@@ -46,9 +47,7 @@ const features = [
 
             <div class="relative">
                 <div class="flex items-center gap-3">
-                    <div class="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500 shadow-lg shadow-violet-900/40">
-                        <ShieldCheck class="h-6 w-6" />
-                    </div>
+                    <AppLogoIcon class="h-11 w-11 shrink-0 drop-shadow-lg" />
                     <div class="leading-tight">
                         <div class="text-lg font-bold">{{ appName }}</div>
                         <div class="text-[11px] font-semibold tracking-[0.15em] text-violet-300">{{ t('auth.brand_tagline') }}</div>

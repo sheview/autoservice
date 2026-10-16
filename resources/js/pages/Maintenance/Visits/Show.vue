@@ -14,7 +14,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Printer } from 'lucide-vue-next';
+import { FileSpreadsheet, FileUp, Printer } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 interface Signature {
@@ -90,6 +90,17 @@ const props = defineProps<{
 
 const page = usePage<SharedData>();
 const errors = computed(() => page.props.errors as Record<string, string>);
+
+// The results sheet filled in: uploaded as soon as it is picked.
+const resultsInput = ref<HTMLInputElement | null>(null);
+const resultsForm = useForm<{ file: File | null }>({ file: null });
+const importResults = (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    resultsForm.file = input.files?.[0] ?? null;
+    if (resultsForm.file) {
+        resultsForm.post(route('maintenance.visits.results.import', props.visit.ulid), { preserveScroll: true, onFinish: () => (input.value = '') });
+    }
+};
 const breadcrumbs: BreadcrumbItem[] = [
     { title: t('pm_visits.title'), href: route('maintenance.visits.index') },
     { title: props.visit.visit_no, href: route('maintenance.visits.show', props.visit.ulid) },
@@ -226,6 +237,22 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                             >{{ t('pm_visits.print_customer') }}</a
                         >
                     </Button>
+                    <!-- The results as Excel; filled in, brought back while the work is going on -->
+                    <Button variant="outline" as-child>
+                        <a :href="route('maintenance.visits.results.export', visit.ulid)"
+                            ><FileSpreadsheet class="mr-1.5 h-4 w-4" />{{ t('pm_visits.results_export') }}</a
+                        >
+                    </Button>
+                    <Button
+                        v-if="can.perform"
+                        variant="outline"
+                        :title="t('pm_visits.results_import_hint')"
+                        :disabled="resultsForm.processing"
+                        @click="resultsInput?.click()"
+                    >
+                        <FileUp class="mr-1.5 h-4 w-4" />{{ t('pm_visits.results_import') }}
+                    </Button>
+                    <input ref="resultsInput" type="file" accept=".xlsx,.xls" class="hidden" @change="importResults" />
                     <Button v-if="can.start || can.perform" variant="outline" as-child>
                         <Link :href="route('maintenance.field.visit', visit.ulid)">{{ t('pm_visits.field_page') }}</Link>
                     </Button>
@@ -247,7 +274,7 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
             </p>
-            <InputError :message="errors.visit ?? errors.photo ?? errors.action" />
+            <InputError :message="errors.visit ?? errors.photo ?? errors.action ?? errors.file" />
 
             <!-- Sent back: what to fix -->
             <div

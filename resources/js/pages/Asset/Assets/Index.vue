@@ -2,6 +2,7 @@
 import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
+import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
@@ -9,7 +10,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, Boxes, CircleCheck, ShieldAlert, Wrench } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface AssetRow {
@@ -52,6 +53,7 @@ const props = defineProps<{
     assetTypes: string[];
     statuses: string[];
     expiringDays: number;
+    stats: { total: number; in_use: number; in_repair: number; warranty_expiring: number };
     can: { create: boolean; import: boolean; export: boolean };
 }>();
 
@@ -107,6 +109,32 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <Link :href="route('asset.assets.create')">{{ t('assets.create') }}</Link>
                     </Button>
                 </div>
+            </div>
+
+            <!-- Click a figure to list those assets -->
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <StatTile :label="t('assets.stats.total')" :value="stats.total" :icon="Boxes" tone="violet" :href="route('asset.assets.index')" />
+                <StatTile
+                    :label="t('assets.stats.in_use')"
+                    :value="stats.in_use"
+                    :icon="CircleCheck"
+                    tone="emerald"
+                    :href="route('asset.assets.index', { status: 'in_use' })"
+                />
+                <StatTile
+                    :label="t('assets.stats.in_repair')"
+                    :value="stats.in_repair"
+                    :icon="Wrench"
+                    tone="orange"
+                    :href="route('asset.assets.index', { status: 'in_repair' })"
+                />
+                <StatTile
+                    :label="t('assets.stats.warranty_expiring', { days: expiringDays })"
+                    :value="stats.warranty_expiring"
+                    :icon="ShieldAlert"
+                    tone="amber"
+                    :href="route('asset.assets.index', { warranty: 'expiring' })"
+                />
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

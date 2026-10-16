@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
 import StockMovementTypeBadge from '@/components/StockMovementTypeBadge.vue';
 import { Input } from '@/components/ui/input';
@@ -7,8 +8,8 @@ import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
-import type { BreadcrumbItem, Paginated } from '@/types';
-import { Head, Link } from '@inertiajs/vue3';
+import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp } from 'lucide-vue-next';
 
 interface MovementRow {
@@ -21,6 +22,9 @@ interface MovementRow {
     user_name: string | null;
     part: { id: number; code: string; name: string; unit: string; deleted: boolean } | null;
     ticket: { ulid: string; ticket_no: string; status: string } | null;
+    voided: boolean;
+    voidable: boolean;
+    voids_id: number | null;
     at: string;
 }
 
@@ -60,6 +64,16 @@ const columns = [
     { key: 'user', sortable: false, right: false },
 ];
 
+const page = usePage<SharedData>();
+
+// A receipt entered by mistake: cancelled with a reason; the server takes the stock back out.
+const voidReceipt = (movement: MovementRow) => {
+    const reason = prompt(t('stock_movements.void_prompt', { quantity: movement.quantity, unit: movement.part?.unit ?? '' }));
+    if (reason?.trim()) {
+        router.post(route('inventory.movements.void', movement.id), { reason }, { preserveScroll: true });
+    }
+};
+
 const signed = (quantity: number) => (quantity > 0 ? '+' : '') + quantity.toLocaleString('th-TH');
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
@@ -71,6 +85,11 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
 
         <div class="space-y-6 p-4">
             <Heading :title="t('stock_movements.title')" :description="t('stock_movements.description')" />
+
+            <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
+                {{ page.props.flash.success }}
+            </p>
+            <InputError :message="(page.props.errors as Record<string, string>).void ?? (page.props.errors as Record<string, string>).reason" />
 
             <div class="flex flex-wrap items-center gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('stock_movements.search_placeholder')" />
@@ -124,7 +143,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 </template>
                                 <template v-else>{{ t('common.none') }}</template>
                             </td>
-                            <td class="px-4 py-2"><StockMovementTypeBadge :type="movement.type" /></td>
+                            <td class="px-4 py-2">
+                                <StockMovementTypeBadge :type="movement.type" />
+                                <div v-if="movement.voided" class="mt-1 text-xs font-medium text-red-700 dark:text-red-400">
+                                    {{ t('stock_movements.voided') }}
+                                </div>
+                                <div v-if="movement.voids_id" class="mt-1 text-xs text-muted-foreground">
+                                    {{ t('stock_movements.void_of', { id: movement.voids_id }) }}
+                                </div>
+                            </td>
                             <td class="whitespace-nowrap px-4 py-2 text-right font-medium">
                                 {{ signed(movement.quantity) }}
                                 <span class="font-normal text-muted-foreground">{{ movement.part?.unit }}</span>
@@ -144,7 +171,17 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <span v-if="movement.reference">{{ movement.reference }}</span>
                                 <div v-if="movement.note" class="text-xs text-muted-foreground">{{ movement.note }}</div>
                             </td>
-                            <td class="px-4 py-2">{{ movement.user_name ?? t('common.system') }}</td>
+                            <td class="px-4 py-2">
+                                {{ movement.user_name ?? t('common.system') }}
+                                <button
+                                    v-if="movement.voidable"
+                                    type="button"
+                                    class="mt-1 block text-xs text-red-700 underline-offset-4 hover:underline dark:text-red-400"
+                                    @click="voidReceipt(movement)"
+                                >
+                                    {{ t('stock_movements.void') }}
+                                </button>
+                            </td>
                         </tr>
                         <tr v-if="movements.data.length === 0">
                             <td :colspan="columns.length" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>

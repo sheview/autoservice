@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
+import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +8,26 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/vue3';
+import {
+    Banknote,
+    Boxes,
+    CalendarClock,
+    CalendarDays,
+    CircleCheck,
+    CircleX,
+    Gauge,
+    Inbox,
+    Layers,
+    MessageSquareText,
+    PackageMinus,
+    PackagePlus,
+    PackageSearch,
+    PackageX,
+    ShieldAlert,
+    ShieldX,
+    Timer,
+    TriangleAlert,
+} from 'lucide-vue-next';
 import { computed, reactive } from 'vue';
 
 interface SlaClock {
@@ -149,26 +170,11 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
                 <h3 class="text-base font-semibold">{{ t('reports.sections.tickets') }}</h3>
 
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.opened') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.tickets.opened) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.closed') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.tickets.closed) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.cancelled') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.tickets.cancelled) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.backlog') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.tickets.backlog) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.avg_resolve_hours') }}</p>
-                        <p class="text-2xl font-semibold">{{ orNone(report.tickets.avg_resolve_hours) }}</p>
-                    </div>
+                    <StatTile :label="t('reports.opened')" :value="number(report.tickets.opened)" :icon="Inbox" tone="violet" />
+                    <StatTile :label="t('reports.closed')" :value="number(report.tickets.closed)" :icon="CircleCheck" tone="emerald" />
+                    <StatTile :label="t('reports.cancelled')" :value="number(report.tickets.cancelled)" :icon="CircleX" tone="slate" />
+                    <StatTile :label="t('reports.backlog')" :value="number(report.tickets.backlog)" :icon="Layers" tone="amber" />
+                    <StatTile :label="t('reports.avg_resolve_hours')" :value="orNone(report.tickets.avg_resolve_hours)" :icon="Timer" tone="sky" />
                 </div>
 
                 <div class="rounded-md border p-4">
@@ -318,32 +324,20 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
             <section v-if="report.pm" class="space-y-4">
                 <h3 class="text-base font-semibold">{{ t('reports.sections.pm') }}</h3>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_compliance') }}</p>
-                        <p class="text-2xl font-semibold">{{ orNone(report.pm.compliance, '%') }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_due') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.pm.due) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_completed') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.pm.completed) }}</p>
+                    <StatTile :label="t('reports.pm_compliance')" :value="orNone(report.pm.compliance, '%')" :icon="Gauge" tone="indigo" />
+                    <StatTile :label="t('reports.pm_due')" :value="number(report.pm.due)" :icon="CalendarDays" tone="violet" />
+                    <StatTile :label="t('reports.pm_completed')" :value="number(report.pm.completed)" :icon="CircleCheck" tone="emerald">
                         <p class="text-xs text-muted-foreground">{{ t('reports.pm_on_time') }} {{ number(report.pm.on_time) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_overdue') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.pm.overdue) }}</p>
+                    </StatTile>
+                    <StatTile :label="t('reports.pm_overdue')" :value="number(report.pm.overdue)" :icon="CalendarClock" tone="rose">
                         <p class="text-xs text-muted-foreground">
                             {{ t('reports.pm_scheduled') }} {{ number(report.pm.scheduled) }} · {{ t('reports.pm_in_progress') }}
                             {{ number(report.pm.in_progress) }}
                         </p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.pm_items_issue') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.pm.items.failed ?? 0) }}</p>
+                    </StatTile>
+                    <StatTile :label="t('reports.pm_items_issue')" :value="number(report.pm.items.failed ?? 0)" :icon="TriangleAlert" tone="amber">
                         <p class="text-xs text-muted-foreground">{{ t('reports.pm_items_ok') }} {{ number(report.pm.items.passed ?? 0) }}</p>
-                    </div>
+                    </StatTile>
                 </div>
             </section>
 
@@ -351,31 +345,19 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
             <section v-if="report.parts" class="space-y-4">
                 <h3 class="text-base font-semibold">{{ t('reports.sections.parts') }}</h3>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.parts_used') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.parts.used) }}</p>
+                    <StatTile :label="t('reports.parts_used')" :value="number(report.parts.used)" :icon="PackageMinus" tone="blue">
                         <p class="text-xs text-muted-foreground">
                             {{ t('reports.parts_used_on_tickets') }} {{ number(report.parts.used_on_tickets) }}
                         </p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.parts_used_value') }}</p>
-                        <p class="text-2xl font-semibold">{{ money(report.parts.used_value) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.parts_received') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.parts.received) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.parts_low') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.parts.low) }}</p>
+                    </StatTile>
+                    <StatTile :label="t('reports.parts_used_value')" :value="money(report.parts.used_value)" :icon="Banknote" tone="emerald" />
+                    <StatTile :label="t('reports.parts_received')" :value="number(report.parts.received)" :icon="PackagePlus" tone="teal" />
+                    <StatTile :label="t('reports.parts_low')" :value="number(report.parts.low)" :icon="PackageSearch" tone="amber">
                         <p class="text-xs text-muted-foreground">{{ t('reports.today_note') }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.parts_out') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.parts.out) }}</p>
+                    </StatTile>
+                    <StatTile :label="t('reports.parts_out')" :value="number(report.parts.out)" :icon="PackageX" tone="rose">
                         <p class="text-xs text-muted-foreground">{{ t('reports.today_note') }}</p>
-                    </div>
+                    </StatTile>
                 </div>
 
                 <div v-if="report.parts.top.length" class="overflow-x-auto rounded-md border">
@@ -412,13 +394,16 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
                             <span class="text-sm font-normal text-muted-foreground">{{ t('surveys.summary.out_of', { max: 5 }) }}</span>
                         </p>
                     </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.survey_rate') }}</p>
-                        <p class="text-2xl font-semibold">{{ orNone(report.surveys.response_rate, '%') }}</p>
+                    <StatTile
+                        :label="t('reports.survey_rate')"
+                        :value="orNone(report.surveys.response_rate, '%')"
+                        :icon="MessageSquareText"
+                        tone="sky"
+                    >
                         <p class="text-xs text-muted-foreground">
                             {{ t('surveys.summary.answered_of', { answered: report.surveys.answered, sent: report.surveys.sent }) }}
                         </p>
-                    </div>
+                    </StatTile>
                     <div class="rounded-md border p-4">
                         <p class="mb-1 text-xs text-muted-foreground">{{ t('surveys.summary.distribution') }}</p>
                         <div v-for="score in [5, 4, 3, 2, 1]" :key="score" class="flex items-center gap-2 text-xs">
@@ -444,18 +429,14 @@ const selectable = 'rounded-md border px-3 py-1 text-sm hover:bg-muted';
                     <span class="text-xs font-normal text-muted-foreground">· {{ t('reports.today_note') }}</span>
                 </h3>
                 <div class="grid gap-4 sm:grid-cols-3">
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.assets_total') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.assets.total) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.warranty_expiring', { days: report.assets.expiring_days }) }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.assets.warranty_expiring) }}</p>
-                    </div>
-                    <div class="rounded-md border p-4">
-                        <p class="text-xs text-muted-foreground">{{ t('reports.warranty_expired') }}</p>
-                        <p class="text-2xl font-semibold">{{ number(report.assets.warranty_expired) }}</p>
-                    </div>
+                    <StatTile :label="t('reports.assets_total')" :value="number(report.assets.total)" :icon="Boxes" tone="violet" />
+                    <StatTile
+                        :label="t('reports.warranty_expiring', { days: report.assets.expiring_days })"
+                        :value="number(report.assets.warranty_expiring)"
+                        :icon="ShieldAlert"
+                        tone="amber"
+                    />
+                    <StatTile :label="t('reports.warranty_expired')" :value="number(report.assets.warranty_expired)" :icon="ShieldX" tone="rose" />
                 </div>
                 <div class="grid gap-4 lg:grid-cols-2">
                     <div class="rounded-md border p-4">

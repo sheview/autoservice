@@ -3,6 +3,7 @@
 namespace App\Modules\Platform\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Platform\Actions\SetStaffCompanies;
 use App\Modules\Platform\Actions\SetStaffCompany;
 use App\Modules\Platform\CrossTenant\CompanyStaff;
 use App\Modules\Platform\Models\StaffPool;
@@ -10,6 +11,7 @@ use App\Modules\Platform\Support\Impersonation;
 use App\Modules\Tenancy\Models\Tenant;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -60,6 +62,25 @@ class LinkedStaffController extends Controller
         return back()->with('success', __($on ? 'platform.linked_staff.enabled' : 'platform.linked_staff.disabled', [
             'name' => $main->name, 'company' => $tenant->name,
         ]));
+    }
+
+    /** The boxes ticked on the page, saved together. */
+    public function updateMany(Request $request, SetStaffCompanies $setCompanies, Impersonation $impersonation): RedirectResponse
+    {
+        $this->authorizePlatform($request, $impersonation);
+
+        $data = $request->validate([
+            'changes' => ['required', 'array', 'min:1', 'max:500'],
+            'changes.*.user' => ['required', 'integer'],
+            'changes.*.tenant_id' => ['required', 'integer', Rule::exists('tenants', 'id')->where('is_platform', false)->whereNull('deleted_at')],
+            'changes.*.active' => ['required', 'boolean'],
+        ]);
+
+        ['saved' => $saved, 'failed' => $failed] = $setCompanies->handle($data['changes']);
+
+        $response = back()->with('success', __('platform.linked_staff.saved_many', ['count' => $saved]));
+
+        return $failed === [] ? $response : $response->withErrors(['changes' => __('platform.linked_staff.failed_many', ['list' => implode(' · ', $failed)])]);
     }
 
     private function authorizePlatform(Request $request, Impersonation $impersonation): void

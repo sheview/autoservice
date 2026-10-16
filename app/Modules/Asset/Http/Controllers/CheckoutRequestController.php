@@ -72,6 +72,8 @@ class CheckoutRequestController extends Controller
                 ->through(fn (CheckoutRequest $row) => RequestRow::of($row)),
             'lines' => $lineTab ? $this->linesPage($lines->handle($user, $filters)->paginate(30)->withQueryString()) : null,
             'counts' => [
+                // Not closed, rejected or cancelled (the "open" status filter of the list).
+                'open' => $search->handle($user, ['tab' => 'requests', 'status' => 'open'])->count(),
                 'approve' => $can['approve'] ? $search->handle($user, ['tab' => 'approve'])->count() : null,
                 'fulfill' => $can['fulfill'] ? $search->handle($user, ['tab' => 'fulfill'])->count() : null,
                 'backorders' => $can['fulfill'] ? $lines->handle($user, ['tab' => 'backorders'])->count() : null,

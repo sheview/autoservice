@@ -89,3 +89,36 @@ it('is only for the platform', function () {
     $this->actingAs($this->superadmin)->put("/platform/linked-staff/{$customer->id}/{$this->other->ulid}", ['active' => true])->assertNotFound();
     $this->actingAs($this->superadmin)->put("/platform/linked-staff/999999/{$this->other->ulid}", ['active' => true])->assertNotFound();
 });
+
+it('saves several boxes ticked together, and reports those refused without holding back the rest', function () {
+    $helper = asTenant($this->home, fn () => userWithRole('technician', ['email' => 'helper@itbtthai.com']));
+    $admin = asTenant($this->home, fn () => userWithRole('admin_company', ['email' => 'boss@itbtthai.com']));
+    $this->actingAs($this->superadmin)->put("/platform/linked-staff/{$admin->id}/{$this->other->ulid}", ['active' => true]);
+
+    $this->actingAs($this->superadmin)->put('/platform/linked-staff', ['changes' => [
+        ['user' => $this->tech->id, 'tenant_id' => $this->other->id, 'active' => true],
+        ['user' => $helper->id, 'tenant_id' => $this->other->id, 'active' => true],
+        // "Other"'s only admin: refused
+        ['user' => $admin->id, 'tenant_id' => $this->other->id, 'active' => false],
+        // their own company: refused
+        ['user' => $helper->id, 'tenant_id' => $this->home->id, 'active' => false],
+        // nobody: skipped
+        ['user' => 999999, 'tenant_id' => $this->other->id, 'active' => true],
+    ]])->assertSessionHas('success', 'บันทึกแล้ว 2 รายการ')->assertSessionHasErrors('changes');
+
+    asTenant($this->other, function () use ($helper, $admin) {
+        expect(User::where('login_user_id', $this->tech->id)->value('is_active'))->toBeTrue()
+            ->and(User::where('login_user_id', $helper->id)->value('is_active'))->toBeTrue()
+            ->and(User::where('login_user_id', $admin->id)->value('is_active'))->toBeTrue();
+    });
+    expect(session('errors')->first('changes'))->toContain("{$admin->name} — Other")->toContain("{$helper->name} — Default");
+});
+
+it('lets only the platform save several at once', function () {
+    $companyAdmin = asTenant($this->home, fn () => userWithRole('admin_company'));
+
+    $this->actingAs($companyAdmin)->put('/platform/linked-staff', ['changes' => [['user' => $this->tech->id, 'tenant_id' => $this->other->id, 'active' => true]]])
+        ->assertForbidden();
+    $this->actingAs($this->superadmin)->put('/platform/linked-staff', ['changes' => []])->assertSessionHasErrors('changes');
+    expect(asTenant($this->other, fn () => User::where('login_user_id', $this->tech->id)->exists()))->toBeFalse();
+});

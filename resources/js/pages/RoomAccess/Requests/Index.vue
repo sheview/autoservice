@@ -4,6 +4,7 @@ import Pagination from '@/components/Pagination.vue';
 import RoomRequestStatusBadge from '@/components/RoomRequestStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useCalendarLink } from '@/composables/useCalendarLink';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
@@ -52,6 +53,9 @@ const sortBy = (column: string) => {
     filters.sort = column;
 };
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
+
+// The rooms on the one calendar (งานของฉัน), where there is one.
+const calendarHref = useCalendarLink('room', route('room-access.calendar'));
 </script>
 
 <template>
@@ -63,7 +67,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <Heading :title="t('room_requests.title')" :description="t('room_requests.description')" />
                 <div class="flex flex-wrap gap-2">
                     <Button variant="outline" as-child>
-                        <Link :href="route('room-access.calendar')">{{ t('room_requests.calendar') }}</Link>
+                        <Link :href="calendarHref">{{ t('room_requests.calendar') }}</Link>
                     </Button>
                     <Button variant="outline" as-child>
                         <Link :href="route('room-access.report')">{{ t('room_requests.report') }}</Link>
@@ -99,14 +103,22 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <th class="px-4 py-2 font-medium">
                                 <button type="button" class="inline-flex items-center gap-1" @click="sortBy('request_no')">
                                     {{ t('room_requests.request_no') }}
-                                    <component :is="filters.direction === 'asc' ? ArrowUp : ArrowDown" v-if="filters.sort === 'request_no'" class="size-3" />
+                                    <component
+                                        :is="filters.direction === 'asc' ? ArrowUp : ArrowDown"
+                                        v-if="filters.sort === 'request_no'"
+                                        class="size-3"
+                                    />
                                 </button>
                             </th>
                             <th class="px-4 py-2 font-medium">{{ t('room_requests.room') }}</th>
                             <th class="px-4 py-2 font-medium">
                                 <button type="button" class="inline-flex items-center gap-1" @click="sortBy('planned_start')">
                                     {{ t('room_requests.when') }}
-                                    <component :is="filters.direction === 'asc' ? ArrowUp : ArrowDown" v-if="filters.sort === 'planned_start'" class="size-3" />
+                                    <component
+                                        :is="filters.direction === 'asc' ? ArrowUp : ArrowDown"
+                                        v-if="filters.sort === 'planned_start'"
+                                        class="size-3"
+                                    />
                                 </button>
                             </th>
                             <th class="px-4 py-2 font-medium">{{ t('room_requests.requester') }}</th>
@@ -116,14 +128,23 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <tbody>
                         <tr v-for="row in requests.data" :key="row.ulid" class="border-t align-top">
                             <td class="px-4 py-2">
-                                <Link :href="route('room-access.requests.show', row.ulid)" class="font-mono text-primary hover:underline">{{ row.request_no }}</Link>
+                                <Link :href="route('room-access.requests.show', row.ulid)" class="font-mono text-primary hover:underline">{{
+                                    row.request_no
+                                }}</Link>
                                 <div class="line-clamp-1 text-xs text-muted-foreground">{{ row.purpose }}</div>
                             </td>
-                            <td class="px-4 py-2">{{ row.room }}<div class="text-xs text-muted-foreground">{{ row.customer }}</div></td>
-                            <td class="whitespace-nowrap px-4 py-2">
-                                {{ dateTime(row.planned_start) }}<div class="text-xs text-muted-foreground">– {{ dateTime(row.planned_end) }}</div>
+                            <td class="px-4 py-2">
+                                {{ row.room }}
+                                <div class="text-xs text-muted-foreground">{{ row.customer }}</div>
                             </td>
-                            <td class="px-4 py-2">{{ row.requester_name }}<div class="text-xs text-muted-foreground">{{ t('room_requests.people') }} {{ row.people_count }}</div></td>
+                            <td class="whitespace-nowrap px-4 py-2">
+                                {{ dateTime(row.planned_start) }}
+                                <div class="text-xs text-muted-foreground">– {{ dateTime(row.planned_end) }}</div>
+                            </td>
+                            <td class="px-4 py-2">
+                                {{ row.requester_name }}
+                                <div class="text-xs text-muted-foreground">{{ t('room_requests.people') }} {{ row.people_count }}</div>
+                            </td>
                             <td class="px-4 py-2"><RoomRequestStatusBadge :status="row.status" /></td>
                         </tr>
                         <tr v-if="requests.data.length === 0">

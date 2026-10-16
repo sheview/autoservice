@@ -18,8 +18,9 @@ class PartTrend
     public function handle(int $year, array $years): array
     {
         $series = function (string $part, CarbonImmutable $from, array $keys) use ($year): array {
+            // Receipts voided later come off (a void is negative).
             $rows = StockMovement::query()
-                ->where('type', StockMovement::TYPE_RECEIVE)
+                ->whereIn('type', [StockMovement::TYPE_RECEIVE, StockMovement::TYPE_VOID])
                 ->whereBetween('created_at', [$from, CarbonImmutable::create($year)->endOfYear()])
                 ->selectRaw("extract({$part} from created_at) as k, sum(quantity) as total")
                 ->groupBy('k')

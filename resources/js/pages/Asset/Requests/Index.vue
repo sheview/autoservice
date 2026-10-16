@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
-import SerialHits, { type SerialHit } from '@/components/SerialHits.vue';
 import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import RequestSteps from '@/components/RequestSteps.vue';
+import SerialHits, { type SerialHit } from '@/components/SerialHits.vue';
+import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
@@ -13,7 +14,7 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import type { CheckoutLineRequestRef, CheckoutLineRow, CheckoutRequestRow } from '@/types/checkout';
 import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp, HandHelping } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, CalendarX, ClipboardList, HandHelping, PackageCheck, Stamp } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 type Tab = 'requests' | 'approve' | 'fulfill' | 'backorders' | 'returns';
@@ -34,7 +35,7 @@ const props = defineProps<{
     requests: Paginated<CheckoutRequestRow> | null;
     lines: Paginated<CheckoutLineRow & { request: CheckoutLineRequestRef }> | null;
     // null = the user has no such queue.
-    counts: { approve: number | null; fulfill: number | null; backorders: number | null; returns: number | null };
+    counts: { open: number; approve: number | null; fulfill: number | null; backorders: number | null; returns: number | null };
     statuses: string[];
     serialHits: SerialHit[];
     can: { view: boolean; create: boolean; forOthers: boolean; approve: boolean; fulfill: boolean; return: boolean };
@@ -97,6 +98,42 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         {{ t('requests.new') }}
                     </Link>
                 </Button>
+            </div>
+
+            <!-- Click a figure to list those requests -->
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <StatTile
+                    :label="t('requests.stats.open')"
+                    :value="counts.open"
+                    :icon="ClipboardList"
+                    tone="violet"
+                    :href="route('asset.requests.index', { tab: 'requests', status: 'open' })"
+                />
+                <StatTile
+                    v-if="counts.approve !== null"
+                    :label="t('requests.stats.approve')"
+                    :value="counts.approve"
+                    :icon="Stamp"
+                    tone="amber"
+                    :href="route('asset.requests.index', { tab: 'approve' })"
+                />
+                <StatTile
+                    v-if="counts.fulfill !== null"
+                    :label="t('requests.stats.fulfill')"
+                    :value="counts.fulfill"
+                    :icon="PackageCheck"
+                    tone="blue"
+                    :href="route('asset.requests.index', { tab: 'fulfill' })"
+                />
+                <StatTile
+                    v-if="counts.returns !== null"
+                    :label="t('requests.stats.overdue')"
+                    :value="counts.returns"
+                    :icon="CalendarX"
+                    tone="rose"
+                    :alert="counts.returns > 0"
+                    :href="route('asset.requests.index', { tab: 'returns', overdue: 1 })"
+                />
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

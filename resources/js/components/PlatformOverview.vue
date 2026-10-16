@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { Link, router } from '@inertiajs/vue3';
+import { Ban, Building2, CircleCheck, Eye, Hourglass, Lock } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface Company {
@@ -30,12 +32,19 @@ const props = defineProps<{
 const tiles = computed(() => {
     const c = props.platform.counts;
     return [
-        { key: 'total', label: t('dashboard.platform.total'), value: c.total, alert: false },
-        { key: 'active', label: t('dashboard.platform.active'), value: c.active, alert: false },
-        { key: 'expiring', label: t('dashboard.platform.expiring', { days: 30 }), value: c.expiring, alert: c.expiring > 0 },
-        { key: 'grace', label: t('dashboard.platform.grace'), value: c.grace, alert: c.grace > 0 },
-        { key: 'locked', label: t('dashboard.platform.locked'), value: c.locked, alert: c.locked > 0 },
-        { key: 'suspended', label: t('dashboard.platform.suspended'), value: c.suspended, alert: false },
+        { key: 'total', label: t('dashboard.platform.total'), value: c.total, alert: false, icon: Building2, tone: 'violet' as const },
+        { key: 'active', label: t('dashboard.platform.active'), value: c.active, alert: false, icon: CircleCheck, tone: 'emerald' as const },
+        {
+            key: 'expiring',
+            label: t('dashboard.platform.expiring', { days: 30 }),
+            value: c.expiring,
+            alert: c.expiring > 0,
+            icon: Hourglass,
+            tone: 'amber' as const,
+        },
+        { key: 'grace', label: t('dashboard.platform.grace'), value: c.grace, alert: c.grace > 0, icon: Eye, tone: 'orange' as const },
+        { key: 'locked', label: t('dashboard.platform.locked'), value: c.locked, alert: c.locked > 0, icon: Lock, tone: 'slate' as const },
+        { key: 'suspended', label: t('dashboard.platform.suspended'), value: c.suspended, alert: false, icon: Ban, tone: 'indigo' as const },
     ];
 });
 
@@ -62,17 +71,17 @@ const enter = (company: Company) => router.post(route('platform.impersonation.st
 
 <template>
     <div class="space-y-6">
-        <div class="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-            <Link
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+            <StatTile
                 v-for="tile in tiles"
                 :key="tile.key"
                 :href="route('platform.impersonation.index')"
-                class="rounded-md border p-4 transition-colors hover:bg-muted/40"
-                :class="{ 'border-red-300 dark:border-red-900': tile.alert }"
-            >
-                <p class="text-xs text-muted-foreground">{{ tile.label }}</p>
-                <p class="text-2xl font-semibold" :class="{ 'text-red-700 dark:text-red-400': tile.alert }">{{ tile.value }}</p>
-            </Link>
+                :label="tile.label"
+                :value="tile.value"
+                :icon="tile.icon"
+                :tone="tile.tone"
+                :alert="tile.alert"
+            />
         </div>
 
         <!-- To renew -->

@@ -18,6 +18,7 @@ use LogicException;
  *
  *   receive, return   $quantity goes into stock
  *   issue, loan, spare   $quantity comes out of stock (never below zero)
+ *   void              $quantity comes out of stock: a receipt cancelled ($details['voids_id'])
  *   adjust            $quantity is the counted stock; the movement is the difference (for a
  *                     tracked part: the pieces taken off)
  *
@@ -31,7 +32,7 @@ use LogicException;
 class RecordStockMovement
 {
     /**
-     * @param  array{unit_cost?: int|null, ticket_id?: int|null, reference?: string|null, note?: string|null,
+     * @param  array{unit_cost?: int|null, ticket_id?: int|null, voids_id?: int|null, reference?: string|null, note?: string|null,
      *     units?: Closure(Part): list<array<string, mixed>>}  $details  unit_cost in satang
      */
     public function handle(Part $part, string $type, int $quantity, ?User $actor, array $details = []): StockMovement
@@ -42,7 +43,7 @@ class RecordStockMovement
 
             $change = match ($type) {
                 StockMovement::TYPE_RECEIVE, StockMovement::TYPE_RETURN => $quantity,
-                StockMovement::TYPE_ISSUE, StockMovement::TYPE_LOAN, StockMovement::TYPE_SPARE => -$quantity,
+                StockMovement::TYPE_ISSUE, StockMovement::TYPE_LOAN, StockMovement::TYPE_SPARE, StockMovement::TYPE_VOID => -$quantity,
                 StockMovement::TYPE_ADJUST => $quantity - $locked->qty_on_hand,
             };
 
@@ -91,6 +92,7 @@ class RecordStockMovement
                 'balance_after' => $balance,
                 'unit_cost' => $unitCost,
                 'ticket_id' => $details['ticket_id'] ?? null,
+                'voids_id' => $details['voids_id'] ?? null,
                 'reference' => $details['reference'] ?? null,
                 'note' => $details['note'] ?? null,
                 'user_id' => $actor?->id,

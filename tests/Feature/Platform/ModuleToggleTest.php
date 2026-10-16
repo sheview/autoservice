@@ -20,7 +20,7 @@ it('builds the sidebar from config, filtered by permission', function () {
             ->toBe([
                 'หน้าหลัก',
                 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
-                'ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'แผน PM', 'ตาราง PM (Schedule)', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'Template PM', 'เครื่องมือวัด', 'ตั้งค่า PM',
+                'ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'แผน PM', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'Template PM', 'เครื่องมือวัด', 'ตั้งค่า PM',
                 'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
                 'ลูกค้า', 'สัญญา MA',
                 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
@@ -45,7 +45,7 @@ it('builds the sidebar from config, filtered by permission', function () {
     // helpdesk runs the PM work but does not shape templates or settings
     $this->actingAs(userWithRole('helpdesk'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(collect(navigationTitles($page))->filter(fn ($title) => str_contains($title, 'PM') || $title === 'รายงานถึงลูกค้า')->values()->all())
-            ->toBe(['ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'แผน PM', 'ตาราง PM (Schedule)', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)']));
+            ->toBe(['ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'แผน PM', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)']));
 });
 
 it('turns the asset module on by default', function () {

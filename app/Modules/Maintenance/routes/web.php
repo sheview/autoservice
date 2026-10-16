@@ -12,6 +12,7 @@ use App\Modules\Maintenance\Http\Controllers\PmPlanController;
 use App\Modules\Maintenance\Http\Controllers\PmPlanImportController;
 use App\Modules\Maintenance\Http\Controllers\PmPublicController;
 use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
+use App\Modules\Maintenance\Http\Controllers\PmResultSheetController;
 use App\Modules\Maintenance\Http\Controllers\PmRoundReportController;
 use App\Modules\Maintenance\Http\Controllers\PmRoundShareController;
 use App\Modules\Maintenance\Http\Controllers\PmSettingsController;
@@ -102,6 +103,9 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
         ->names('visits')->parameters(['pm-visits' => 'visit']);
     Route::get('pm-visits/{visit}/pdf', [PmVisitPdfController::class, 'consolidated'])->name('visits.pdf');
     Route::get('pm-visits/{visit}/sheet', [PmVisitPdfController::class, 'sheet'])->name('visits.sheet');
+    // The results as Excel, and the same sheet filled in brought back (PmResultSheetController).
+    Route::get('pm-visits/{visit}/results.xlsx', [PmResultSheetController::class, 'export'])->name('visits.results.export');
+    Route::post('pm-visits/{visit}/results', [PmResultSheetController::class, 'import'])->name('visits.results.import');
     Route::post('pm-visits/{visit}/sign-link', [PmVisitController::class, 'signLink'])->name('visits.sign-link');
     Route::post('pm-visits/{visit}/revise', [PmVisitController::class, 'revise'])->name('visits.revise');
     Route::post('pm-visits/{visit}/customer-sign', [PmVisitController::class, 'customerSign'])->name('visits.customer-sign');

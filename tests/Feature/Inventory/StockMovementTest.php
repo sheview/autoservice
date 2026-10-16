@@ -67,7 +67,7 @@ it('lends parts and puts them in as spares, and takes them back', function () {
 
     $this->actingAs($this->admin)->get('/stock-movements?type=loan')
         ->assertInertia(fn (Assert $page) => $page->where('movements.total', 1)
-            ->where('types', ['receive', 'issue', 'loan', 'spare', 'return', 'adjust']));
+            ->where('types', ['receive', 'issue', 'loan', 'spare', 'return', 'adjust', 'void']));
 });
 
 it('shows the history of a part newest first by date', function () {

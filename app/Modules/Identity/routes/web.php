@@ -11,5 +11,5 @@ Route::middleware(['auth', 'verified'])->name('identity.')->group(function () {
     Route::get('users/import/template', [UserImportController::class, 'template'])->name('users.import.template');
     Route::resource('users', UserController::class)->except(['show', 'destroy']);
     Route::put('roles-matrix', [RoleController::class, 'matrix'])->name('roles.matrix');
-    Route::resource('roles', RoleController::class)->except(['show', 'destroy']);
+    Route::resource('roles', RoleController::class)->except(['show']);
 });

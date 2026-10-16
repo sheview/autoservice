@@ -6,6 +6,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Models\PersonalEvent;
 use Inertia\Testing\AssertableInertia as Assert;
+use Spatie\Permission\PermissionRegistrar;
 
 beforeEach(function () {
     // Wednesday 10 June 2026, 10:00 Bangkok
@@ -125,4 +126,40 @@ it('shows when the contracts the user may see start and end, never drafts or ano
     expect($milestones($this->tech))->toBe([['2026-06-25', 'contract_end', 'MA-END Acme']]);
     $this->actingAs($this->tech)->get('/my-work')->assertInertia(fn (Assert $page) => $page->where('todo', []));
     expect($theirs->contract_no)->toBe('MA-THEIRS');
+});
+
+it('shows the team\'s PM on the same calendar, by customer and technician, to who may see PM', function () {
+    $customer = createCustomer(['name' => 'Acme']);
+    $contract = createContract($customer, ['starts_on' => '2026-01-01', 'ends_on' => '2026-12-31']);
+    $contract->contractAssets()->create(['asset_id' => createAsset(createAssetCategory(), ['customer_id' => $customer->id])->id]);
+    createPmTemplate(['name' => 'General', 'items' => [['key' => 'look', 'label' => 'Look', 'type' => 'check']]]);
+    $plan = pmPlanWithAllRounds(['contract_id' => $contract->id, 'title' => 'PM Acme', 'interval_months' => 1, 'assignee_id' => $this->other->id]);
+    $visit = $plan->visits()->whereBetween('due_on', ['2026-06-01', '2026-06-30'])->first();
+
+    $this->actingAs($this->helpdesk)->get('/my-work?view=pm')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('view', 'pm')
+        ->where('views', fn ($views) => collect($views)->contains('pm'))
+        ->where('events', fn ($events) => collect($events)->contains(fn ($e) => $e['kind'] === 'pm' && $e['date'] === $visit->due_on->toDateString()
+            && $e['when'] === 'pm_due' && str_contains($e['notes'], 'Tech Two')))
+        ->has('options.customers')
+        ->has('options.assignees'));
+
+    // Filtered to another technician: none of these.
+    $this->actingAs($this->helpdesk)->get("/my-work?view=pm&assignee={$this->tech->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('events', fn ($events) => collect($events)->where('kind', 'pm')->isEmpty()));
+    // The to-do list stays the user's own whatever the view.
+    $this->actingAs($this->other)->get('/my-work?view=pm')
+        ->assertInertia(fn (Assert $page) => $page->where('todo', fn ($todo) => collect($todo)->every(fn ($e) => $e['kind'] !== 'pm_projected')));
+});
+
+it('falls back to the user\'s own work for a view they may not open', function () {
+    $this->actingAs($this->tech)->get('/my-work?view=nonsense')->assertInertia(fn (Assert $page) => $page->where('view', 'mine'));
+
+    // Without the right to see PM work orders, no PM view, whatever is asked.
+    $noPm = userWithRole('helpdesk');
+    $noPm->roles->first()->revokePermissionTo('pm-visits.view');
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
+    $this->actingAs($noPm->fresh())->get('/my-work?view=pm')->assertInertia(fn (Assert $page) => $page
+        ->where('view', 'mine')
+        ->where('views', fn ($views) => ! collect($views)->contains('pm')));
 });

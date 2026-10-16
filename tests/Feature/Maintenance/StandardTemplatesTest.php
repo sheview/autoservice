@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Support\ChecklistItems;
 use App\Modules\Maintenance\Support\StandardTemplates;
 
@@ -94,4 +95,43 @@ it('renders every standard template in the report, empty and filled in, and flag
             }
         }
     }
+});
+
+it('checks Memory and the Port Status of a switch, after CPU', function () {
+    $keys = fn (string $code) => array_column(collect(StandardTemplates::all())->firstWhere('code', $code)['items'], 'key');
+
+    foreach (['NW-SWITCH', 'NW-GROUP'] as $code) {
+        $at = array_search('cpu', $keys($code), true);
+        expect(array_slice($keys($code), $at, 3))->toBe(['cpu', 'memory', 'port_status']);
+    }
+});
+
+it('gives the switch form a company already has a new version with Memory and Port Status', function () {
+    $section = 'Preventive Maintenance Check List';
+    $old = [
+        ['key' => 'system_status', 'label' => 'Check System Status', 'type' => 'pass_fail', 'section' => $section],
+        ['key' => 'cpu', 'label' => 'CPU', 'type' => 'pass_fail', 'section' => $section],
+        ['key' => 'cleaning', 'label' => 'Cleaning', 'type' => 'pass_fail', 'section' => $section],
+    ];
+    $make = fn (string $code, string $status, int $version = 1) => PmChecklist::create([
+        'code' => $code, 'name' => $code, 'service_line' => 'network', 'layout' => 'single', 'blocks' => [],
+        'items' => ChecklistItems::clean($old), 'version' => $version, 'status' => $status, 'published_at' => now(),
+    ]);
+    $switch = $make('NW-SWITCH', 'published');
+    // Being changed by someone: left alone.
+    $make('NW-GROUP', 'published');
+    $make('NW-GROUP', 'draft', 2);
+
+    (require base_path('app/Modules/Maintenance/database/migrations/2026_11_26_100002_add_memory_port_status_to_switch_templates.php'))->up();
+
+    $versions = PmChecklist::where('code', 'NW-SWITCH')->orderBy('version')->get();
+    expect($versions->pluck('status')->all())->toBe(['archived', 'published'])
+        ->and(array_column($versions[1]->items, 'key'))->toBe(['system_status', 'cpu', 'memory', 'port_status', 'cleaning'])
+        ->and($versions[1]->items[2]['section'])->toBe($section)
+        ->and($switch->fresh()->items)->toHaveCount(3)
+        ->and(PmChecklist::where('code', 'NW-GROUP')->count())->toBe(2);
+
+    // Run again: nothing more.
+    (require base_path('app/Modules/Maintenance/database/migrations/2026_11_26_100002_add_memory_port_status_to_switch_templates.php'))->up();
+    expect(PmChecklist::where('code', 'NW-SWITCH')->count())->toBe(2);
 });

@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\RecordTrackedMovement;
 use App\Modules\Inventory\Actions\SearchStockMovements;
+use App\Modules\Inventory\Actions\VoidStockReceipt;
 use App\Modules\Inventory\Http\Requests\StockMovementRequest;
 use App\Modules\Inventory\Models\Part;
+use App\Modules\Inventory\Models\PurchaseReceipt;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketLabels;
@@ -29,6 +31,11 @@ class StockMovementController extends Controller
         $filters = SearchStockMovements::filtersFrom($request);
         $movements = $search->handle($filters, $user)->paginate(30)->withQueryString();
         $tickets = $modules->enabled('service') ? $ticketLabels->handle($movements->pluck('ticket_id')->all()) : [];
+        // Receipts on this page already voided, and those of a purchase request (cancelled there, not here).
+        $ids = $movements->pluck('id');
+        $voided = StockMovement::whereIn('voids_id', $ids)->pluck('voids_id')->flip();
+        $purchased = PurchaseReceipt::whereIn('stock_movement_id', $ids)->pluck('stock_movement_id')->flip();
+        $canVoid = $user->can(StockMovement::permissionFor(StockMovement::TYPE_RECEIVE));
 
         return Inertia::render('Inventory/Movements/Index', [
             'movements' => $movements->through(fn (StockMovement $movement) => [
@@ -38,6 +45,9 @@ class StockMovementController extends Controller
                     'deleted' => $movement->part->trashed(),
                 ] : null,
                 'ticket' => $tickets[$movement->ticket_id] ?? null,
+                'voided' => $voided->has($movement->id),
+                'voidable' => $canVoid && $movement->type === StockMovement::TYPE_RECEIVE && ! $voided->has($movement->id) && ! $purchased->has($movement->id),
+                'voids_id' => $movement->voids_id,
                 'at' => $movement->created_at->toIso8601String(),
             ]),
             'filters' => $filters,
@@ -63,5 +73,16 @@ class StockMovementController extends Controller
         }
 
         return back()->with('success', __("inventory.movements.recorded.{$type}"));
+    }
+
+    /** A receipt entered by mistake, cancelled (VoidStockReceipt): who may enter stock movements. */
+    public function void(Request $request, StockMovement $movement, VoidStockReceipt $void): RedirectResponse
+    {
+        abort_unless($request->user()->can('viewAny', Part::class) && $request->user()->can(StockMovement::permissionFor(StockMovement::TYPE_RECEIVE)), 403);
+
+        $reason = $request->validate(['reason' => ['required', 'string', 'max:1000']], [], ['reason' => __('inventory.movements.void.reason')])['reason'];
+        $void->handle($movement, $reason, $request->user());
+
+        return back()->with('success', __('inventory.movements.void.done'));
     }
 }

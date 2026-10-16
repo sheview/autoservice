@@ -3,6 +3,7 @@
 namespace App\Modules\Identity\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Identity\Actions\DeleteRole;
 use App\Modules\Identity\Actions\SaveRole;
 use App\Modules\Identity\Actions\SaveRoleMatrix;
 use App\Modules\Identity\Actions\SyncRoleGrants;
@@ -98,5 +99,14 @@ class RoleController extends Controller
         $saveRole->handle($role, $request->validated());
 
         return redirect()->route('identity.roles.index')->with('success', __('identity.roles.updated'));
+    }
+
+    public function destroy(Role $role, DeleteRole $deleteRole): RedirectResponse
+    {
+        Gate::authorize('delete', $role);
+
+        $deleteRole->handle($role);
+
+        return redirect()->route('identity.roles.index')->with('success', __('identity.roles.deleted', ['role' => $role->label ?? $role->name]));
     }
 }

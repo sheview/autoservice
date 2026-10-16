@@ -54,6 +54,7 @@ Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(functi
 
     // Which companies each person works in (their own and linked accounts).
     Route::get('linked-staff', [LinkedStaffController::class, 'index'])->name('linked-staff.index');
+    Route::put('linked-staff', [LinkedStaffController::class, 'updateMany'])->name('linked-staff.update-many');
     Route::put('linked-staff/{user}/{tenant:ulid}', [LinkedStaffController::class, 'update'])->whereNumber('user')->name('linked-staff.update');
     Route::post('staff-pools', [StaffPoolController::class, 'store'])->name('staff-pools.store');
     Route::put('staff-pools/{pool}', [StaffPoolController::class, 'update'])->whereNumber('pool')->name('staff-pools.update');

@@ -137,3 +137,33 @@ it('leaves resources whose menu was removed off the matrix, keeping their grants
     $this->actingAs($this->admin)->put('/roles-matrix', ['matrix' => [$this->technician->id => ($this->grants)('technician')]])->assertSessionHasNoErrors();
     expect(($this->grants)('technician'))->toHaveKeys(['pm-visits.view', 'pm-plans.view', 'pm-checklists.view']);
 });
+
+it('deletes a role the company made once nobody holds it, never a system role', function () {
+    $this->actingAs($this->admin)->post('/roles', ['name' => 'senior_tech', 'label' => 'ช่างอาวุโส']);
+    $role = Role::findByName('senior_tech');
+    $this->actingAs($this->admin)->put('/roles-matrix', ['matrix' => [$role->id => ['tickets.view' => 'all']]]);
+    $holder = userWithRole('senior_tech');
+
+    // Someone holds it: refused.
+    $this->actingAs($this->admin)->delete("/roles/{$role->id}")->assertSessionHasErrors('role');
+    expect(Role::where('name', 'senior_tech')->exists())->toBeTrue();
+
+    $holder->syncRoles(['technician']);
+    $this->actingAs($this->admin)->delete("/roles/{$role->id}")->assertSessionHasNoErrors()->assertRedirect('/roles');
+    expect(Role::where('name', 'senior_tech')->exists())->toBeFalse()
+        ->and(DB::table('role_has_permissions')->where('role_id', $role->id)->exists())->toBeFalse()
+        ->and(Activity::where('event', 'role_deleted')->exists())->toBeTrue();
+
+    // A system role, or without the right to manage roles: refused.
+    $this->actingAs($this->admin)->delete("/roles/{$this->technician->id}")->assertSessionHasErrors('role');
+    $this->actingAs(userWithRole('technician'))->delete("/roles/{$this->technician->id}")->assertForbidden();
+    expect(Role::where('name', 'technician')->exists())->toBeTrue();
+});
+
+it('does not delete another company\'s role', function () {
+    $other = createTenant('other');
+    $theirs = asTenant($other, fn () => Role::create(['name' => 'their_role', 'label' => 'x', 'guard_name' => 'web']));
+
+    $this->actingAs($this->admin)->delete("/roles/{$theirs->id}")->assertNotFound();
+    expect(asTenant($other, fn () => Role::where('name', 'their_role')->exists()))->toBeTrue();
+});

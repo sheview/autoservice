@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import StarRating from '@/components/StarRating.vue';
+import StatTile from '@/components/StatTile.vue';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -9,7 +10,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, MessageSquareText, Star } from 'lucide-vue-next';
 
 interface SurveyRow {
     id: number;
@@ -80,21 +81,21 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <Heading :title="t('surveys.title')" :description="t('surveys.description')" />
 
             <div class="grid gap-4 sm:grid-cols-3">
-                <div class="rounded-md border p-4">
-                    <p class="text-xs text-muted-foreground">{{ t('surveys.summary.average') }}</p>
-                    <p class="text-2xl font-semibold">
-                        {{ summary.average === null ? t('common.none') : summary.average.toFixed(2) }}
-                        <span class="text-sm font-normal text-muted-foreground">{{ t('surveys.summary.out_of', { max: 5 }) }}</span>
-                    </p>
+                <StatTile
+                    :label="t('surveys.summary.average')"
+                    :value="summary.average === null ? t('common.none') : `${summary.average.toFixed(2)} / 5`"
+                    :icon="Star"
+                    tone="amber"
+                >
                     <StarRating :model-value="summary.average === null ? null : Math.round(summary.average)" />
-                </div>
-                <div class="rounded-md border p-4">
-                    <p class="text-xs text-muted-foreground">{{ t('surveys.summary.response_rate') }}</p>
-                    <p class="text-2xl font-semibold">{{ summary.response_rate === null ? t('common.none') : `${summary.response_rate}%` }}</p>
-                    <p class="text-xs text-muted-foreground">
-                        {{ t('surveys.summary.answered_of', { answered: summary.answered, sent: summary.sent }) }}
-                    </p>
-                </div>
+                </StatTile>
+                <StatTile
+                    :label="t('surveys.summary.response_rate')"
+                    :value="summary.response_rate === null ? t('common.none') : `${summary.response_rate}%`"
+                    :icon="MessageSquareText"
+                    tone="sky"
+                    :hint="t('surveys.summary.answered_of', { answered: summary.answered, sent: summary.sent })"
+                />
                 <div class="rounded-md border p-4">
                     <p class="mb-1 text-xs text-muted-foreground">{{ t('surveys.summary.distribution') }}</p>
                     <div v-for="score in scoreOptions" :key="score" class="flex items-center gap-2 text-xs">

@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     Route::delete('part-categories/{category}', [PartCategoryController::class, 'destroy'])->whereNumber('category')->name('part-categories.destroy');
 
     Route::get('stock-movements', [StockMovementController::class, 'index'])->name('movements.index');
+    Route::post('stock-movements/{movement}/void', [StockMovementController::class, 'void'])->whereNumber('movement')->name('movements.void');
 
     // Receiving goods without a purchase request (by serial for tracked parts).
     Route::get('stock-receipts/create', [StockReceiptController::class, 'create'])->name('stock-receipts.create');

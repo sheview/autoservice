@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
+import StatTile from '@/components/StatTile.vue';
 import PmRoundSharePanel, { type PmRoundShare } from '@/components/pm/PmRoundSharePanel.vue';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
@@ -9,7 +10,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp, FileDown, Printer } from 'lucide-vue-next';
+import { ArrowDown, ArrowUp, CalendarClock, CalendarDays, CircleCheck, FileDown, Gauge, Printer, Timer, TriangleAlert } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface VisitRow {
@@ -78,12 +79,12 @@ const sortBy = (column: string) => {
 };
 
 const tiles = computed(() => [
-    { key: 'due', value: props.summary.due },
-    { key: 'done', value: props.summary.done },
-    { key: 'on_time', value: props.summary.on_time },
-    { key: 'overdue', value: props.summary.overdue },
-    { key: 'compliance', value: props.summary.compliance === null ? '–' : `${props.summary.compliance}%` },
-    { key: 'issues', value: props.summary.results.failed ?? 0 },
+    { key: 'due', value: props.summary.due, icon: CalendarDays, tone: 'violet' as const },
+    { key: 'done', value: props.summary.done, icon: CircleCheck, tone: 'emerald' as const },
+    { key: 'on_time', value: props.summary.on_time, icon: Timer, tone: 'teal' as const },
+    { key: 'overdue', value: props.summary.overdue, icon: CalendarClock, tone: 'rose' as const },
+    { key: 'compliance', value: props.summary.compliance === null ? '–' : `${props.summary.compliance}%`, icon: Gauge, tone: 'indigo' as const },
+    { key: 'issues', value: props.summary.results.failed ?? 0, icon: TriangleAlert, tone: 'amber' as const },
 ]);
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
@@ -141,11 +142,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 :max-share-days="maxShareDays"
             />
 
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                <div v-for="tile in tiles" :key="tile.key" class="rounded-lg border p-3">
-                    <div class="text-sm text-muted-foreground">{{ t(`pm_reports.tiles.${tile.key}`) }}</div>
-                    <div class="text-2xl font-semibold tabular-nums">{{ tile.value }}</div>
-                </div>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+                <StatTile
+                    v-for="tile in tiles"
+                    :key="tile.key"
+                    :label="t(`pm_reports.tiles.${tile.key}`)"
+                    :value="tile.value"
+                    :icon="tile.icon"
+                    :tone="tile.tone"
+                />
             </div>
 
             <!-- By customer -->

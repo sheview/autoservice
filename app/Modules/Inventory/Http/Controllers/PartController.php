@@ -12,6 +12,7 @@ use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\DeletePart;
 use App\Modules\Inventory\Actions\FindPartUnits;
 use App\Modules\Inventory\Actions\PartCategoryOptions;
+use App\Modules\Inventory\Actions\PartStats;
 use App\Modules\Inventory\Actions\PartUnitHistory;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Actions\SearchParts;
@@ -38,7 +39,7 @@ class PartController extends Controller
 {
     public const EXPORT_PERMISSION = 'parts.export';
 
-    public function index(Request $request, SearchParts $search): Response
+    public function index(Request $request, SearchParts $search, PartStats $stats): Response
     {
         Gate::authorize('viewAny', Part::class);
 
@@ -56,6 +57,7 @@ class PartController extends Controller
             'serialHits' => app(FindPartUnits::class)->handle($filters['search']),
             'statuses' => SearchParts::STATUSES,
             'stockLevels' => SearchParts::STOCK_LEVELS,
+            'stats' => $stats->handle(),
             'can' => [
                 'create' => $user->can('create', Part::class),
                 'update' => $user->can('parts.update'),
@@ -64,6 +66,7 @@ class PartController extends Controller
                 'export' => $user->can(self::EXPORT_PERMISSION),
                 'categories' => $user->can(PartCategoryController::PERMISSION),
                 'receive' => $user->can('stock-movements.create'),
+                'movements' => $user->can(StockMovementController::VIEW_PERMISSION),
             ],
         ]);
     }

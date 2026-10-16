@@ -227,3 +227,21 @@ it('keeps another company out of the calendar and the report', function () {
         expect(RoomAccessVisit::count())->toBe(0);
     });
 });
+
+it('shows the rooms on the one calendar of "my work", with the days to stay out', function () {
+    ($this->approve)(($this->send)($this->weekly));
+    $this->room->update(['freeze_periods' => [['from' => '2026-11-26 08:00', 'to' => '2026-11-27 18:00', 'reason' => 'Audit']]]);
+
+    $this->actingAs($this->desk)->get('/my-work?view=room&month=2026-11')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('view', 'room')
+        ->where('events', fn ($events) => collect($events)->where('kind', 'room')->count() === 8
+            && collect($events)->every(fn ($e) => $e['time'] === '09:00' && $e['end_time'] === '12:00' && str_starts_with($e['title'], 'DC Room 1 · ')))
+        ->where('marks.2026-11-26.freeze', 'DC Room 1 Audit')
+        ->where('marks.2026-11-27.freeze', 'DC Room 1 Audit')
+        ->has('options.rooms', 1));
+
+    // Narrowed to a room that has none.
+    $other = ServerRoom::create(['customer_id' => $this->room->customer_id, 'name' => 'DC Room 2']);
+    $this->actingAs($this->desk)->get("/my-work?view=room&month=2026-11&room={$other->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('events', []));
+});

@@ -161,7 +161,7 @@ it('lists by tab, with search, filters, sort and pages', function () {
         ->where('requests.total', 4)
         ->where('requests.data.0.request_no', $lent->request_no) // newest first
         ->where('lines', null)
-        ->where('counts', ['approve' => 1, 'fulfill' => 1, 'backorders' => 1, 'returns' => 1]));
+        ->where('counts', ['open' => 4, 'approve' => 1, 'fulfill' => 1, 'backorders' => 1, 'returns' => 1]));
     $page('?tab=approve')->assertInertia(fn (Assert $p) => $p->where('requests.total', 1)->where('requests.data.0.request_no', $waiting->request_no));
     $page('?tab=fulfill')->assertInertia(fn (Assert $p) => $p->where('requests.total', 1)->where('requests.data.0.request_no', $toHand->request_no));
     $page('?tab=backorders')->assertInertia(fn (Assert $p) => $p

@@ -4,6 +4,7 @@ namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetHeldQuantities;
+use App\Modules\Asset\Actions\AssetStats;
 use App\Modules\Asset\Actions\AssetSuggestions;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
@@ -56,7 +57,7 @@ class AssetController extends Controller
         private AssetSuggestions $suggestions,
     ) {}
 
-    public function index(Request $request, SearchAssets $search, AssetHeldQuantities $heldQuantities): Response
+    public function index(Request $request, SearchAssets $search, AssetHeldQuantities $heldQuantities, AssetStats $stats): Response
     {
         Gate::authorize('viewAny', Asset::class);
 
@@ -98,6 +99,7 @@ class AssetController extends Controller
             'assetTypes' => AssetCategory::ASSET_TYPES,
             'statuses' => Asset::STATUSES,
             'expiringDays' => SearchAssets::EXPIRING_DAYS,
+            'stats' => $stats->handle($user),
             'can' => [
                 'create' => $user->can('create', Asset::class),
                 'import' => $user->can('import', Asset::class),

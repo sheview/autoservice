@@ -2,12 +2,14 @@
 import ColumnChart from '@/components/ColumnChart.vue';
 import Heading from '@/components/Heading.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
+import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/vue3';
+import { CalendarCheck, CalendarClock, ClipboardCheck, Send, Stamp, Wrench } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 interface VisitRow {
@@ -41,12 +43,25 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: t('pm_dashboard.title'), href: r
 
 // Where the work stands now; the overdue tile stands out when there is any.
 const tiles = computed(() => [
-    { key: 'overdue', value: props.counts.overdue, query: { status: 'overdue' }, alert: props.counts.overdue > 0 },
-    { key: 'due_this_month', value: props.counts.due_this_month, query: {} },
-    { key: 'working', value: props.counts.in_progress + props.counts.revision_required, query: { status: 'in_progress' } },
-    { key: 'to_review', value: props.counts.submitted, query: { status: 'submitted' } },
-    { key: 'to_approve', value: props.counts.pending_approval, query: { status: 'pending_approval' } },
-    { key: 'to_publish', value: props.counts.approved, query: { status: 'approved' } },
+    {
+        key: 'overdue',
+        value: props.counts.overdue,
+        query: { status: 'overdue' },
+        alert: props.counts.overdue > 0,
+        icon: CalendarClock,
+        tone: 'rose' as const,
+    },
+    { key: 'due_this_month', value: props.counts.due_this_month, query: {}, icon: CalendarCheck, tone: 'teal' as const },
+    {
+        key: 'working',
+        value: props.counts.in_progress + props.counts.revision_required,
+        query: { status: 'in_progress' },
+        icon: Wrench,
+        tone: 'blue' as const,
+    },
+    { key: 'to_review', value: props.counts.submitted, query: { status: 'submitted' }, icon: ClipboardCheck, tone: 'amber' as const },
+    { key: 'to_approve', value: props.counts.pending_approval, query: { status: 'pending_approval' }, icon: Stamp, tone: 'violet' as const },
+    { key: 'to_publish', value: props.counts.approved, query: { status: 'approved' }, icon: Send, tone: 'emerald' as const },
 ]);
 
 const monthLabel = (month: string) => new Date(`${month}-01T00:00:00`).toLocaleDateString('th-TH-u-ca-gregory', { month: 'short', year: '2-digit' });
@@ -81,17 +96,17 @@ const lists = computed(() =>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                <Link
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+                <StatTile
                     v-for="tile in tiles"
                     :key="tile.key"
                     :href="route('maintenance.visits.index', tile.query)"
-                    class="rounded-lg border p-3 transition hover:bg-muted/50"
-                    :class="{ 'border-red-300 bg-red-50 dark:border-red-900 dark:bg-red-950/40': tile.alert }"
-                >
-                    <div class="text-sm text-muted-foreground">{{ t(`pm_dashboard.tiles.${tile.key}`) }}</div>
-                    <div class="text-2xl font-semibold tabular-nums" :class="{ 'text-red-700 dark:text-red-400': tile.alert }">{{ tile.value }}</div>
-                </Link>
+                    :label="t(`pm_dashboard.tiles.${tile.key}`)"
+                    :value="tile.value"
+                    :icon="tile.icon"
+                    :tone="tile.tone"
+                    :alert="tile.alert"
+                />
             </div>
 
             <div class="grid gap-4 lg:grid-cols-3">

@@ -9,7 +9,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 interface Person {
     id: number;
@@ -70,18 +70,73 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: t('linked_staff.title'), href: r
 
 const filters = useListFilters('platform.linked-staff.index', props.filters);
 
-// The cell being saved ("person-tenant"), to disable it meanwhile.
-const saving = ref<string | null>(null);
-
-const toggle = (person: Person, tenant: { id: number; ulid: string }, active: boolean) => {
-    saving.value = `${person.id}-${tenant.id}`;
-    router.put(
-        route('platform.linked-staff.update', [person.id, tenant.ulid]),
-        { active },
-        // Not preserving state: a refused change (e.g. the company's last admin) puts the box back.
-        { preserveScroll: true, preserveState: false, onFinish: () => (saving.value = null) },
-    );
+// Boxes changed but not saved yet, by "person-company": saved together with "บันทึก" (one request,
+// not one per box). Kept across pages and searches until saved or discarded.
+const draft = ref<Record<string, boolean>>({});
+const cell = (person: Person, tenantId: number) => `${person.id}-${tenantId}`;
+const isOn = (person: Person, tenantId: number) => draft.value[cell(person, tenantId)] ?? person.on.includes(tenantId);
+const isChanged = (person: Person, tenantId: number) => cell(person, tenantId) in draft.value;
+const setOn = (person: Person, tenantId: number, on: boolean) => {
+    const changes = { ...draft.value };
+    if (on === person.on.includes(tenantId)) {
+        delete changes[cell(person, tenantId)];
+    } else {
+        changes[cell(person, tenantId)] = on;
+    }
+    draft.value = changes;
 };
+const pending = computed(() => Object.keys(draft.value).length);
+
+// A company's column on this page: everyone but those whose own company it is.
+const column = (tenantId: number) => props.staff.data.filter((person) => person.home !== tenantId);
+const columnState = (tenantId: number) => {
+    const on = column(tenantId).filter((person) => isOn(person, tenantId)).length;
+    return { all: on > 0 && on === column(tenantId).length, some: on > 0 && on < column(tenantId).length };
+};
+const setColumn = (tenantId: number, on: boolean) => column(tenantId).forEach((person) => setOn(person, tenantId, on));
+
+const saving = ref(false);
+const save = () =>
+    router.put(
+        route('platform.linked-staff.update-many'),
+        {
+            changes: Object.entries(draft.value).map(([key, active]) => {
+                const [user, tenantId] = key.split('-').map(Number);
+                return { user, tenant_id: tenantId, active };
+            }),
+        },
+        {
+            preserveScroll: true,
+            onStart: () => (saving.value = true),
+            onSuccess: () => (draft.value = {}),
+            onFinish: () => (saving.value = false),
+        },
+    );
+
+// After a save (or another page of people): what now matches the saved state is no longer a change;
+// what was refused (e.g. a company's last admin) stays ticked as a change.
+watch(
+    () => props.staff,
+    () =>
+        props.staff.data.forEach((person) =>
+            props.tenants.forEach((tenant) => isChanged(person, tenant.id) && setOn(person, tenant.id, isOn(person, tenant.id))),
+        ),
+);
+
+// Leaving the page with changes not saved: ask first (paging and searching here keep them).
+const leaving = (url: URL) => pending.value > 0 && !url.pathname.startsWith(new URL(route('platform.linked-staff.index')).pathname);
+const beforeUnload = (event: BeforeUnloadEvent) => {
+    if (pending.value > 0) event.preventDefault();
+};
+let stopListening: () => void = () => {};
+onMounted(() => {
+    stopListening = router.on('before', (event) => (leaving(event.detail.visit.url) ? confirm(t('linked_staff.leave_confirm')) : true));
+    window.addEventListener('beforeunload', beforeUnload);
+});
+onUnmounted(() => {
+    stopListening();
+    window.removeEventListener('beforeunload', beforeUnload);
+});
 
 const errors = () => Object.values(page.props.errors as Record<string, string>);
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
@@ -210,7 +265,22 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <thead class="bg-muted/50 text-left">
                         <tr>
                             <th class="px-4 py-2 font-medium">{{ t('linked_staff.person') }}</th>
-                            <th v-for="tenant in tenants" :key="tenant.id" class="px-4 py-2 text-center font-medium">{{ tenant.name }}</th>
+                            <th v-for="tenant in tenants" :key="tenant.id" class="px-4 py-2 text-center font-medium">
+                                {{ tenant.name }}
+                                <label
+                                    v-if="column(tenant.id).length"
+                                    class="mt-1 flex items-center justify-center gap-1.5 text-xs font-normal text-muted-foreground"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        class="size-4 rounded border-input"
+                                        :checked="columnState(tenant.id).all"
+                                        :indeterminate="columnState(tenant.id).some"
+                                        @change="setColumn(tenant.id, ($event.target as HTMLInputElement).checked)"
+                                    />
+                                    {{ t('linked_staff.select_all') }}
+                                </label>
+                            </th>
                         </tr>
                     </thead>
                     <tbody>
@@ -226,7 +296,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                     {{ person.email }}<template v-if="person.employee_code"> · {{ person.employee_code }}</template>
                                 </div>
                             </td>
-                            <td v-for="tenant in tenants" :key="tenant.id" class="px-4 py-2 text-center">
+                            <td
+                                v-for="tenant in tenants"
+                                :key="tenant.id"
+                                class="px-4 py-2 text-center"
+                                :class="{ 'bg-amber-50 dark:bg-amber-950/40': isChanged(person, tenant.id) }"
+                            >
                                 <span v-if="person.home === tenant.id" class="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                     {{ t('linked_staff.home') }}
                                 </span>
@@ -234,10 +309,9 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                     v-else
                                     type="checkbox"
                                     class="size-4 rounded border-input"
-                                    :checked="person.on.includes(tenant.id)"
-                                    :disabled="saving === `${person.id}-${tenant.id}`"
+                                    :checked="isOn(person, tenant.id)"
                                     :aria-label="`${person.name} — ${tenant.name}`"
-                                    @change="toggle(person, tenant, ($event.target as HTMLInputElement).checked)"
+                                    @change="setOn(person, tenant.id, ($event.target as HTMLInputElement).checked)"
                                 />
                             </td>
                         </tr>
@@ -246,6 +320,18 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- The changes not saved yet: saved in one go -->
+            <div
+                v-if="pending"
+                class="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 shadow-lg dark:border-amber-800 dark:bg-amber-950"
+            >
+                <span class="text-sm font-medium">{{ t('linked_staff.pending', { count: pending }) }}</span>
+                <div class="flex gap-2">
+                    <Button variant="outline" size="sm" :disabled="saving" @click="draft = {}">{{ t('linked_staff.discard') }}</Button>
+                    <Button size="sm" :disabled="saving" @click="save">{{ t('linked_staff.save') }}</Button>
+                </div>
             </div>
 
             <p class="text-xs text-muted-foreground">{{ t('linked_staff.new_hint') }}</p>

@@ -7,7 +7,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { Lock, Pencil, Plus } from 'lucide-vue-next';
+import { Lock, Pencil, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, reactive, ref } from 'vue';
 
 interface RoleColumn {
@@ -95,6 +95,16 @@ const save = () => {
         { preserveScroll: true, onStart: () => (saving.value = true), onFinish: () => (saving.value = false) },
     );
 };
+// Only roles the company made; the server refuses while anyone holds the role.
+const destroy = (role: RoleColumn) => {
+    const message =
+        role.users_count > 0 ? t('roles.delete_in_use', { count: role.users_count }) : t('roles.delete_confirm', { role: role.label ?? role.name });
+    if (role.users_count > 0) {
+        alert(message);
+    } else if (confirm(message)) {
+        router.delete(route('identity.roles.destroy', role.id), { preserveScroll: true });
+    }
+};
 const reset = () => {
     for (const role of props.roles) matrix[role.id] = { ...(props.grants[role.id] ?? {}) };
 };
@@ -119,6 +129,7 @@ const reset = () => {
                 {{ page.props.flash.success }}
             </p>
             <InputError :message="errors.matrix" />
+            <InputError :message="errors.role" />
 
             <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
                 <Input v-model="filter" type="search" class="max-w-xs" :placeholder="t('roles.filter_placeholder')" />
@@ -160,6 +171,16 @@ const reset = () => {
                                     >
                                         <Pencil class="h-3.5 w-3.5" />
                                     </Link>
+                                    <button
+                                        v-if="!role.is_system"
+                                        type="button"
+                                        class="text-muted-foreground hover:text-red-600"
+                                        :aria-label="t('roles.delete_label')"
+                                        :title="t('roles.delete_label')"
+                                        @click="destroy(role)"
+                                    >
+                                        <Trash2 class="h-3.5 w-3.5" />
+                                    </button>
                                 </div>
                                 <div class="text-sm font-normal text-muted-foreground">
                                     {{ t('roles.users_count', { count: role.users_count }) }}

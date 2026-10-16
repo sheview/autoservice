@@ -39,7 +39,8 @@ class PartUsageReport
         $value = fn (int $partId, int $quantity) => $parts[$partId]?->unit_cost === null ? null : $parts[$partId]->unit_cost * $quantity;
 
         return [
-            'received' => (int) $inPeriod()->where('type', StockMovement::TYPE_RECEIVE)->sum('quantity'),
+            // Receipts voided later come off (a void is negative).
+            'received' => (int) $inPeriod()->whereIn('type', [StockMovement::TYPE_RECEIVE, StockMovement::TYPE_VOID])->sum('quantity'),
             'used' => (int) $used->sum(),
             'used_on_tickets' => max(0, -(int) $inPeriod()->whereIn('type', $usage)->whereNotNull('ticket_id')->sum('quantity')),
             'used_value' => Money::toBaht((int) $used->map(fn (int $quantity, int $partId) => $value($partId, $quantity) ?? 0)->sum()),

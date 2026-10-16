@@ -13,22 +13,20 @@ defineProps<Props>();
 </script>
 
 <template>
-    <!-- The app's mark: a building on a tile in the brand's violet, the same as public/favicon.svg. -->
+    <!-- The app's mark: "ITSM" on a violet-to-indigo tile, the same as public/favicon.svg (letters drawn, not typed, so no font is needed). -->
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" :class="className" v-bind="$attrs" aria-hidden="true">
         <defs>
             <linearGradient id="app-logo-bg" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stop-color="#7c3aed" />
-                <stop offset="1" stop-color="#6366f1" />
+                <stop offset="0" stop-color="#8b5cf6" />
+                <stop offset="1" stop-color="#4f46e5" />
             </linearGradient>
         </defs>
         <rect width="64" height="64" rx="14" fill="url(#app-logo-bg)" />
-        <rect x="16" y="9" width="32" height="46" rx="4.5" fill="none" stroke="#fff" stroke-width="4.5" stroke-linejoin="round" />
-        <g fill="#fff">
-            <rect x="23" y="16.5" width="6.5" height="6.5" rx="1.5" />
-            <rect x="34.5" y="16.5" width="6.5" height="6.5" rx="1.5" />
-            <rect x="23" y="27" width="6.5" height="6.5" rx="1.5" />
-            <rect x="34.5" y="27" width="6.5" height="6.5" rx="1.5" />
-            <rect x="27.5" y="39" width="9" height="16" rx="1.5" />
+        <g fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10.5 24.5v15" />
+            <path d="M15.5 24.5h10M20.5 24.5v15" />
+            <path d="M38 27.2c-.8-1.8-2.5-2.7-4.4-2.7-2.6 0-4.2 1.5-4.2 3.6 0 4.8 8.8 2.6 8.8 7.6 0 2.3-1.8 3.8-4.6 3.8-2 0-3.8-.9-4.6-2.8" />
+            <path d="M42.5 39.5v-15l5.5 8.5 5.5-8.5v15" />
         </g>
     </svg>
 </template>
