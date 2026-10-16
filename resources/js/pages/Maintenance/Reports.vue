@@ -2,6 +2,7 @@
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
+import PmRoundSharePanel, { type PmRoundShare } from '@/components/pm/PmRoundSharePanel.vue';
 import { Input } from '@/components/ui/input';
 import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -63,6 +64,10 @@ const props = defineProps<{
         failed: number;
         onsite_minutes: number | null;
     }[];
+    roundShares: PmRoundShare[];
+    canShare: boolean;
+    shareDays: number;
+    maxShareDays: number;
 }>();
 
 const breadcrumbs: BreadcrumbItem[] = [{ title: t('pm_reports.title'), href: route('maintenance.reports.index') }];
@@ -123,6 +128,18 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 </a>
                 <span v-else class="self-center text-xs text-muted-foreground">{{ t('pm_reports.round_report_hint') }}</span>
             </div>
+
+            <!-- A link for the customer to the same round, without an account -->
+            <PmRoundSharePanel
+                v-if="canShare && filters.customer_id"
+                :key="filters.customer_id"
+                :customer-id="filters.customer_id"
+                :from="filters.from"
+                :to="filters.to"
+                :shares="roundShares"
+                :share-days="shareDays"
+                :max-share-days="maxShareDays"
+            />
 
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
                 <div v-for="tile in tiles" :key="tile.key" class="rounded-lg border p-3">

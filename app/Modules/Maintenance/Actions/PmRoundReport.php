@@ -9,6 +9,7 @@ use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Maintenance\Support\PmNumber;
 use App\Modules\Tenancy\Support\CompanyProfile;
 use App\Modules\Tenancy\Support\TenantContext;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -56,7 +57,29 @@ class PmRoundReport
      */
     public function printable(array $filters): array
     {
-        $visits = PmVisit::query()
+        $visits = $this->visits($filters);
+        ['cover' => $cover, 'file' => $file] = $this->summary($filters, $visits);
+
+        $sheets = [];
+        $documents = [];
+        foreach ($visits as $visit) {
+            $version = $this->version($visit);
+            $sheets[] = $this->document->handle($visit, $version, null, customerCopy: true);
+            $documents[] = [$visit, $version];
+        }
+
+        return ['cover' => $cover, 'sheets' => $sheets, 'documents' => $documents, 'file' => $file];
+    }
+
+    /**
+     * The approved work orders of the round, by due date, with their results counted.
+     *
+     * @param  array{customer_id?: int|null, plan_id?: int|null, from: string, to: string}  $filters
+     * @return Collection<int, PmVisit>
+     */
+    public function visits(array $filters): Collection
+    {
+        return PmVisit::query()
             ->whereIn('status', PmVisit::REPORTED_STATUSES)
             ->where('current_version', '>', 0)
             ->when($filters['customer_id'] ?? null, fn ($q, $id) => $q->where('customer_id', $id))
@@ -71,6 +94,19 @@ class PmRoundReport
             ->orderBy('due_on')
             ->orderBy('visit_no')
             ->get();
+    }
+
+    /**
+     * The cover (a row per work order) and the PDF's file name.
+     *
+     * @param  array{customer_id?: int|null, plan_id?: int|null, from: string, to: string}  $filters
+     * @param  Collection<int, PmVisit>  $visits  of visits()
+     * @return array{cover: array<string, mixed>, file: string}
+     *
+     * @throws ValidationException when there is none
+     */
+    public function summary(array $filters, Collection $visits): array
+    {
         if ($visits->isEmpty()) {
             throw ValidationException::withMessages(['report' => __('maintenance.round_report.empty')]);
         }
@@ -88,6 +124,7 @@ class PmRoundReport
             'from' => $filters['from'],
             'to' => $filters['to'],
             'rows' => $visits->map(fn (PmVisit $visit) => [
+                'ulid' => $visit->ulid,
                 'number' => PmNumber::shown($visit->visit_no, $visit->tenant_id),
                 'title' => $visit->displayTitle(),
                 'customer' => $customers[$visit->customer_id]['name'] ?? null,
@@ -101,16 +138,14 @@ class PmRoundReport
             ])->all(),
         ];
 
-        $sheets = [];
-        $documents = [];
-        foreach ($visits as $visit) {
-            $version = $visit->versions()->where('version', $visit->published_version ?: $visit->current_version)->first();
-            $sheets[] = $this->document->handle($visit, $version, null, customerCopy: true);
-            $documents[] = [$visit, $version];
-        }
-
         $name = preg_replace('/[^A-Za-z0-9_.-]+/', '-', 'PM-round-'.($customers[$customerId]['code'] ?? 'all').'-'.$filters['from'].'-'.$filters['to']);
 
-        return ['cover' => $cover, 'sheets' => $sheets, 'documents' => $documents, 'file' => $name.'.pdf'];
+        return ['cover' => $cover, 'file' => $name.'.pdf'];
+    }
+
+    /** The version of a work order the round shows: the one given to the customer, else the newest approved. */
+    public function version(PmVisit $visit): mixed
+    {
+        return $visit->versions()->where('version', $visit->published_version ?: $visit->current_version)->first();
     }
 }

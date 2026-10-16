@@ -137,6 +137,8 @@ return [
         'settings' => 'แก้ไขการตั้งค่า PM',
         'share_created' => 'สร้างลิงก์รายงาน PM :no ให้ลูกค้า',
         'share_revoked' => 'ยกเลิกลิงก์รายงาน PM :no',
+        'round_share_created' => 'สร้างลิงก์รายงานสรุปรอบ PM :from ถึง :to ให้ลูกค้า',
+        'round_share_revoked' => 'ยกเลิกลิงก์รายงานสรุปรอบ PM :from ถึง :to',
     ],
 
     'settings' => [
@@ -222,6 +224,10 @@ return [
         'require_customer_signature' => 'บังคับลายเซ็นลูกค้า',
         'share_days' => 'อายุลิงก์แชร์เริ่มต้น (วัน)',
         'report_note' => 'ข้อความท้ายรายงาน',
+        'customer_id' => 'ลูกค้า',
+        'plan_id' => 'แผน PM',
+        'from' => 'ตั้งแต่วันที่',
+        'to' => 'ถึงวันที่',
         'recipient_name' => 'ชื่อผู้รับ',
         'recipient_email' => 'อีเมลผู้รับ',
         'days' => 'อายุลิงก์ (วัน)',

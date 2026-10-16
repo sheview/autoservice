@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Maintenance\Actions\PmOverview;
 use App\Modules\Maintenance\Actions\PmTechnicianStats;
+use App\Modules\Maintenance\Models\PmReportShare;
+use App\Modules\Maintenance\Models\PmRoundShare;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
+use App\Modules\Maintenance\Support\PmSettings;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -92,6 +95,7 @@ class PmDashboardController extends Controller
             'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
         $customers = collect($this->listCustomers->handle(withTrashed: true))->pluck('name', 'id');
+        $canShare = $user->can('pm-reports.share');
 
         $visits = $this->overview->visible($user)
             ->with('plan:id,title')
@@ -121,6 +125,23 @@ class PmDashboardController extends Controller
             'technicians' => $this->technicianStats->handle($user, $from, $to, $filters['customer_id']),
             'customers' => $this->listCustomers->handle(),
             'statuses' => PmVisit::STATUSES,
+            // Customers' links to the round report of the chosen customer (the link itself is never shown again).
+            'roundShares' => $canShare && $filters['customer_id']
+                ? PmRoundShare::query()->where('customer_id', $filters['customer_id'])->latest('id')->limit(20)->get()
+                    ->map(fn (PmRoundShare $share) => [
+                        ...$share->only(['id', 'recipient_name', 'recipient_email', 'allow_download', 'view_count', 'created_by_name', 'revoked_by_name']),
+                        'from' => $share->from_on->toDateString(),
+                        'to' => $share->to_on->toDateString(),
+                        'active' => $share->isActive(),
+                        'expires_at' => $share->expires_at->toIso8601String(),
+                        'revoked_at' => $share->revoked_at?->toIso8601String(),
+                        'last_viewed_at' => $share->last_viewed_at?->toIso8601String(),
+                        'created_at' => $share->created_at->toIso8601String(),
+                    ])
+                : [],
+            'canShare' => $canShare,
+            'shareDays' => PmSettings::of()->shareDays,
+            'maxShareDays' => PmReportShare::MAX_DAYS,
         ]);
     }
 

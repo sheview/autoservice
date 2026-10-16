@@ -13,8 +13,10 @@ use App\Modules\Maintenance\Http\Controllers\PmPlanImportController;
 use App\Modules\Maintenance\Http\Controllers\PmPublicController;
 use App\Modules\Maintenance\Http\Controllers\PmReportShareController;
 use App\Modules\Maintenance\Http\Controllers\PmRoundReportController;
+use App\Modules\Maintenance\Http\Controllers\PmRoundShareController;
 use App\Modules\Maintenance\Http\Controllers\PmSettingsController;
 use App\Modules\Maintenance\Http\Controllers\PmSharedReportController;
+use App\Modules\Maintenance\Http\Controllers\PmSharedRoundController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitPdfController;
 use App\Modules\Maintenance\Http\Controllers\PmWorkOrderController;
@@ -30,6 +32,15 @@ Route::middleware('throttle:track-link')->group(function () {
     Route::get('t/{code}/pm-report/{token}/pdf', [PmSharedReportController::class, 'pdfOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.shared.pdf.path');
     Route::get('t/{code}/pm-report/{token}/equipment/{item}/pdf', [PmSharedReportController::class, 'pdfOnPath'])
         ->where('code', '[0-9]{1,10}')->whereNumber('item')->name('maintenance.shared.equipment.path');
+
+    // A customer's round report link (PmSharedRoundController): the whole round, or one work order of it.
+    Route::get('pm-round/{token}', [PmSharedRoundController::class, 'showOnHost'])->name('maintenance.shared-round.show');
+    Route::get('pm-round/{token}/pdf', [PmSharedRoundController::class, 'pdfOnHost'])->name('maintenance.shared-round.pdf');
+    Route::get('pm-round/{token}/visits/{visit}/pdf', [PmSharedRoundController::class, 'pdfOnHost'])->where('visit', '[0-9A-Za-z]{26}')->name('maintenance.shared-round.visit');
+    Route::get('t/{code}/pm-round/{token}', [PmSharedRoundController::class, 'showOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.shared-round.show.path');
+    Route::get('t/{code}/pm-round/{token}/pdf', [PmSharedRoundController::class, 'pdfOnPath'])->where('code', '[0-9]{1,10}')->name('maintenance.shared-round.pdf.path');
+    Route::get('t/{code}/pm-round/{token}/visits/{visit}/pdf', [PmSharedRoundController::class, 'pdfOnPath'])
+        ->where('code', '[0-9]{1,10}')->where('visit', '[0-9A-Za-z]{26}')->name('maintenance.shared-round.visit.path');
 
     // The customer signs on their own phone (a sign link), and the tracking QR on the sheet (PmPublicController).
     Route::get('pm-sign/{token}', [PmPublicController::class, 'signOnHost'])->name('maintenance.public.sign');
@@ -56,6 +67,8 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::get('pm-reports', [PmDashboardController::class, 'reports'])->name('reports.index');
     Route::get('pm-reports/round', PmRoundReportController::class)->name('reports.round');
     Route::get('pm-equipment', [PmEquipmentController::class, 'index'])->name('equipment.index');
+    Route::post('pm-round-shares', [PmRoundShareController::class, 'store'])->name('round-shares.store');
+    Route::delete('pm-round-shares/{roundShare}', [PmRoundShareController::class, 'destroy'])->whereNumber('roundShare')->name('round-shares.destroy');
     Route::get('pm-customer-reports', [PmCustomerReportController::class, 'index'])->name('customer-reports.index');
     Route::resource('pm-instruments', PmInstrumentController::class)->only(['index', 'store', 'update', 'destroy'])
         ->names('instruments')->parameters(['pm-instruments' => 'instrument']);
