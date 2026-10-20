@@ -10,6 +10,7 @@ use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Actions\AddPmVisitItems;
 use App\Modules\Maintenance\Actions\CreatePmWorkOrder;
+use App\Modules\Maintenance\Actions\PmTemplatesForAssets;
 use App\Modules\Maintenance\Actions\RemovePmVisitItem;
 use App\Modules\Maintenance\Http\Requests\PmPlanRequest;
 use App\Modules\Maintenance\Models\PmVisit;
@@ -36,20 +37,26 @@ class PmWorkOrderController extends Controller
     ) {}
 
     /**
-     * ?customer_id= fills the contracts and the equipment of that customer.
+     * ?customer_id= fills the contracts and the equipment of that customer (the register, Asset), each with
+     * the template it would get; ?contract_id= (from the contract page) also picks the contract, and its customer.
      */
-    public function create(Request $request): Response
+    public function create(Request $request, PmTemplatesForAssets $templatesFor): Response
     {
         Gate::authorize('create', PmVisit::class);
         abort_if($request->user()->customer_id !== null, 403);
 
-        $customerId = $request->integer('customer_id') ?: null;
+        $contractId = $request->integer('contract_id') ?: null;
+        $contract = $contractId ? ($this->contractDetails->handle([$contractId], active: true)[$contractId] ?? null) : null;
+        $customerId = $contract['customer_id'] ?? ($request->integer('customer_id') ?: null);
+        $assets = $customerId ? $this->assetSummaries->handle($request->user(), ['customer_id' => $customerId, 'limit' => 500]) : [];
 
         return Inertia::render('Maintenance/Visits/Create', [
             'customers' => $this->listCustomers->handle(),
             'customerId' => $customerId,
-            'contracts' => fn () => $customerId ? $this->contracts($customerId) : [],
-            'assets' => fn () => $customerId ? $this->assetSummaries->handle($request->user(), ['customer_id' => $customerId, 'limit' => 500]) : [],
+            'contractId' => $contract['id'] ?? null,
+            'contracts' => $customerId ? $this->contracts($customerId) : [],
+            'assets' => $assets,
+            'templates' => $templatesFor->handle(array_column($assets, 'id')),
             'assignees' => $this->usersWithPermission->handle(PmPlanRequest::ASSIGNABLE_PERMISSION)
                 ->map(fn (User $user) => $user->only(['id', 'name']))->values(),
         ]);
@@ -110,15 +117,15 @@ class PmWorkOrderController extends Controller
     }
 
     /**
-     * Running contracts of a customer, by id.
+     * Running contracts of a customer, by id, with the assets they cover.
      *
-     * @return array<int, array{id: int, contract_no: string, title: string}>
+     * @return array<int, array{id: int, contract_no: string, title: string, asset_ids: list<int>}>
      */
     private function contracts(int $customerId): array
     {
         return collect($this->contractDetails->handle(null, active: true))
             ->where('customer_id', $customerId)
-            ->map(fn (array $contract) => collect($contract)->only(['id', 'contract_no', 'title'])->all())
+            ->map(fn (array $contract) => collect($contract)->only(['id', 'contract_no', 'title', 'asset_ids'])->all())
             ->all();
     }
 }

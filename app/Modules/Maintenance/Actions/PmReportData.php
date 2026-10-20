@@ -102,7 +102,7 @@ class PmReportData
                         'asset_code' => $asset['asset_code'],
                         'name' => $asset['name'],
                         'category' => $categories[$asset['category_id']] ?? null,
-                        ...collect($device)->only(['brand', 'model', 'serial_number', 'property_no', 'location', 'ip_address'])->all(),
+                        ...collect($device)->only(['brand', 'model', 'serial_number', 'property_no', 'location', 'ip_address', 'used_by'])->all(),
                     ] : null,
                     'result' => $item->result,
                     'not_inspected_reason' => $item->not_inspected_reason,

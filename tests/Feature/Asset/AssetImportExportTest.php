@@ -3,6 +3,7 @@
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetImport;
+use App\Modules\Asset\Support\AssetSheet;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\UploadedFile;
@@ -131,7 +132,7 @@ it('exports the filtered list and imports the same file back as updates', functi
     $rows = sheetRows($spareOnly->getFile()->getPathname());
     expect($rows[0])->toBe([
         'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'ประเภทย่อย', 'Serial Number', 'จำนวน', 'หน่วย',
-        'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'ชั้น', 'ห้อง', 'IP Address', 'MAC Address', 'ผู้ใช้งานประจำเครื่อง', 'แผนก',
+        'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'ชั้น', 'ห้อง', 'IP Address', 'MAC Address', 'ชื่อผู้ใช้งาน', 'แผนก',
         'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'รหัสเครื่องแม่ (ชุด)', 'สัญญา MA (เลขที่)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
     ])
         ->and(count($rows))->toBe(2)
@@ -208,4 +209,9 @@ it('requires assets.import and assets.export', function () {
     $this->actingAs($technician)->post('/assets/imports', ['file' => xlsxUpload([HEADINGS])])->assertForbidden();
     $this->actingAs($technician)->get('/assets/imports/template')->assertForbidden();
     $this->actingAs($technician)->get('/assets/export')->assertForbidden();
+});
+
+it('still reads a renamed heading from an older file', function () {
+    expect(AssetSheet::mapHeadings(['ชื่อ', 'ผู้ใช้งานประจำเครื่อง', 'ชื่อผู้ใช้งาน']))
+        ->toBe([0 => 'name', 1 => 'used_by', 2 => 'used_by']);
 });

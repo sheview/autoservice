@@ -250,6 +250,7 @@ return [
         'property_no' => 'เลขครุภัณฑ์',
         'location' => 'ตำแหน่งที่ตั้ง',
         'ip' => 'IP Address',
+        'used_by' => 'ชื่อผู้ใช้งาน',
         'check' => 'รายการตรวจ',
         'criterion' => 'เกณฑ์',
         'outcome' => 'ผลตรวจ',

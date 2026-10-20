@@ -11,7 +11,7 @@ import { t } from '@/lib/i18n';
 import type { PmItemDraft } from '@/lib/pmDraftStore';
 import { sectionsOf, type Answer, type TemplateField } from '@/lib/pmTemplate';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { Camera, CheckCheck, MessageSquarePlus, Trash2, X } from 'lucide-vue-next';
+import { Camera, CheckCheck, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /** A field of the item's copy of its template (see resources/js/lib/pmTemplate.ts). */
@@ -84,6 +84,21 @@ const remarkOpen = ref<Record<string, boolean>>(Object.fromEntries(props.item.ch
 const sections = computed(() => sectionsOf(props.item.checklist));
 const assetValues = computed(() => (props.item.asset ?? {}) as Record<string, string | null>);
 
+// What the register says about the device (who uses it, IP, place, property no., serial no.), fixable on site: saved to the asset.
+const assetFields = ['used_by', 'ip_address', 'location', 'property_no', 'serial_number'] as const;
+const assetEditing = ref(false);
+const assetForm = useForm(Object.fromEntries(assetFields.map((field) => [field, (props.item.asset?.[field] as string | null) ?? ''])));
+const editAsset = () => {
+    assetFields.forEach((field) => (assetForm[field] = (props.item.asset?.[field] as string | null) ?? ''));
+    assetForm.clearErrors();
+    assetEditing.value = true;
+};
+const saveAsset = () =>
+    assetForm.put(route('maintenance.visits.items.asset', [props.visitUlid, props.item.id]), {
+        preserveScroll: true,
+        onSuccess: () => (assetEditing.value = false),
+    });
+
 const ticket = useForm({ priority: 'medium' });
 const openTicket = () => ticket.post(route('maintenance.visits.items.ticket', [props.visitUlid, props.item.id]), { preserveScroll: true });
 
@@ -91,13 +106,34 @@ const remove = () =>
     confirm(t('pm_visits.confirm_remove_item')) &&
     router.delete(route('maintenance.visits.items.destroy', [props.visitUlid, props.item.id]), { preserveScroll: true });
 
-// Photos upload one by one as soon as they are picked, of the equipment or of one question.
-const photo = useForm<{ photo: File | null; question: string | null }>({ photo: null, question: null });
+// Photos upload one by one as soon as they are picked, of the equipment or of one question,
+// to the PM report, the asset's own photos or both (remembered on this device).
+const photoTargets = ['report', 'asset', 'both'] as const;
+type PhotoTarget = (typeof photoTargets)[number];
+const photoTargetKey = 'pm.photoTarget';
+const storedTarget = (() => {
+    try {
+        return localStorage.getItem(photoTargetKey);
+    } catch {
+        return null;
+    }
+})();
+const photoTarget = ref<PhotoTarget>(photoTargets.includes(storedTarget as PhotoTarget) ? (storedTarget as PhotoTarget) : 'report');
+const setPhotoTarget = (target: PhotoTarget) => {
+    photoTarget.value = target;
+    try {
+        localStorage.setItem(photoTargetKey, target);
+    } catch {
+        // not remembered, still used for this page
+    }
+};
+const photo = useForm<{ photo: File | null; question: string | null; target: PhotoTarget }>({ photo: null, question: null, target: 'report' });
 const uploadPhotos = async (event: Event, question: string | null = null) => {
     const input = event.target as HTMLInputElement;
     for (const file of Array.from(input.files ?? [])) {
         photo.photo = file;
         photo.question = question;
+        photo.target = photoTarget.value;
         await new Promise<void>((resolve) =>
             photo.post(route('maintenance.visits.items.photos.store', [props.visitUlid, props.item.id]), {
                 preserveScroll: true,
@@ -180,6 +216,36 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
             </div>
         </div>
 
+        <!-- The device as the register has it; fixed here, it is fixed on the asset -->
+        <div v-if="item.asset" class="rounded-md bg-muted/40 px-3 py-2 text-sm">
+            <div v-if="!assetEditing" class="flex flex-wrap items-start gap-x-6 gap-y-1">
+                <div v-for="field in assetFields" :key="field" class="min-w-36">
+                    <span class="text-xs text-muted-foreground">{{ t(`pm_visits.asset_fields.${field}`) }}</span>
+                    <p class="font-medium">{{ item.asset[field] || '-' }}</p>
+                </div>
+                <Button v-if="editable" type="button" variant="ghost" size="sm" class="ml-auto" @click="editAsset">
+                    <Pencil class="mr-1 h-3.5 w-3.5" />{{ t('pm_visits.asset_info_edit') }}
+                </Button>
+            </div>
+            <form v-else class="space-y-3" @submit.prevent="saveAsset">
+                <p class="text-xs text-muted-foreground">{{ t('pm_visits.asset_info_hint') }}</p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div v-for="field in assetFields" :key="field" class="grid gap-1">
+                        <label :for="`asset_${field}_${item.id}`" class="text-xs text-muted-foreground">{{
+                            t(`pm_visits.asset_fields.${field}`)
+                        }}</label>
+                        <Input :id="`asset_${field}_${item.id}`" v-model="assetForm[field]" />
+                        <InputError :message="(assetForm.errors as Record<string, string>)[field]" />
+                    </div>
+                </div>
+                <InputError :message="(assetForm.errors as Record<string, string>).visit ?? (assetForm.errors as Record<string, string>).asset" />
+                <div class="flex gap-2">
+                    <Button type="submit" size="sm" :disabled="assetForm.processing">{{ t('pm_visits.asset_info_save') }}</Button>
+                    <Button type="button" variant="ghost" size="sm" @click="assetEditing = false">{{ t('common.cancel') }}</Button>
+                </div>
+            </form>
+        </div>
+
         <!-- Recording -->
         <form v-if="editable" class="space-y-4" @submit.prevent="save()">
             <p v-if="restoredDraft" class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
@@ -200,6 +266,24 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
                 <Button type="button" variant="outline" :title="t('pm_field.pass_all_hint')" @click="passAll">
                     <CheckCheck class="mr-1 h-4 w-4" />{{ t('pm_field.pass_all') }}
                 </Button>
+                <div class="flex flex-wrap items-center gap-2 text-xs">
+                    <span class="text-muted-foreground">{{ t('pm_visits.photo_target') }}</span>
+                    <div class="inline-flex overflow-hidden rounded-md border" role="radiogroup" :aria-label="t('pm_visits.photo_target')">
+                        <button
+                            v-for="target in photoTargets"
+                            :key="target"
+                            type="button"
+                            role="radio"
+                            :aria-checked="photoTarget === target"
+                            class="inline-flex items-center gap-1 border-l px-2.5 py-1.5 first:border-l-0"
+                            :class="photoTarget === target ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'"
+                            @click="setPhotoTarget(target)"
+                        >
+                            <Camera v-if="photoTarget === target" class="h-3.5 w-3.5" />{{ t(`pm_visits.photo_targets.${target}`) }}
+                        </button>
+                    </div>
+                    <span v-if="photoTarget === 'asset'" class="text-muted-foreground">{{ t('pm_visits.photo_target_asset_hint') }}</span>
+                </div>
                 <span class="ml-auto text-xs text-muted-foreground" aria-live="polite">
                     <template v-if="draftState === 'saving'">{{ t('pm_field.draft_saving') }}</template>
                     <template v-else-if="draftState === 'saved'">{{ t('pm_field.draft_saved', { time: timeOf(draftSavedAt) }) }}</template>

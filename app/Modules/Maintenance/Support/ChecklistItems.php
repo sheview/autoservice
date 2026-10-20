@@ -46,7 +46,7 @@ final class ChecklistItems
     public const REPEAT_COLUMN_TYPES = ['text', 'number', 'pass_fail'];
 
     /** Asset register fields a readonly_from_asset field may show. */
-    public const ASSET_SOURCES = ['asset_code', 'name', 'brand', 'model', 'serial_number', 'property_no', 'ip_address', 'location', 'floor', 'room'];
+    public const ASSET_SOURCES = ['asset_code', 'name', 'brand', 'model', 'serial_number', 'property_no', 'ip_address', 'location', 'floor', 'room', 'used_by'];
 
     public const PASS_FAIL = ['pass', 'fail', 'na'];
 

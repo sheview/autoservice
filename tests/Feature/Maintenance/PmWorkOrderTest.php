@@ -168,3 +168,35 @@ it('saves checklist templates with Pass/Fail, readings with unit and range, sect
         ['key' => 'volt', 'label' => 'แรงดัน', 'type' => 'measure', 'unit' => 'V', 'min' => 210.0, 'max' => 240.0],
     ]);
 });
+
+it('opens a work order for a contract with its equipment from the register and the template of each', function () {
+    $contract = createContract($this->customer);
+    $contract->contractAssets()->create(['asset_id' => $this->upsA->id]);
+    $router = createAsset(createAssetCategory(['name' => 'Router', 'code_prefix' => 'RT']), ['customer_id' => $this->customer->id, 'name' => 'Router']);
+    $template = PmChecklist::where('name', 'UPS PM')->sole();
+
+    // from the contract page: the customer and the contract are picked, the contract's equipment listed
+    $this->actingAs($this->helpdesk)->get("/contracts/{$contract->id}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('can.createPmVisit', true));
+    $this->actingAs($this->helpdesk)->get("/pm-visits/create?contract_id={$contract->id}")
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('customerId', $this->customer->id)
+            ->where('contractId', $contract->id)
+            ->where("contracts.{$contract->id}.asset_ids", [$this->upsA->id])
+            ->where("templates.{$this->upsA->id}", ['code' => $template->code, 'name' => 'UPS PM'])
+            ->where("templates.{$router->id}", null));
+
+    // a contract of another customer, or one that ended, picks nothing
+    $ended = createContract($this->customer, ['starts_on' => '2025-01-01', 'ends_on' => '2025-12-31']);
+    $this->actingAs($this->helpdesk)->get("/pm-visits/create?contract_id={$ended->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('contractId', null)->where('customerId', null));
+    $this->actingAs($this->helpdesk)->get("/contracts/{$ended->id}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('can.createPmVisit', false));
+});
+
+it('does not pick a contract of another tenant for a work order', function () {
+    $theirs = asTenant(createTenant('other'), fn () => createContract(createCustomer())->id);
+
+    $this->actingAs($this->helpdesk)->get("/pm-visits/create?contract_id={$theirs}")
+        ->assertInertia(fn (Assert $page) => $page->where('contractId', null)->where('customerId', null)->where('assets', []));
+});

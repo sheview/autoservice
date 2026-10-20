@@ -67,6 +67,11 @@ class AssetSheet
             $byLabel[mb_strtolower(__("asset.columns.{$column}"))] = $column;
             $byLabel[$column] = $column;
         }
+        foreach ((array) __('asset.column_aliases') as $column => $aliases) {
+            foreach ($aliases as $alias) {
+                $byLabel[mb_strtolower($alias)] ??= $column;
+            }
+        }
         foreach ($extra as $key => $heading) {
             $byLabel[mb_strtolower($heading)] = "extra.{$key}";
             $byLabel[$key] = "extra.{$key}";

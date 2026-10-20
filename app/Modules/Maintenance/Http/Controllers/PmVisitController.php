@@ -11,6 +11,7 @@ use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Labeling\Actions\QrSvg;
+use App\Modules\Maintenance\Actions\CorrectPmItemAsset;
 use App\Modules\Maintenance\Actions\CreatePmRevision;
 use App\Modules\Maintenance\Actions\CreatePmSignLink;
 use App\Modules\Maintenance\Actions\MovePmVisit;
@@ -256,6 +257,26 @@ class PmVisitController extends Controller
         $recordItem->handle($item, $request->user(), $request->validated());
 
         return back()->with('success', __('maintenance.visits.item_saved'));
+    }
+
+    /**
+     * Fixes the register from the work order when the device is not as recorded (who uses it, IP, place, property no., serial no.).
+     */
+    public function correctAsset(Request $request, PmVisit $visit, PmVisitItem $item, CorrectPmItemAsset $correctAsset): RedirectResponse
+    {
+        Gate::authorize('perform', $visit);
+
+        $data = $request->validate([
+            'used_by' => ['nullable', 'string', 'max:255'],
+            'ip_address' => ['nullable', 'ip'],
+            'location' => ['nullable', 'string', 'max:255'],
+            'property_no' => ['nullable', 'string', 'max:100', Rule::unique('assets', 'property_no')->ignore($item->asset_id)],
+            // Unique among the serials of other assets: checked by CorrectAssetDetails, which names the asset that has it.
+            'serial_number' => ['nullable', 'string', 'max:255'],
+        ], [], __('maintenance.fields'));
+        $correctAsset->handle($item, $data);
+
+        return back()->with('success', __('maintenance.visits.asset_corrected'));
     }
 
     public function openTicket(Request $request, PmVisit $visit, PmVisitItem $item, OpenTicketFromPmItem $openTicket): RedirectResponse

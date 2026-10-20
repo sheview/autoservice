@@ -56,7 +56,7 @@ const props = defineProps<{
     members: StaffRow[];
     staff: StaffRow[];
     history: { id: number; description: string; event: string | null; actor: string | null; at: string }[];
-    can: { update: boolean; delete: boolean; manageAssets: boolean };
+    can: { update: boolean; delete: boolean; manageAssets: boolean; createPmVisit: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -110,9 +110,7 @@ const team = ref<number[]>([]);
 const teamSearch = ref('');
 const teamCandidates = computed(() => {
     const needle = teamSearch.value.trim().toLowerCase();
-    return needle === ''
-        ? props.staff
-        : props.staff.filter((person) => `${person.name} ${person.email ?? ''}`.toLowerCase().includes(needle));
+    return needle === '' ? props.staff : props.staff.filter((person) => `${person.name} ${person.email ?? ''}`.toLowerCase().includes(needle));
 });
 
 const editTeam = () => {
@@ -165,6 +163,9 @@ const dateTime = (iso: string) => new Date(iso).toLocaleString('en-GB', { dateSt
                 </div>
                 <div class="flex items-center gap-2">
                     <ContractPhaseBadge :phase="contract.phase" />
+                    <Button v-if="can.createPmVisit" variant="outline" as-child>
+                        <Link :href="route('maintenance.visits.create', { contract_id: contract.id })">{{ t('contracts.open_pm_visit') }}</Link>
+                    </Button>
                     <Button v-if="can.delete" variant="outline" @click="destroy">{{ t('common.delete') }}</Button>
                     <Button v-if="can.update" as-child>
                         <Link :href="route('contract.contracts.edit', contract.id)">{{ t('common.edit') }}</Link>

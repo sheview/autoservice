@@ -158,6 +158,9 @@ class ContractController extends Controller
                 'update' => $canUpdate,
                 'delete' => $user->can('delete', $contract),
                 'manageAssets' => $canUpdate && $assetsOn,
+                // A PM work order for a running contract (Maintenance), its equipment taken from the register.
+                'createPmVisit' => $modules->enabled('maintenance') && $user->customer_id === null && $user->can('pm-visits.create')
+                    && $contract->status === Contract::STATUS_ACTIVE && $contract->ends_on->gte(today()),
             ],
         ]);
     }

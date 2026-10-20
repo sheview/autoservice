@@ -22,8 +22,11 @@ interface AssetRow {
 const props = defineProps<{
     customers: { id: number; code: string; name: string }[];
     customerId: number | null;
-    contracts: Record<string, { id: number; contract_no: string; title: string }>;
+    contractId: number | null;
+    contracts: Record<string, { id: number; contract_no: string; title: string; asset_ids: number[] }>;
     assets: AssetRow[];
+    // The template each asset would get (by asset id); null = none checks it.
+    templates: Record<string, { code: string; name: string } | null>;
     assignees: { id: number; name: string }[];
 }>();
 
@@ -34,7 +37,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const form = useForm({
     customer_id: props.customerId,
-    contract_id: null as number | null,
+    contract_id: props.contractId,
     title: '',
     due_on: '',
     scheduled_on: '',
@@ -43,23 +46,39 @@ const form = useForm({
     draft: false as boolean,
 });
 
+// The equipment of the contract comes ticked; the customer's other equipment is shown on request.
+const contractAssetIds = computed(() => (form.contract_id ? (props.contracts[form.contract_id]?.asset_ids ?? []) : null));
+const showOthers = ref(false);
+const pickContractAssets = () => {
+    const ids = contractAssetIds.value;
+    form.asset_ids = ids ? props.assets.filter((a) => ids.includes(a.id)).map((a) => a.id) : [];
+};
+pickContractAssets();
+watch(() => form.contract_id, pickContractAssets);
+
 // Another customer: its contracts and equipment come from the server; what was picked goes.
 watch(
     () => form.customer_id,
     (id) => {
         form.contract_id = null;
         form.asset_ids = [];
-        router.reload({ only: ['contracts', 'assets', 'customerId'], data: { customer_id: id ?? undefined } });
+        showOthers.value = false;
+        router.reload({ only: ['contracts', 'assets', 'templates', 'customerId', 'contractId'], data: { customer_id: id ?? undefined } });
     },
 );
 
 const filter = ref('');
+const inContract = (asset: AssetRow) => contractAssetIds.value === null || contractAssetIds.value.includes(asset.id);
+const otherCount = computed(() => props.assets.filter((a) => !inContract(a)).length);
 const shown = computed(() => {
     const q = filter.value.trim().toLowerCase();
+    const listed = props.assets.filter((a) => showOthers.value || inContract(a) || form.asset_ids.includes(a.id));
     return q
-        ? props.assets.filter((a) => [a.asset_code, a.name, a.category, a.serial_number, a.location].some((v) => v?.toLowerCase().includes(q)))
-        : props.assets;
+        ? listed.filter((a) => [a.asset_code, a.name, a.category, a.serial_number, a.location].some((v) => v?.toLowerCase().includes(q)))
+        : listed;
 });
+const templateOf = (asset: AssetRow) => props.templates[asset.id] ?? null;
+const withoutTemplate = computed(() => props.assets.filter((a) => form.asset_ids.includes(a.id) && !templateOf(a)));
 const allShownPicked = computed(() => shown.value.length > 0 && shown.value.every((a) => form.asset_ids.includes(a.id)));
 const toggleAll = () => {
     const ids = shown.value.map((a) => a.id);
@@ -134,7 +153,13 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <h3 class="text-sm font-semibold">{{ t('pm_visits.equipment') }} ({{ form.asset_ids.length }})</h3>
                         <p class="text-xs text-muted-foreground">{{ t('pm_visits.equipment_hint') }}</p>
                     </div>
-                    <Input v-model="filter" type="search" class="max-w-xs" :placeholder="t('pm_visits.filter_equipment')" />
+                    <div class="flex flex-wrap items-center gap-3">
+                        <label v-if="form.contract_id && otherCount" class="inline-flex items-center gap-2 text-xs">
+                            <input v-model="showOthers" type="checkbox" class="size-4 rounded border-input" />
+                            {{ t('pm_visits.show_other_assets', { count: otherCount }) }}
+                        </label>
+                        <Input v-model="filter" type="search" class="max-w-xs" :placeholder="t('pm_visits.filter_equipment')" />
+                    </div>
                 </div>
                 <div v-if="assets.length" class="max-h-96 overflow-y-auto rounded-md border">
                     <label class="flex items-center gap-3 border-b bg-muted/40 px-3 py-2 text-sm font-medium">
@@ -148,9 +173,18 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <span class="text-xs text-muted-foreground">{{
                             [asset.category, asset.serial_number, asset.location].filter(Boolean).join(' · ')
                         }}</span>
+                        <span v-if="!inContract(asset)" class="rounded bg-amber-100 px-1.5 text-xs text-amber-800">{{
+                            t('pm_visits.outside_contract')
+                        }}</span>
+                        <span class="ml-auto shrink-0 text-xs" :class="templateOf(asset) ? 'text-muted-foreground' : 'text-red-600'">
+                            {{ templateOf(asset)?.name ?? t('pm_visits.no_template') }}
+                        </span>
                     </label>
                 </div>
                 <p v-else class="text-sm text-muted-foreground">{{ t('pm_visits.no_assets') }}</p>
+                <p v-if="withoutTemplate.length" class="text-xs text-red-600">
+                    {{ t('pm_visits.assets_without_template', { count: withoutTemplate.length }) }}
+                </p>
                 <InputError :message="form.errors.asset_ids" />
             </section>
 

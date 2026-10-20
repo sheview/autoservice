@@ -202,9 +202,9 @@ class ImportAssets
         if (array_key_exists('customer', $values)) {
             $data['customer_id'] = $customerText === '' ? null : ($this->customers[$customerText] ?? null);
         }
-        // Into the context's contract: its customer unless the row names one.
+        // The context's customer (of its contract, or picked on the import page) unless the row names one.
         $forcedContract = $this->context['contract_id'] ?? null;
-        if ($forcedContract !== null && ($data['customer_id'] ?? null) === null && ($customerText === '' || ! array_key_exists('customer', $values))) {
+        if (isset($this->context['customer_id']) && ($data['customer_id'] ?? null) === null && ($customerText === '' || ! array_key_exists('customer', $values))) {
             $data['customer_id'] = $existing?->customer_id ?? ($this->context['customer_id'] ?? null);
         }
 

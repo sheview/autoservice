@@ -9,6 +9,8 @@
     <div class="fact"><span class="label">{{ __('document.pm.serial') }}</span><span class="value">{{ $asset['serial_number'] ?? '' }}</span></div>
     <div class="fact"><span class="label">{{ __('document.pm.property_no') }}</span><span class="value">{{ $asset['property_no'] ?? '' }}</span></div>
     <div class="fact"><span class="label">{{ __('document.pm.location') }}</span><span class="value">{{ $asset['location'] ?? '' }}</span></div>
+    <div class="fact"><span class="label">{{ __('document.pm.used_by') }}</span><span class="value">{{ $asset['used_by'] ?? '' }}</span></div>
+    <div class="fact"><span class="label">{{ __('document.pm.ip') }}</span><span class="value">{{ $asset['ip_address'] ?? '' }}</span></div>
     <div class="fact"><span class="label">{{ __('document.pm_sheet.instrument') }}</span><span class="value">{{ isset($item['instrument']) ? $item['instrument']['name'].' · '.$item['instrument']['serial_no'] : '' }}</span></div>
     @if (($item['not_inspected_reason'] ?? null))
         <div class="fact"><span class="label">{{ __('document.pm_sheet.not_inspected_reason') }}</span><span class="value">{{ __('ui.pm_visits.not_inspected_reasons.'.$item['not_inspected_reason']) }}</span></div>

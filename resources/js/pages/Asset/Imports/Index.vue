@@ -8,7 +8,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 
 interface ImportRow {
     id: number;
@@ -26,6 +26,9 @@ interface ImportRow {
 const props = defineProps<{
     imports: Paginated<ImportRow>;
     maxRows: number;
+    customers: { id: number; code: string; name: string }[];
+    // the MA contracts the user may put assets into, by customer id
+    contracts: Record<string, { id: number; label: string }[]>;
 }>();
 
 const page = usePage<SharedData>();
@@ -34,9 +37,24 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: t('asset_imports.title'), href: route('asset.imports.index') },
 ];
 
-const form = useForm<{ file: File | null }>({ file: null });
+const form = useForm<{ file: File | null; customer_id: number | null; contract_id: number | null }>({
+    file: null,
+    customer_id: null,
+    contract_id: null,
+});
+const customerContracts = computed(() => (form.customer_id ? (props.contracts[form.customer_id] ?? []) : []));
+// Another customer: its own contracts only.
+watch(
+    () => form.customer_id,
+    () => {
+        if (!customerContracts.value.some((c) => c.id === form.contract_id)) {
+            form.contract_id = null;
+        }
+    },
+);
+const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs disabled:opacity-50';
 
-const submit = () => form.post(route('asset.imports.store'), { forceFormData: true, onSuccess: () => form.reset() });
+const submit = () => form.post(route('asset.imports.store'), { forceFormData: true, onSuccess: () => form.reset('file') });
 
 // While an import is still running, reload the list every few seconds.
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -83,6 +101,30 @@ const statusClass: Record<string, string> = {
                     />
                     <p class="text-xs text-muted-foreground">{{ t('asset_imports.hint', { max: maxRows }) }}</p>
                     <InputError :message="form.errors.file" />
+                </div>
+                <div v-if="customers.length" class="grid gap-4 sm:grid-cols-2">
+                    <div class="grid content-start gap-2">
+                        <Label for="customer_id">{{ t('asset_imports.customer') }}</Label>
+                        <select id="customer_id" v-model="form.customer_id" :class="selectClass">
+                            <option :value="null">{{ t('asset_imports.customer_none') }}</option>
+                            <option v-for="customer in customers" :key="customer.id" :value="customer.id">
+                                {{ customer.code }} · {{ customer.name }}
+                            </option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">{{ t('asset_imports.customer_hint') }}</p>
+                        <InputError :message="form.errors.customer_id" />
+                    </div>
+                    <div class="grid content-start gap-2">
+                        <Label for="contract_id">{{ t('asset_imports.contract') }}</Label>
+                        <select id="contract_id" v-model="form.contract_id" :class="selectClass" :disabled="!form.customer_id">
+                            <option :value="null">
+                                {{ form.customer_id ? t('asset_imports.contract_none') : t('asset_imports.contract_no_customer') }}
+                            </option>
+                            <option v-for="contract in customerContracts" :key="contract.id" :value="contract.id">{{ contract.label }}</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">{{ t('asset_imports.contract_hint') }}</p>
+                        <InputError :message="form.errors.contract_id" />
+                    </div>
                 </div>
                 <div class="flex flex-wrap items-center gap-3">
                     <Button :disabled="form.processing || !form.file">{{ t('asset_imports.upload') }}</Button>

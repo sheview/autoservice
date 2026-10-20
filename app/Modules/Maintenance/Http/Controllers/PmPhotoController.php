@@ -10,6 +10,7 @@ use App\Modules\Maintenance\Models\PmVisitItem;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -29,11 +30,13 @@ class PmPhotoController extends Controller
             'photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.self::MAX_KB],
             'question' => ['nullable', 'string', 'max:40'],
             'caption' => ['nullable', 'string', 'max:200'],
+            'target' => ['nullable', Rule::in(AddPmPhoto::TARGETS)],
         ], attributes: ['photo' => __('maintenance.fields.photo')]);
 
-        $addPhoto->handle($item, $request->file('photo'), $data['question'] ?? null, $data['caption'] ?? null);
+        $target = $data['target'] ?? AddPmPhoto::TARGET_REPORT;
+        $addPhoto->handle($item, $request->file('photo'), $data['question'] ?? null, $data['caption'] ?? null, $target);
 
-        return back()->with('success', __('maintenance.photos.added'));
+        return back()->with('success', __('maintenance.photos.added_'.$target));
     }
 
     public function show(Request $request, PmVisit $visit, PmVisitItem $item, int $photo): StreamedResponse

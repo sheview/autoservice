@@ -13,6 +13,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Stores an uploaded asset Excel file and queues ImportAssetsJob for it. Another module asking for
@@ -32,6 +33,8 @@ class StartAssetImport
      */
     public function handle(User $user, UploadedFile $file, array $context = []): AssetImport
     {
+        $context = $this->chosenContract($user, $context);
+
         $path = $file->storeAs(
             'asset-imports/'.$this->context->id(),
             Str::ulid().'.'.strtolower($file->getClientOriginalExtension()),
@@ -48,6 +51,29 @@ class StartAssetImport
         ImportAssetsJob::dispatch($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id, $this->contracts($user));
 
         return $import;
+    }
+
+    /**
+     * A contract picked by id (the import page) must be one of the chosen customer's that the uploader
+     * may change; its number is kept for the row messages. A customer alone is the rows' default customer.
+     *
+     * @param  array<string, mixed>  $context
+     * @return array<string, mixed>
+     */
+    private function chosenContract(User $user, array $context): array
+    {
+        if (! isset($context['contract_id']) || isset($context['contract_no'])) {
+            return $context;
+        }
+
+        $customerId = (int) ($context['customer_id'] ?? 0);
+        $contracts = $this->modules->enabled('contract') ? $this->editableContracts->handle($user, [$customerId], runningOnly: false) : [];
+        $contract = collect($contracts[$customerId] ?? [])->firstWhere('id', (int) $context['contract_id']);
+        if ($contract === null) {
+            throw ValidationException::withMessages(['contract_id' => __('asset.imports.contract_not_allowed')]);
+        }
+
+        return [...$context, 'contract_no' => $contract['contract_no']];
     }
 
     /**

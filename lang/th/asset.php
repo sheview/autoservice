@@ -112,6 +112,9 @@ return [
 
     'imports' => [
         'file' => 'ไฟล์ Excel',
+        'customer' => 'ลูกค้า',
+        'contract' => 'สัญญา MA',
+        'contract_not_allowed' => 'ไม่พบสัญญานี้ของลูกค้าที่เลือก หรือคุณไม่มีสิทธิ์แก้ไขสัญญานี้',
         'queued' => 'อัปโหลดแล้ว ระบบกำลังนำเข้าข้อมูล',
         'unreadable' => 'อ่านไฟล์ไม่ได้ กรุณาตรวจสอบว่าเป็นไฟล์ Excel หรือ CSV ที่ถูกต้อง',
         'missing_headings' => 'ไม่พบหัวคอลัมน์ "ชื่อ" และ "หมวด" ในแถวแรก กรุณาใช้ไฟล์ต้นแบบ',
@@ -128,6 +131,11 @@ return [
         'parent_self' => 'เครื่องแม่ต้องเป็นเครื่องอื่น',
         'parent_other_customer' => 'เครื่องแม่ ":value" เป็นของลูกค้ารายอื่น',
         'has_parts' => 'เครื่องนี้มีชิ้นส่วนอยู่แล้ว จึงเป็นชิ้นส่วนของเครื่องอื่นไม่ได้',
+    ],
+
+    // Old headings still read on import (files made before a heading was renamed).
+    'column_aliases' => [
+        'used_by' => ['ผู้ใช้งานประจำเครื่อง'],
     ],
 
     // Excel headings (export, template and import).
@@ -152,7 +160,7 @@ return [
         'parent' => 'รหัสเครื่องแม่ (ชุด)',
         'ip_address' => 'IP Address',
         'mac_address' => 'MAC Address',
-        'used_by' => 'ผู้ใช้งานประจำเครื่อง',
+        'used_by' => 'ชื่อผู้ใช้งาน',
         'department' => 'แผนก',
         'purchased_at' => 'วันที่ซื้อ',
         'purchase_price' => 'ราคาซื้อ (บาท)',
@@ -207,5 +215,9 @@ return [
         'spare' => 'สำรอง',
         'in_repair' => 'ส่งซ่อม',
         'retired' => 'ปลดระวาง',
+    ],
+
+    'photos' => [
+        'full' => 'ทรัพย์สินนี้มีรูปครบ :max รูปแล้ว ลบรูปเดิมในเมนูทรัพย์สินก่อน',
     ],
 ];

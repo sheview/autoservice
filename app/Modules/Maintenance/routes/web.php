@@ -117,6 +117,7 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::scopeBindings()->group(function () {
         Route::delete('pm-visits/{visit}/shares/{share}', [PmReportShareController::class, 'destroy'])->whereNumber('share')->name('visits.shares.destroy');
         Route::put('pm-visits/{visit}/items/{item}', [PmVisitController::class, 'recordItem'])->name('visits.items.update');
+        Route::put('pm-visits/{visit}/items/{item}/asset', [PmVisitController::class, 'correctAsset'])->name('visits.items.asset');
         Route::post('pm-visits/{visit}/items/{item}/ticket', [PmVisitController::class, 'openTicket'])->name('visits.items.ticket');
         Route::post('pm-visits/{visit}/items/{item}/photos', [PmPhotoController::class, 'store'])->name('visits.items.photos.store');
         Route::get('pm-visits/{visit}/items/{item}/photos/{photo}', [PmPhotoController::class, 'show'])
