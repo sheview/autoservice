@@ -5,7 +5,7 @@ import { t } from '@/lib/i18n';
 import type { RowItem } from '@/lib/pmRows';
 import { INLINE_TYPES } from '@/lib/pmRows';
 import type { TemplateField } from '@/lib/pmTemplate';
-import { CheckCheck, MapPin } from 'lucide-vue-next';
+import { Check, CheckCheck, MapPin, Minus, X } from 'lucide-vue-next';
 import { computed } from 'vue';
 
 export interface TableSet {
@@ -43,8 +43,14 @@ const pending = computed(() => props.places.flatMap((place) => place.sets.flatMa
 <template>
     <div class="space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
-            <p v-if="elsewhere" class="text-xs text-muted-foreground">{{ t('pm_field.table_elsewhere') }}</p>
-            <Button v-if="working" size="sm" class="ml-auto" :disabled="busy || pending.length === 0" @click="emit('pass', pending)">
+            <!-- What the icon buttons of a check column mean -->
+            <p class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span class="flex items-center gap-1"><Check class="h-3.5 w-3.5 text-green-600" />{{ t('pm_field.pass_fail_short.pass') }}</span>
+                <span class="flex items-center gap-1"><X class="h-3.5 w-3.5 text-red-600" />{{ t('pm_field.pass_fail_short.fail') }}</span>
+                <span class="flex items-center gap-1"><Minus class="h-3.5 w-3.5" />{{ t('pm_field.pass_fail_short.na') }}</span>
+                <span v-if="elsewhere">· {{ t('pm_field.table_elsewhere') }}</span>
+            </p>
+            <Button v-if="working && pending.length > 0" size="sm" class="ml-auto" :disabled="busy" @click="emit('pass', pending)">
                 <CheckCheck class="mr-1.5 h-4 w-4" />{{ t('pm_field.pass_rows', { count: pending.length }) }}
             </Button>
         </div>
@@ -53,7 +59,9 @@ const pending = computed(() => props.places.flatMap((place) => place.sets.flatMa
                 <thead class="bg-muted/40 text-left text-xs">
                     <tr>
                         <th class="sticky left-0 z-10 bg-muted px-2 py-2 font-medium">{{ t('pm_field.equipment_column') }}</th>
-                        <th v-for="field in columns" :key="field.key" class="whitespace-nowrap px-1.5 py-2 font-medium">{{ field.label }}</th>
+                        <th v-for="field in columns" :key="field.key" class="min-w-20 max-w-32 px-1.5 py-2 align-bottom font-medium leading-tight">
+                            {{ field.label }}
+                        </th>
                         <th class="px-1.5 py-2 font-medium">{{ t('pm_field.result_column') }}</th>
                         <th />
                     </tr>

@@ -4,7 +4,7 @@ import { serverDraftStore } from '@/lib/pmDraftStore';
 import { RowRejected, saveRow, type RowItem } from '@/lib/pmRows';
 import { formAnswer, outOfRange, PASS_FAIL, type Answer, type TemplateField } from '@/lib/pmTemplate';
 import { Link } from '@inertiajs/vue3';
-import { Check, CornerDownRight, ExternalLink, LoaderCircle } from 'lucide-vue-next';
+import { Check, CornerDownRight, ExternalLink, LoaderCircle, Minus, X } from 'lucide-vue-next';
 import { onBeforeUnmount, reactive, ref, watch } from 'vue';
 
 export interface TableRow extends RowItem {
@@ -117,6 +117,8 @@ const passFailClass: Record<string, string> = {
     fail: 'border-red-600 bg-red-600 text-white',
     na: 'border-slate-500 bg-slate-500 text-white',
 };
+// A cell per question: three small icon buttons keep a wide checklist readable (the legend above the table names them).
+const passFailIcon = { pass: Check, fail: X, na: Minus } as const;
 </script>
 
 <template>
@@ -140,11 +142,14 @@ const passFailClass: Record<string, string> = {
                     :key="option"
                     type="button"
                     :disabled="!working"
-                    class="h-8 min-w-9 rounded border px-1 text-xs"
-                    :class="state.answers[field.key] === option ? passFailClass[option] : 'border-input'"
+                    class="flex h-8 w-8 items-center justify-center rounded border"
+                    :class="state.answers[field.key] === option ? passFailClass[option] : 'border-input text-muted-foreground'"
+                    :title="t(`pm_field.pass_fail_short.${option}`)"
+                    :aria-label="`${field.label}: ${t(`pm_field.pass_fail_short.${option}`)}`"
+                    :aria-pressed="state.answers[field.key] === option"
                     @click="answer(field, state.answers[field.key] === option ? null : option)"
                 >
-                    {{ t(`pm_field.pass_fail_short.${option}`) }}
+                    <component :is="passFailIcon[option as keyof typeof passFailIcon]" class="h-4 w-4" />
                 </button>
             </div>
             <input

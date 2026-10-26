@@ -88,7 +88,8 @@ it('prints the work order as a draft before approval, then the approved version 
         ->toContain('แบตเตอรี่')->toContain('ทดสอบแบตเตอรี่')->toContain('≤ 80 %')->toContain('92 %')->toContain('แบตเสื่อม')
         // the photo, shrunk to JPEG, and the drawn signature
         ->toContain('data:image/jpeg;base64,')->toContain('data:image/png;base64,')
-        ->toContain('ผู้อนุมัติ')->toContain('Boss')
+        // approved without signing: the approver is left off the signature block (PmSheetTest has the signed one)
+        ->not->toContain('<div style="font-weight: 600">ผู้อนุมัติ</div>')
         ->and($footer)->toContain('v1');
 });
 

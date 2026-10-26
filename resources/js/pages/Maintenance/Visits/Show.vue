@@ -306,8 +306,14 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 <Label for="move_note">{{ needsNote.includes(moving) ? t('pm_visits.move_reason') : t('pm_visits.move_note') }}</Label>
                 <textarea id="move_note" v-model="move.note" rows="2" :required="needsNote.includes(moving)" :class="textareaClass" />
                 <p v-if="moving === 'revise'" class="text-xs text-muted-foreground">{{ t('pm_sign.revise_hint') }}</p>
-                <div v-if="moving === 'approve' && signing.approver" class="grid gap-1">
-                    <Label>{{ t('pm_sign.approver_signature') }}</Label>
+                <!-- The approver may always sign (on a phone too); required when the company says so. Unsigned, the report leaves the approver out. -->
+                <div v-if="moving === 'approve'" class="grid gap-1">
+                    <Label
+                        >{{ t('pm_sign.approver_signature') }}
+                        <span class="text-xs font-normal text-muted-foreground"
+                            >({{ signing.approver ? t('pm_visits.required') : t('pm_visits.optional') }})</span
+                        ></Label
+                    >
                     <SignaturePad v-model="move.approver_signature" />
                     <InputError :message="(move.errors as Record<string, string>).approver_signature" />
                 </div>

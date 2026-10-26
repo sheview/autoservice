@@ -1,7 +1,13 @@
-{{-- The signature block at the foot of every page: technician, customer, approver; who signed, when, and the lock. --}}
+{{-- The signature block at the foot of every page: technician, customer, approver; who signed, when, and the lock.
+     The approver shows only once they signed (approving without a signature leaves them off the report). --}}
 @php($signatures = $report['signatures'] ?? [])
-<div class="sign-block">
-    @foreach (['technician' => [__('document.pm_sheet.engineer'), $visit['assignee'] ?? null], 'customer' => [__('document.pm_sheet.customer'), null], 'approver' => [__('document.pm_sheet.approver'), $visit['approved_by'] ?? null]] as $who => [$role, $fallback])
+@php($signers = array_filter(
+    ['technician' => [__('document.pm_sheet.engineer'), $visit['assignee'] ?? null], 'customer' => [__('document.pm_sheet.customer'), null], 'approver' => [__('document.pm_sheet.approver'), $visit['approved_by'] ?? null]],
+    fn (string $who) => $who !== 'approver' || ! empty($signatures['approver']['image']),
+    ARRAY_FILTER_USE_KEY,
+))
+<div class="sign-block" style="grid-template-columns: repeat({{ count($signers) }}, minmax(0, 1fr))">
+    @foreach ($signers as $who => [$role, $fallback])
         @php($signature = $signatures[$who] ?? null)
         <div>
             @if ($signature && ($signature['image'] ?? null))

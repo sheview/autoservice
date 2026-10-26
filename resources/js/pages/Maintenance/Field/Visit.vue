@@ -14,7 +14,7 @@ import { passRows, type RowItem } from '@/lib/pmRows';
 import type { Answer, TemplateField } from '@/lib/pmTemplate';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ChevronRight, LogIn, LogOut, MapPin, Printer } from 'lucide-vue-next';
+import { ChevronRight, CircleCheck, LogIn, LogOut, MapPin, Printer } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 
 interface FieldVisit {
@@ -194,6 +194,8 @@ const goToTyped = () => {
 
 const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '');
 const busy = ref(false);
+const doneClass =
+    'flex h-14 items-center justify-center gap-2 rounded-md border border-green-200 bg-green-50 text-base font-medium text-green-800 dark:border-green-900 dark:bg-green-950 dark:text-green-200';
 const tap = (name: 'arrive' | 'depart') =>
     router.post(
         route(`maintenance.field.${name}`, props.visit.ulid),
@@ -221,26 +223,27 @@ const errors = computed(() => page.props.errors as Record<string, string>);
             </p>
             <InputError :message="errors.visit" />
 
-            <!-- Arrived / left: big, for a thumb -->
+            <!-- Arrived / left: big, for a thumb. Once done, each shows as a plain status with its time, and the
+                 next step is the one that stands out. -->
             <div class="grid grid-cols-2 gap-3">
-                <Button
-                    size="lg"
-                    class="h-14 text-base"
-                    :disabled="busy || !!visit.onsite_at || !(visit.working || visit.can_start)"
-                    @click="tap('arrive')"
-                >
-                    <LogIn class="mr-2 h-5 w-5" />
-                    {{ visit.onsite_at ? t('pm_field.arrived_at', { time: time(visit.onsite_at) }) : t('pm_field.arrive') }}
+                <div v-if="visit.onsite_at" :class="doneClass">
+                    <CircleCheck class="h-5 w-5" />{{ t('pm_field.arrived_at', { time: time(visit.onsite_at) }) }}
+                </div>
+                <Button v-else size="lg" class="h-14 text-base" :disabled="busy || !(visit.working || visit.can_start)" @click="tap('arrive')">
+                    <LogIn class="mr-2 h-5 w-5" />{{ t('pm_field.arrive') }}
                 </Button>
+                <div v-if="visit.departed_at" :class="doneClass">
+                    <CircleCheck class="h-5 w-5" />{{ t('pm_field.departed_at', { time: time(visit.departed_at) }) }}
+                </div>
                 <Button
+                    v-else
                     size="lg"
-                    variant="outline"
+                    :variant="visit.onsite_at ? 'default' : 'outline'"
                     class="h-14 text-base"
                     :disabled="busy || !visit.onsite_at || !visit.working"
                     @click="tap('depart')"
                 >
-                    <LogOut class="mr-2 h-5 w-5" />
-                    {{ visit.departed_at ? t('pm_field.departed_at', { time: time(visit.departed_at) }) : t('pm_field.depart') }}
+                    <LogOut class="mr-2 h-5 w-5" />{{ t('pm_field.depart') }}
                 </Button>
             </div>
             <p v-if="visit.can_start" class="text-sm text-muted-foreground">{{ t('pm_field.start_hint') }}</p>

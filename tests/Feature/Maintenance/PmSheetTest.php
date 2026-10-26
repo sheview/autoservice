@@ -104,3 +104,20 @@ it('prints from the browser without the PDF service: the whole sheet, one piece 
     Http::assertNothingSent();
     $this->actingAs(userWithRole('technician'))->get("{$this->url}/sheet?print=1")->assertForbidden();
 });
+
+it('leaves the approver off the signature block until they sign, and lets them sign when approving', function () {
+    $approverBox = '<div style="font-weight: 600">'.__('document.pm_sheet.approver').'</div>';
+    $this->actingAs($this->tech)->post("{$this->url}/submit", ['technician_signature' => signaturePng()])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("{$this->url}/move", ['action' => 'review'])->assertSessionHasNoErrors();
+
+    $this->actingAs($this->admin)->get("{$this->url}/pdf")->assertOk();
+    expect(sheetSent())->toContain('<div style="font-weight: 600">'.__('document.pm_sheet.engineer').'</div>')
+        ->not->toContain($approverBox)
+        ->toContain('grid-template-columns: repeat(2,');
+
+    // the company does not ask for it, but the approver may sign
+    $this->actingAs($this->admin)->post("{$this->url}/move", ['action' => 'approve', 'approver_signature' => signaturePng()])->assertSessionHasNoErrors();
+    Http::fake(['gotenberg.test:3000/*' => Http::response('%PDF-1.7 sheet', 200, ['Content-Type' => 'application/pdf'])]);
+    $this->actingAs($this->admin)->get("{$this->url}/pdf")->assertOk();
+    expect(sheetSent())->toContain($approverBox)->toContain('grid-template-columns: repeat(3,');
+});
