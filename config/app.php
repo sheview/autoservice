@@ -54,6 +54,10 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // Password of every account of the training company (SampleCompanySeeder); empty = "password"
+    // off production, a random one (printed once) in production.
+    'sample_company_password' => env('SAMPLE_COMPANY_PASSWORD'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

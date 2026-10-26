@@ -7,6 +7,7 @@ use App\Modules\Tenancy\Concerns\InteractsWithTenant;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use App\Modules\Tenancy\Support\TenantPresenceVerifier;
+use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Queue\Events\JobExceptionOccurred;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
@@ -33,6 +34,20 @@ class TenancyServiceProvider extends ServiceProvider
     {
         $this->carryTenantThroughQueue();
         $this->keepCompanyCodes();
+        $this->keepSampleCompanyQuiet();
+    }
+
+    /**
+     * No e-mail ever leaves the training company (SampleCompanySeeder): its addresses are made up,
+     * and people practising there may type real ones. Every mail of the app is sent with the
+     * company as the current tenant (in a request, or a job with InteractsWithTenant); a false
+     * from MessageSending stops it (LINE and Telegram: SendAlert, AlertSender).
+     */
+    private function keepSampleCompanyQuiet(): void
+    {
+        Event::listen(MessageSending::class, function (MessageSending $event) {
+            return $this->app->make(TenantContext::class)->tenant()?->is_sample ? false : null;
+        });
     }
 
     /**

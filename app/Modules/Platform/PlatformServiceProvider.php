@@ -3,6 +3,7 @@
 namespace App\Modules\Platform;
 
 use App\Modules\Identity\Events\UserSaved;
+use App\Modules\Platform\Console\DeployCommand;
 use App\Modules\Platform\Console\InstallPlatformCommand;
 use App\Modules\Platform\Console\LinkAccountsCommand;
 use App\Modules\Platform\Console\PruneActivityLogCommand;
@@ -42,7 +43,7 @@ class PlatformServiceProvider extends ServiceProvider
         }
 
         if ($this->app->runningInConsole()) {
-            $this->commands([InstallPlatformCommand::class, LinkAccountsCommand::class, SyncPermissionsCommand::class, SyncStaffPoolsCommand::class, PruneActivityLogCommand::class]);
+            $this->commands([DeployCommand::class, InstallPlatformCommand::class, LinkAccountsCommand::class, SyncPermissionsCommand::class, SyncStaffPoolsCommand::class, PruneActivityLogCommand::class]);
         }
 
         // The activity log keeps SearchActivityLog::KEEP_DAYS days.

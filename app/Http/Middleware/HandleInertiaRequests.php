@@ -59,7 +59,7 @@ class HandleInertiaRequests extends Middleware
             ],
             // Sidebar from config/modules.php, filtered by permission and the tenant's modules.
             'navigation' => fn () => $user ? app(Modules::class)->navigation($permissions(), $user->customer_id !== null, $user) : [],
-            'tenant' => $tenant ? ['name' => $tenant->name, 'is_platform' => $tenant->is_platform] : null,
+            'tenant' => $tenant ? ['name' => $tenant->name, 'is_platform' => $tenant->is_platform, 'is_sample' => $tenant->is_sample] : null,
             'impersonation' => $impersonation->active() ? ['tenant' => ['name' => $impersonation->tenant()->name]] : null,
             // Companies this person also works in (one account each, LinkedAccounts); empty for most people.
             'companies' => fn () => $user && ! $impersonation->active() ? app(LinkedAccounts::class)->companiesOf($user) : [],

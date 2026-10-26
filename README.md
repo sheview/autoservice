@@ -45,6 +45,25 @@ docker compose up -d gotenberg  # สำหรับปุ่ม PDF (ถ้า�
 | `helpdesk@…`, `tech1@…`, `tech2@…`, `user@…` | บทบาทอื่นของแต่ละบริษัท เห็นเฉพาะสาขาของตัวเอง |
 | `customer@itsol.test`, `customer@netpro.test` | บัญชีลูกค้า (CUST001) เห็นเฉพาะใบงานและทรัพย์สินของตัวเอง |
 
+## บริษัทตัวอย่างสำหรับสอนพนักงานและลูกค้า
+
+`SampleCompanySeeder` สร้าง **บริษัท ตัวอย่าง จำกัด** (subdomain `sample`) ที่มีข้อมูลตัวอย่างอย่างน้อย 4 รายการต่อเรื่อง
+และครบทุกสถานะของทุก workflow: ใบแจ้งซ่อม (รวมแจ้งผ่าน QR), ใบงาน PM, แบบฟอร์ม PM, ใบขอซื้อ, ใบเบิก/ยืม,
+คำขอเข้าห้อง Server, สัญญา, ทรัพย์สิน, IP, อะไหล่ (มี serial / ตัดจำหน่าย / ยกเลิกรับ), แบบสอบถาม
+ข้อมูลทั้งหมดสร้างผ่าน Action เดียวกับที่แอปใช้ และย้อนวันที่ไปในช่วงสัปดาห์ที่ผ่านมา จึงมี SLA และประวัติเหมือนงานจริง
+
+- รันบน production ได้ (DemoSeeder รันไม่ได้) และ**ไม่ทำอะไรถ้ามีบริษัทนี้อยู่แล้ว** `platform:deploy` จึงเรียกทุกครั้ง
+- บริษัทนี้ถูกตั้ง `tenants.is_sample`: มีแถบ "บริษัทตัวอย่าง" ทุกหน้า และ**ไม่ส่งอีเมล / LINE / Telegram ออกไปเลย**
+  (ทั้งตอนสร้างข้อมูลและตอนใช้งานจริง) ปุ่ม "ทดสอบส่ง" ในหน้าตั้งค่าแจ้งเตือนจะแจ้งเหตุผลแทน
+- บัญชี: `admin@sample.test`, `helpdesk@sample.test`, `tech1@sample.test`, `tech2@sample.test`, `user@sample.test`,
+  `customer@sample.test` (ลูกค้า CUST001), `customer2@sample.test` (ลูกค้า CUST002), `former@sample.test` (ปิดใช้งาน)
+- รหัสผ่านทุกบัญชี = `SAMPLE_COMPANY_PASSWORD` ใน `.env` ถ้าเว้นว่าง: เครื่อง dev ใช้ `password`,
+  production สุ่มให้และแสดงครั้งเดียวตอนสร้าง (superadmin ตั้งใหม่ได้ภายหลัง)
+
+```bash
+php artisan db:seed --class=SampleCompanySeeder --force
+```
+
 ## Deploy (production)
 
 ต้องมี: PHP 8.3 (ext: pdo_mysql, intl, mbstring, gd, zip, exif, fileinfo), MariaDB 10.11,
@@ -80,13 +99,13 @@ cp .env.example .env && php artisan key:generate
 # แก้ .env: APP_ENV=production, APP_DEBUG=false, APP_URL, TENANCY_CENTRAL_DOMAINS, SESSION_DOMAIN,
 #            DB_*, cache/session/queue, MAIL_*, GOTENBERG_URL (ถ้ามี)
 
-php artisan migrate --force
 php artisan storage:link
+
+# migrate, สิทธิ์, บริษัทตัวอย่าง และ cache (จดรหัสผ่านบริษัทตัวอย่างที่แสดง ถ้าไม่ได้ตั้ง SAMPLE_COMPANY_PASSWORD)
+php artisan platform:deploy
 
 # บริษัทแพลตฟอร์มและ superadmin คนแรก (ถามชื่อ อีเมล รหัสผ่าน)
 php artisan platform:install
-
-php artisan config:cache && php artisan route:cache && php artisan view:cache
 ```
 
 จากนั้น superadmin เข้าระบบที่ `admin.<โดเมน>` แล้วไปที่ "บริษัทลูกค้า" → "เพิ่มบริษัท"
@@ -103,13 +122,23 @@ php artisan config:cache && php artisan route:cache && php artisan view:cache
 ### ทุกครั้งที่อัปเดตโค้ด
 
 ```bash
-php artisan down
 git pull && composer install --no-dev --optimize-autoloader && npm ci && npm run build
-php artisan migrate --force
-php artisan platform:sync-permissions      # เพิ่มสิทธิ์ใหม่ (ไม่ลบสิ่งที่บริษัทปรับเอง)
-php artisan config:cache && php artisan route:cache && php artisan view:cache
-php artisan up
+php artisan platform:deploy
 ```
+
+`platform:deploy` ทำตามลำดับและหยุดทันทีถ้าขั้นไหนล้มเหลว: ล้าง cache เก่า → `migrate --force` →
+`platform:sync-permissions` (เพิ่มสิทธิ์ใหม่ ไม่ลบสิ่งที่บริษัทปรับเอง) → บริษัทตัวอย่าง (ข้ามถ้ามีอยู่แล้ว,
+ไม่เอาใช้ `--without-sample`) → `optimize` (เฉพาะ production) บน production จะเข้า maintenance mode ระหว่างทำ
+และออกเสมอแม้ขั้นใดล้มเหลว
+
+บน Plesk ใส่ใน Git → "Additional deployment actions" ให้ทำเองทุกครั้งที่ push:
+
+```bash
+composer install --no-dev --optimize-autoloader --ignore-platform-req=ext-pcntl --ignore-platform-req=ext-posix
+php artisan platform:deploy
+```
+
+(Plesk แบบแชร์มักไม่มี Node ให้ build บนเซิร์ฟเวอร์: build `public/build` บนเครื่องแล้วส่งขึ้นไปพร้อมโค้ด)
 
 ### อายุการใช้งานของบริษัทลูกค้า
 

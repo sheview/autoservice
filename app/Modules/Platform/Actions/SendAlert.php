@@ -9,7 +9,8 @@ use App\Modules\Tenancy\Support\TenantContext;
 /**
  * Tells the company about something that happened (AlertSettings::EVENTS) on LINE, Telegram and
  * e-mail, as it set them. Queued after the transaction commits; nothing when the company does
- * not want the event or has no channel ready. Texts: lang/th/alerts.php "events.{event}".
+ * not want the event, has no channel ready, or is the training company (is_sample).
+ * Texts: lang/th/alerts.php "events.{event}".
  */
 class SendAlert
 {
@@ -21,7 +22,7 @@ class SendAlert
     public function handle(string $event, array $replace = [], ?string $url = null): void
     {
         $tenant = $this->context->tenant();
-        if ($tenant === null || $tenant->is_platform || AlertSettings::channels($tenant, $event) === []) {
+        if ($tenant === null || $tenant->is_platform || $tenant->is_sample || AlertSettings::channels($tenant, $event) === []) {
             return;
         }
 

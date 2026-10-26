@@ -25,7 +25,8 @@ export interface SharedData {
     name: string;
     quote?: { message: string; author: string };
     auth: Auth;
-    tenant: { name: string; is_platform: boolean } | null;
+    /** is_sample: the training company (SampleCompanySeeder), a banner shows on every page. */
+    tenant: { name: string; is_platform: boolean; is_sample: boolean } | null;
     impersonation: { tenant: { name: string } } | null;
     /** Companies this person also works in (one account each); empty for most people. */
     companies: { ulid: string; name: string; current: boolean }[];

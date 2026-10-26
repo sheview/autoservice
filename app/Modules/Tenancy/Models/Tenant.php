@@ -24,6 +24,7 @@ class Tenant extends Model implements HasMedia
         'status' => self::STATUS_ACTIVE,
         'plan' => 'standard',
         'is_platform' => false,
+        'is_sample' => false,
         'settings' => '{}',
     ];
 
@@ -36,6 +37,7 @@ class Tenant extends Model implements HasMedia
         return [
             'settings' => 'array',
             'is_platform' => 'boolean',
+            'is_sample' => 'boolean',
             'subscription_starts_on' => 'date',
             'subscription_ends_on' => 'date',
         ];

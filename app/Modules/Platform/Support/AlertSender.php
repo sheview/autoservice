@@ -3,6 +3,7 @@
 namespace App\Modules\Platform\Support;
 
 use App\Modules\Platform\Notifications\AlertMail;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -12,9 +13,12 @@ use RuntimeException;
 /**
  * Sends one alert through one channel. Throws when the service refuses (bad token, unknown
  * chat) or cannot be reached, so the caller can report it or show it on the settings page.
+ * The training company (is_sample) never sends: the settings page's test says why.
  */
 class AlertSender
 {
+    public function __construct(private TenantContext $context) {}
+
     public const LINE_PUSH_URL = 'https://api.line.me/v2/bot/message/push';
 
     public const TELEGRAM_URL = 'https://api.telegram.org/bot%s/sendMessage';
@@ -24,6 +28,10 @@ class AlertSender
      */
     public function send(string $channel, array $config, string $title, string $body, ?string $url = null): void
     {
+        if ($this->context->tenant()?->is_sample) {
+            throw new RuntimeException(__('alerts.sample_company'));
+        }
+
         $text = trim($title."\n".$body.($url ? "\n".$url : ''));
 
         try {
