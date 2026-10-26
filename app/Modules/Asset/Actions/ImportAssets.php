@@ -382,7 +382,7 @@ class ImportAssets
 
     private function loadLookups(): void
     {
-        $this->categories = AssetCategory::all()->keyBy(fn (AssetCategory $c) => mb_strtolower($c->name));
+        $this->categories = $this->categoryNames(AssetCategory::all());
 
         // A base collection: Eloquent's merge() would merge by primary key and drop the string keys.
         $branches = Branch::all()->toBase();
@@ -399,6 +399,33 @@ class ImportAssets
             $this->customers[mb_strtolower($customer['name'])] = $customer['id'];
             $this->customers[mb_strtolower($customer['code'])] = $customer['id'];
         }
+    }
+
+    /**
+     * What a category cell may say, lower case: the full name, the code prefix ("UPS", "CCTV"), or
+     * the short name before or inside its brackets ("Access Control" for "ระบบควบคุมการเข้าออก
+     * (Access Control)"). A full name always wins; a short one that fits two categories fits none.
+     *
+     * @param  Collection<int, AssetCategory>  $categories
+     * @return Collection<string, AssetCategory>
+     */
+    private function categoryNames(Collection $categories): Collection
+    {
+        $short = [];
+        foreach ($categories as $category) {
+            $names = [$category->code_prefix];
+            if (preg_match('/^(.+?)\s*\((.+)\)\s*$/u', $category->name, $parts)) {
+                $names = [...$names, $parts[1], $parts[2]];
+            }
+            foreach (array_unique(array_map(fn (?string $name) => mb_strtolower(trim((string) $name)), $names)) as $name) {
+                if ($name !== '') {
+                    $short[$name][] = $category;
+                }
+            }
+        }
+
+        return collect($short)->filter(fn (array $fits) => count($fits) === 1)->map(fn (array $fits) => $fits[0])
+            ->merge($categories->keyBy(fn (AssetCategory $category) => mb_strtolower($category->name)));
     }
 
     private function fail(AssetImport $import, string $message): void

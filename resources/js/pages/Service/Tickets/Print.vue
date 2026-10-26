@@ -10,6 +10,8 @@ import { onBeforeUnmount, onMounted } from 'vue';
 // Same layout as resources/views/documents/ticket.blade.php (the PDF): change both together.
 const props = defineProps<{
     company: string | null;
+    // Who gives the service (company profile), at the foot of the sheet; null = not set.
+    serviceProvider?: string | null;
     logo: string | null;
     // The customer's tracking QR (link with its token) and where to type the number instead.
     tracking: { qr: string; search: string } | null;
@@ -125,7 +127,12 @@ const goBack = () => window.history.back();
 
 const doneSigns = [
     { caption: t('ticket_print.done_caption'), role: t('ticket_print.technician'), name: ticket.assignee },
-    { caption: t('ticket_print.checked_caption'), role: t('ticket_print.customer_sign'), name: props.signature?.signer ?? ticket.contact_name, image: props.signature?.image },
+    {
+        caption: t('ticket_print.checked_caption'),
+        role: t('ticket_print.customer_sign'),
+        name: props.signature?.signer ?? ticket.contact_name,
+        image: props.signature?.image,
+    },
 ] as { caption: string; role: string; name: string | null; image?: string }[];
 
 // The five levels, best first, as on the paper form.
@@ -336,8 +343,9 @@ const blankRows = 2;
                     </div>
                 </section>
 
-                <footer class="mt-4 text-[8.5pt] text-gray-500">
-                    {{ t('ticket_print.printed_at', { at: documentDateTime(new Date().toISOString()) }) }}
+                <footer class="mt-4 flex justify-between gap-4 text-[8.5pt] text-gray-500">
+                    <span v-if="serviceProvider">{{ t('ticket_print.service_provider', { name: serviceProvider }) }}</span>
+                    <span>{{ t('ticket_print.printed_at', { at: documentDateTime(new Date().toISOString()) }) }}</span>
                 </footer>
             </article>
         </div>

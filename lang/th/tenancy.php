@@ -8,6 +8,7 @@ return [
         'fields' => [
             'service_phone' => 'เบอร์แจ้งบริการ',
             'service_email' => 'อีเมลแจ้งบริการ',
+            'service_provider' => 'ชื่อบริษัทผู้ให้บริการ',
             'logo' => 'โลโก้',
             'auto_approve_limit' => 'วงเงินอนุมัติอัตโนมัติ',
         ],

@@ -25,10 +25,10 @@ class CompanyProfile
     public const LOGO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
     /** Keys in tenants.settings. */
-    public const FIELDS = ['service_phone', 'service_email'];
+    public const FIELDS = ['service_phone', 'service_email', 'service_provider'];
 
     /**
-     * @return array{name: string, service_phone: string|null, service_email: string|null, logo_url: string|null, auto_approve_limit: string|null, reporter_retention_days: int}
+     * @return array{name: string, service_phone: string|null, service_email: string|null, service_provider: string|null, logo_url: string|null, auto_approve_limit: string|null, reporter_retention_days: int}
      */
     public static function of(Tenant $tenant): array
     {
@@ -38,12 +38,22 @@ class CompanyProfile
             'name' => $tenant->name,
             'service_phone' => $tenant->settings['service_phone'] ?? null,
             'service_email' => $tenant->settings['service_email'] ?? null,
+            // Who gives the service, at the foot of every document (e.g. the company that holds the contract).
+            'service_provider' => $tenant->settings['service_provider'] ?? null,
             // The media id changes with a new logo, so the browser does not show the old one.
             'logo_url' => $logo ? route('tenancy.company.logo', ['v' => $logo->id]) : null,
             // Issue/loan requests of cheap parts skip approval (baht; null = off).
             'auto_approve_limit' => Money::toBaht($tenant->settings['checkout']['auto_approve_limit'] ?? null),
             'reporter_retention_days' => self::reporterRetentionDays($tenant),
         ];
+    }
+
+    /** The service provider of a company (default: the current one), for the foot of a document; null = none set. */
+    public static function serviceProvider(?Tenant $tenant = null): ?string
+    {
+        $tenant ??= app(TenantContext::class)->tenant();
+
+        return $tenant === null || $tenant->is_platform ? null : ($tenant->settings['service_provider'] ?? null);
     }
 
     /** Days after a job ends that a QR reporter's name, phone and e-mail are kept (then blanked out). */

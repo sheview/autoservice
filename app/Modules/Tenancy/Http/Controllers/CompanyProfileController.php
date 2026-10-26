@@ -38,6 +38,7 @@ class CompanyProfileController extends Controller
         $data = $request->validate([
             'service_phone' => ['nullable', 'string', 'max:50'],
             'service_email' => ['nullable', 'email', 'max:255'],
+            'service_provider' => ['nullable', 'string', 'max:255'],
             'logo' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:'.CompanyProfile::LOGO_MAX_KB],
             'remove_logo' => ['boolean'],
             'auto_approve_limit' => ['nullable', 'numeric', 'min:0', 'max:9999999', 'decimal:0,2'], // baht

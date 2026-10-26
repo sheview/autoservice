@@ -59,7 +59,12 @@
     @yield('content')
 
     <div class="footer">
-        <span>{{ __('document.page_note') }}</span>
+        <span>
+            @if ($provider = \App\Modules\Tenancy\Support\CompanyProfile::serviceProvider())
+                {{ __('document.service_provider', ['name' => $provider]) }} ·
+            @endif
+            {{ __('document.page_note') }}
+        </span>
         <span>{{ __('document.printed_at', ['at' => \App\Modules\Document\Support\ThaiDate::format(now(), true)]) }}</span>
     </div>
 </body>

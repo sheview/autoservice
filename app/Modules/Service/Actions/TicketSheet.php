@@ -60,6 +60,7 @@ class TicketSheet
 
         return [
             'company' => $tenant?->name,
+            'serviceProvider' => $tenant ? CompanyProfile::serviceProvider($tenant) : null,
             'logo' => $logo ? 'data:'.$logo->mime_type.';base64,'.base64_encode(stream_get_contents($logo->stream())) : null,
             // The customer's way to follow the job without signing in: scan, or type the number on the page.
             'tracking' => $tenant && $ticket->tracking_token ? [

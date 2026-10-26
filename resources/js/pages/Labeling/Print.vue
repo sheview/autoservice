@@ -36,7 +36,13 @@ const props = defineProps<{
     labels: Label[];
     template: string;
     templates: Template[];
-    company: { name: string; service_phone: string | null; service_email: string | null; logo_url: string | null } | null;
+    company: {
+        name: string;
+        service_provider?: string | null;
+        service_phone: string | null;
+        service_email: string | null;
+        logo_url: string | null;
+    } | null;
     canEditCompany: boolean;
 }>();
 
@@ -143,7 +149,7 @@ const companyIncomplete = computed(
                         <div class="flex shrink-0 items-center gap-[2mm] border-b-[0.3mm] border-black pb-[0.8mm]">
                             <img v-if="company?.logo_url" :src="company.logo_url" alt="" class="h-[10mm] max-w-[28mm] shrink-0 object-contain" />
                             <div class="min-w-0 flex-1">
-                                <div class="truncate text-[9.5pt] font-bold">{{ company?.name }}</div>
+                                <div class="truncate text-[9.5pt] font-bold">{{ company?.service_provider || company?.name }}</div>
                                 <div v-if="company?.service_phone" class="truncate text-[7.5pt]">
                                     {{ t('labels.service_phone', { phone: company.service_phone }) }}
                                 </div>
@@ -195,7 +201,7 @@ const companyIncomplete = computed(
                     >
                         <div class="qr aspect-square h-full shrink-0" v-html="label.qr" />
                         <div class="flex min-w-0 flex-1 flex-col justify-center leading-tight" :style="{ fontSize: `${textScale * 7}pt` }">
-                            <div v-if="company" class="truncate text-[0.8em] text-gray-600">{{ company.name }}</div>
+                            <div v-if="company" class="truncate text-[0.8em] text-gray-600">{{ company.service_provider || company.name }}</div>
                             <div class="truncate font-mono text-[1.35em] font-bold">{{ label.asset_code }}</div>
                             <div v-if="label.property_no" class="truncate font-mono text-[0.9em]">
                                 {{ t('assets.property_no_short') }} {{ label.property_no }}

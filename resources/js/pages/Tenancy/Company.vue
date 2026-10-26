@@ -16,6 +16,7 @@ const props = defineProps<{
         name: string;
         service_phone: string | null;
         service_email: string | null;
+        service_provider: string | null;
         logo_url: string | null;
         auto_approve_limit: string | null;
         reporter_retention_days: number;
@@ -31,6 +32,7 @@ const breadcrumbs: BreadcrumbItem[] = [{ title: t('company.title'), href: route(
 const form = useForm({
     service_phone: props.company.service_phone ?? '',
     service_email: props.company.service_email ?? '',
+    service_provider: props.company.service_provider ?? '',
     auto_approve_limit: props.company.auto_approve_limit ?? '',
     reporter_retention_days: props.company.reporter_retention_days,
     logo: null as File | null,
@@ -120,6 +122,13 @@ const submit = () =>
                             <InputError :message="form.errors.logo" />
                         </div>
 
+                        <div class="grid gap-2">
+                            <Label for="service_provider">{{ t('company.service_provider') }}</Label>
+                            <Input id="service_provider" v-model="form.service_provider" :placeholder="t('company.service_provider_placeholder')" />
+                            <p class="text-xs text-muted-foreground">{{ t('company.service_provider_hint') }}</p>
+                            <InputError :message="form.errors.service_provider" />
+                        </div>
+
                         <div class="grid gap-6 sm:grid-cols-2">
                             <div class="grid content-start gap-2">
                                 <Label for="service_phone">{{ t('company.service_phone') }}</Label>
@@ -176,7 +185,7 @@ const submit = () =>
                     <div class="flex items-center gap-4 rounded-md border bg-white p-4 text-black">
                         <img v-if="logoUrl" :src="logoUrl" alt="" class="h-14 max-w-32 object-contain" />
                         <div class="min-w-0 leading-snug">
-                            <p class="truncate font-bold">{{ company.name }}</p>
+                            <p class="truncate font-bold">{{ form.service_provider || company.name }}</p>
                             <p v-if="form.service_phone" class="truncate text-sm">{{ t('labels.service_phone', { phone: form.service_phone }) }}</p>
                             <p v-if="form.service_email" class="truncate text-sm">{{ t('labels.service_email', { email: form.service_email }) }}</p>
                         </div>

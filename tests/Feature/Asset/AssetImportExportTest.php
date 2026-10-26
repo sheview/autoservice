@@ -48,6 +48,28 @@ function sheetRows(string $path): array
 
 const HEADINGS = ['รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'สถานะ', 'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]'];
 
+it('finds a category by its code or the short name before or inside its brackets', function () {
+    $ups = createAssetCategory(['name' => 'เครื่องสำรองไฟ (UPS)', 'code_prefix' => 'UPS']);
+    $acs = createAssetCategory(['name' => 'ระบบควบคุมการเข้าออก (Access Control)', 'code_prefix' => 'ACS']);
+    // "Monitoring" fits two categories: it is not guessed
+    createAssetCategory(['name' => 'ระบบตรวจวัดสภาพแวดล้อม (Monitoring)', 'code_prefix' => 'EMS']);
+    createAssetCategory(['name' => 'ระบบตรวจวัดไฟฟ้า (Monitoring)', 'code_prefix' => 'PWR']);
+    $row = fn (string $category) => [null, "เครื่อง {$category}", $category, null, null, null, null, null, null];
+
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([
+        HEADINGS, $row('ups'), $row('เครื่องสำรองไฟ'), $row('Access Control'), $row('PC'), $row('Monitoring'), $row('ระบบตรวจวัดสภาพแวดล้อม'),
+    ])])->assertSessionHasNoErrors();
+
+    $import = AssetImport::first();
+    expect(Asset::where('name', 'เครื่อง ups')->value('category_id'))->toBe($ups->id)
+        ->and(Asset::where('name', 'เครื่อง เครื่องสำรองไฟ')->value('category_id'))->toBe($ups->id)
+        ->and(Asset::where('name', 'เครื่อง Access Control')->value('category_id'))->toBe($acs->id)
+        // the PC row misses its required CPU, and the Monitoring row is not guessed
+        ->and(collect($import->errors)->pluck('row')->all())->toBe([5, 6])
+        ->and($import->errors[1]['messages'][0])->toStartWith('ไม่พบหมวด "Monitoring"')
+        ->and($import->created_rows)->toBe(4);
+});
+
 it('imports new rows, updates existing codes and reports bad rows by row number', function () {
     createAsset($this->pc, ['name' => 'Old name', 'specs' => ['cpu' => 'old']]); // PC-00001
 
@@ -65,7 +87,7 @@ it('imports new rows, updates existing codes and reports bad rows by row number'
         ->and($import->only(['total_rows', 'created_rows', 'updated_rows', 'failed_rows']))
         ->toBe(['total_rows' => 4, 'created_rows' => 1, 'updated_rows' => 1, 'failed_rows' => 2])
         ->and(collect($import->errors)->pluck('row')->all())->toBe([4, 5])
-        ->and($import->errors[0]['messages'])->toBe(['ไม่พบหมวด "ไม่มีหมวดนี้"'])
+        ->and($import->errors[0]['messages'][0])->toStartWith('ไม่พบหมวด "ไม่มีหมวดนี้"')
         ->and($import->errors[1]['messages'])->toContain('ไม่พบสาขา "XYZ"');
 
     $updated = Asset::where('asset_code', 'PC-00001')->first();

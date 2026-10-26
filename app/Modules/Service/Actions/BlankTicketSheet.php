@@ -34,6 +34,7 @@ class BlankTicketSheet
                 'priorities' => Ticket::PRIORITIES,
             ],
             'company' => $tenant?->name,
+            'serviceProvider' => $tenant ? CompanyProfile::serviceProvider($tenant) : null,
             'logo' => $logo ? 'data:'.$logo->mime_type.';base64,'.base64_encode(stream_get_contents($logo->stream())) : null,
             'tracking' => null,
             'ticket' => [

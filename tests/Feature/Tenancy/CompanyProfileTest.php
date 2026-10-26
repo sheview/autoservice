@@ -3,7 +3,9 @@
 use App\Modules\Contract\Actions\AddContractAssets;
 use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Support\CompanyProfile;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -121,4 +123,29 @@ it('prints the company header, the contract and the province on detailed labels'
     // small labels do not look the contract up
     $this->actingAs($this->admin)->get("/labels/print?assets={$asset->ulid}&template=roll_50x30")
         ->assertInertia(fn (Assert $page) => $page->where('labels.0.contract', null));
+});
+
+it('prints the service provider at the foot of the job sheet and of every PDF document', function () {
+    $pdfFoot = fn () => Blade::render("@extends('documents.layout', ['autoPrint' => false])\n@section('content') x @endsection");
+    expect($pdfFoot())->not->toContain('ผู้ให้บริการ');
+
+    $this->actingAs($this->admin)->put('/company', ['service_provider' => ' บริษัท ดาต้าคอมเอเซีย จำกัด '])->assertSessionHasNoErrors();
+    $this->tenant->refresh();
+    app(TenantContext::class)->set($this->tenant);
+
+    expect(CompanyProfile::of($this->tenant)['service_provider'])->toBe('บริษัท ดาต้าคอมเอเซีย จำกัด')
+        ->and($pdfFoot())->toContain('ผู้ให้บริการ: บริษัท ดาต้าคอมเอเซีย จำกัด');
+
+    $ticket = openTicket($this->admin);
+    $this->actingAs($this->admin)->get("/tickets/{$ticket->ulid}/print")
+        ->assertInertia(fn (Assert $page) => $page->where('serviceProvider', 'บริษัท ดาต้าคอมเอเซีย จำกัด'));
+
+    // the QR sticker's header names it (Labeling/Print shows it in place of the company name)
+    $asset = createAsset(createAssetCategory());
+    $this->actingAs($this->admin)->get("/labels/print?assets={$asset->ulid}&template=a3_5x6")
+        ->assertInertia(fn (Assert $page) => $page->where('company.service_provider', 'บริษัท ดาต้าคอมเอเซีย จำกัด'));
+
+    // cleared: nothing at the foot
+    $this->actingAs($this->admin)->put('/company', ['service_provider' => ''])->assertSessionHasNoErrors();
+    expect(CompanyProfile::of($this->tenant->fresh())['service_provider'])->toBeNull();
 });

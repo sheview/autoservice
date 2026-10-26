@@ -13,7 +13,7 @@ use Illuminate\Http\UploadedFile;
 class UpdateCompanyProfile
 {
     /**
-     * @param  array{service_phone?: string|null, service_email?: string|null, auto_approve_limit?: string|float|null, reporter_retention_days?: int|null}  $data  auto_approve_limit in baht
+     * @param  array{service_phone?: string|null, service_email?: string|null, service_provider?: string|null, auto_approve_limit?: string|float|null, reporter_retention_days?: int|null}  $data  auto_approve_limit in baht
      */
     public function handle(Tenant $tenant, array $data, ?UploadedFile $logo = null, bool $removeLogo = false): Tenant
     {
