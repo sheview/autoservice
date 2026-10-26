@@ -113,6 +113,7 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::post('pm-visits/{visit}/start', [PmVisitController::class, 'start'])->name('visits.start');
     Route::post('pm-visits/{visit}/submit', [PmVisitController::class, 'submit'])->name('visits.submit');
     Route::post('pm-visits/{visit}/move', [PmVisitController::class, 'move'])->name('visits.move');
+    Route::post('pm-visits-bulk/move', [PmVisitController::class, 'bulkMove'])->name('visits.bulk-move');
     Route::post('pm-visits/{visit}/shares', [PmReportShareController::class, 'store'])->name('visits.shares.store');
     Route::scopeBindings()->group(function () {
         Route::delete('pm-visits/{visit}/shares/{share}', [PmReportShareController::class, 'destroy'])->whereNumber('share')->name('visits.shares.destroy');

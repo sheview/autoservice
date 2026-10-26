@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Maintenance\Actions\CreatePmWorkOrder;
 use App\Modules\Maintenance\Actions\MovePmVisit;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Actions\SavePmSettings;
@@ -228,4 +229,35 @@ it('refuses a move whose status changed after the permission was checked', funct
     expect(fn () => app(MovePmVisit::class)->handle($stale, 'return', $this->helpdesk, 'x'))
         ->toThrow(ValidationException::class);
     expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_PENDING_APPROVAL);
+});
+
+it('reviews, approves, publishes and closes several work orders ticked on the list', function () {
+    ($this->work)();
+    ($this->submit)(['summary' => 'ทุกเครื่องปกติ'])->assertSessionHasNoErrors();
+    // still scheduled: nothing can be done to it from the list yet
+    $other = app(CreatePmWorkOrder::class)->handle([
+        'customer_id' => $this->customer->id, 'title' => 'PM เพิ่มเติม', 'due_on' => '2026-03-01', 'assignee_id' => $this->tech->id,
+    ], $this->admin);
+    $bulk = fn ($user, string $action) => $this->actingAs($user)->post('/pm-visits-bulk/move', ['action' => $action, 'visits' => [$this->visit->ulid, $other->ulid]]);
+
+    // the list says what may be done to each
+    $this->actingAs($this->helpdesk)->get('/pm-visits?status=all')->assertInertia(fn (Assert $page) => $page
+        ->where('visits.data', fn ($rows) => collect($rows)->firstWhere('ulid', $this->visit->ulid)['bulk'] === ['review']
+            && collect($rows)->firstWhere('ulid', $other->ulid)['bulk'] === []));
+
+    // the one not handed in is skipped and named; the other still goes
+    $bulk($this->helpdesk, 'review')->assertSessionHasErrors('visits');
+    expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_PENDING_APPROVAL)
+        ->and($other->fresh()->status)->toBe(PmVisit::STATUS_SCHEDULED);
+
+    // each move needs its own permission: the helpdesk does not approve
+    $bulk($this->helpdesk, 'approve');
+    expect($this->visit->fresh()->status)->toBe(PmVisit::STATUS_PENDING_APPROVAL);
+
+    foreach (['approve' => PmVisit::STATUS_APPROVED, 'publish' => PmVisit::STATUS_PUBLISHED, 'close' => PmVisit::STATUS_CLOSED] as $action => $status) {
+        $bulk($this->admin, $action);
+        expect($this->visit->fresh()->status)->toBe($status);
+    }
+
+    $this->actingAs($this->admin)->post('/pm-visits-bulk/move', ['action' => 'cancel', 'visits' => [$this->visit->ulid]])->assertSessionHasErrors('action');
 });

@@ -42,6 +42,21 @@ it('shares every technician of one company with another in one step', function (
             ->where('pools.0.role_labels', ['ช่างเทคนิค']));
 });
 
+it('marks on the people table who works in a company through a pool', function () {
+    $pooled = fn () => collect($this->actingAs($this->superadmin)->get('/platform/linked-staff')
+        ->viewData('page')['props']['staff']['data'])->pluck('pooled', 'email');
+
+    $pool = StaffPool::create(['from_tenant_id' => $this->itbt->id, 'to_tenant_id' => $this->datacom->id, 'roles' => ['technician']]);
+    expect($pooled()['tech1@itbtthai.com'])->toBe([$this->datacom->id])
+        ->and($pooled()['desk@itbtthai.com'])->toBe([]);
+
+    // switched off, or the person deactivated: nothing comes from the pool
+    asTenant($this->itbt, fn () => $this->tech2->update(['is_active' => false]));
+    expect($pooled()['tech2@itbtthai.com'])->toBe([]);
+    $pool->update(['is_active' => false]);
+    expect($pooled()['tech1@itbtthai.com'])->toBe([]);
+});
+
 it('adds technicians who join later and follows their own company', function () {
     StaffPool::create(['from_tenant_id' => $this->itbt->id, 'to_tenant_id' => $this->datacom->id, 'roles' => ['technician']]);
     $this->artisan('platform:sync-staff-pools')->assertSuccessful();

@@ -15,6 +15,7 @@ use App\Modules\Maintenance\Actions\CorrectPmItemAsset;
 use App\Modules\Maintenance\Actions\CreatePmRevision;
 use App\Modules\Maintenance\Actions\CreatePmSignLink;
 use App\Modules\Maintenance\Actions\MovePmVisit;
+use App\Modules\Maintenance\Actions\MovePmVisits;
 use App\Modules\Maintenance\Actions\OpenTicketFromPmItem;
 use App\Modules\Maintenance\Actions\PmInstrumentOptions;
 use App\Modules\Maintenance\Actions\RecordPmItem;
@@ -72,6 +73,9 @@ class PmVisitController extends Controller
                 'due_on' => $visit->due_on->toDateString(),
                 'scheduled_on' => $visit->scheduled_on?->toDateString(),
                 'overdue' => $visit->isOverdue(),
+                // What this person may do to it from the list, ticked together with others.
+                'bulk' => $staff ? array_values(array_filter(MovePmVisits::ACTIONS, fn (string $action) => PmWorkflow::allows($visit, $action)
+                    && $request->user()->can(PmWorkflow::ACTIONS[$action]['ability'], $visit))) : [],
             ]),
             'filters' => $filters,
             'statuses' => PmVisit::STATUSES,
@@ -386,6 +390,23 @@ class PmVisitController extends Controller
             $data['action'] === 'approve' ? ($data['approver_signature'] ?? null) : null, $this->client($request));
 
         return back()->with('success', __('maintenance.visits.moved.'.$data['action']));
+    }
+
+    /** The same move for the work orders ticked on the list (MovePmVisits). */
+    public function bulkMove(Request $request, MovePmVisits $moveVisits): RedirectResponse
+    {
+        Gate::authorize('viewAny', PmVisit::class);
+        $data = $request->validate([
+            'action' => ['required', Rule::in(MovePmVisits::ACTIONS)],
+            'visits' => ['required', 'array', 'min:1', 'max:100'],
+            'visits.*' => ['required', 'string', 'size:26'],
+        ]);
+
+        ['moved' => $moved, 'skipped' => $skipped] = $moveVisits->handle($data['visits'], $data['action'], $request->user());
+
+        $response = back()->with('success', __('maintenance.visits.bulk_moved', ['count' => $moved, 'action' => __('maintenance.visits.moved.'.$data['action'])]));
+
+        return $skipped === [] ? $response : $response->withErrors(['visits' => __('maintenance.visits.bulk_skipped', ['list' => implode(' · ', $skipped)])]);
     }
 
     /**

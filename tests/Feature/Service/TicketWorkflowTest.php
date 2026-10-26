@@ -162,6 +162,26 @@ it('needs the warranty checked before work starts', function () {
     expect($ticket->fresh())->warranty_status->toBe('in_warranty')->status->toBe(Ticket::STATUS_IN_PROGRESS);
 });
 
+it('takes the warranty from the asset register when the device has a warranty date', function () {
+    $category = createAssetCategory(['name' => 'Router']);
+    $covered = createAsset($category, ['branch_id' => $this->north->id, 'warranty_expires_at' => '2026-06-15']);
+    $expired = createAsset($category, ['branch_id' => $this->north->id, 'warranty_expires_at' => '2026-06-14']);
+    $this->actingAs($this->tech);
+
+    foreach ([[$covered, 'in_warranty', '2026-06-15'], [$expired, 'out_of_warranty', '2026-06-14']] as [$asset, $status, $date]) {
+        $ticket = openTicket($this->helpdesk, ['asset_id' => $asset->id], warrantyChecked: false);
+        app(AssignTicket::class)->handle($ticket, $this->tech->id, $this->helpdesk);
+
+        moveTicket($ticket, 'start')->assertSessionHasNoErrors();
+        $ticket = $ticket->fresh();
+        expect($ticket->status)->toBe(Ticket::STATUS_IN_PROGRESS)
+            ->and($ticket->warranty_status)->toBe($status)
+            ->and($ticket->warranty_expires_on?->toDateString())->toBe($date)
+            ->and($ticket->warranty_checked_by_name)->toBe('Tech North')
+            ->and($ticket->events()->where('type', 'warranty')->value('body'))->toContain('ทะเบียนทรัพย์สิน');
+    }
+});
+
 it('needs the repair report before the job is done or closed', function () {
     $ticket = openTicket($this->helpdesk, reportFilled: false);
     app(AssignTicket::class)->handle($ticket, $this->tech->id, $this->helpdesk);

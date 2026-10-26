@@ -439,8 +439,9 @@ const stepBar = computed(() => {
                     </form>
                 </div>
                 <InputError :message="assign.errors.assignee_id" />
+                <!-- A device with a warranty date in the register is answered by itself on "start". -->
                 <p
-                    v-if="can.checkWarranty && !ticket.warranty.status"
+                    v-if="can.checkWarranty && !ticket.warranty.status && !ticket.warranty.asset_expires_on"
                     class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200"
                 >
                     {{ t('tickets.warranty_required') }}

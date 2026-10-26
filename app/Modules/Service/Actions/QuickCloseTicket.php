@@ -31,6 +31,7 @@ class QuickCloseTicket
         private IssuePartToTicket $issuePart,
         private PartsForCheckout $parts,
         private SignatureRequirement $signatureRequirement,
+        private AssetWarranty $assetWarranty,
     ) {}
 
     /**
@@ -54,14 +55,20 @@ class QuickCloseTicket
         if (blank($approver)) {
             throw ValidationException::withMessages(['approver_name' => __('service.quick_close.approver_required')]);
         }
-        if ($ticket->warranty_checked_at === null && blank($data['warranty_status'] ?? null)) {
+        // Not checked yet: what the technician picked, else the asset register's warranty date.
+        $fromAsset = $ticket->warranty_checked_at === null && blank($data['warranty_status'] ?? null)
+            ? $this->assetWarranty->handle($ticket)
+            : null;
+        if ($ticket->warranty_checked_at === null && blank($data['warranty_status'] ?? null) && $fromAsset === null) {
             throw ValidationException::withMessages(['warranty_status' => __('service.tickets.warranty_first')]);
         }
 
         $this->checkStock($data['parts'] ?? []);
 
-        return DB::transaction(function () use ($ticket, $actor, $data, $photos, $approver) {
-            if ($ticket->warranty_checked_at === null) {
+        return DB::transaction(function () use ($ticket, $actor, $data, $photos, $approver, $fromAsset) {
+            if ($fromAsset !== null) {
+                $this->checkWarranty->handle($ticket, $actor, $fromAsset['status'], $fromAsset['expires_on'], fromAsset: true);
+            } elseif ($ticket->warranty_checked_at === null) {
                 $this->checkWarranty->handle($ticket, $actor, $data['warranty_status'], null);
             }
 

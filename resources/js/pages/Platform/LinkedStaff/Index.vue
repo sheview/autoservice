@@ -20,6 +20,8 @@ interface Person {
     home: number;
     on: number[];
     off: number[];
+    /** Companies a staff pool keeps this person in: changed on the pool, not here. */
+    pooled: number[];
 }
 
 interface Filters {
@@ -87,8 +89,13 @@ const setOn = (person: Person, tenantId: number, on: boolean) => {
 };
 const pending = computed(() => Object.keys(draft.value).length);
 
-// A company's column on this page: everyone but those whose own company it is.
-const column = (tenantId: number) => props.staff.data.filter((person) => person.home !== tenantId);
+// A staff pool keeps the person there (the hourly sync would switch a box ticked off back on).
+const isPooled = (person: Person, tenantId: number) => person.home !== tenantId && person.pooled.includes(tenantId);
+
+// A company's column on this page: everyone who can be ticked one by one (not their own company, not by a pool).
+const column = (tenantId: number) => props.staff.data.filter((person) => person.home !== tenantId && !isPooled(person, tenantId));
+const tenantName = (tenantId: number) => props.tenants.find((tenant) => tenant.id === tenantId)?.name ?? '';
+const canAddPool = computed(() => !!poolForm.from_tenant_id && !!poolForm.to_tenant_id && poolForm.roles.length > 0);
 const columnState = (tenantId: number) => {
     const on = column(tenantId).filter((person) => isOn(person, tenantId)).length;
     return { all: on > 0 && on === column(tenantId).length, some: on > 0 && on < column(tenantId).length };
@@ -241,9 +248,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             </label>
                         </div>
                     </fieldset>
-                    <Button :disabled="poolForm.processing || !poolForm.from_tenant_id || !poolForm.to_tenant_id || poolForm.roles.length === 0">
+                    <Button :disabled="poolForm.processing || !canAddPool">
                         {{ t('linked_staff.pool_add') }}
                     </Button>
+                    <p v-if="!canAddPool" class="w-full text-xs text-muted-foreground">{{ t('linked_staff.pool_add_hint') }}</p>
                 </form>
             </section>
 
@@ -260,16 +268,35 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 </select>
             </div>
 
-            <div class="overflow-x-auto rounded-md border">
+            <!-- What the boxes mean -->
+            <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
+                <span class="flex items-center gap-1.5">
+                    <span class="rounded bg-primary/10 px-2 py-0.5 font-medium text-primary">{{ t('linked_staff.home') }}</span>
+                    {{ t('linked_staff.legend_home') }}
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <input type="checkbox" checked disabled class="size-4 rounded border-input opacity-50" aria-hidden="true" />
+                    <span class="font-medium">{{ t('linked_staff.pooled') }}</span>
+                    {{ t('linked_staff.legend_pooled') }}
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <input type="checkbox" checked disabled class="size-4 rounded border-input" aria-hidden="true" />
+                    {{ t('linked_staff.legend_person') }}
+                </span>
+            </div>
+
+            <!-- Scrolls inside its own box, so the names and the company headers stay in view -->
+            <div class="max-h-[70vh] overflow-auto rounded-md border">
                 <table class="w-full text-sm">
-                    <thead class="bg-muted/50 text-left">
+                    <thead class="sticky top-0 z-20 bg-muted text-left">
                         <tr>
-                            <th class="px-4 py-2 font-medium">{{ t('linked_staff.person') }}</th>
-                            <th v-for="tenant in tenants" :key="tenant.id" class="px-4 py-2 text-center font-medium">
-                                {{ tenant.name }}
+                            <th class="sticky left-0 z-30 min-w-56 bg-muted px-4 py-2 font-medium">{{ t('linked_staff.person') }}</th>
+                            <th v-for="tenant in tenants" :key="tenant.id" class="min-w-32 px-4 py-2 text-center align-top font-medium">
+                                <span class="mx-auto line-clamp-2 max-w-40" :title="tenant.name">{{ tenant.name }}</span>
                                 <label
                                     v-if="column(tenant.id).length"
                                     class="mt-1 flex items-center justify-center gap-1.5 text-xs font-normal text-muted-foreground"
+                                    :title="t('linked_staff.select_all_hint')"
                                 >
                                     <input
                                         type="checkbox"
@@ -285,7 +312,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     </thead>
                     <tbody>
                         <tr v-for="person in staff.data" :key="person.id" class="border-t">
-                            <td class="px-4 py-2">
+                            <td class="sticky left-0 z-10 bg-background px-4 py-2">
                                 <div class="font-medium">
                                     {{ person.name }}
                                     <span v-if="!person.is_active" class="ml-1 text-xs text-muted-foreground"
@@ -295,6 +322,8 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <div class="text-xs text-muted-foreground">
                                     {{ person.email }}<template v-if="person.employee_code"> · {{ person.employee_code }}</template>
                                 </div>
+                                <!-- Two people with the same name are told apart by their own company -->
+                                <div class="text-xs text-muted-foreground">{{ t('linked_staff.home') }}: {{ tenantName(person.home) }}</div>
                             </td>
                             <td
                                 v-for="tenant in tenants"
@@ -304,6 +333,20 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             >
                                 <span v-if="person.home === tenant.id" class="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                                     {{ t('linked_staff.home') }}
+                                </span>
+                                <span
+                                    v-else-if="isPooled(person, tenant.id)"
+                                    class="inline-flex flex-col items-center gap-0.5"
+                                    :title="t('linked_staff.pooled_hint')"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked
+                                        disabled
+                                        class="size-4 rounded border-input opacity-50"
+                                        :aria-label="`${person.name} — ${tenant.name} (${t('linked_staff.pooled')})`"
+                                    />
+                                    <span class="text-[11px] text-muted-foreground">{{ t('linked_staff.pooled') }}</span>
                                 </span>
                                 <input
                                     v-else

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
+import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
 import PmVisitViewSwitch from '@/components/PmVisitViewSwitch.vue';
@@ -9,8 +10,9 @@ import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
 interface VisitRow {
     ulid: string;
@@ -26,6 +28,8 @@ interface VisitRow {
     due_on: string;
     scheduled_on: string | null;
     overdue: boolean;
+    /** Moves this person may make on it from the list, together with other work orders. */
+    bulk: string[];
 }
 
 interface Filters {
@@ -69,6 +73,35 @@ const columns = [
 ];
 
 const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
+
+// Work orders ticked on this page, to review / approve / publish / close together (the end of a round).
+const bulkActions = ['review', 'approve', 'publish', 'close'];
+const selectable = computed(() => props.visits.data.filter((visit) => visit.bulk.length > 0));
+const selected = ref<string[]>([]);
+const allSelected = computed(() => selectable.value.length > 0 && selected.value.length === selectable.value.length);
+const toggleAll = (on: boolean) => (selected.value = on ? selectable.value.map((visit) => visit.ulid) : []);
+// A move is offered when at least one ticked work order allows it; the others are skipped and listed.
+const offered = computed(() =>
+    bulkActions.filter((action) => props.visits.data.some((visit) => selected.value.includes(visit.ulid) && visit.bulk.includes(action))),
+);
+const moving = ref(false);
+const bulkMove = (action: string) =>
+    router.post(
+        route('maintenance.visits.bulk-move'),
+        { action, visits: selected.value },
+        {
+            preserveScroll: true,
+            onStart: () => (moving.value = true),
+            onSuccess: () => (selected.value = []),
+            onFinish: () => (moving.value = false),
+        },
+    );
+// Another page or filter: nothing ticked carries over.
+watch(
+    () => props.visits,
+    () => (selected.value = selected.value.filter((ulid) => selectable.value.some((visit) => visit.ulid === ulid))),
+);
+const errors = computed(() => Object.values(page.props.errors as Record<string, string>));
 </script>
 
 <template>
@@ -89,6 +122,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
             </p>
+            <InputError v-for="(message, index) in errors" :key="index" :message="message" />
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('pm_visits.search_placeholder')" />
@@ -115,6 +149,18 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <table class="w-full text-sm">
                     <thead class="bg-muted/50 text-left">
                         <tr>
+                            <th class="w-10 px-4 py-2">
+                                <input
+                                    v-if="selectable.length"
+                                    type="checkbox"
+                                    class="size-4 rounded border-input"
+                                    :checked="allSelected"
+                                    :indeterminate="selected.length > 0 && !allSelected"
+                                    :aria-label="t('pm_visits.select_all')"
+                                    :title="t('pm_visits.select_all')"
+                                    @change="toggleAll(($event.target as HTMLInputElement).checked)"
+                                />
+                            </th>
                             <th v-for="column in columns" :key="column.key" class="whitespace-nowrap px-4 py-2 font-medium">
                                 <button v-if="column.sortable" type="button" class="flex items-center gap-1" @click="sortBy(column.key)">
                                     {{ t(column.label) }}
@@ -129,6 +175,16 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     </thead>
                     <tbody>
                         <tr v-for="visit in visits.data" :key="visit.ulid" class="border-t">
+                            <td class="px-4 py-2">
+                                <input
+                                    v-if="visit.bulk.length"
+                                    v-model="selected"
+                                    type="checkbox"
+                                    class="size-4 rounded border-input"
+                                    :value="visit.ulid"
+                                    :aria-label="visit.visit_no"
+                                />
+                            </td>
                             <td class="whitespace-nowrap px-4 py-2">
                                 <Link
                                     :href="route('maintenance.visits.show', visit.ulid)"
@@ -157,10 +213,24 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="px-4 py-2"><PmVisitStatusBadge :status="visit.status" :overdue="visit.overdue" /></td>
                         </tr>
                         <tr v-if="visits.data.length === 0">
-                            <td :colspan="columns.length" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
+                            <td :colspan="columns.length + 1" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
                         </tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- What to do with the ticked work orders -->
+            <div
+                v-if="selected.length"
+                class="sticky bottom-4 z-10 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3 shadow-lg"
+            >
+                <span class="text-sm font-medium">{{ t('pm_visits.selected', { count: selected.length }) }}</span>
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" :disabled="moving" @click="selected = []">{{ t('common.cancel') }}</Button>
+                    <Button v-for="action in offered" :key="action" size="sm" :disabled="moving" @click="bulkMove(action)">
+                        {{ t(`pm_visits.moves.${action}`) }}
+                    </Button>
+                </div>
             </div>
 
             <Pagination :paginator="visits" />

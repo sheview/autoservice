@@ -430,3 +430,21 @@ it('hands out every line still to hand out in one go, and closes when all is out
     // nothing left to hand out
     $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasErrors('request');
 });
+
+it('takes every lent asset back in one go, and closes the request', function () {
+    $laptop = createAsset(createAssetCategory(['name' => 'Laptop']), ['name' => 'Laptop Dell', 'status' => Asset::STATUS_SPARE]);
+    $request = ($this->approved)([
+        ($this->asset)($this->notebook, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-15']),
+        ($this->asset)($laptop, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-15']),
+    ]);
+    $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasNoErrors();
+    expect($request->fresh()->status)->toBe('fulfilled');
+
+    $this->actingAs($this->staff)->post("/checkout-requests/{$request->ulid}/return-all")->assertForbidden();
+    $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/return-all", ['condition' => 'สภาพปกติ'])->assertSessionHasNoErrors();
+
+    expect($request->items()->get()->every(fn ($line) => $line->outstanding() === 0 && $line->return_condition === 'สภาพปกติ'))->toBeTrue()
+        ->and($this->notebook->fresh()->status)->toBe(Asset::STATUS_SPARE)
+        ->and($laptop->fresh()->status)->toBe(Asset::STATUS_SPARE)
+        ->and($request->fresh()->status)->toBe('closed');
+});

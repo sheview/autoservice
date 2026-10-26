@@ -2,11 +2,15 @@
 
 namespace App\Modules\Platform\CrossTenant;
 
+use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
+use App\Modules\Platform\Models\StaffPool;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Scopes\TenantScope;
+use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * The staff of every customer company, for the platform's "ช่างหลายบริษัท" page: each person's
@@ -15,9 +19,12 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class CompanyStaff
 {
+    public function __construct(private TenantContext $context) {}
+
     /**
      * Main accounts of company staff (not customer accounts), each with where they can work: home
-     * (their own company), on (companies where their linked account is active), off (deactivated).
+     * (their own company), on (companies where their linked account is active), off (deactivated),
+     * pooled (companies a staff pool keeps them in).
      */
     public function directory(string $search, ?int $tenantId, int $perPage = 25): LengthAwarePaginator
     {
@@ -43,8 +50,9 @@ class CompanyStaff
             ->whereIn('login_user_id', $page->getCollection()->pluck('id'))
             ->get(['id', 'tenant_id', 'login_user_id', 'is_active'])
             ->groupBy('login_user_id'));
+        $pooled = $this->pooled($page->getCollection());
 
-        return $page->through(function (User $user) use ($linked) {
+        return $page->through(function (User $user) use ($linked, $pooled) {
             $rows = $linked[$user->id] ?? collect();
 
             return [
@@ -56,8 +64,39 @@ class CompanyStaff
                 'home' => $user->tenant_id,
                 'on' => $rows->where('is_active', true)->pluck('tenant_id')->values()->all(),
                 'off' => $rows->where('is_active', false)->pluck('tenant_id')->values()->all(),
+                'pooled' => $pooled[$user->id] ?? [],
             ];
         });
+    }
+
+    /**
+     * The companies each person works in through a staff pool, by user id: the same people
+     * SyncStaffPool keeps switched on (an active pool, the person active with one of its roles, the
+     * "to" company active), so those boxes are changed on the pool, not one by one.
+     *
+     * @param  Collection<int, User>  $people
+     * @return array<int, list<int>>
+     */
+    private function pooled(Collection $people): array
+    {
+        $pooled = [];
+        foreach (StaffPool::query()->where('is_active', true)->with('fromTenant', 'toTenant')->get() as $pool) {
+            $ids = $people->where('tenant_id', $pool->from_tenant_id)->where('is_active', true)->pluck('id')->all();
+            if ($ids === [] || $pool->fromTenant === null || ! $pool->toTenant?->isActive()) {
+                continue;
+            }
+
+            $members = $this->context->run($pool->fromTenant, function () use ($pool, $ids) {
+                $roles = Role::whereIn('name', $pool->roles ?? [])->pluck('name')->all();
+
+                return $roles === [] ? [] : User::role($roles)->whereIn('id', $ids)->pluck('id')->all();
+            });
+            foreach ($members as $id) {
+                $pooled[$id][] = $pool->to_tenant_id;
+            }
+        }
+
+        return $pooled;
     }
 
     /** A main account of a customer company, or null. */

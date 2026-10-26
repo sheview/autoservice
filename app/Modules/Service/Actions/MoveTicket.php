@@ -17,7 +17,8 @@ use Illuminate\Validation\ValidationException;
 /**
  * Moves a ticket along TicketWorkflow (start, hold, resolve, approve, reject, cancel) and keeps
  * the SLA clock right:
- *   - "start" needs the device's warranty checked (CheckTicketWarranty)
+ *   - "start" needs the device's warranty checked (CheckTicketWarranty), taken from the asset
+ *     register when nobody checked it and the device has a warranty date (AssetWarranty)
  *   - the first "start" is the response time (responded_at)
  *   - "hold" stops the resolve clock; leaving hold adds the business minutes spent on hold to
  *     hold_minutes and moves resolve_due_at
@@ -38,9 +39,14 @@ class MoveTicket
         if (! TicketWorkflow::allows($ticket, $action)) {
             throw ValidationException::withMessages(['action' => __('service.tickets.not_allowed')]);
         }
-        // Whether the repair is a warranty claim decides how the job is done: check it first.
+        // Whether the repair is a warranty claim decides how the job is done: check it first. A
+        // registered device with a warranty date answers it by itself; anything else is checked by hand.
         if ($action === 'start' && $ticket->warranty_checked_at === null) {
-            throw ValidationException::withMessages(['action' => __('service.tickets.warranty_first')]);
+            $found = app(AssetWarranty::class)->handle($ticket);
+            if ($found === null) {
+                throw ValidationException::withMessages(['action' => __('service.tickets.warranty_first')]);
+            }
+            $ticket = app(CheckTicketWarranty::class)->handle($ticket, $actor, $found['status'], $found['expires_on'], fromAsset: true);
         }
         // The repair report (cause, who approved it at the customer) is filled in before the job is done.
         if (in_array($action, ['resolve', 'approve'], true) && (blank($ticket->cause) || blank($ticket->approver_name))) {

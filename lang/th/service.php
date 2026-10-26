@@ -102,6 +102,7 @@ return [
         'in_warranty' => 'อยู่ในประกัน',
         'out_of_warranty' => 'หมดประกัน',
         'until' => 'ถึง :date',
+        'from_asset' => 'ตามวันหมดประกันในทะเบียนทรัพย์สิน',
     ],
 
     'holiday_fields' => [

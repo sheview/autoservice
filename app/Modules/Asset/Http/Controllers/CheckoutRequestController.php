@@ -9,6 +9,7 @@ use App\Modules\Asset\Actions\CancelCheckoutRequest;
 use App\Modules\Asset\Actions\CloseCheckoutRequest;
 use App\Modules\Asset\Actions\FulfillCheckoutRequest;
 use App\Modules\Asset\Actions\RejectCheckoutRequest;
+use App\Modules\Asset\Actions\ReturnCheckoutRequest;
 use App\Modules\Asset\Actions\SaveCheckoutRequest;
 use App\Modules\Asset\Actions\SearchAssets;
 use App\Modules\Asset\Actions\SearchCheckoutLines;
@@ -273,6 +274,16 @@ class CheckoutRequestController extends Controller
         $result = $fulfill->handle($checkout, $request->user());
 
         return back()->with('success', __($result['left'] > 0 ? 'asset.requests.fulfilled_all_left' : 'asset.requests.fulfilled_all', $result));
+    }
+
+    /** "Take all back": every asset still out on the request, in one condition. */
+    public function returnAll(Request $request, CheckoutRequest $checkout, ReturnCheckoutRequest $return): RedirectResponse
+    {
+        Gate::authorize('returnItems', $checkout);
+        $data = $request->validate(['condition' => ['nullable', 'string', 'max:255']]);
+        $result = $return->handle($checkout, $request->user(), $data['condition'] ?? null);
+
+        return back()->with('success', __($result['left'] > 0 ? 'asset.requests.returned_all_left' : 'asset.requests.returned_all', $result));
     }
 
     public function close(Request $request, CheckoutRequest $checkout, CloseCheckoutRequest $close): RedirectResponse

@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Contract\Actions\SignatureRequirement;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Platform\Support\Modules;
+use App\Modules\Service\Actions\AssetWarranty;
 use App\Modules\Service\Actions\QuickCloseTicket;
 use App\Modules\Service\Actions\RepairPresetList;
 use App\Modules\Service\Models\Ticket;
@@ -30,7 +31,7 @@ class TicketCloseController extends Controller
 
     public function __construct(private Modules $modules) {}
 
-    public function show(Request $request, Ticket $ticket, RepairPresetList $presets, SignatureRequirement $signature, AssetDetails $assetDetails, PartsForCheckout $parts): Response
+    public function show(Request $request, Ticket $ticket, RepairPresetList $presets, SignatureRequirement $signature, AssetDetails $assetDetails, PartsForCheckout $parts, AssetWarranty $assetWarranty): Response
     {
         Gate::authorize('resolve', $ticket);
         $user = $request->user();
@@ -41,7 +42,8 @@ class TicketCloseController extends Controller
             'ticket' => [
                 ...$ticket->only(['ulid', 'ticket_no', 'title', 'status', 'contact_name', 'device_name']),
                 'asset' => $asset ? $asset['asset_code'].' '.$asset['name'] : null,
-                'warranty_checked' => $ticket->warranty_checked_at !== null,
+                // Checked already, or the asset register's warranty date answers it on closing.
+                'warranty_checked' => $ticket->warranty_checked_at !== null || $assetWarranty->handle($ticket) !== null,
                 'closable' => in_array($ticket->status, QuickCloseTicket::CLOSABLE, true),
             ],
             'presets' => $presets->handle(),

@@ -51,6 +51,14 @@ const post = (name: string, confirmText?: string) => {
     router.post(route(`asset.requests.${name}`, props.request.ulid), {}, options);
 };
 
+// "Take all back": every asset still out, in normal condition (damaged or short: line by line).
+const toReturn = (item: { item_type: string; qty_fulfilled: number; qty_returned: number }) =>
+    item.item_type === 'asset' && item.qty_fulfilled > item.qty_returned;
+const returnAll = () => {
+    if (!confirm(t('requests.confirm_return_all', { no: props.request.request_no }))) return;
+    router.post(route('asset.requests.return-all', props.request.ulid), { condition: t('requests.return_all_condition') }, options);
+};
+
 // Approval: every line as asked unless lowered or rejected (with a reason).
 const decisions = reactive(
     Object.fromEntries(props.request.items.map((item) => [item.id, { qty: item.qty_requested, reject: false, reason: '' }])) as Record<
@@ -166,6 +174,9 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         @click="post('fulfill-all', t('requests.confirm_fulfill_all', { no: request.request_no }))"
                     >
                         {{ t('requests.fulfill_all') }}
+                    </Button>
+                    <Button v-if="can.return && request.items.some(toReturn)" @click="returnAll">
+                        {{ t('requests.return_all') }}
                     </Button>
                     <Button v-if="can.close" variant="outline" @click="post('close', t('requests.confirm_close', { no: request.request_no }))">
                         {{ t('requests.close') }}

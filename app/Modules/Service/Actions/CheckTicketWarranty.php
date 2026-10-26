@@ -17,10 +17,11 @@ class CheckTicketWarranty
 
     /**
      * @param  string  $status  one of Ticket::WARRANTY_STATUSES
+     * @param  bool  $fromAsset  taken from the asset register's warranty date (AssetWarranty), not checked by hand
      */
-    public function handle(Ticket $ticket, User $actor, string $status, ?string $expiresOn): Ticket
+    public function handle(Ticket $ticket, User $actor, string $status, ?string $expiresOn, bool $fromAsset = false): Ticket
     {
-        return DB::transaction(function () use ($ticket, $actor, $status, $expiresOn) {
+        return DB::transaction(function () use ($ticket, $actor, $status, $expiresOn, $fromAsset) {
             $ticket->update([
                 'warranty_status' => $status,
                 'warranty_expires_on' => $expiresOn,
@@ -31,6 +32,9 @@ class CheckTicketWarranty
             $body = __("service.warranty.{$status}");
             if ($expiresOn !== null) {
                 $body .= ' ('.__('service.warranty.until', ['date' => $expiresOn]).')';
+            }
+            if ($fromAsset) {
+                $body .= ' · '.__('service.warranty.from_asset');
             }
             $this->recordEvent->handle($ticket, TicketEvent::TYPE_WARRANTY, $actor, ['body' => $body]);
 
