@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Maintenance\Models\PmTemplateAssignment;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -154,4 +155,13 @@ it('removes in one go the picked categories nothing uses, never one in use', fun
         ->assertSessionHas('success', 'ลบหมวดที่ไม่ได้ใช้ 1 หมวดแล้ว');
 
     expect(AssetCategory::orderBy('name')->pluck('name')->all())->toBe(['Keyboard', 'สายแลน', 'เราเตอร์']);
+});
+
+it('offers a standard category with only its PM template as unused', function () {
+    $rack = createAssetCategory(['name' => 'ตู้ Rack', 'code_prefix' => 'RK']);
+    PmTemplateAssignment::create(['template_code' => 'DC-RACK', 'asset_category_id' => $rack->id]);
+
+    $this->actingAs($this->admin)->post('/asset-categories/remove-unused', ['ids' => [$rack->id]])
+        ->assertSessionHas('success', 'ลบหมวดที่ไม่ได้ใช้ 1 หมวดแล้ว');
+    expect(AssetCategory::count())->toBe(0);
 });
