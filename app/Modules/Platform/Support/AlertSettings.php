@@ -19,9 +19,9 @@ class AlertSettings
 
     /** Events by group, as the settings page lists them. */
     public const EVENTS = [
-        'checkout' => ['checkout_requested', 'checkout_approved', 'checkout_rejected', 'checkout_returned', 'checkout_restocked'],
+        'checkout' => ['checkout_requested', 'checkout_approved', 'checkout_rejected', 'checkout_returned', 'checkout_restocked', 'checkout_receipt_issue'],
         // Sent by the hourly check (checkouts:notify-delays), with the thresholds below.
-        'checkout_delays' => ['checkout_approval_overdue', 'checkout_backorder_overdue', 'checkout_return_overdue'],
+        'checkout_delays' => ['checkout_approval_overdue', 'checkout_backorder_overdue', 'checkout_return_overdue', 'checkout_receipt_overdue'],
         // ticket_reported: a customer reported a problem with an asset's QR code (waits for the helpdesk).
         // ticket_field_reported: an outside technician / the customer sent something back through a ticket link.
         'repair' => ['ticket_reported', 'ticket_opened', 'ticket_field_reported', 'ticket_resolved', 'asset_in_repair'],
@@ -36,12 +36,13 @@ class AlertSettings
 
     /**
      * When a delay alert goes out: a request waiting approval_hours for approval; a line backordered
-     * or partly handed out backorder_days after approval, or needed within needed_soon_days.
+     * or partly handed out backorder_days after approval, or needed within needed_soon_days; a
+     * hand-out the receiver has not confirmed receipt_hours after it.
      */
-    public const THRESHOLDS = ['approval_hours' => 24, 'backorder_days' => 3, 'needed_soon_days' => 2];
+    public const THRESHOLDS = ['approval_hours' => 24, 'backorder_days' => 3, 'needed_soon_days' => 2, 'receipt_hours' => 24];
 
     /**
-     * @return array{approval_hours: int, backorder_days: int, needed_soon_days: int}
+     * @return array{approval_hours: int, backorder_days: int, needed_soon_days: int, receipt_hours: int}
      */
     public static function thresholds(Tenant $tenant): array
     {

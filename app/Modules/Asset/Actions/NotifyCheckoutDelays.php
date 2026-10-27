@@ -2,6 +2,7 @@
 
 namespace App\Modules\Asset\Actions;
 
+use App\Modules\Asset\Models\CheckoutFulfillment;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Asset\Support\RequestAlert;
@@ -11,7 +12,8 @@ use App\Modules\Tenancy\Support\TenantContext;
 /**
  * Alerts (once each) about issue/loan requests that are late, with the company's thresholds
  * (AlertSettings::thresholds): waiting for approval too many hours; backordered or partly handed
- * out for too many days, or close to the day they are needed; lent assets past their due date.
+ * out for too many days, or close to the day they are needed; lent assets past their due date;
+ * hand-outs the receiver has not confirmed for too many hours (one alert per request).
  */
 class NotifyCheckoutDelays
 {
@@ -61,6 +63,22 @@ class NotifyCheckoutDelays
             ->each(function (CheckoutItem $item) use (&$sent) {
                 RequestAlert::send('checkout_return_overdue', $item->request, null, $item->due_return_date?->format('d/m/Y'), $item);
                 $item->update(['overdue_alerted_at' => now()]);
+                $sent++;
+            });
+
+        CheckoutFulfillment::query()
+            ->with('item.request')
+            ->whereNull('received_at')
+            ->whereNull('receipt_issue')
+            ->whereNull('receipt_alerted_at')
+            ->where('fulfilled_at', '<=', now()->subHours($limits['receipt_hours']))
+            ->get()
+            ->groupBy(fn (CheckoutFulfillment $f) => $f->item->request_id)
+            ->each(function ($rows) use (&$sent) {
+                $first = $rows->sortBy('fulfilled_at')->first();
+                RequestAlert::send('checkout_receipt_overdue', $first->item->request, null, $first->fulfilled_at?->format('d/m/Y H:i'),
+                    $rows->unique('item_id')->count() === 1 ? $first->item : null);
+                CheckoutFulfillment::query()->whereIn('id', $rows->pluck('id'))->update(['receipt_alerted_at' => now()]);
                 $sent++;
             });
 

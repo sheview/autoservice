@@ -44,7 +44,15 @@ export interface CheckoutLineRow {
     purchase_request_id: number | null;
     purchase_request: { ulid: string; pr_no: string; status: string } | null;
     // The request page: each hand-out of this line.
-    fulfillments?: { qty: number; by: string | null; at: string | null }[];
+    // received_at: the receiver confirmed it; receipt_issue: they said it was short / never came.
+    fulfillments?: {
+        qty: number;
+        by: string | null;
+        at: string | null;
+        received_at: string | null;
+        received_by: string | null;
+        receipt_issue: string | null;
+    }[];
     // The request page, parts: handed out by choosing pieces (serial numbers), and those out / taken back.
     track_serial?: boolean;
     serials?: {

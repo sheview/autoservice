@@ -64,6 +64,7 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::get('checkout-requests/{checkout}/delivery-note', [CheckoutRequestController::class, 'deliveryNote'])->name('requests.delivery-note');
     Route::get('checkout-requests/{checkout}/delivery-note/print', [CheckoutRequestController::class, 'deliveryNotePrint'])->name('requests.delivery-note.print');
     Route::post('checkout-requests/{checkout}/fulfill-all', [CheckoutRequestController::class, 'fulfillAll'])->name('requests.fulfill-all');
+    Route::post('checkout-requests/{checkout}/confirm-receipt', [CheckoutRequestController::class, 'confirmReceipt'])->name('requests.confirm-receipt');
     Route::post('checkout-requests/{checkout}/return-all', [CheckoutRequestController::class, 'returnAll'])->name('requests.return-all');
     Route::post('checkout-items/{item}/fulfill', [CheckoutItemController::class, 'fulfill'])->whereNumber('item')->name('items.fulfill');
     Route::post('checkout-items/{item}/backorder', [CheckoutItemController::class, 'backorder'])->whereNumber('item')->name('items.backorder');

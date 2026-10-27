@@ -161,7 +161,7 @@ it('lists by tab, with search, filters, sort and pages', function () {
         ->where('requests.total', 4)
         ->where('requests.data.0.request_no', $lent->request_no) // newest first
         ->where('lines', null)
-        ->where('counts', ['open' => 4, 'approve' => 1, 'fulfill' => 1, 'backorders' => 1, 'returns' => 1]));
+        ->where('counts', ['open' => 4, 'approve' => 1, 'fulfill' => 1, 'backorders' => 1, 'returns' => 1, 'receipt_pending' => 1, 'receipt_issue' => 0]));
     $page('?tab=approve')->assertInertia(fn (Assert $p) => $p->where('requests.total', 1)->where('requests.data.0.request_no', $waiting->request_no));
     $page('?tab=fulfill')->assertInertia(fn (Assert $p) => $p->where('requests.total', 1)->where('requests.data.0.request_no', $toHand->request_no));
     $page('?tab=backorders')->assertInertia(fn (Assert $p) => $p
@@ -219,6 +219,8 @@ it('alerts once each about late approvals, late backorders and loans past due', 
 
     $lent = ($this->approve)(($this->send)([($this->line)($this->notebook, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-03'])]));
     $this->actingAs($this->desk)->post('/checkout-items/'.$lent->items()->sole()->id.'/fulfill', ['qty' => 1]);
+    // received (not confirming is its own alert: CheckoutReceiptTest)
+    $this->actingAs($this->staff)->post("/checkout-requests/{$lent->ulid}/confirm-receipt")->assertSessionHasNoErrors();
     $owed = ($this->approve)(($this->send)([['item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]));
     $this->actingAs($this->desk)->post('/checkout-items/'.$owed->items()->sole()->id.'/backorder');
     $waiting = ($this->send)([($this->line)($this->projector)]);

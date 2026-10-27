@@ -60,6 +60,19 @@ return [
 ผู้รับ: :borrower
 พร้อมจ่ายแล้ว',
         ],
+        'checkout_receipt_issue' => [
+            'title' => 'ผู้รับแจ้งว่าได้ของไม่ครบ :no',
+            'body' => 'ผู้รับ: :borrower
+รายการ: :items
+แจ้งโดย: :actor
+ปัญหา: :note',
+        ],
+        'checkout_receipt_overdue' => [
+            'title' => 'จ่ายแล้วแต่ผู้รับยังไม่ยืนยันรับ :no',
+            'body' => 'ผู้รับ: :borrower
+รายการ: :items
+จ่ายเมื่อ: :note',
+        ],
         'checkout_approval_overdue' => [
             'title' => 'ใบเบิก/ยืมรออนุมัตินานเกินกำหนด :no',
             'body' => 'ผู้รับ: :borrower

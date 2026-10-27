@@ -33,6 +33,7 @@ const props = defineProps<{
         order: boolean;
         return: boolean;
         close: boolean;
+        confirm_receipt: boolean;
         print: boolean;
     };
 }>();
@@ -145,6 +146,20 @@ const fulfillments = computed(() =>
         .flatMap((line) => (line.fulfillments ?? []).map((f) => ({ ...f, line })))
         .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? '')),
 );
+// Receipt: the receiver confirms what was handed out, or says what was wrong with it.
+const unconfirmed = computed(() => fulfillments.value.filter((f) => f.received_at === null));
+const reportedCount = computed(() => unconfirmed.value.filter((f) => f.receipt_issue !== null).length);
+const reporting = ref(false);
+const receiptForm = useForm({ receipt_issue: '' });
+const confirmReceipt = () => {
+    if (!confirm(t('requests.receipt.confirm_prompt'))) return;
+    receiptForm.transform(() => ({})).post(route('asset.requests.confirm-receipt', props.request.ulid), options);
+};
+const reportIssue = () =>
+    receiptForm
+        .transform((d) => ({ report: true, receipt_issue: d.receipt_issue }))
+        .post(route('asset.requests.confirm-receipt', props.request.ulid), { ...options, onSuccess: () => (reporting.value = false) });
+
 const lineError = (field: string) => (lineForm.errors as Record<string, string>)[field];
 const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm';
 </script>
@@ -216,6 +231,68 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
             <InputError :message="errors.item" />
 
             <RequestSteps :request="request" />
+
+            <!-- The receiver: confirm what was handed out, or report what was wrong -->
+            <section
+                v-if="can.confirm_receipt && unconfirmed.length"
+                class="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950"
+            >
+                <div>
+                    <h3 class="text-sm font-semibold">
+                        {{ t('requests.receipt.title') }} · {{ t('requests.receipt.waiting', { count: unconfirmed.length }) }}
+                    </h3>
+                    <p class="text-xs text-muted-foreground">{{ t('requests.receipt.hint') }}</p>
+                </div>
+                <ul class="space-y-1 text-sm">
+                    <li v-for="(f, index) in unconfirmed" :key="index">
+                        {{ f.line.item_name }} × {{ f.qty }} {{ f.line.unit ?? '' }}
+                        <span class="text-xs text-muted-foreground">· {{ f.by ?? '-' }} · {{ dateTime(f.at) }}</span>
+                        <span v-if="f.receipt_issue" class="block text-xs text-red-700 dark:text-red-400">
+                            {{ t('requests.receipt.issue') }}: {{ f.receipt_issue }}
+                        </span>
+                    </li>
+                </ul>
+                <p v-if="reportedCount" class="text-xs text-muted-foreground">{{ t('requests.receipt.reported') }}</p>
+                <div class="flex flex-wrap gap-2">
+                    <Button class="min-h-11 sm:min-h-9" :disabled="receiptForm.processing" @click="confirmReceipt">
+                        {{ t('requests.receipt.confirm') }}
+                    </Button>
+                    <Button v-if="reportedCount < unconfirmed.length" variant="outline" class="min-h-11 sm:min-h-9" @click="reporting = !reporting">
+                        {{ t('requests.receipt.report') }}
+                    </Button>
+                </div>
+                <form v-if="reporting" class="space-y-2" @submit.prevent="reportIssue">
+                    <label for="receipt_issue" class="text-xs text-muted-foreground">
+                        {{ t('requests.receipt.issue_label') }} <span class="text-red-600">*</span>
+                    </label>
+                    <textarea
+                        id="receipt_issue"
+                        v-model="receiptForm.receipt_issue"
+                        rows="2"
+                        required
+                        maxlength="1000"
+                        :placeholder="t('requests.receipt.issue_placeholder')"
+                        :class="textareaClass"
+                    />
+                    <InputError :message="receiptForm.errors.receipt_issue" />
+                    <Button variant="destructive" class="min-h-11 sm:min-h-9" :disabled="receiptForm.processing">
+                        {{ t('requests.receipt.send_issue') }}
+                    </Button>
+                </form>
+            </section>
+            <!-- Everyone else: what still waits for the receiver -->
+            <p
+                v-else-if="unconfirmed.length"
+                class="rounded-md px-4 py-2 text-sm"
+                :class="
+                    reportedCount
+                        ? 'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200'
+                        : 'bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100'
+                "
+            >
+                <template v-if="reportedCount">{{ t('requests.receipt.others_issue', { count: reportedCount }) }} · </template>
+                {{ t('requests.receipt.others_waiting', { count: unconfirmed.length }) }}
+            </p>
 
             <p
                 v-if="request.reject_reason && (request.status === 'rejected' || request.status === 'cancelled')"
@@ -548,6 +625,7 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                 <th class="px-3 py-2 font-medium">{{ t('requests.columns.item') }}</th>
                                 <th class="px-3 py-2 text-right font-medium">{{ t('requests.qty') }}</th>
                                 <th class="px-3 py-2 font-medium">{{ t('requests.fulfilled_by') }}</th>
+                                <th class="px-3 py-2 font-medium">{{ t('requests.receipt.column') }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -556,6 +634,21 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                 <td class="px-3 py-2">{{ f.line.item_name }}</td>
                                 <td class="whitespace-nowrap px-3 py-2 text-right">{{ f.qty }} {{ f.line.unit ?? '' }}</td>
                                 <td class="px-3 py-2">{{ f.by ?? '-' }}</td>
+                                <td class="px-3 py-2">
+                                    <template v-if="f.received_at">
+                                        <span class="text-green-700 dark:text-green-400">✓ {{ t('requests.receipt.received') }}</span>
+                                        <span v-if="f.received_by" class="text-xs text-muted-foreground">
+                                            · {{ f.received_by }} · {{ dateTime(f.received_at) }}
+                                        </span>
+                                        <span v-else class="text-xs text-muted-foreground"> · {{ t('requests.receipt.before') }}</span>
+                                    </template>
+                                    <span v-else-if="!f.receipt_issue" class="text-amber-700 dark:text-amber-400">{{
+                                        t('requests.receipt.pending')
+                                    }}</span>
+                                    <div v-if="f.receipt_issue" class="text-xs text-red-700 dark:text-red-400">
+                                        {{ t('requests.receipt.issue') }}: {{ f.receipt_issue }}
+                                    </div>
+                                </td>
                             </tr>
                         </tbody>
                     </table>

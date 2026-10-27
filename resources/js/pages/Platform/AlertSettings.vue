@@ -16,7 +16,7 @@ type Channel = 'line' | 'telegram' | 'mail';
 const props = defineProps<{
     settings: {
         events: string[];
-        thresholds: { approval_hours: number; backorder_days: number; needed_soon_days: number };
+        thresholds: { approval_hours: number; backorder_days: number; needed_soon_days: number; receipt_hours: number };
         line: { enabled: boolean; to: string; token_set: boolean };
         telegram: { enabled: boolean; chat_id: string; token_set: boolean };
         mail: { enabled: boolean; recipients: string[] };

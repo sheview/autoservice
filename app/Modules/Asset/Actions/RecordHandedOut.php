@@ -56,6 +56,8 @@ class RecordHandedOut
             'fulfilled_by' => $actor->id,
             'fulfilled_by_name' => $actor->name,
             'fulfilled_at' => $on,
+            // Already with them before it was registered: nothing to confirm.
+            'received_at' => $on,
         ]);
 
         activity()->performedOn($asset)->causedBy($actor)->event('checkout_approved')

@@ -6,8 +6,9 @@ import { t } from '@/lib/i18n';
 import type { CheckoutRequestStatus } from '@/types/checkout';
 import { computed } from 'vue';
 
-// Where an issue/loan request stands: draft → sent → approved → partly handed out → handed out →
-// closed. A rejected request stops at the approval; a cancelled one where it was. "compact" = dots.
+// Where an issue/loan request stands, in four steps: asked → approved → handed out → closed. The
+// step being worked on says how it stands (draft, waiting approval, partly handed out, loan still
+// out). A rejected request stops at the approval; a cancelled one where it was. "compact" = dots.
 const props = defineProps<{
     request: {
         status: CheckoutRequestStatus;
@@ -19,25 +20,28 @@ const props = defineProps<{
     compact?: boolean;
 }>();
 
-const order: CheckoutRequestStatus[] = ['draft', 'pending', 'approved', 'partial', 'fulfilled', 'closed'];
+// The step each status is working on.
+const current: Partial<Record<CheckoutRequestStatus, number>> = { draft: 0, pending: 1, approved: 2, partial: 2, fulfilled: 3, closed: 3 };
 
 const bar = computed(() => {
     const r = props.request;
     const at = (iso?: string | null) => (iso ? dateTime(iso) : null);
+    const label = (key: string, now: CheckoutRequestStatus[], nowKey: string) => t(`requests.steps.${now.includes(r.status) ? nowKey : key}`);
     const steps: Step[] = [
-        { key: 'draft', label: t('requests.steps.draft'), at: at(r.requested_at) },
-        { key: 'pending', label: t('requests.steps.pending'), at: at(r.submitted_at) },
-        { key: 'approved', label: r.status === 'rejected' ? t('requests.steps.rejected') : t('requests.steps.approved'), at: at(r.approved_at) },
-        { key: 'partial', label: t('requests.steps.partial') },
-        { key: 'fulfilled', label: t('requests.steps.fulfilled') },
-        { key: 'closed', label: t('requests.steps.closed'), at: at(r.closed_at) },
+        { key: 'request', label: label('request', ['draft'], 'draft'), at: at(r.submitted_at ?? r.requested_at) },
+        {
+            key: 'approve',
+            label: r.status === 'rejected' ? t('requests.steps.rejected') : label('approve', ['pending'], 'pending'),
+            at: at(r.approved_at),
+        },
+        { key: 'hand_out', label: t(`requests.steps.${r.status === 'approved' ? 'to_hand_out' : r.status === 'partial' ? 'partial' : 'hand_out'}`) },
+        { key: 'closed', label: label('closed', ['fulfilled'], 'loan_out'), at: at(r.closed_at) },
     ];
 
-    if (r.status === 'rejected') return { steps, current: 2, state: 'cancelled' as const };
-    if (r.status === 'cancelled') return { steps, current: r.approved_at ? 3 : r.submitted_at ? 2 : 1, state: 'cancelled' as const };
+    if (r.status === 'rejected') return { steps, current: 1, state: 'cancelled' as const };
+    if (r.status === 'cancelled') return { steps, current: r.approved_at ? 2 : r.submitted_at ? 1 : 0, state: 'cancelled' as const };
 
-    const current = order.indexOf(r.status);
-    return { steps, current, state: r.status === 'closed' ? ('done' as const) : ('active' as const) };
+    return { steps, current: current[r.status] ?? 0, state: r.status === 'closed' ? ('done' as const) : ('active' as const) };
 });
 </script>
 

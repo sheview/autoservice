@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  *   fulfill         asset-checkouts.fulfill: hand out, backorder, give up what is left, close
  *   return          asset-checkouts.return
  *   cancel          the requester, or an approver, before the decision
+ *   confirmReceipt  the receiver: the borrower's account, or the requester when the borrower has none
  */
 class CheckoutRequestPolicy extends TenantPolicy
 {
@@ -68,6 +69,13 @@ class CheckoutRequestPolicy extends TenantPolicy
     {
         return in_array($request->status, [CheckoutRequest::STATUS_DRAFT, CheckoutRequest::STATUS_PENDING], true)
             && ((int) $request->requester_id === (int) $user->id || $this->approve($user, $request));
+    }
+
+    /** Says the hand-outs came (or did not): whoever they were for, not whoever handed them out. */
+    public function confirmReceipt(User $user, Model $request): bool
+    {
+        return $user->customer_id === null
+            && (int) ($request->getAttribute('borrower_user_id') ?? $request->getAttribute('requester_id')) === (int) $user->id;
     }
 
     /** Scope "own": asked for by the user, or made out to them. */

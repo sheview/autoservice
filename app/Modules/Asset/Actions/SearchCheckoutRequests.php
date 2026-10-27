@@ -34,11 +34,17 @@ class SearchCheckoutRequests
     /** Requests with a line of that kind: parts issued, or assets lent ("all" = no filter). */
     public const KINDS = ['all', CheckoutItem::TYPE_PART, CheckoutItem::TYPE_ASSET];
 
+    /**
+     * Hand-outs the receiver has not confirmed yet (pending) or reported as wrong (issue), on
+     * requests of any status (one is closed once handed out in full, before it is confirmed).
+     */
+    public const RECEIPT_FILTERS = ['all', 'pending', 'issue'];
+
     /** "open" = in progress; or one status. */
     public const STATUS_FILTERS = ['open', 'all', ...CheckoutRequest::STATUSES];
 
     /**
-     * @return array{tab: string, kind: string, search: string, status: string, overdue: bool, sort: string, direction: string}
+     * @return array{tab: string, kind: string, search: string, status: string, receipt: string, overdue: bool, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
     {
@@ -49,6 +55,7 @@ class SearchCheckoutRequests
             'kind' => in_array($request->input('kind'), self::KINDS, true) ? $request->input('kind') : 'all',
             'search' => $request->string('search')->trim()->value(),
             'status' => in_array($request->input('status'), self::STATUS_FILTERS, true) ? $request->input('status') : 'open',
+            'receipt' => in_array($request->input('receipt'), self::RECEIPT_FILTERS, true) ? $request->input('receipt') : 'all',
             'overdue' => $request->boolean('overdue'),
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : ($tab === 'requests' ? 'created_at' : 'needed_by'),
             'direction' => $request->input('direction') === 'desc' || ($tab === 'requests' && $request->input('direction') !== 'asc') ? 'desc' : 'asc',
@@ -66,6 +73,7 @@ class SearchCheckoutRequests
         $search = $filters['search'] ?? '';
         $status = $filters['status'] ?? 'open';
         $tab = $filters['tab'] ?? 'requests';
+        $receipt = $filters['receipt'] ?? 'all';
         $sort = $filters['sort'] ?? 'created_at';
         $direction = ($filters['direction'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
@@ -87,7 +95,9 @@ class SearchCheckoutRequests
             ->when($tab === 'approve', fn (Builder $q) => $q->where('status', CheckoutRequest::STATUS_PENDING))
             ->when($tab === 'fulfill', fn (Builder $q) => $q->whereIn('status', [CheckoutRequest::STATUS_APPROVED, CheckoutRequest::STATUS_PARTIAL])
                 ->whereHas('items', fn ($q) => $q->whereIn('status', [CheckoutItem::STATUS_APPROVED, CheckoutItem::STATUS_PARTIAL])))
-            ->when($tab === 'requests' && $status === 'open', fn (Builder $q) => $q->whereIn('status', [CheckoutRequest::STATUS_DRAFT, ...CheckoutRequest::OPEN_STATUSES, CheckoutRequest::STATUS_FULFILLED]))
+            ->when($receipt !== 'all', fn (Builder $q) => $q->whereHas('items.fulfillments', fn ($q) => $q->whereNull('received_at')
+                ->when($receipt === 'pending', fn ($q) => $q->whereNull('receipt_issue'), fn ($q) => $q->whereNotNull('receipt_issue'))))
+            ->when($tab === 'requests' && $status === 'open' && $receipt === 'all', fn (Builder $q) => $q->whereIn('status', [CheckoutRequest::STATUS_DRAFT, ...CheckoutRequest::OPEN_STATUSES, CheckoutRequest::STATUS_FULFILLED]))
             ->when($tab === 'requests' && in_array($status, CheckoutRequest::STATUSES, true), fn (Builder $q) => $q->where('status', $status))
             // A draft is only its writer's.
             ->where(fn ($q) => $q->where('status', '!=', CheckoutRequest::STATUS_DRAFT)->orWhere('requester_id', $user->id))

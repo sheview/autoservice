@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\ApproveCheckoutRequest;
 use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Actions\CancelCheckoutRequest;
 use App\Modules\Asset\Actions\CloseCheckoutRequest;
+use App\Modules\Asset\Actions\ConfirmCheckoutReceipt;
 use App\Modules\Asset\Actions\FulfillCheckoutRequest;
 use App\Modules\Asset\Actions\RejectCheckoutRequest;
 use App\Modules\Asset\Actions\ReturnCheckoutRequest;
@@ -80,6 +81,9 @@ class CheckoutRequestController extends Controller
                 'fulfill' => $can['fulfill'] ? $search->handle($user, ['tab' => 'fulfill'])->count() : null,
                 'backorders' => $can['fulfill'] ? $lines->handle($user, ['tab' => 'backorders'])->count() : null,
                 'returns' => $can['return'] ? $lines->handle($user, ['tab' => 'returns', 'overdue' => true])->count() : null,
+                // Handed out and not confirmed by the receiver yet / reported as wrong.
+                'receipt_pending' => $search->handle($user, ['tab' => 'requests', 'receipt' => 'pending'])->count(),
+                'receipt_issue' => $search->handle($user, ['tab' => 'requests', 'receipt' => 'issue'])->count(),
             ],
             'statuses' => CheckoutRequest::STATUSES,
             // Pieces of parts whose serial number matches the search, with their history (Inventory module).
@@ -148,7 +152,10 @@ class CheckoutRequestController extends Controller
         $row['items'] = collect($row['items'])->map(fn (array $item) => [
             ...$item,
             'fulfillments' => $checkout->items->firstWhere('id', $item['id'])->fulfillments
-                ->map(fn (CheckoutFulfillment $f) => ['qty' => $f->qty, 'by' => $f->fulfilled_by_name, 'at' => $f->fulfilled_at?->toIso8601String()])->values(),
+                ->map(fn (CheckoutFulfillment $f) => [
+                    'qty' => $f->qty, 'by' => $f->fulfilled_by_name, 'at' => $f->fulfilled_at?->toIso8601String(),
+                    'received_at' => $f->received_at?->toIso8601String(), 'received_by' => $f->received_by_name, 'receipt_issue' => $f->receipt_issue,
+                ])->values(),
             'track_serial' => $item['part_id'] ? (bool) ($partRows[$item['part_id']]['track_serial'] ?? false) : false,
             'serials' => $serials[$item['id']] ?? null,
         ])->all();
@@ -166,6 +173,7 @@ class CheckoutRequestController extends Controller
                 'order' => $this->modules->enabled('inventory') && $user->can('purchase-requests.create') && $user->can('fulfill', $checkout),
                 'return' => $user->can('returnItems', $checkout),
                 'close' => CheckoutStatus::closable($checkout) && ($user->can('fulfill', $checkout) || $user->can('approve', $checkout)),
+                'confirm_receipt' => $user->can('confirmReceipt', $checkout),
                 'print' => ! in_array($checkout->status, [CheckoutRequest::STATUS_DRAFT, CheckoutRequest::STATUS_PENDING, CheckoutRequest::STATUS_REJECTED, CheckoutRequest::STATUS_CANCELLED], true),
             ],
         ]);
@@ -285,6 +293,21 @@ class CheckoutRequestController extends Controller
         $result = $return->handle($checkout, $request->user(), $data['condition'] ?? null);
 
         return back()->with('success', __($result['left'] > 0 ? 'asset.requests.returned_all_left' : 'asset.requests.returned_all', $result));
+    }
+
+    /** The receiver: got everything handed out so far, or (report + receipt_issue) what was wrong with it. */
+    public function confirmReceipt(Request $request, CheckoutRequest $checkout, ConfirmCheckoutReceipt $confirm): RedirectResponse
+    {
+        Gate::authorize('confirmReceipt', $checkout);
+        $data = $request->validate([
+            'report' => ['boolean'],
+            'receipt_issue' => ['required_if_accepted:report', 'nullable', 'string', 'max:1000'],
+        ], attributes: ['receipt_issue' => __('asset.requests.fields.receipt_issue')]);
+        $issue = $request->boolean('report') ? $data['receipt_issue'] : null;
+
+        $confirm->handle($checkout, $request->user(), $issue);
+
+        return back()->with('success', __($issue === null ? 'asset.requests.receipt_confirmed' : 'asset.requests.receipt_reported', ['no' => $checkout->request_no]));
     }
 
     public function close(Request $request, CheckoutRequest $checkout, CloseCheckoutRequest $close): RedirectResponse

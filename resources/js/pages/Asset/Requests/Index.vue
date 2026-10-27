@@ -25,6 +25,8 @@ interface Filters {
     kind: 'all' | 'part' | 'asset';
     search: string;
     status: string;
+    // Hand-outs not confirmed by the receiver yet / reported as wrong.
+    receipt: 'all' | 'pending' | 'issue';
     overdue: boolean;
     sort: string;
     direction: string;
@@ -37,7 +39,15 @@ const props = defineProps<{
     requests: Paginated<CheckoutRequestRow> | null;
     lines: Paginated<CheckoutLineRow & { request: CheckoutLineRequestRef }> | null;
     // null = the user has no such queue.
-    counts: { open: number; approve: number | null; fulfill: number | null; backorders: number | null; returns: number | null };
+    counts: {
+        open: number;
+        approve: number | null;
+        fulfill: number | null;
+        backorders: number | null;
+        returns: number | null;
+        receipt_pending: number;
+        receipt_issue: number;
+    };
     statuses: string[];
     serialHits: SerialHit[];
     can: { view: boolean; create: boolean; forOthers: boolean; approve: boolean; fulfill: boolean; return: boolean };
@@ -66,6 +76,7 @@ const switchTab = (tab: Tab) => {
     filters.sort = '';
     filters.direction = '';
     filters.overdue = false;
+    filters.receipt = 'all';
 };
 
 const sortBy = (column: string) => {
@@ -196,6 +207,11 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <option value="open">{{ t('requests.status_filters.open') }}</option>
                     <option value="all">{{ t('requests.status_filters.all') }}</option>
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`requests.statuses.${status}`) }}</option>
+                </select>
+                <select v-if="filters.tab === 'requests'" v-model="filters.receipt" :class="selectClass" :aria-label="t('requests.receipt.filter')">
+                    <option value="all">{{ t('requests.receipt.filters.all') }}</option>
+                    <option value="pending">{{ t('requests.receipt.filters.pending', { count: counts.receipt_pending }) }}</option>
+                    <option value="issue">{{ t('requests.receipt.filters.issue', { count: counts.receipt_issue }) }}</option>
                 </select>
                 <label v-if="filters.tab === 'returns'" class="flex items-center gap-2 text-sm">
                     <input v-model="filters.overdue" type="checkbox" />
