@@ -21,6 +21,8 @@ const props = defineProps<{
     request: CheckoutRequestRow | null;
     borrowers: { id: number; name: string }[];
     contracts: { id: number; label: string }[];
+    // Names of the customers, for "department" (empty: the field is typed).
+    customers: string[];
     partsEnabled: boolean;
     maxItems: number;
     // May open a purchase request for what is not there (or not free).
@@ -286,6 +288,25 @@ const save = (submit: boolean, thenPurchase: string | null = null) => {
 };
 
 const today = new Date().toLocaleDateString('sv-SE');
+// Department: one of the customers, or typed ("other", or a saved name that is not a customer).
+const OTHER_DEPARTMENT = '__other__';
+const typingDepartment = ref(form.borrower_department !== '' && !props.customers.includes(form.borrower_department));
+const departmentChoice = computed({
+    get: () => form.borrower_department,
+    set: (value: string) => {
+        if (value === OTHER_DEPARTMENT) {
+            form.borrower_department = '';
+            typingDepartment.value = true;
+        } else {
+            form.borrower_department = value;
+        }
+    },
+});
+const pickDepartment = () => {
+    typingDepartment.value = false;
+    if (!props.customers.includes(form.borrower_department)) form.borrower_department = '';
+};
+
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 const title = props.request ? t('requests.edit_title', { no: props.request.request_no }) : t('requests.new');
 </script>
@@ -340,7 +361,17 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
 
                 <div class="grid content-start gap-2">
                     <Label for="borrower_department">{{ t('requests.borrower_department') }}</Label>
-                    <Input id="borrower_department" v-model="form.borrower_department" />
+                    <select v-if="customers.length && !typingDepartment" id="borrower_department" v-model="departmentChoice" :class="selectClass">
+                        <option value="">{{ t('requests.choose_department') }}</option>
+                        <option v-for="name in customers" :key="name" :value="name">{{ name }}</option>
+                        <option :value="OTHER_DEPARTMENT">{{ t('requests.department_other') }}</option>
+                    </select>
+                    <div v-else class="flex gap-2">
+                        <Input id="borrower_department" v-model="form.borrower_department" class="min-w-0 flex-1" />
+                        <Button v-if="customers.length" type="button" variant="outline" @click="pickDepartment">{{
+                            t('requests.department_pick')
+                        }}</Button>
+                    </div>
                     <InputError :message="form.errors.borrower_department" />
                 </div>
                 <div class="grid content-start gap-2">

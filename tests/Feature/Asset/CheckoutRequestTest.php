@@ -461,3 +461,16 @@ it('narrows the list to parts issued or assets lent', function () {
     // Anything else is all of them.
     $list('nope')->assertInertia(fn (Assert $page) => $page->where('requests.total', 2)->where('filters.kind', 'all'));
 });
+
+it('offers the customers of the company as the department of a request', function () {
+    createCustomer(['name' => 'ACME Co.']);
+    createCustomer(['name' => 'Beta Ltd.']);
+    asTenant(createTenant('other'), fn () => createCustomer(['name' => 'ของบริษัทอื่น']));
+
+    $this->actingAs($this->desk)->get('/checkout-requests/create')
+        ->assertInertia(fn (Assert $page) => $page->where('customers', ['ACME Co.', 'Beta Ltd.']));
+
+    // A name typed by hand is kept as it is.
+    ($this->send)([($this->asset)($this->notebook)], ['borrower_department' => 'ฝ่ายขาย'])->assertSessionHasNoErrors();
+    expect(CheckoutRequest::sole()->borrower_department)->toBe('ฝ่ายขาย');
+});

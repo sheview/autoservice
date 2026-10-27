@@ -24,6 +24,7 @@ use App\Modules\Asset\Support\CheckoutStatus;
 use App\Modules\Asset\Support\RequestRow;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ContractOptions;
+use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Identity\Actions\UsersWithPermission;
@@ -419,6 +420,13 @@ class CheckoutRequestController extends Controller
                 ? app(UsersWithPermission::class)->handle('assets.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
                 : [],
             'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle($contractId, $user, 'asset-checkouts.request') : [],
+            // "Department" is picked from the customers (their name is kept; typing another is still possible).
+            // A customer account only sees its own.
+            'customers' => $this->modules->enabled('contract')
+                ? collect(app(ListCustomers::class)->handle())
+                    ->filter(fn (array $c) => $user->customer_id === null || $c['id'] === $user->customer_id)
+                    ->pluck('name')->values()->all()
+                : [],
             'partsEnabled' => $this->modules->enabled('inventory'),
             'maxItems' => CheckoutRequestForm::MAX_ITEMS,
             // Nothing free to hand out: offer to open a purchase request for it instead.
