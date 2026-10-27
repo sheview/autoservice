@@ -2,6 +2,8 @@
 
 namespace App\Modules\Inventory\Exports;
 
+use App\Modules\Asset\Actions\CategoryNames;
+use App\Modules\Asset\Actions\StorageLocationOptions;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Support\PartSheet;
 use App\Modules\Platform\Support\Money;
@@ -19,10 +21,20 @@ class PartsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappin
 {
     use Exportable;
 
+    /** @var array<int, string> id => name, deleted ones included */
+    private array $categories;
+
+    /** @var array<int, string> id => name, deleted ones included */
+    private array $locations;
+
     /**
      * @param  Builder<Part>  $query
      */
-    public function __construct(private Builder $query) {}
+    public function __construct(private Builder $query)
+    {
+        $this->categories = app(CategoryNames::class)->handle(withTrashed: true);
+        $this->locations = app(StorageLocationOptions::class)->names();
+    }
 
     public function query(): Builder
     {
@@ -50,6 +62,8 @@ class PartsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappin
             $part->qty_on_hand,
             __('inventory.statuses.'.($part->is_active ? 'active' : 'inactive')),
             $part->notes,
+            $this->categories[$part->asset_category_id] ?? null,
+            $this->locations[$part->storage_location_id] ?? null,
         ];
     }
 }

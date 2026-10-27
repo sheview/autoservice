@@ -61,11 +61,15 @@ class ImportAssets
     /** @var array<string, mixed> see AssetImport::context */
     private array $context = [];
 
+    /** @var array<string, int> lower(name) => storage location id (active ones) */
+    private array $locations = [];
+
     public function __construct(
         private SaveAsset $saveAsset,
         private ListCustomers $listCustomers,
         private AddAssetToContracts $addToContracts,
         private Modules $modules,
+        private FindDuplicateAssets $findDuplicates,
     ) {}
 
     /**
@@ -293,6 +297,27 @@ class ImportAssets
             $contractIds[] = (int) $forcedContract;
         }
 
+        // Only a file with the storage location column sets it; the name must be in Settings.
+        if (array_key_exists('storage_location', $values)) {
+            $locationText = mb_strtolower(trim((string) ($values['storage_location'] ?? '')));
+            $data['storage_location_id'] = $locationText === '' ? null : ($this->locations[$locationText] ?? null);
+            if ($locationText !== '' && $data['storage_location_id'] === null) {
+                $messages[] = __('asset.imports.unknown_location', ['value' => $values['storage_location']]);
+            }
+        }
+
+        // The same device as another asset (equipment number, IP, MAC): refused as on the form.
+        $duplicates = $this->findDuplicates->handle([
+            'property_no' => array_key_exists('property_no', $data) ? $data['property_no'] : null,
+            'ip_address' => $data['ip_address'] ?? null,
+            'mac_address' => $data['mac_address'] ?? null,
+        ], $existing?->id, false);
+        foreach ($duplicates as $duplicate) {
+            foreach ($duplicate['reasons'] as $reason) {
+                $messages[] = __("asset.assets.duplicate_{$reason}", ['code' => $duplicate['asset_code'], 'name' => $duplicate['name']]);
+            }
+        }
+
         if (array_key_exists('parent', $values)) {
             $customerId = array_key_exists('customer_id', $data) ? $data['customer_id'] : $existing?->customer_id;
             [$data['parent_asset_id'], $parentErrors] = $this->parent($values['parent'], $existing, $customerId);
@@ -383,6 +408,7 @@ class ImportAssets
     private function loadLookups(): void
     {
         $this->categories = $this->categoryNames(AssetCategory::all());
+        $this->locations = app(StorageLocationOptions::class)->idsByName();
 
         // A base collection: Eloquent's merge() would merge by primary key and drop the string keys.
         $branches = Branch::all()->toBase();

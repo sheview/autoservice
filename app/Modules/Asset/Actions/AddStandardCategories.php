@@ -16,12 +16,13 @@ class AddStandardCategories
     public function __construct(private SaveAssetCategory $saveCategory) {}
 
     /**
+     * @param  list<string>|null  $names  only these standard categories (by name); null = all
      * @return int how many were added
      */
-    public function handle(): int
+    public function handle(?array $names = null): int
     {
-        return DB::transaction(function () {
-            $missing = $this->missing();
+        return DB::transaction(function () use ($names) {
+            $missing = array_values(array_filter($this->missing(), fn (array $category) => $names === null || in_array($category['name'], $names, true)));
             foreach ($missing as $category) {
                 $this->saveCategory->handle(null, $category);
             }

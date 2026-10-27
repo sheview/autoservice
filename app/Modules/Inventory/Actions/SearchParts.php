@@ -19,7 +19,8 @@ class SearchParts
     public const STOCK_LEVELS = ['low', 'out'];
 
     /**
-     * @return array{search: string, status: string|null, stock: string|null, sort: string, direction: string}
+     * @return array{search: string, status: string|null, stock: string|null, asset_category_id: int|null, storage_location_id: int|null,
+     *     sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
     {
@@ -27,6 +28,8 @@ class SearchParts
             'search' => $request->string('search')->trim()->value(),
             'status' => in_array($request->input('status'), self::STATUSES, true) ? $request->input('status') : null,
             'stock' => in_array($request->input('stock'), self::STOCK_LEVELS, true) ? $request->input('stock') : null,
+            'asset_category_id' => $request->integer('asset_category_id') ?: null,
+            'storage_location_id' => $request->integer('storage_location_id') ?: null,
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'code',
             'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
@@ -49,6 +52,8 @@ class SearchParts
                 // Or a piece with that serial number.
                 ->orWhereIn('id', app(PartIdsWithSerial::class)->handle($search))))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('is_active', $status === 'active'))
+            ->when($filters['asset_category_id'] ?? null, fn (Builder $q, $id) => $q->where('asset_category_id', $id))
+            ->when($filters['storage_location_id'] ?? null, fn (Builder $q, $id) => $q->where('storage_location_id', $id))
             ->when($filters['stock'] ?? null, fn (Builder $q, $stock) => match ($stock) {
                 'out' => $q->where('qty_on_hand', 0),
                 'low' => $q->where('min_qty', '>', 0)->where('qty_on_hand', '>', 0)->whereColumn('qty_on_hand', '<=', 'min_qty'),

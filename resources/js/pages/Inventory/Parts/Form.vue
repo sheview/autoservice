@@ -1,14 +1,20 @@
 <script setup lang="ts">
+import DuplicateMatches, { type DuplicateMatch } from '@/components/DuplicateMatches.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
+import PhotoPicker from '@/components/PhotoPicker.vue';
+import SerialInputs from '@/components/SerialInputs.vue';
+import { useDuplicates } from '@/composables/useDuplicates';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
+import { pendingPhotos } from '@/lib/photoUpload';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 interface PartForm {
     id: number;
@@ -22,17 +28,23 @@ interface PartForm {
     unit_cost: string | null;
     is_active: boolean;
     notes: string | null;
-    part_category_id: number | null;
+    asset_category_id: number | null;
+    storage_location_id: number | null;
     track_serial: boolean;
 }
 
 // contracts: the MA contracts (projects) a part can be kept for; none = the field is hidden.
-// categories: part categories (a new part starts tracked by serial as its category says).
+// categories: the asset categories, shared with parts (a new part starts tracked by serial as its category says).
 const props = defineProps<{
     part: PartForm | null;
     contracts: { id: number; label: string }[];
-    categories: { id: number; name: string; track_serial: boolean }[];
+    categories: { id: number; name: string; requires_serial: boolean }[];
+    // Storage locations (Settings), shared with assets.
+    locations: { id: number; name: string }[];
     canSerials: boolean;
+    // Creating only: the first stock is received with the part (stock-movements.create).
+    canReceive?: boolean;
+    maxInitialSerials?: number;
 }>();
 
 const title = props.part ? t('parts.edit') : t('parts.create');
@@ -52,24 +64,72 @@ const form = useForm({
     unit_cost: props.part?.unit_cost ?? '',
     is_active: props.part?.is_active ?? true,
     notes: props.part?.notes ?? '',
-    part_category_id: props.part?.part_category_id ?? (null as number | null),
+    asset_category_id: props.part?.asset_category_id ?? (null as number | null),
+    storage_location_id: props.part?.storage_location_id ?? (null as number | null),
     track_serial: props.part?.track_serial ?? false,
+    // Creating only (CreatePart): a count, or the serial numbers of a part tracked by serial.
+    initial_qty: 0 as number | string,
+    initial_serials: [] as string[],
 });
+
+// The same part already there (same name or part number): saving is refused, so offer it instead.
+type PartDuplicate = {
+    id: number;
+    code: string;
+    name: string;
+    part_number: string | null;
+    brand: string | null;
+    unit: string;
+    qty_on_hand: number;
+    reasons: string[];
+    url: string;
+};
+const duplicates = useDuplicates<PartDuplicate>('inventory.parts.duplicates', () => ({
+    name: form.name,
+    part_number: form.part_number,
+    except: props.part?.id,
+}));
+const duplicateMatches = computed<DuplicateMatch[]>(() =>
+    duplicates.value.map((part) => ({
+        key: String(part.id),
+        title: `${part.code} ${part.name}`,
+        detail: [part.part_number, part.brand, t('duplicates.stock', { qty: part.qty_on_hand, unit: part.unit })].filter(Boolean).join(' · '),
+        reasons: part.reasons,
+        blocking: true,
+        actions: [
+            ...(props.part ? [] : [{ label: t('duplicates.receive'), href: `${part.url}#stock-form` }]),
+            { label: t('duplicates.open'), href: part.url },
+        ],
+    })),
+);
+
+// Photos picked before the part exists (PhotoPicker): uploaded by its page once it is saved
+// (PhotoSlots pending-key), so a failed photo never loses the part.
+const photos = ref<File[]>([]);
 
 // A new part takes its category's setting until it is changed here.
 watch(
-    () => form.part_category_id,
+    () => form.asset_category_id,
     (id) => {
-        if (!props.part) form.track_serial = props.categories.find((c) => c.id === id)?.track_serial ?? false;
+        if (!props.part) form.track_serial = props.categories.find((c) => c.id === id)?.requires_serial ?? false;
     },
 );
 
 const submit = () => {
     if (props.part) {
-        form.put(route('inventory.parts.update', props.part.id));
-    } else {
-        form.post(route('inventory.parts.store'));
+        form.transform(({ initial_qty, initial_serials, ...data }) => data) // eslint-disable-line @typescript-eslint/no-unused-vars
+            .put(route('inventory.parts.update', props.part.id));
+        return;
     }
+    form.transform(({ initial_qty, initial_serials, ...data }) =>
+        // One of the two, as the part will be followed.
+        data.track_serial ? { ...data, initial_serials: initial_serials.filter((serial) => serial.trim() !== '') } : { ...data, initial_qty },
+    ).post(route('inventory.parts.store'), {
+        onSuccess: (page) => {
+            const id = (page.props as { part?: { id: number } }).part?.id;
+            if (id && photos.value.length) pendingPhotos.value = { key: `part:${id}`, files: photos.value };
+        },
+    });
 };
 
 const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs';
@@ -103,6 +163,8 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                         <Input id="name" v-model="form.name" required autocomplete="off" />
                         <InputError :message="form.errors.name" />
                     </div>
+                    <!-- Already there (name or part number): use that part instead of typing it again -->
+                    <DuplicateMatches v-if="duplicateMatches.length" class="sm:col-span-3" :matches="duplicateMatches" />
 
                     <div v-if="contracts.length" class="grid content-start gap-2 sm:col-span-3">
                         <Label for="contract_id">{{ t('parts.contract') }}</Label>
@@ -119,16 +181,28 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                     </div>
 
                     <div class="grid content-start gap-2">
-                        <Label for="part_category_id">{{ t('parts.category') }}</Label>
+                        <Label for="asset_category_id">{{ t('parts.category') }}</Label>
                         <select
-                            id="part_category_id"
-                            v-model="form.part_category_id"
+                            id="asset_category_id"
+                            v-model="form.asset_category_id"
                             class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                         >
                             <option :value="null">{{ t('parts.no_category') }}</option>
                             <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
                         </select>
-                        <InputError :message="form.errors.part_category_id" />
+                        <InputError :message="form.errors.asset_category_id" />
+                    </div>
+                    <div class="grid content-start gap-2">
+                        <Label for="storage_location_id">{{ t('storage_locations.field') }}</Label>
+                        <select
+                            id="storage_location_id"
+                            v-model="form.storage_location_id"
+                            class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                        >
+                            <option :value="null">{{ t('storage_locations.no_location') }}</option>
+                            <option v-for="location in locations" :key="location.id" :value="location.id">{{ location.name }}</option>
+                        </select>
+                        <InputError :message="form.errors.storage_location_id" />
                     </div>
                     <div class="grid content-start gap-2 sm:col-span-2">
                         <span class="text-sm font-medium">{{ t('parts.track_serial') }}</span>
@@ -149,7 +223,13 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                     </div>
                     <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="part_number">{{ t('parts.part_number') }}</Label>
-                        <Input id="part_number" v-model="form.part_number" class="font-mono" maxlength="100" />
+                        <div class="flex gap-2">
+                            <Input id="part_number" v-model="form.part_number" class="font-mono" maxlength="100" />
+                            <BarcodeScanButton
+                                :hint="t('scan_camera.hint_field', { field: t('parts.part_number') })"
+                                @scanned="(text) => (form.part_number = text)"
+                            />
+                        </div>
                         <InputError :message="form.errors.part_number" />
                     </div>
 
@@ -160,22 +240,44 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                     </div>
                     <div class="grid content-start gap-2">
                         <Label for="min_qty">{{ t('parts.min_qty') }}</Label>
-                        <Input id="min_qty" v-model="form.min_qty" type="number" min="0" step="1" />
+                        <Input id="min_qty" v-model="form.min_qty" type="number" inputmode="numeric" min="0" step="1" />
                         <InputError :message="form.errors.min_qty" />
                     </div>
                     <div class="grid content-start gap-2">
                         <Label for="unit_cost">{{ t('parts.unit_cost') }}</Label>
-                        <Input id="unit_cost" v-model="form.unit_cost" type="number" min="0" step="0.01" />
+                        <Input id="unit_cost" v-model="form.unit_cost" type="number" inputmode="decimal" min="0" step="0.01" />
                         <InputError :message="form.errors.unit_cost" />
                     </div>
                 </div>
                 <p class="text-xs text-muted-foreground">{{ t('parts.min_qty_hint') }} · {{ t('parts.unit_cost_hint') }}</p>
+
+                <!-- Creating only: the first stock, received together with the part (one transaction) -->
+                <section v-if="!part && canReceive" class="space-y-2 rounded-md border p-4">
+                    <h3 class="text-sm font-semibold">{{ t('parts.initial_title') }}</h3>
+                    <template v-if="form.track_serial">
+                        <p class="text-xs text-muted-foreground">{{ t('parts.initial_serials_hint') }}</p>
+                        <SerialInputs id="initial_serials" v-model="form.initial_serials" />
+                        <p class="text-xs text-muted-foreground">
+                            {{ t('parts.initial_serials_count', { count: form.initial_serials.filter((s) => s.trim() !== '').length }) }}
+                        </p>
+                        <InputError :message="form.errors.initial_serials ?? Object.entries(form.errors).find(([k]) => k.startsWith('initial_serials.'))?.[1]" />
+                    </template>
+                    <div v-else class="grid max-w-xs content-start gap-2">
+                        <Label for="initial_qty">{{ t('parts.initial_qty') }}</Label>
+                        <Input id="initial_qty" v-model="form.initial_qty" type="number" inputmode="numeric" min="0" step="1" />
+                        <InputError :message="form.errors.initial_qty" />
+                    </div>
+                    <p class="text-xs text-muted-foreground">{{ t('parts.initial_hint') }}</p>
+                </section>
 
                 <div class="grid content-start gap-2">
                     <Label for="notes">{{ t('parts.notes') }}</Label>
                     <textarea id="notes" v-model="form.notes" rows="3" :class="textareaClass" />
                     <InputError :message="form.errors.notes" />
                 </div>
+
+                <!-- Creating only: photos picked now, sent once the part is saved (its page shows how it went) -->
+                <PhotoPicker v-if="!part" v-model="photos" />
 
                 <label class="flex items-center gap-2 text-sm">
                     <input v-model="form.is_active" type="checkbox" class="size-4 rounded border-input" />

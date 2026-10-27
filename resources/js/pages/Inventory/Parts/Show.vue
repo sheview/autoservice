@@ -36,6 +36,7 @@ interface PartDetail {
     contract: { id: number; contract_no: string; title: string } | null;
     track_serial: boolean;
     category: string | null;
+    storage_location: string | null;
 }
 
 interface MovementRow {
@@ -131,6 +132,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <Heading :title="part.name" :description="[part.brand, part.part_number].filter(Boolean).join(' · ')" />
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <!-- On a phone the stock form is far below the photos: straight to it -->
+                    <Button v-if="movementTypes.length" class="lg:hidden" as-child>
+                        <a href="#stock-form">{{ t('parts.jump_to_stock') }}</a>
+                    </Button>
                     <template v-if="can.serials">
                         <Button v-if="!part.track_serial" variant="outline" as-child>
                             <Link :href="route('inventory.parts.serials.start', part.id)">{{ t('parts.start_tracking') }}</Link>
@@ -157,7 +162,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             </p>
             <p v-else-if="units" class="text-sm text-muted-foreground">{{ t('parts.untracked_with_units') }}</p>
 
-            <PhotoSlots :photos="photos" :editable="can.update" />
+            <PhotoSlots :photos="photos" :editable="can.update" :pending-key="`part:${part.id}`" />
 
             <ItemRequestsPanel v-if="checkouts" :checkouts="checkouts" :query="{ part: part.id }" />
 
@@ -198,6 +203,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <dt class="text-xs text-muted-foreground">{{ t('parts.category') }}</dt>
                         <dd>{{ part.category }}</dd>
                     </div>
+                    <div v-if="part.storage_location">
+                        <dt class="text-xs text-muted-foreground">{{ t('storage_locations.field') }}</dt>
+                        <dd>{{ part.storage_location }}</dd>
+                    </div>
                     <div v-if="part.contract">
                         <dt class="text-xs text-muted-foreground">{{ t('parts.contract') }}</dt>
                         <dd>{{ part.contract.contract_no }} · {{ part.contract.title }}</dd>
@@ -208,7 +217,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     </div>
                 </dl>
 
-                <form v-if="movementTypes.length" class="space-y-4 rounded-md border p-4 lg:col-span-2" @submit.prevent="submit">
+                <form
+                    v-if="movementTypes.length"
+                    id="stock-form"
+                    class="scroll-mt-4 space-y-4 rounded-md border p-4 lg:col-span-2"
+                    @submit.prevent="submit"
+                >
                     <h3 class="text-sm font-semibold">{{ t('stock_movements.new') }}</h3>
                     <div class="grid gap-4 sm:grid-cols-3">
                         <div class="grid content-start gap-2">
@@ -223,11 +237,19 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <Label for="quantity">
                                 {{ form.type === 'adjust' ? t('stock_movements.counted_field') : t('stock_movements.quantity_field') }}
                             </Label>
-                            <Input id="quantity" v-model="form.quantity" type="number" :min="form.type === 'adjust' ? 0 : 1" step="1" required />
+                            <Input
+                                id="quantity"
+                                v-model="form.quantity"
+                                type="number"
+                                inputmode="numeric"
+                                :min="form.type === 'adjust' ? 0 : 1"
+                                step="1"
+                                required
+                            />
                         </div>
                         <div v-if="form.type === 'receive'" class="grid content-start gap-2">
                             <Label for="movement_unit_cost">{{ t('stock_movements.unit_cost') }}</Label>
-                            <Input id="movement_unit_cost" v-model="form.unit_cost" type="number" min="0" step="0.01" />
+                            <Input id="movement_unit_cost" v-model="form.unit_cost" type="number" inputmode="decimal" min="0" step="0.01" />
                         </div>
                     </div>
                     <InputError :message="form.errors.quantity ?? form.errors.unit_cost ?? form.errors.type" />

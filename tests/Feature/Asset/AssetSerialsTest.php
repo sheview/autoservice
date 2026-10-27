@@ -55,7 +55,7 @@ it('requires at least one serial number for a device category', function () {
 });
 
 it('stores things without serial as one record of a lot, with quantity and unit', function () {
-    $lot = ['category_id' => $this->cable->id, 'name' => 'หัวแลน CAT6', 'status' => 'spare', 'owner' => 'company', 'location' => 'Stock'];
+    $lot = ['category_id' => $this->cable->id, 'name' => 'หัวแลน CAT6', 'status' => 'spare', 'owner' => 'company', 'location' => 'Stock', 'confirm_duplicate' => true];
 
     $this->actingAs($this->admin)->post('/assets', [...$lot, 'quantity' => 50, 'unit' => 'ตัว'])->assertSessionHasNoErrors();
     expect(Asset::sole()->only(['quantity', 'unit', 'serial_number']))->toBe(['quantity' => 50, 'unit' => 'ตัว', 'serial_number' => null]);

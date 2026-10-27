@@ -2,6 +2,8 @@
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Asset\Actions\CategoryOptions;
+use App\Modules\Asset\Actions\StorageLocationOptions;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
@@ -22,6 +24,10 @@ use Throwable;
  * stock of an existing part changes through movements, never through a file.
  * A bad row is skipped and reported with its Excel row number; the other rows are still imported.
  * Runs in the request (part lists are small), unlike the queued asset import.
+ *
+ * "category" and "storage_location" are names from the lists shared with assets; an unknown name
+ * fails the row. A part with the name or part number of another is refused (FindDuplicateParts),
+ * and so is opening stock for a new part tracked by serial (its pieces need serial numbers).
  */
 class ImportParts
 {
@@ -30,9 +36,16 @@ class ImportParts
     /** At most this many row errors are reported. */
     public const MAX_ERRORS = 200;
 
+    /** @var array<string, array{id: int, name: string, requires_serial: bool}> lower(name) => category */
+    private array $categories = [];
+
+    /** @var array<string, int> lower(name) => storage location id (active ones) */
+    private array $locations = [];
+
     public function __construct(
         private SavePart $savePart,
         private RecordStockMovement $recordMovement,
+        private FindDuplicateParts $findDuplicates,
     ) {}
 
     /**
@@ -58,6 +71,11 @@ class ImportParts
         if ($dataRows->count() > self::MAX_ROWS) {
             return $this->failed(__('inventory.imports.too_many_rows', ['max' => self::MAX_ROWS]));
         }
+
+        foreach (app(CategoryOptions::class)->handle() as $category) {
+            $this->categories[mb_strtolower(trim($category['name']))] = $category;
+        }
+        $this->locations = app(StorageLocationOptions::class)->idsByName();
 
         $result = ['ok' => true, 'total' => $dataRows->count(), 'created' => 0, 'updated' => 0, 'failed' => 0, 'errors' => []];
 
@@ -114,6 +132,24 @@ class ImportParts
             : Money::toBaht($existing?->unit_cost);
         $opening = $existing ? null : ($values['qty_on_hand'] ?? null);
 
+        // Names from the shared lists; a column not in the file leaves the part as it is.
+        $lookupErrors = [];
+        $category = null;
+        if (($values['category'] ?? null) !== null) {
+            $category = $this->categories[mb_strtolower((string) $values['category'])] ?? null;
+            if ($category === null) {
+                $lookupErrors[] = __('inventory.imports.unknown_category', ['value' => $values['category']]);
+            }
+        }
+        $data['asset_category_id'] = array_key_exists('category', $values) ? ($category['id'] ?? null) : $existing?->asset_category_id;
+        $data['storage_location_id'] = array_key_exists('storage_location', $values) ? null : $existing?->storage_location_id;
+        if (($values['storage_location'] ?? null) !== null) {
+            $data['storage_location_id'] = $this->locations[mb_strtolower((string) $values['storage_location'])] ?? null;
+            if ($data['storage_location_id'] === null) {
+                $lookupErrors[] = __('inventory.imports.unknown_location', ['value' => $values['storage_location']]);
+            }
+        }
+
         $statusText = $values['status'] ?? null;
         $status = $statusText === null ? null : PartSheet::status($statusText);
         $data['is_active'] = $status === null ? ($existing?->is_active ?? true) : $status === 'active';
@@ -130,7 +166,15 @@ class ImportParts
             'notes' => ['nullable', 'string', 'max:5000'],
         ], [], array_combine(PartSheet::COLUMNS, PartSheet::headings()));
 
-        $messages = $validator->errors()->all();
+        $messages = [...$validator->errors()->all(), ...$lookupErrors];
+        foreach ($this->findDuplicates->handle($data['name'], $data['part_number'], $existing?->id) as $duplicate) {
+            foreach ($duplicate['reasons'] as $field) {
+                $messages[] = __("inventory.parts.duplicate_{$field}", ['code' => $duplicate['code'], 'name' => $duplicate['name']]);
+            }
+        }
+        if (! $existing && (int) $opening > 0 && ($category['requires_serial'] ?? false)) {
+            $messages[] = __('inventory.imports.opening_tracked');
+        }
         if ($statusText !== null && $status === null) {
             $messages[] = __('inventory.imports.unknown_status', ['value' => $statusText]);
         }

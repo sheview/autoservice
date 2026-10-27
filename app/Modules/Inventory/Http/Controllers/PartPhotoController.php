@@ -5,6 +5,7 @@ namespace App\Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Document\Http\Concerns\ServesPhotoSlots;
 use App\Modules\Inventory\Models\Part;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +19,7 @@ class PartPhotoController extends Controller
 {
     use ServesPhotoSlots;
 
-    public function store(Request $request, Part $part, int $slot): RedirectResponse
+    public function store(Request $request, Part $part, int $slot): RedirectResponse|JsonResponse
     {
         Gate::authorize('update', $part);
 

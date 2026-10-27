@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
+import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import Heading from '@/components/Heading.vue';
 import Pagination from '@/components/Pagination.vue';
 import StatTile from '@/components/StatTile.vue';
@@ -36,6 +37,7 @@ interface Filters {
     branch_id: number | null;
     customer_id: number | null;
     category_id: number | null;
+    storage_location_id: number | null;
     asset_type: string | null;
     status: string | null;
     warranty: string | null;
@@ -50,11 +52,12 @@ const props = defineProps<{
     branches: { id: number; name: string }[];
     customers: { id: number; code: string; name: string }[];
     categories: { id: number; name: string; asset_type: string }[];
+    locations: { id: number; name: string }[];
     assetTypes: string[];
     statuses: string[];
     expiringDays: number;
     stats: { total: number; in_use: number; in_repair: number; warranty_expiring: number };
-    can: { create: boolean; import: boolean; export: boolean };
+    can: { create: boolean; import: boolean; export: boolean; lists: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -99,6 +102,13 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('assets.title')" :description="t('assets.description')" />
                 <div class="flex flex-wrap gap-2">
+                    <!-- The shared lists behind the drop-downs (Settings) -->
+                    <Button v-if="can.lists" variant="outline" as-child>
+                        <Link :href="route('asset.categories.index')">{{ t('nav.asset_categories') }}</Link>
+                    </Button>
+                    <Button v-if="can.lists" variant="outline" as-child>
+                        <Link :href="route('asset.locations.index')">{{ t('nav.storage_locations') }}</Link>
+                    </Button>
                     <Button v-if="can.export" variant="outline" as-child>
                         <a :href="exportUrl">{{ t('assets.export') }}</a>
                     </Button>
@@ -142,7 +152,11 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             </p>
 
             <div class="flex flex-wrap gap-3">
-                <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('assets.search_placeholder')" />
+                <div class="flex w-full max-w-sm gap-2">
+                    <Input v-model="filters.search" type="search" class="min-w-0 flex-1" :placeholder="t('assets.search_placeholder')" />
+                    <!-- A serial, part number or QR read by the camera becomes the search -->
+                    <BarcodeScanButton :hint="t('scan_camera.hint_search')" @scanned="(text) => (filters.search = text)" />
+                </div>
                 <select v-model="filters.asset_type" :class="selectClass" :aria-label="t('asset_categories.asset_type')">
                     <option :value="null">{{ t('asset_categories.all_asset_types') }}</option>
                     <option v-for="type in assetTypes" :key="type" :value="type">{{ t(`asset_categories.asset_types.${type}`) }}</option>
@@ -156,6 +170,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     >
                         {{ category.name }}
                     </option>
+                </select>
+                <select v-if="locations.length" v-model="filters.storage_location_id" :class="selectClass" :aria-label="t('storage_locations.field')">
+                    <option :value="null">{{ t('storage_locations.all') }}</option>
+                    <option v-for="location in locations" :key="location.id" :value="location.id">{{ location.name }}</option>
                 </select>
                 <select v-if="branches.length > 1" v-model="filters.branch_id" :class="selectClass" :aria-label="t('assets.branch')">
                     <option :value="null">{{ t('assets.all_branches') }}</option>

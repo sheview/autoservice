@@ -70,11 +70,13 @@ class AssetCategoryController extends Controller
         ]);
     }
 
-    public function addStandard(AddStandardCategories $addStandard): RedirectResponse
+    public function addStandard(Request $request, AddStandardCategories $addStandard): RedirectResponse
     {
         Gate::authorize('create', AssetCategory::class);
 
-        $added = $addStandard->handle();
+        // The standard categories ticked on the page; none sent = all of them.
+        $names = $request->validate(['names' => ['nullable', 'array'], 'names.*' => ['string', 'max:255']])['names'] ?? null;
+        $added = $addStandard->handle($names);
 
         return back()->with('success', __('asset.categories.standard_added', ['count' => $added]));
     }

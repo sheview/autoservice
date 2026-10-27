@@ -3,6 +3,7 @@
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetImport;
+use App\Modules\Asset\Models\StorageLocation;
 use App\Modules\Asset\Support\AssetSheet;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Tenancy\Models\Branch;
@@ -155,7 +156,7 @@ it('exports the filtered list and imports the same file back as updates', functi
     expect($rows[0])->toBe([
         'รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'ลูกค้า (รหัส)', 'ยี่ห้อ', 'รุ่น', 'ประเภทย่อย', 'Serial Number', 'จำนวน', 'หน่วย',
         'เลขครุภัณฑ์', 'สถานะ', 'ตำแหน่งที่ตั้ง', 'ชั้น', 'ห้อง', 'IP Address', 'MAC Address', 'ชื่อผู้ใช้งาน', 'แผนก',
-        'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'รหัสเครื่องแม่ (ชุด)', 'สัญญา MA (เลขที่)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
+        'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'วันหมดประกัน', 'หมายเหตุ', 'รหัสเครื่องแม่ (ชุด)', 'สัญญา MA (เลขที่)', 'สถานที่จัดเก็บ', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]',
     ])
         ->and(count($rows))->toBe(2)
         ->and($rows[1][1])->toBe('Spare PC')
@@ -236,4 +237,26 @@ it('requires assets.import and assets.export', function () {
 it('still reads a renamed heading from an older file', function () {
     expect(AssetSheet::mapHeadings(['ชื่อ', 'ผู้ใช้งานประจำเครื่อง', 'ชื่อผู้ใช้งาน']))
         ->toBe([0 => 'name', 1 => 'used_by', 2 => 'used_by']);
+});
+
+it('imports and exports the storage location by name, and refuses an IP or equipment number another asset has', function () {
+    $store = StorageLocation::create(['name' => 'คลังหลัก']);
+    $taken = createAsset($this->pc, ['ip_address' => '10.0.0.5', 'property_no' => 'P-01', 'specs' => ['cpu' => 'x']]);
+
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([
+        ['ชื่อ', 'หมวด', 'IP Address', 'เลขครุภัณฑ์', 'สถานที่จัดเก็บ', 'CPU [spec.cpu]'],
+        ['Spare PC', 'คอมพิวเตอร์', null, null, 'คลังหลัก', 'i5'],
+        ['Same IP', 'คอมพิวเตอร์', '10.0.0.5', null, null, 'i5'],
+        ['Same number', 'คอมพิวเตอร์', null, 'p 01', 'ไม่มีที่นี้', 'i5'],
+    ])])->assertSessionHasNoErrors();
+
+    $import = AssetImport::first();
+    expect($import->failed_rows)->toBe(2)
+        ->and($import->errors[0]['messages'])->toBe(["IP Address ซ้ำกับทรัพย์สิน {$taken->asset_code} {$taken->name}"])
+        ->and($import->errors[1]['messages'])->toContain("เลขครุภัณฑ์ซ้ำกับทรัพย์สิน {$taken->asset_code} {$taken->name}", 'ไม่พบสถานที่จัดเก็บ "ไม่มีที่นี้" (ดูที่เมนู ตั้งค่า → สถานที่จัดเก็บ)')
+        ->and(Asset::where('name', 'Spare PC')->value('storage_location_id'))->toBe($store->id);
+
+    $rows = sheetRows($this->actingAs($this->admin)->get('/assets/export')->getFile()->getPathname());
+    $column = array_search('สถานที่จัดเก็บ', $rows[0], true);
+    expect(collect($rows)->firstWhere(1, 'Spare PC')[$column])->toBe('คลังหลัก');
 });

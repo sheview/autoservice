@@ -5,6 +5,7 @@ namespace App\Modules\Asset\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Document\Http\Concerns\ServesPhotoSlots;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -18,7 +19,7 @@ class AssetPhotoController extends Controller
 {
     use ServesPhotoSlots;
 
-    public function store(Request $request, Asset $asset, int $slot): RedirectResponse
+    public function store(Request $request, Asset $asset, int $slot): RedirectResponse|JsonResponse
     {
         Gate::authorize('update', $asset);
 

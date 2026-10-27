@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Asset\Models\StorageLocation;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
 use Illuminate\Http\UploadedFile;
@@ -97,7 +98,7 @@ it('exports the filtered list and imports the same file back as updates', functi
 
     $inactiveOnly = $this->actingAs($this->admin)->get('/parts/export?status=inactive')->assertOk();
     $rows = partSheetRows($inactiveOnly->getFile()->getPathname());
-    expect($rows[0])->toBe(['รหัสอะไหล่', 'ชื่ออะไหล่', 'ยี่ห้อ', 'Part number', 'หน่วยนับ', 'จุดสั่งซื้อ', 'ราคาต่อหน่วย (บาท)', 'คงเหลือ', 'สถานะ', 'หมายเหตุ'])
+    expect($rows[0])->toBe(['รหัสอะไหล่', 'ชื่ออะไหล่', 'ยี่ห้อ', 'Part number', 'หน่วยนับ', 'จุดสั่งซื้อ', 'ราคาต่อหน่วย (บาท)', 'คงเหลือ', 'สถานะ', 'หมายเหตุ', 'หมวด', 'สถานที่จัดเก็บ'])
         ->and(count($rows))->toBe(2)
         ->and($rows[1][0])->toBe('PSU')
         ->and($rows[1][8])->toBe('ปิดใช้งาน');
@@ -148,4 +149,32 @@ it('requires part.import and part.export, and imports only into the own tenant',
 
     $export = partSheetRows($this->actingAs($this->admin)->get('/parts/export')->getFile()->getPathname());
     expect(array_column(array_slice($export, 1), 1))->toBe(['My memory']);
+});
+
+it('reads category and storage location by name, and refuses duplicates and opening stock of tracked parts', function () {
+    $ups = createAssetCategory(['name' => 'Power Supply', 'code_prefix' => 'PSU']);
+    $disks = createAssetCategory(['name' => 'SSD/HDD', 'code_prefix' => 'DSK', 'requires_serial' => true]);
+    $store = StorageLocation::create(['name' => 'คลังหลัก']);
+    createPart(['code' => 'OLD', 'name' => 'Toner 59A', 'part_number' => 'CF259A']);
+
+    $this->actingAs($this->admin)->post('/parts/import', ['file' => partsXlsx([
+        ['รหัสอะไหล่', 'ชื่ออะไหล่', 'Part number', 'หน่วยนับ', 'คงเหลือ', 'หมวด', 'สถานที่จัดเก็บ'],
+        ['PSU-1', 'PSU 550W', null, 'ชิ้น', 2, 'power supply', 'คลังหลัก'],
+        ['X1', 'Toner HP', 'cf-259a', 'ตลับ', null, null, null],
+        ['X2', 'Fan', null, 'ชิ้น', null, 'ไม่มีหมวดนี้', 'ไม่มีที่นี้'],
+        ['SSD-1', 'SSD 1TB', null, 'ลูก', 3, 'SSD/HDD', null],
+    ])])->assertInertia(fn (Assert $page) => $page
+        ->where('result.created', 1)->where('result.failed', 3)
+        ->where('result.errors.0.messages', ['Part number ซ้ำกับอะไหล่ OLD Toner 59A'])
+        ->where('result.errors.1.messages', fn ($m) => collect($m)->contains('ไม่พบหมวด "ไม่มีหมวดนี้" (ดูชื่อหมวดที่เมนู ตั้งค่า → หมวดทรัพย์สิน)')
+            && collect($m)->contains('ไม่พบสถานที่จัดเก็บ "ไม่มีที่นี้" (ดูที่เมนู ตั้งค่า → สถานที่จัดเก็บ)'))
+        ->where('result.errors.2.messages', fn ($m) => str_contains($m[0], 'ติดตาม Serial Number')));
+
+    expect(Part::where('code', 'PSU-1')->sole()->only(['asset_category_id', 'storage_location_id', 'qty_on_hand']))
+        ->toBe(['asset_category_id' => $ups->id, 'storage_location_id' => $store->id, 'qty_on_hand' => 2]);
+
+    $rows = partSheetRows($this->actingAs($this->admin)->get('/parts/export')->getFile()->getPathname());
+    $psu = collect($rows)->first(fn ($row) => $row[0] === 'PSU-1');
+    expect(array_slice($psu, -2))->toBe(['Power Supply', 'คลังหลัก'])
+        ->and($disks->exists)->toBeTrue();
 });

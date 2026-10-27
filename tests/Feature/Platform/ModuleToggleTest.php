@@ -20,13 +20,15 @@ it('builds the sidebar from config, filtered by permission', function () {
             ->toBe([
                 'หน้าหลัก',
                 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
-                'ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'ใบงาน PM (Work Orders)', 'แผน PM', 'อุปกรณ์ในแผน PM', 'Template PM', 'เครื่องมือวัด', 'ตั้งค่า PM',
-                'ทรัพย์สิน', 'เบิก / ยืม', 'หมวดทรัพย์สิน', 'พิมพ์ป้าย QR',
+                'ทรัพย์สิน', 'พิมพ์ป้าย QR',
+                'อะไหล่', 'ความเคลื่อนไหวสต็อก', 'ใบขอซื้อ',
+                'เบิก / ยืม',
+                'ภาพรวม PM', 'รายงานถึงลูกค้า', 'แผน PM', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'รายงาน PM', 'Template PM', 'เครื่องมือวัด', 'ตั้งค่า PM',
                 'ลูกค้า', 'สัญญา MA',
-                'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก',
                 'รายงาน', 'อะไหล่ที่เปลี่ยน/ส่งออก', 'สรุปรายบุคคล', 'สรุปรายโครงการ', 'ผลประเมินความพึงพอใจ',
                 'คู่มือ',
                 'ผู้ใช้งาน', 'บทบาทและสิทธิ์', 'ข้อมูลบริษัท', 'สาขา', 'วันหยุด', 'แชร์ข้อมูลกับบริษัทอื่น', 'อาการและวิธีแก้', 'ห้อง Server', 'การแจ้งเตือน', 'Log การใช้งาน',
+                'หมวดทรัพย์สิน', 'สถานที่จัดเก็บ',
             ]));
 
     // each item carries its section
@@ -38,14 +40,14 @@ it('builds the sidebar from config, filtered by permission', function () {
     $this->actingAs(userWithRole('technician'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe([
             'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
-            'ทรัพย์สิน', 'เบิก / ยืม', 'พิมพ์ป้าย QR',
-            'ลูกค้า', 'สัญญา MA', 'อะไหล่', 'ใบขอซื้อ', 'ความเคลื่อนไหวสต็อก', 'สรุปรายบุคคล', 'ผลประเมินความพึงพอใจ', 'คู่มือ',
+            'ทรัพย์สิน', 'พิมพ์ป้าย QR', 'อะไหล่', 'ความเคลื่อนไหวสต็อก', 'ใบขอซื้อ', 'เบิก / ยืม',
+            'ลูกค้า', 'สัญญา MA', 'สรุปรายบุคคล', 'ผลประเมินความพึงพอใจ', 'คู่มือ',
         ]));
 
     // helpdesk runs the PM work but does not shape templates or settings
     $this->actingAs(userWithRole('helpdesk'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(collect(navigationTitles($page))->filter(fn ($title) => str_contains($title, 'PM') || $title === 'รายงานถึงลูกค้า')->values()->all())
-            ->toBe(['ภาพรวม PM', 'รายงาน PM', 'รายงานถึงลูกค้า', 'ใบงาน PM (Work Orders)', 'แผน PM', 'อุปกรณ์ในแผน PM']));
+            ->toBe(['ภาพรวม PM', 'รายงานถึงลูกค้า', 'แผน PM', 'อุปกรณ์ในแผน PM', 'ใบงาน PM (Work Orders)', 'รายงาน PM']));
 });
 
 it('turns the asset module on by default', function () {
@@ -113,7 +115,7 @@ it('forbids a customer admin and an impersonating superadmin from switching modu
 it('puts the PM pages under four tabs, and gives a customer account only its reports', function () {
     $this->actingAs(userWithRole('admin_company'))->get('/dashboard')->assertInertia(fn (Assert $page) => $page
         ->where('navigation', fn ($items) => collect($items)->whereNotNull('tab')->pluck('tab')->unique()->values()->all()
-            === ['pm.overview', 'pm.visits', 'pm.plans', 'pm.settings', 'settings.users', 'settings.company', 'settings.service', 'settings.system']));
+            === ['pm.overview', 'pm.plans', 'pm.visits', 'pm.settings', 'settings.users', 'settings.company', 'settings.service', 'settings.system']));
 
     $customer = userWithRole('customer_it', ['customer_id' => createCustomer()->id]);
     $this->actingAs($customer)->get('/dashboard')->assertInertia(fn (Assert $page) => $page

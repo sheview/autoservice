@@ -11,7 +11,8 @@ namespace App\Modules\Inventory\Support;
  */
 class PartSheet
 {
-    public const COLUMNS = ['code', 'name', 'brand', 'part_number', 'unit', 'min_qty', 'unit_cost', 'qty_on_hand', 'status', 'notes'];
+    // category / storage_location: names from the lists shared with assets, last so older files still read.
+    public const COLUMNS = ['code', 'name', 'brand', 'part_number', 'unit', 'min_qty', 'unit_cost', 'qty_on_hand', 'status', 'notes', 'category', 'storage_location'];
 
     public const STATUSES = ['active', 'inactive'];
 

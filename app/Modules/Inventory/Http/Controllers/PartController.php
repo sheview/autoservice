@@ -3,15 +3,20 @@
 namespace App\Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\CategoryNames;
+use App\Modules\Asset\Actions\CategoryOptions;
 use App\Modules\Asset\Actions\ItemRequestLines;
+use App\Modules\Asset\Actions\StorageLocationOptions;
+use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Identity\Models\User;
+use App\Modules\Inventory\Actions\CreatePart;
 use App\Modules\Inventory\Actions\DeletePart;
+use App\Modules\Inventory\Actions\FindDuplicateParts;
 use App\Modules\Inventory\Actions\FindPartUnits;
-use App\Modules\Inventory\Actions\PartCategoryOptions;
 use App\Modules\Inventory\Actions\PartStats;
 use App\Modules\Inventory\Actions\PartUnitHistory;
 use App\Modules\Inventory\Actions\SavePart;
@@ -21,12 +26,12 @@ use App\Modules\Inventory\Actions\SearchStockMovements;
 use App\Modules\Inventory\Exports\PartsExport;
 use App\Modules\Inventory\Http\Requests\PartRequest;
 use App\Modules\Inventory\Models\Part;
-use App\Modules\Inventory\Models\PartCategory;
 use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Service\Actions\TicketLabels;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -38,6 +43,9 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 class PartController extends Controller
 {
     public const EXPORT_PERMISSION = 'parts.export';
+
+    // Turning serial number tracking on or off for a part, and picking it for a new one.
+    public const SERIALS_PERMISSION = 'parts.serials';
 
     public function index(Request $request, SearchParts $search, PartStats $stats): Response
     {
@@ -56,6 +64,8 @@ class PartController extends Controller
             // Pieces whose serial number matches the search, with their history on the page.
             'serialHits' => app(FindPartUnits::class)->handle($filters['search']),
             'statuses' => SearchParts::STATUSES,
+            'categories' => collect(app(CategoryOptions::class)->handle())->map(fn (array $c) => ['id' => $c['id'], 'name' => $c['name']])->all(),
+            'locations' => app(StorageLocationOptions::class)->handle($filters['storage_location_id']),
             'stockLevels' => SearchParts::STOCK_LEVELS,
             'stats' => $stats->handle(),
             'can' => [
@@ -64,11 +74,24 @@ class PartController extends Controller
                 'delete' => $user->can('parts.delete'),
                 'import' => $user->can(PartImportController::PERMISSION),
                 'export' => $user->can(self::EXPORT_PERMISSION),
-                'categories' => $user->can(PartCategoryController::PERMISSION),
+                'categories' => $user->can('viewAny', AssetCategory::class),
                 'receive' => $user->can('stock-movements.create'),
                 'movements' => $user->can(StockMovementController::VIEW_PERMISSION),
             ],
         ]);
+    }
+
+    /**
+     * Parts the one on the form would repeat (?name, ?part_number, ?except = the part edited), for
+     * the form to show while typing.
+     */
+    public function duplicates(Request $request, FindDuplicateParts $find): JsonResponse
+    {
+        abort_unless($request->user()->can('create', Part::class) || $request->user()->can('parts.update'), 403);
+
+        $duplicates = $find->handle($request->string('name')->value(), $request->string('part_number')->value(), $request->integer('except') ?: null);
+
+        return response()->json(array_map(fn (array $part) => [...$part, 'url' => route('inventory.parts.show', $part['id'])], $duplicates));
     }
 
     /**
@@ -88,14 +111,19 @@ class PartController extends Controller
         return Inertia::render('Inventory/Parts/Form', [
             'part' => null,
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle() : [],
-            'categories' => app(PartCategoryOptions::class)->handle(),
-            'canSerials' => request()->user()->can(PartCategoryController::PERMISSION),
+            'categories' => app(CategoryOptions::class)->handle(),
+            'locations' => app(StorageLocationOptions::class)->handle(),
+            'canSerials' => request()->user()->can(self::SERIALS_PERMISSION),
+            // The first stock is entered with the part (CreatePart), by whoever may enter receipts.
+            'canReceive' => request()->user()->can(StockMovement::permissionFor(StockMovement::TYPE_RECEIVE)),
+            'maxInitialSerials' => PartRequest::MAX_INITIAL_SERIALS,
         ]);
     }
 
-    public function store(PartRequest $request, SavePart $savePart): RedirectResponse
+    public function store(PartRequest $request, CreatePart $createPart): RedirectResponse
     {
-        $part = $savePart->handle(null, $request->partData());
+        ['quantity' => $quantity, 'serials' => $serials] = $request->initialStock();
+        $part = $createPart->handle($request->partData(), $quantity, $serials, $request->user());
 
         return redirect()->route('inventory.parts.show', $part)->with('success', __('inventory.parts.created'));
     }
@@ -123,7 +151,10 @@ class PartController extends Controller
                 ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active', 'notes', 'track_serial']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
-                'category' => $part->part_category_id ? PartCategory::query()->find($part->part_category_id)?->name : null,
+                'category' => $part->asset_category_id ? app(CategoryNames::class)->handle(withTrashed: true)[$part->asset_category_id] ?? null : null,
+                'storage_location' => $part->storage_location_id
+                    ? app(StorageLocationOptions::class)->names([$part->storage_location_id])[$part->storage_location_id] ?? null
+                    : null,
                 // The MA contract (project) it is kept for.
                 'contract' => $part->contract_id && $modules->enabled('contract')
                     ? app(ContractLabels::class)->handle([$part->contract_id])[$part->contract_id] ?? null
@@ -141,7 +172,7 @@ class PartController extends Controller
                 'update' => $user->can('update', $part),
                 'delete' => $user->can('delete', $part),
                 'viewTickets' => $user->can('tickets.view'),
-                'serials' => $user->can('update', $part) && $user->can(PartCategoryController::PERMISSION),
+                'serials' => $user->can('update', $part) && $user->can(self::SERIALS_PERMISSION),
                 'correct' => $user->can('stock-movements.create'),
             ],
         ]);
@@ -165,12 +196,13 @@ class PartController extends Controller
 
         return Inertia::render('Inventory/Parts/Form', [
             'part' => [
-                ...$part->only(['id', 'code', 'name', 'contract_id', 'part_category_id', 'part_number', 'brand', 'unit', 'min_qty', 'is_active', 'notes', 'track_serial']),
+                ...$part->only(['id', 'code', 'name', 'contract_id', 'asset_category_id', 'storage_location_id', 'part_number', 'brand', 'unit', 'min_qty', 'is_active', 'notes', 'track_serial']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
             ],
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($part->contract_id) : [],
-            'categories' => app(PartCategoryOptions::class)->handle(),
-            'canSerials' => request()->user()->can(PartCategoryController::PERMISSION),
+            'categories' => app(CategoryOptions::class)->handle(),
+            'locations' => app(StorageLocationOptions::class)->handle($part->storage_location_id),
+            'canSerials' => request()->user()->can(self::SERIALS_PERMISSION),
         ]);
     }
 

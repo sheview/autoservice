@@ -42,6 +42,8 @@ return [
     'required_if' => 'กรุณากรอก :attribute',
     'string' => ':attribute ต้องเป็นข้อความ',
     'unique' => ':attribute นี้ถูกใช้แล้ว',
+    // The file did not arrive whole: usually larger than the server's upload_max_filesize.
+    'uploaded' => 'อัปโหลด:attributeไม่สำเร็จ ไฟล์อาจใหญ่เกินกว่าที่ server รับได้',
 
     'attributes' => [
         'name' => 'ชื่อ',

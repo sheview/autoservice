@@ -108,6 +108,6 @@ class PartUnitController extends Controller
 
     private function authorizeSettings(Request $request, Part $part): void
     {
-        abort_unless($request->user()->can('update', $part) && $request->user()->can(PartCategoryController::PERMISSION), 403);
+        abort_unless($request->user()->can('update', $part) && $request->user()->can(PartController::SERIALS_PERMISSION), 403);
     }
 }

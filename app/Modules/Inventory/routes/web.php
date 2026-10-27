@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Inventory\Http\Controllers\PartCategoryController;
 use App\Modules\Inventory\Http\Controllers\PartController;
 use App\Modules\Inventory\Http\Controllers\PartImportController;
 use App\Modules\Inventory\Http\Controllers\PartPhotoController;
@@ -15,6 +14,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')->group(function () {
     // Before the resource, so "export" / "import" are not taken as a part id.
     Route::get('parts/export', [PartController::class, 'export'])->name('parts.export');
+    Route::get('parts/duplicates', [PartController::class, 'duplicates'])->name('parts.duplicates');
     Route::get('parts/import', [PartImportController::class, 'create'])->name('parts.import');
     Route::post('parts/import', [PartImportController::class, 'store'])->name('parts.import.store');
     Route::get('parts/import/template', [PartImportController::class, 'template'])->name('parts.import.template');
@@ -34,11 +34,6 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     Route::post('parts/{part}/serials/stop', [PartUnitController::class, 'stop'])->name('parts.serials.stop');
     Route::get('part-units/{unit}/history', [PartUnitController::class, 'history'])->whereNumber('unit')->name('part-units.history');
     Route::put('part-units/{unit}', [PartUnitController::class, 'update'])->whereNumber('unit')->name('part-units.update');
-
-    Route::get('part-categories', [PartCategoryController::class, 'index'])->name('part-categories.index');
-    Route::post('part-categories', [PartCategoryController::class, 'store'])->name('part-categories.store');
-    Route::put('part-categories/{category}', [PartCategoryController::class, 'update'])->whereNumber('category')->name('part-categories.update');
-    Route::delete('part-categories/{category}', [PartCategoryController::class, 'destroy'])->whereNumber('category')->name('part-categories.destroy');
 
     Route::get('stock-movements', [StockMovementController::class, 'index'])->name('movements.index');
     Route::post('stock-movements/{movement}/void', [StockMovementController::class, 'void'])->whereNumber('movement')->name('movements.void');

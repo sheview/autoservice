@@ -17,7 +17,7 @@ it('gives a new company the standard categories, which it may then change', func
         expect(AssetCategory::orderBy('id')->pluck('code_prefix')->all())->toBe($standard->pluck('code_prefix')->all());
 
         $switch = AssetCategory::where('code_prefix', 'SW')->sole();
-        expect($switch->only(['name', 'service_line', 'asset_type']))->toBe(['name' => 'สวิตช์', 'service_line' => 'network', 'asset_type' => 'hardware'])
+        expect($switch->only(['name', 'service_line', 'asset_type']))->toBe(['name' => 'Switch', 'service_line' => 'network', 'asset_type' => 'hardware'])
             ->and(collect($switch->spec_fields)->pluck('key')->all())->toBe(['ports', 'layer', 'poe', 'mgmt_ip', 'firmware'])
             ->and(AssetCategory::where('code_prefix', 'LIC')->value('asset_type'))->toBe('software');
     });
@@ -29,19 +29,19 @@ it('gives a new company the standard categories, which it may then change', func
 it('adds only the standard categories the company is missing, never doubling its own', function () {
     $admin = userWithRole('admin_company');
     // Own versions: one with a standard name, one with a standard prefix, and one of its own.
-    createAssetCategory(['name' => 'สวิตช์', 'code_prefix' => 'NSW']);
+    createAssetCategory(['name' => 'switch', 'code_prefix' => 'NSW']);
     createAssetCategory(['name' => 'คอมพิวเตอร์ PC', 'code_prefix' => 'PC']);
     createAssetCategory(['name' => 'โดรนสำรวจ', 'code_prefix' => 'DRN']);
     $count = count(StandardCategories::all());
 
     $this->actingAs($admin)->get('/asset-categories')->assertInertia(fn (Assert $page) => $page
         ->where('standardMissing', fn ($names) => count($names) === $count - 2
-            && ! collect($names)->contains('สวิตช์') && ! collect($names)->contains('คอมพิวเตอร์ตั้งโต๊ะ')));
+            && ! collect($names)->contains('Switch') && ! collect($names)->contains('คอมพิวเตอร์ตั้งโต๊ะ')));
 
     $this->actingAs($admin)->post('/asset-categories/standard')->assertSessionHasNoErrors()
         ->assertSessionHas('success', 'เพิ่มหมวดมาตรฐาน '.($count - 2).' หมวดแล้ว');
     expect(AssetCategory::count())->toBe($count + 1)
-        ->and(AssetCategory::where('name', 'สวิตช์')->value('code_prefix'))->toBe('NSW');
+        ->and(AssetCategory::where('name', 'switch')->value('code_prefix'))->toBe('NSW');
 
     // Nothing left to add: the offer is gone and a second click adds nothing.
     $this->actingAs($admin)->get('/asset-categories')->assertInertia(fn (Assert $page) => $page->where('standardMissing', []));
@@ -55,4 +55,15 @@ it('lets only who may create categories add the standard ones', function () {
     $this->actingAs($helpdesk)->get('/asset-categories')->assertInertia(fn (Assert $page) => $page->where('standardMissing', []));
     $this->actingAs($helpdesk)->post('/asset-categories/standard')->assertForbidden();
     expect(AssetCategory::count())->toBe(0);
+});
+
+it('adds only the standard categories ticked, the others staying on offer', function () {
+    $admin = userWithRole('admin_company');
+
+    $this->actingAs($admin)->post('/asset-categories/standard', ['names' => ['Mouse', 'Keyboard', 'ไม่มีในมาตรฐาน']])
+        ->assertSessionHas('success', 'เพิ่มหมวดมาตรฐาน 2 หมวดแล้ว');
+
+    expect(AssetCategory::orderBy('name')->pluck('code_prefix', 'name')->all())->toBe(['Keyboard' => 'KB', 'Mouse' => 'MS']);
+    $this->actingAs($admin)->get('/asset-categories')->assertInertia(fn (Assert $page) => $page
+        ->where('standardMissing', fn ($names) => count($names) === count(StandardCategories::all()) - 2 && collect($names)->contains('SSD/HDD')));
 });

@@ -114,7 +114,7 @@ it('hides the module when it is switched off', function () {
 
 it('gives a new part the next code when none is typed', function () {
     $admin = userWithRole('admin_company');
-    $post = fn (array $data) => $this->actingAs($admin)->post('/parts', $data + ['name' => 'Fan', 'unit' => 'pcs']);
+    $post = fn (array $data) => $this->actingAs($admin)->post('/parts', $data + ['name' => 'Fan '.uniqid(), 'unit' => 'pcs']);
 
     $post([])->assertSessionHasNoErrors();
     $post(['code' => ''])->assertSessionHasNoErrors();

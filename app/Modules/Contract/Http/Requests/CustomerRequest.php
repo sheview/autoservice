@@ -24,7 +24,8 @@ class CustomerRequest extends FormRequest
         $customer = $this->route('customer');
 
         return [
-            'code' => ['required', 'string', 'regex:/^[A-Za-z0-9_-]{1,30}$/', function (string $attribute, mixed $value, Closure $fail) use ($customer) {
+            // A new customer without a code gets the next "CUST001" (SaveCustomer).
+            'code' => [$customer instanceof Customer ? 'required' : 'nullable', 'string', 'regex:/^[A-Za-z0-9_-]{1,30}$/', function (string $attribute, mixed $value, Closure $fail) use ($customer) {
                 // Unique per tenant, ignoring case (the tenant scope limits the query to this tenant).
                 $taken = Customer::query()
                     ->whereRaw('lower(code) = ?', [mb_strtolower(trim((string) $value))])

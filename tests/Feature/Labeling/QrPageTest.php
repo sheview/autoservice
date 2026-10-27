@@ -7,6 +7,8 @@ use App\Modules\Asset\Actions\SubmitCheckoutRequest;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Branch;
 use App\Modules\Tenancy\Support\CompanyCodes;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -72,21 +74,24 @@ it('counts free devices from the same source as the asset list', function () {
         ->where('assets.data', fn ($rows) => collect($rows)->firstWhere('asset_code', $this->asset->asset_code)['available'] === 0));
 });
 
-it('shows anyone else only the broad name and code, and only with the key of the label', function () {
+it('shows anyone else what the device is and its warranty, never where it is or who uses it, and only with the key of the label', function () {
     $this->get("{$this->url}?k={$this->key}")->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Labeling/QrPublic')
         ->where('company', 'Default')
-        ->where('asset', ['asset_code' => $this->asset->asset_code, 'name' => 'Notebook ASUS']));
-
+        ->where('asset', [
+            'asset_code' => $this->asset->asset_code, 'name' => 'Finance laptop', 'category' => 'Notebook', 'brand' => 'ASUS', 'model' => 'X15',
+            'serials' => ['SN-SECRET-1'], 'status' => 'in_use', 'warranty_expires_at' => now()->addDays(20)->toDateString(), 'warranty' => 'expiring',
+            'photo' => null,
+        ]));
     $same = fn ($response) => $response->assertInertia(fn (Assert $page) => $page->component('Labeling/QrPublic')->where('asset', null)->where('company', null));
     $same($this->get($this->url));                                   // no key
     $same($this->get("{$this->url}?k=wrongkey"));                    // wrong key
     $same($this->get("/t/001/q/NB-99999?k={$this->key}"));           // no such asset
     $same($this->get("/t/002/q/{$this->asset->asset_code}?k={$this->key}")); // another company's code
 
-    // Nothing internal anywhere in the public page.
+    // Never where it is, who uses it or whose it is, anywhere in the public page.
     $html = $this->get("{$this->url}?k={$this->key}")->getContent();
-    foreach (['SN-SECRET-1', 'Khun Somchai', 'Floor 3', 'Acme', 'Finance laptop'] as $secret) {
+    foreach (['Khun Somchai', 'Floor 3', 'Acme'] as $secret) {
         expect($html)->not->toContain($secret);
     }
 
@@ -115,4 +120,17 @@ it('lets who may move devices change only where it is', function () {
 
     expect($this->asset->fresh()->only(['branch_id', 'location', 'name']))
         ->toBe(['branch_id' => $other->id, 'location' => 'Server room', 'name' => 'Finance laptop']);
+});
+
+it('shows the main photo on the public page, only with the key of the label', function () {
+    Storage::fake('local');
+    $this->actingAs(userWithRole('admin_company'))->post("/assets/{$this->asset->ulid}/photos/0", [
+        'photo' => UploadedFile::fake()->image('front.jpg', 400, 300),
+    ])->assertSessionHasNoErrors();
+    auth()->logout();
+
+    $photo = url("t/001/q/{$this->asset->asset_code}/photo").'?k='.$this->key;
+    $this->get("{$this->url}?k={$this->key}")->assertInertia(fn (Assert $page) => $page->where('asset.photo', $photo));
+    $this->get($photo)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    $this->get("{$this->url}/photo?k=wrong-key")->assertNotFound();
 });

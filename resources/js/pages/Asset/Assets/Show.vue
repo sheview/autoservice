@@ -42,6 +42,7 @@ interface AssetDetail {
     department: string | null;
     notes: string | null;
     category: string | null;
+    storage_location: string | null;
     branch: string | null;
     customer: string | null;
     purchased_at: string | null;
@@ -158,6 +159,7 @@ const details: [string, (a: AssetDetail) => string | null][] = [
     ['branch', (a) => a.branch ?? t('assets.no_branch')],
     ['customer', (a) => a.customer ?? t('assets.owner_company')],
     ['location', (a) => a.location],
+    ['storage_location', (a) => a.storage_location],
     ['used_by', (a) => [a.used_by, a.department].filter(Boolean).join(' · ') || null],
     ['ip_address', (a) => a.ip_address],
     ['mac_address', (a) => a.mac_address],
@@ -210,7 +212,7 @@ const details: [string, (a: AssetDetail) => string | null][] = [
                 {{ page.props.flash.error }}
             </p>
 
-            <PhotoSlots :photos="photos" :editable="can.update" />
+            <PhotoSlots :photos="photos" :editable="can.update" :pending-key="`asset:${asset.id}`" />
 
             <dl class="grid gap-x-6 gap-y-4 rounded-md border p-4 sm:grid-cols-3 lg:grid-cols-5">
                 <div v-for="[key, value] in details" :key="key">

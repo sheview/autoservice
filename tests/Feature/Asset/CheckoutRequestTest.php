@@ -448,3 +448,16 @@ it('takes every lent asset back in one go, and closes the request', function () 
         ->and($laptop->fresh()->status)->toBe(Asset::STATUS_SPARE)
         ->and($request->fresh()->status)->toBe('closed');
 });
+
+it('narrows the list to parts issued or assets lent', function () {
+    ($this->send)([($this->asset)($this->notebook, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-15'])])->assertSessionHasNoErrors();
+    ($this->send)([($this->part)(1)], ['ticket_id' => $this->ticket->id])->assertSessionHasNoErrors();
+    [$loan, $issue] = CheckoutRequest::orderBy('id')->pluck('request_no')->all();
+
+    $list = fn (string $kind) => $this->actingAs($this->admin)->get("/checkout-requests?kind={$kind}");
+    $list('all')->assertInertia(fn (Assert $page) => $page->where('requests.total', 2)->where('filters.kind', 'all'));
+    $list('part')->assertInertia(fn (Assert $page) => $page->where('requests.total', 1)->where('requests.data.0.request_no', $issue));
+    $list('asset')->assertInertia(fn (Assert $page) => $page->where('requests.total', 1)->where('requests.data.0.request_no', $loan));
+    // Anything else is all of them.
+    $list('nope')->assertInertia(fn (Assert $page) => $page->where('requests.total', 2)->where('filters.kind', 'all'));
+});

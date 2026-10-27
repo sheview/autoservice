@@ -26,7 +26,7 @@ class SearchAssets
     public const EXPIRING_DAYS = 90;
 
     /**
-     * @return array{search: string, branch_id: int|null, customer_id: int|null, category_id: int|null, asset_type: string|null, status: string|null,
+     * @return array{search: string, branch_id: int|null, customer_id: int|null, category_id: int|null, storage_location_id: int|null, asset_type: string|null, status: string|null,
      *     warranty: string|null, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
@@ -36,6 +36,7 @@ class SearchAssets
             'branch_id' => $request->integer('branch_id') ?: null,
             'customer_id' => $request->integer('customer_id') ?: null,
             'category_id' => $request->integer('category_id') ?: null,
+            'storage_location_id' => $request->integer('storage_location_id') ?: null,
             // Hardware or software: the type of the asset's category.
             'asset_type' => in_array($request->input('asset_type'), AssetCategory::ASSET_TYPES, true) ? $request->input('asset_type') : null,
             'status' => in_array($request->input('status'), Asset::STATUSES, true) ? $request->input('status') : null,
@@ -69,6 +70,7 @@ class SearchAssets
             ->when($filters['branch_id'] ?? null, fn (Builder $q, $id) => $q->where('branch_id', $id))
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['category_id'] ?? null, fn (Builder $q, $id) => $q->where('category_id', $id))
+            ->when($filters['storage_location_id'] ?? null, fn (Builder $q, $id) => $q->where('storage_location_id', $id))
             ->when($filters['asset_type'] ?? null, fn (Builder $q, $type) => $q->whereHas('category', fn (Builder $q) => $q->where('asset_type', $type)))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
             ->when(($filters['warranty'] ?? null) === 'active', fn (Builder $q) => $q->where('warranty_expires_at', '>=', $today))

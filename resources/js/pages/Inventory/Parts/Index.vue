@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
@@ -33,6 +34,8 @@ interface Filters {
     search: string;
     status: string | null;
     stock: string | null;
+    asset_category_id: number | null;
+    storage_location_id: number | null;
     sort: string;
     direction: 'asc' | 'desc';
     [key: string]: unknown;
@@ -43,6 +46,8 @@ const props = defineProps<{
     filters: Filters;
     statuses: string[];
     stockLevels: string[];
+    categories: { id: number; name: string }[];
+    locations: { id: number; name: string }[];
     stats: { active: number; stock_value: string | null; low: number; out: number; out_this_month: number };
     serialHits: SerialHit[];
     can: {
@@ -106,7 +111,10 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         <Link :href="route('inventory.stock-receipts.create')">{{ t('stock_receipts.title') }}</Link>
                     </Button>
                     <Button v-if="can.categories" variant="outline" as-child>
-                        <Link :href="route('inventory.part-categories.index')">{{ t('parts.categories') }}</Link>
+                        <Link :href="route('asset.categories.index')">{{ t('parts.categories') }}</Link>
+                    </Button>
+                    <Button v-if="can.categories" variant="outline" as-child>
+                        <Link :href="route('asset.locations.index')">{{ t('nav.storage_locations') }}</Link>
                     </Button>
                     <Button v-if="can.export" variant="outline" as-child>
                         <a :href="exportUrl">{{ t('parts.export') }}</a>
@@ -161,7 +169,11 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             <SerialHits :hits="serialHits" />
 
             <div class="flex flex-wrap gap-3">
-                <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('parts.search_placeholder')" />
+                <div class="flex w-full max-w-sm gap-2">
+                    <Input v-model="filters.search" type="search" class="min-w-0 flex-1" :placeholder="t('parts.search_placeholder')" />
+                    <!-- A serial, part number or QR read by the camera becomes the search -->
+                    <BarcodeScanButton :hint="t('scan_camera.hint_search')" @scanned="(text) => (filters.search = text)" />
+                </div>
                 <select v-model="filters.status" :class="selectClass" :aria-label="t('common.status')">
                     <option :value="null">{{ t('parts.all_statuses') }}</option>
                     <option v-for="status in statuses" :key="status" :value="status">{{ t(`parts.statuses.${status}`) }}</option>
@@ -169,6 +181,14 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 <select v-model="filters.stock" :class="selectClass" :aria-label="t('parts.qty_on_hand')">
                     <option :value="null">{{ t('parts.all_stock_levels') }}</option>
                     <option v-for="level in stockLevels" :key="level" :value="level">{{ t(`parts.stock_levels.${level}`) }}</option>
+                </select>
+                <select v-if="categories.length" v-model="filters.asset_category_id" :class="selectClass" :aria-label="t('parts.category')">
+                    <option :value="null">{{ t('assets.all_categories') }}</option>
+                    <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                </select>
+                <select v-if="locations.length" v-model="filters.storage_location_id" :class="selectClass" :aria-label="t('storage_locations.field')">
+                    <option :value="null">{{ t('storage_locations.all') }}</option>
+                    <option v-for="location in locations" :key="location.id" :value="location.id">{{ location.name }}</option>
                 </select>
             </div>
 

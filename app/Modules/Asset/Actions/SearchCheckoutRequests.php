@@ -31,11 +31,14 @@ class SearchCheckoutRequests
 
     public const SORTABLE = ['created_at', 'request_no', 'needed_by'];
 
+    /** Requests with a line of that kind: parts issued, or assets lent ("all" = no filter). */
+    public const KINDS = ['all', CheckoutItem::TYPE_PART, CheckoutItem::TYPE_ASSET];
+
     /** "open" = in progress; or one status. */
     public const STATUS_FILTERS = ['open', 'all', ...CheckoutRequest::STATUSES];
 
     /**
-     * @return array{tab: string, search: string, status: string, overdue: bool, sort: string, direction: string}
+     * @return array{tab: string, kind: string, search: string, status: string, overdue: bool, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
     {
@@ -43,6 +46,7 @@ class SearchCheckoutRequests
 
         return [
             'tab' => $tab,
+            'kind' => in_array($request->input('kind'), self::KINDS, true) ? $request->input('kind') : 'all',
             'search' => $request->string('search')->trim()->value(),
             'status' => in_array($request->input('status'), self::STATUS_FILTERS, true) ? $request->input('status') : 'open',
             'overdue' => $request->boolean('overdue'),
@@ -79,6 +83,7 @@ class SearchCheckoutRequests
                 ->orWhereHas('items', fn ($q) => $q->where('item_name', 'like', "%{$search}%")->orWhere('item_code', 'like', "%{$search}%")
                     // Or a piece with that serial number went out on the line (Inventory module).
                     ->when(app(Modules::class)->enabled('inventory'), fn ($q) => $q->orWhereIn('id', app(CheckoutItemIdsWithSerial::class)->handle($search))))))
+            ->when(($filters['kind'] ?? 'all') !== 'all', fn (Builder $q) => $q->whereHas('items', fn ($q) => $q->where('item_type', $filters['kind'])))
             ->when($tab === 'approve', fn (Builder $q) => $q->where('status', CheckoutRequest::STATUS_PENDING))
             ->when($tab === 'fulfill', fn (Builder $q) => $q->whereIn('status', [CheckoutRequest::STATUS_APPROVED, CheckoutRequest::STATUS_PARTIAL])
                 ->whereHas('items', fn ($q) => $q->whereIn('status', [CheckoutItem::STATUS_APPROVED, CheckoutItem::STATUS_PARTIAL])))

@@ -22,6 +22,8 @@ class AssetSheet
         'parent',
         // Contract numbers it is in (Contract module). Importing only adds to contracts, never takes it out.
         'contracts',
+        // Where the company keeps it: a name from Settings > storage locations (last, so older files still read).
+        'storage_location',
     ];
 
     /** Several serial numbers of one asset share a cell, one per line or separated by commas. */

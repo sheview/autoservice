@@ -19,9 +19,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * The public side of an asset's QR page (no sign-in): the device's code and broad name, a form to
+ * The public side of an asset's QR page (no sign-in): what the device is, its warranty and main photo, a form to
  * report a problem with it (or, if a job is already running for it, a link to follow that job),
  * and a way for staff to sign in and come back. An unknown company, an unknown code and a wrong
  * key all give the same page, after the same lookup. Nothing here uses the staff's session or rights.
@@ -38,7 +39,7 @@ class QrPublicController extends Controller
     {
         $tenant = $this->usable($tenant);
         $key = $this->key($request);
-        [$asset, $running, $presets] = $this->context->run($tenant, function () use ($tenant, $code, $key) {
+        [$asset, $running, $presets, $hasPhoto] = $this->context->run($tenant, function () use ($tenant, $code, $key) {
             $asset = $this->label->handle($code, $key);
             $serviceOn = $asset && $this->modules->enabled('service', $tenant);
 
@@ -46,12 +47,17 @@ class QrPublicController extends Controller
                 $asset,
                 $serviceOn ? app(OpenTicketOfAsset::class)->handle($asset['id']) : null,
                 $serviceOn ? app(RepairPresetList::class)->handle()['symptom'] : [],
+                $asset !== null && $this->label->photo($code, $key) !== null,
             ];
         });
 
         return Inertia::render('Labeling/QrPublic', [
             'company' => $asset ? $tenant->name : null,
-            'asset' => $asset ? ['asset_code' => $asset['asset_code'], 'name' => $asset['name']] : null,
+            // What the device is and its warranty (PublicAssetLabel), never where it is or who uses it.
+            'asset' => $asset ? [
+                ...collect($asset)->except('id')->all(),
+                'photo' => $hasPhoto ? url($request->path().'/photo').'?k='.urlencode($key) : null,
+            ] : null,
             // A job already running for the device: follow it instead of reporting it again.
             'running' => $running ? PublicUrl::forTenant($tenant, '/track/'.$running->tracking_token) : null,
             'canReport' => $asset !== null && $this->modules->enabled('service', $tenant),
@@ -120,6 +126,32 @@ class QrPublicController extends Controller
 
         return redirect()->to(PublicUrl::forTenant($tenant, '/track/'.$result['ticket']->tracking_token))
             ->with($result['created'] ? 'reported' : 'already', $result['ticket']->ticket_no);
+    }
+
+    /** The device's main photo on its public page, under the same key check as the page. */
+    public function photoOnHost(Request $request, PublicTenant $publicTenant, string $code): StreamedResponse
+    {
+        return $this->photo($request, $publicTenant->known() ? $publicTenant->resolve() : null, $code);
+    }
+
+    public function photoOnPath(Request $request, string $company, string $code): StreamedResponse
+    {
+        return $this->photo($request, CompanyCodes::tenant($company), $code);
+    }
+
+    private function photo(Request $request, ?Tenant $tenant, string $code): StreamedResponse
+    {
+        $tenant = $this->usable($tenant);
+        abort_if($tenant === null, 404);
+        $media = $this->context->run($tenant, fn () => $this->label->photo($code, $this->key($request)));
+        abort_if($media === null, 404);
+
+        return response()->streamDownload(
+            fn () => fpassthru($media->stream()),
+            $media->file_name,
+            ['Content-Type' => $media->mime_type, 'Cache-Control' => 'private, max-age=3600'],
+            'inline',
+        );
     }
 
     private function usable(?Tenant $tenant): ?Tenant

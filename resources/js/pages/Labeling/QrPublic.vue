@@ -3,14 +3,26 @@ import InputError from '@/components/InputError.vue';
 import TurnstileWidget from '@/components/TurnstileWidget.vue';
 import { t } from '@/lib/i18n';
 import { Head, useForm } from '@inertiajs/vue3';
-import { Camera, Check, LogIn, Plus, QrCode, Send, Trash2 } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { Camera, Check, LogIn, Plus, QrCode, Send, Trash2, Wrench } from 'lucide-vue-next';
+import { nextTick, ref } from 'vue';
 
-// The public side of an asset's QR code: no sign-in, so no app layout. Only the code and a broad
-// name of the device, and a form to report a problem; an unknown code or a wrong key reads the same.
+// The public side of an asset's QR code: no sign-in, so no app layout. What the device is first
+// (PublicAssetLabel: never where it is or who uses it), then "report a problem" at the end, which
+// opens the form; an unknown code or a wrong key reads the same.
 const props = defineProps<{
     company: string | null;
-    asset: { asset_code: string; name: string } | null;
+    asset: {
+        asset_code: string;
+        name: string;
+        category: string | null;
+        brand: string | null;
+        model: string | null;
+        serials: string[];
+        status: string;
+        warranty_expires_at: string | null;
+        warranty: 'none' | 'active' | 'expiring' | 'expired';
+        photo: string | null;
+    } | null;
     running: string | null;
     canReport: boolean;
     symptoms: string[];
@@ -81,6 +93,24 @@ const removePhoto = (i: number) => {
 
 const submit = () => props.action && form.post(props.action, { forceFormData: true, preserveScroll: true });
 
+// The form opens from the button at the end of the page.
+const reporting = ref(false);
+const formEl = ref<HTMLFormElement | null>(null);
+const startReport = async () => {
+    reporting.value = true;
+    await nextTick();
+    formEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+
+// A document for people outside: the Buddhist year (th-TH).
+const date = (iso: string | null) => (iso ? new Date(`${iso}T00:00:00`).toLocaleDateString('th-TH', { dateStyle: 'long' }) : '');
+const warrantyClass: Record<string, string> = {
+    none: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
+    active: 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200',
+    expiring: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
+    expired: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
+};
+
 const input =
     'h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-slate-700 dark:bg-slate-900';
 const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-4 text-base font-semibold transition active:scale-[0.98]';
@@ -99,10 +129,34 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                 <p v-if="company" class="text-sm font-semibold text-violet-700 dark:text-violet-300">{{ company }}</p>
             </div>
 
-            <div v-if="asset" class="rounded-2xl border bg-white p-5 text-center dark:bg-slate-950">
-                <div class="text-lg font-semibold">{{ asset.name }}</div>
-                <div class="font-mono text-sm text-muted-foreground">{{ asset.asset_code }}</div>
-            </div>
+            <!-- The device -->
+            <section v-if="asset" class="space-y-4 rounded-2xl border bg-white p-5 dark:bg-slate-950">
+                <img v-if="asset.photo" :src="asset.photo" :alt="asset.name" class="aspect-[4/3] w-full rounded-xl border object-cover" />
+                <div>
+                    <div class="font-mono text-sm text-muted-foreground">{{ asset.asset_code }}</div>
+                    <h2 class="text-xl font-semibold">{{ asset.name }}</h2>
+                    <div class="text-sm text-muted-foreground">{{ [asset.category, asset.brand, asset.model].filter(Boolean).join(' · ') }}</div>
+                </div>
+                <div class="rounded-xl px-3 py-2 text-sm font-semibold" :class="warrantyClass[asset.warranty]">
+                    {{ t(`qr.warranty_states.${asset.warranty}`, { date: date(asset.warranty_expires_at) }) }}
+                </div>
+                <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
+                    <template v-if="asset.brand">
+                        <dt class="text-muted-foreground">{{ t('assets.brand') }}</dt>
+                        <dd>{{ asset.brand }}</dd>
+                    </template>
+                    <template v-if="asset.model">
+                        <dt class="text-muted-foreground">{{ t('assets.model') }}</dt>
+                        <dd>{{ asset.model }}</dd>
+                    </template>
+                    <template v-if="asset.serials.length">
+                        <dt class="text-muted-foreground">{{ t('qr.serial') }}</dt>
+                        <dd class="break-all font-mono">{{ asset.serials.join(', ') }}</dd>
+                    </template>
+                    <dt class="text-muted-foreground">{{ t('assets.status') }}</dt>
+                    <dd>{{ t(`assets.statuses.${asset.status}`) }}</dd>
+                </dl>
+            </section>
             <p v-else class="rounded-2xl border border-dashed bg-white p-6 text-center text-sm text-muted-foreground dark:bg-slate-950">
                 {{ t('qr.public_unknown') }}
             </p>
@@ -116,8 +170,22 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                 <a :href="running" :class="[big, 'bg-violet-600 text-white']">{{ t('qr.running_link') }}</a>
             </div>
 
-            <!-- Report a problem -->
-            <form v-else-if="canReport && asset" class="space-y-5 rounded-2xl border bg-white p-5 dark:bg-slate-950" @submit.prevent="submit">
+            <!-- Report a problem: a button at the end, the form once it is pressed -->
+            <button
+                v-else-if="canReport && asset && !reporting"
+                type="button"
+                :class="[big, 'bg-gradient-to-r from-violet-600 to-indigo-500 text-white shadow-lg']"
+                @click="startReport"
+            >
+                <Wrench class="size-5" />{{ t('qr.report_button') }}
+            </button>
+            <form
+                v-else-if="canReport && asset"
+                ref="formEl"
+                class="scroll-mt-4 space-y-5 rounded-2xl border bg-white p-5 dark:bg-slate-950"
+                @submit.prevent="submit"
+            >
+                <h2 class="text-lg font-semibold">{{ t('qr.report_button') }}</h2>
                 <div class="space-y-2">
                     <div class="font-semibold">{{ t('qr.symptoms') }} <span class="text-red-600">*</span></div>
                     <div class="flex flex-wrap gap-2">

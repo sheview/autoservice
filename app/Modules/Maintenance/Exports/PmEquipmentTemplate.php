@@ -33,7 +33,7 @@ class PmEquipmentTemplate implements Export, WithMultipleSheets
         $rows = [
             $sample(['name' => 'PC ฝ่ายบัญชี 1', 'category' => $category('PC', 'คอมพิวเตอร์ตั้งโต๊ะ'), 'brand' => 'Dell', 'model' => 'OptiPlex 7010',
                 'serial_number' => 'SN-PC-0001', 'property_no' => 'ครุภัณฑ์-0001', 'location' => 'อาคาร A', 'floor' => '2', 'room' => 'ฝ่ายบัญชี'], $form('PC-SET')),
-            $sample(['name' => 'จอ ฝ่ายบัญชี 1', 'category' => $category('MON', 'จอภาพ'), 'brand' => 'Dell', 'model' => 'P2422H',
+            $sample(['name' => 'จอ ฝ่ายบัญชี 1', 'category' => $category('MON', 'จอ Monitor'), 'brand' => 'Dell', 'model' => 'P2422H',
                 'serial_number' => 'SN-MON-0001', 'location' => 'อาคาร A', 'floor' => '2', 'room' => 'ฝ่ายบัญชี', 'parent' => 'SN-PC-0001'], $form('PC-SET')),
             $sample(['name' => 'UPS-01', 'category' => $category('UPS', 'UPS'), 'brand' => 'Eaton', 'model' => '93PM 60kVA',
                 'serial_number' => 'SN-UPS-0001', 'location' => 'อาคาร Data Center', 'floor' => '1', 'room' => 'ห้อง UPS', 'ip_address' => '10.0.0.21'], $form('DC-UPS')),

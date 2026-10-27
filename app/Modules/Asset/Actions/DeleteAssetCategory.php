@@ -2,11 +2,12 @@
 
 namespace App\Modules\Asset\Actions;
 
+use App\Modules\Asset\Events\AssetCategoryDeleted;
 use App\Modules\Asset\Models\AssetCategory;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Soft-deletes a category that no (non-deleted) asset uses.
+ * Soft-deletes a category that no (non-deleted) asset uses. Parts in it stay, with no category.
  */
 class DeleteAssetCategory
 {
@@ -17,5 +18,6 @@ class DeleteAssetCategory
         }
 
         $category->delete();
+        AssetCategoryDeleted::dispatch($category->id);
     }
 }

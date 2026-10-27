@@ -6,6 +6,7 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import { initializeTheme } from './composables/useAppearance';
+import { installUploadNotice } from './lib/uploadNotice';
 
 // Extra env variables for Vite (import.meta.glob etc. come from vite/client).
 declare global {
@@ -29,6 +30,9 @@ createInertiaApp({
         color: '#4B5563',
     },
 });
+
+// A request over the server's size limit: a Thai message instead of an error window.
+installUploadNotice();
 
 // This will set light / dark mode on page load...
 initializeTheme();

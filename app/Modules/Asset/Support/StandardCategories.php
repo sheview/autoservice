@@ -3,9 +3,10 @@
 namespace App\Modules\Asset\Support;
 
 /**
- * The standard asset categories of an MA company (Network / PC / Data Center): what a new company
- * starts with (CreateTenant) and what an existing one may add when missing (AddStandardCategories).
- * Each company then changes or adds its own; nothing here is kept in step afterwards.
+ * The standard categories of an MA company (Network / PC / Data Center), shared by assets and
+ * parts: what a new company starts with (CreateTenant) and what an existing one may pick from when
+ * missing (AddStandardCategories). The everyday ones come first. Each company then changes or adds
+ * its own; nothing here is kept in step afterwards. PM templates find them by code prefix.
  */
 class StandardCategories
 {
@@ -22,14 +23,43 @@ class StandardCategories
         $ip = self::field('mgmt_ip', 'IP สำหรับจัดการ');
         $firmware = self::field('firmware', 'เวอร์ชัน Firmware');
 
+        $capacity = self::field('capacity_gb', 'ความจุ (GB)', 'number');
+
         return [
-            self::category('คอมพิวเตอร์ตั้งโต๊ะ', 'PC', 'pc', [$cpu, $ram, $storage, $os]),
-            self::category('โน้ตบุ๊ก', 'NB', 'pc', [$cpu, $ram, $storage, $os]),
-            self::category('จอภาพ', 'MON', 'pc', [self::field('size_inch', 'ขนาด (นิ้ว)', 'number')]),
-            self::category('เครื่องพิมพ์', 'PR', 'pc', [
+            self::category('Access Point', 'AP', 'network', [
+                self::field('wifi_standard', 'มาตรฐาน Wi-Fi', 'select', ['Wi-Fi 5', 'Wi-Fi 6', 'Wi-Fi 6E', 'Wi-Fi 7']),
+                $ip,
+            ]),
+            self::category('Adapter', 'ADP', 'pc', []),
+            self::category('Flashdrive', 'FD', 'pc', [$capacity]),
+            self::category('Keyboard', 'KB', 'pc', []),
+            self::category('Mouse', 'MS', 'pc', []),
+            self::category('Notebook', 'NB', 'pc', [$cpu, $ram, $storage, $os]),
+            self::category('Portable', 'PTB', 'pc', [$capacity]),
+            self::category('Power Supply', 'PSU', 'pc', [self::field('watt', 'กำลังไฟ (W)', 'number')]),
+            self::category('Printer', 'PR', 'pc', [
                 self::field('print_type', 'ประเภทการพิมพ์', 'select', ['เลเซอร์ขาวดำ', 'เลเซอร์สี', 'อิงค์เจ็ท', 'ดอตเมทริกซ์', 'เครื่องพิมพ์ฉลาก']),
                 self::field('connection', 'การเชื่อมต่อ', 'select', ['USB', 'LAN', 'Wi-Fi']),
             ]),
+            self::category('RAM', 'RAM', 'pc', [$capacity, self::field('ram_type', 'ชนิด', 'select', ['DDR3', 'DDR4', 'DDR5'])]),
+            self::category('Server', 'SV', 'datacenter', [$cpu, $ram, $storage, self::field('rack', 'ตำแหน่ง Rack (เช่น R1-U12)'), $ip]),
+            self::category('Software', 'LIC', 'pc', [
+                self::field('seats', 'จำนวนสิทธิ์ใช้งาน', 'number', required: true),
+                self::field('license_key', 'License Key'),
+                self::field('license_expires_on', 'วันหมดอายุ License', 'date'),
+            ], 'software'),
+            self::category('SSD/HDD', 'DSK', 'pc', [$capacity]),
+            self::category('Switch', 'SW', 'network', [
+                self::field('ports', 'จำนวนพอร์ต', 'number', required: true),
+                self::field('layer', 'Layer', 'select', ['L2', 'L3']),
+                self::field('poe', 'PoE', 'select', ['มี', 'ไม่มี']),
+                $ip,
+                $firmware,
+            ]),
+            self::category('Toner', 'TN', 'pc', []),
+            self::category('จอ Monitor', 'MON', 'pc', [self::field('size_inch', 'ขนาด (นิ้ว)', 'number')]),
+            self::category('วัสดุสิ้นเปลือง', 'CSM', 'pc', []),
+            self::category('คอมพิวเตอร์ตั้งโต๊ะ', 'PC', 'pc', [$cpu, $ram, $storage, $os]),
             self::category('อุปกรณ์สำนักงาน', 'OE', 'pc', [
                 self::field('equipment_type', 'ประเภทอุปกรณ์', 'select', ['เครื่องถ่ายเอกสาร', 'โปรเจกเตอร์', 'สแกนเนอร์', 'โทรศัพท์ IP', 'อื่น ๆ'], true),
             ]),
@@ -37,20 +67,8 @@ class StandardCategories
                 self::field('capacity_va', 'ขนาด (VA)', 'number', required: true),
                 self::field('battery_changed_on', 'วันที่เปลี่ยนแบตเตอรี่ล่าสุด', 'date'),
             ]),
-            self::category('สวิตช์', 'SW', 'network', [
-                self::field('ports', 'จำนวนพอร์ต', 'number', required: true),
-                self::field('layer', 'Layer', 'select', ['L2', 'L3']),
-                self::field('poe', 'PoE', 'select', ['มี', 'ไม่มี']),
-                $ip,
-                $firmware,
-            ]),
             self::category('เราเตอร์', 'RT', 'network', [$ip, $firmware]),
             self::category('ไฟร์วอลล์', 'FW', 'network', [$ip, $firmware, self::field('license_expires_on', 'วันหมดอายุ License', 'date')]),
-            self::category('Access Point', 'AP', 'network', [
-                self::field('wifi_standard', 'มาตรฐาน Wi-Fi', 'select', ['Wi-Fi 5', 'Wi-Fi 6', 'Wi-Fi 6E', 'Wi-Fi 7']),
-                $ip,
-            ]),
-            self::category('เซิร์ฟเวอร์', 'SV', 'datacenter', [$cpu, $ram, $storage, self::field('rack', 'ตำแหน่ง Rack (เช่น R1-U12)'), $ip]),
             self::category('อุปกรณ์จัดเก็บและสำรองข้อมูล (Backup & Storage)', 'STO', 'datacenter', [
                 self::field('capacity_tb', 'ความจุ (TB)', 'number'),
                 self::field('raid', 'RAID', 'select', ['RAID 0', 'RAID 1', 'RAID 5', 'RAID 6', 'RAID 10', 'อื่น ๆ']),
@@ -123,11 +141,6 @@ class StandardCategories
             self::category('ห้องควบคุม (Control Room)', 'CTR', 'datacenter', [
                 self::field('displays', 'จำนวนจอแสดงผล', 'number'),
             ]),
-            self::category('ซอฟต์แวร์ลิขสิทธิ์', 'LIC', 'pc', [
-                self::field('seats', 'จำนวนสิทธิ์ใช้งาน', 'number', required: true),
-                self::field('license_key', 'License Key'),
-                self::field('license_expires_on', 'วันหมดอายุ License', 'date'),
-            ], 'software'),
         ];
     }
 

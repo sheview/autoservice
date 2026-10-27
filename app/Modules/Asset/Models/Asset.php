@@ -61,6 +61,8 @@ class Asset extends Model implements HasMedia
         'location',
         'floor',
         'room',
+        // Where the company keeps it (its store), apart from where it is installed (location).
+        'storage_location_id',
         'ip_address',
         'mac_address',
         'used_by',
@@ -111,6 +113,11 @@ class Asset extends Model implements HasMedia
     public function category(): BelongsTo
     {
         return $this->belongsTo(AssetCategory::class, 'category_id')->withTrashed();
+    }
+
+    public function storageLocation(): BelongsTo
+    {
+        return $this->belongsTo(StorageLocation::class)->withTrashed();
     }
 
     public function serials(): HasMany

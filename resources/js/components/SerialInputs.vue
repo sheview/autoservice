@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import { t } from '@/lib/i18n';
 import { computed, nextTick, ref, watch } from 'vue';
 
@@ -59,6 +60,15 @@ const onPaste = (index: number, event: ClipboardEvent) => {
     focus(Math.min(index + lines.length, rows.value - 1));
 };
 
+// A serial read by the camera: into the first empty box (a new one when there is no count), once.
+const addScanned = (serial: string) => {
+    if (model.value.some((value) => value.trim().toLowerCase() === serial.toLowerCase())) return;
+    const empty = model.value.findIndex((value) => value.trim() === '');
+    const index = empty >= 0 ? empty : model.value.length;
+    if (props.count != null && index >= props.count) return;
+    set(index, serial);
+};
+
 const clear = () => {
     model.value = props.count != null ? Array.from({ length: props.count }, () => '') : [];
     focus(0);
@@ -76,6 +86,8 @@ const clear = () => {
                 · <button type="button" class="underline-offset-4 hover:underline" @click="clear">{{ t('part_units.clear') }}</button>
             </span>
         </div>
+        <!-- Camera: one piece after another into the boxes -->
+        <BarcodeScanButton continuous :label="t('scan_camera.serials')" :hint="t('scan_camera.hint_serials')" @scanned="addScanned" />
         <div class="grid max-h-80 gap-1.5 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
             <div v-for="index in rows" :key="index" class="flex items-center gap-2">
                 <span class="w-8 shrink-0 text-right text-xs text-muted-foreground">{{ index }}.</span>

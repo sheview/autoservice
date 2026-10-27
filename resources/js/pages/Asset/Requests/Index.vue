@@ -21,6 +21,8 @@ type Tab = 'requests' | 'approve' | 'fulfill' | 'backorders' | 'returns';
 
 interface Filters {
     tab: Tab;
+    // Parts issued or assets lent (all = both).
+    kind: 'all' | 'part' | 'asset';
     search: string;
     status: string;
     overdue: boolean;
@@ -144,6 +146,26 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
             </p>
 
             <SerialHits :hits="serialHits" />
+
+            <!-- What kind of line: all / parts issued / assets lent (returns are assets only) -->
+            <div
+                v-if="filters.tab !== 'returns'"
+                class="inline-flex flex-wrap gap-1 rounded-lg bg-muted p-1"
+                role="group"
+                :aria-label="t('requests.kinds_label')"
+            >
+                <button
+                    v-for="kind in ['all', 'part', 'asset'] as const"
+                    :key="kind"
+                    type="button"
+                    class="rounded-md px-3 py-1.5 text-sm"
+                    :class="filters.kind === kind ? 'bg-background font-semibold shadow-sm' : 'text-muted-foreground hover:text-foreground'"
+                    :aria-pressed="filters.kind === kind"
+                    @click="filters.kind = kind"
+                >
+                    {{ t(`requests.kinds.${kind}`) }}
+                </button>
+            </div>
 
             <nav v-if="tabs.length > 1" class="flex flex-wrap gap-1 border-b" :aria-label="t('requests.tabs_label')">
                 <button

@@ -34,7 +34,7 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
 
     public function query(): Builder
     {
-        return $this->query->with(['category:id,name', 'branch:id,code,name', 'serials', 'parent:id,asset_code']);
+        return $this->query->with(['category:id,name', 'branch:id,code,name', 'serials', 'parent:id,asset_code', 'storageLocation:id,name']);
     }
 
     public function headings(): array
@@ -74,6 +74,7 @@ class AssetsExport implements FromQuery, ShouldAutoSize, WithHeadings, WithMappi
             $asset->notes,
             $asset->parent?->asset_code,
             implode(AssetSheet::SERIAL_SEPARATOR, $this->contractNos[$asset->id] ?? []) ?: null,
+            $asset->storageLocation?->name,
         ];
 
         foreach (array_keys($this->specFields) as $key) {

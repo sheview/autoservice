@@ -2,23 +2,24 @@
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Asset\Actions\CategoryOptions;
 use App\Modules\Inventory\Models\Part;
-use App\Modules\Inventory\Models\PartCategory;
 use Illuminate\Support\Facades\DB;
 
 /**
  * Creates or updates a part of the current tenant. Stock is not touched here (RecordStockMovement).
  * A new part with no code gets the next free one ("PT-00001", GeneratePartCode).
- * A new part is followed by serial number when asked, else as its category says; an existing
+ * A new part is followed by serial number when asked, else as its category (an asset category,
+ * requires_serial) says; an existing
  * part changes that only through StartTrackingSerials / StopTrackingSerials.
  */
 class SavePart
 {
-    public function __construct(private GeneratePartCode $generateCode) {}
+    public function __construct(private GeneratePartCode $generateCode, private CategoryOptions $categories) {}
 
     /**
      * @param  array{code?: string|null, name: string, unit: string, part_number?: string|null, brand?: string|null,
-     *     min_qty?: int|null, unit_cost?: int|null, is_active?: bool, notes?: string|null, part_category_id?: int|null,
+     *     min_qty?: int|null, unit_cost?: int|null, is_active?: bool, notes?: string|null, asset_category_id?: int|null, storage_location_id?: int|null,
      *     track_serial?: bool|null}  $data  unit_cost in satang
      */
     public function handle(?Part $part, array $data): Part
@@ -36,7 +37,7 @@ class SavePart
             $part = new Part;
             $part->track_serial = isset($data['track_serial'])
                 ? (bool) $data['track_serial']
-                : (bool) (filled($data['part_category_id'] ?? null) ? PartCategory::query()->find($data['part_category_id'])?->track_serial : false);
+                : (bool) (collect($this->categories->handle())->firstWhere('id', (int) ($data['asset_category_id'] ?? 0))['requires_serial'] ?? false);
         }
         unset($data['track_serial']);
         $data['code'] = strtoupper(trim($data['code']));

@@ -5,6 +5,7 @@ namespace App\Modules\Document\Http\Concerns;
 use App\Modules\Document\Actions\DeletePhotoSlot;
 use App\Modules\Document\Actions\SavePhotoSlot;
 use App\Modules\Document\Support\PhotoSlots;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Spatie\MediaLibrary\HasMedia;
@@ -17,13 +18,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 trait ServesPhotoSlots
 {
-    protected function storePhoto(Request $request, HasMedia $model, int $slot): RedirectResponse
+    /** The page uploads with fetch and asks for JSON (422 on a bad file); a plain form post goes back. */
+    protected function storePhoto(Request $request, HasMedia $model, int $slot): RedirectResponse|JsonResponse
     {
         $request->validate(['photo' => PhotoSlots::FILE_RULES], attributes: ['photo' => __('ui.photos.field')]);
 
         app(SavePhotoSlot::class)->handle($model, $slot, $request->file('photo'));
 
-        return back()->with('success', __('ui.photos.saved'));
+        return $request->expectsJson()
+            ? response()->json(['message' => __('ui.photos.saved')])
+            : back()->with('success', __('ui.photos.saved'));
     }
 
     protected function showPhoto(HasMedia $model, int $slot): StreamedResponse

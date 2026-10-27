@@ -1,7 +1,6 @@
 <?php
 
 use App\Modules\Inventory\Models\Part;
-use App\Modules\Inventory\Models\PartCategory;
 use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\PartUnitEvent;
 use App\Modules\Inventory\Models\StockMovement;
@@ -137,18 +136,16 @@ it('leaves tracking settings to whoever holds parts.serials', function () {
 
     $this->actingAs($keeper)->get("/parts/{$ram->id}/serials/start")->assertForbidden();
     $this->actingAs($keeper)->post("/parts/{$this->part->id}/serials/stop")->assertForbidden();
-    $this->actingAs($keeper)->get('/part-categories')->assertForbidden();
     // The store still receives and takes pieces off.
     ($this->move)(['type' => 'receive', 'serials' => ['SN-1']], $keeper)->assertSessionHasNoErrors();
 });
 
 it('gives new parts the setting of their category, which each part may change', function () {
-    $this->actingAs($this->admin)->post('/part-categories', ['name' => 'HDD/SSD', 'track_serial' => true])->assertSessionHasNoErrors();
-    $this->actingAs($this->admin)->post('/part-categories', ['name' => 'hdd/ssd'])->assertSessionHasErrors('name');
-    $category = PartCategory::sole();
+    // Parts share the asset categories: one that requires serials starts its new parts tracked.
+    $category = createAssetCategory(['name' => 'SSD/HDD', 'requires_serial' => true]);
 
-    $this->actingAs($this->admin)->post('/parts', ['code' => 'NEW1', 'name' => 'Disk', 'unit' => 'pcs', 'part_category_id' => $category->id]);
-    $this->actingAs($this->admin)->post('/parts', ['code' => 'NEW2', 'name' => 'Disk', 'unit' => 'pcs', 'part_category_id' => $category->id, 'track_serial' => false]);
+    $this->actingAs($this->admin)->post('/parts', ['code' => 'NEW1', 'name' => 'Disk', 'unit' => 'pcs', 'asset_category_id' => $category->id]);
+    $this->actingAs($this->admin)->post('/parts', ['code' => 'NEW2', 'name' => 'Disk 2', 'unit' => 'pcs', 'asset_category_id' => $category->id, 'track_serial' => false]);
     $this->actingAs($this->admin)->post('/parts', ['code' => 'NEW3', 'name' => 'Cable', 'unit' => 'pcs']);
 
     expect(Part::where('code', 'NEW1')->value('track_serial'))->toBeTrue()

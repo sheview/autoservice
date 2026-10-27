@@ -17,6 +17,18 @@ it('creates a customer with an upper-case code', function () {
         ->toBe(['code' => 'ACME-01', 'name' => 'บริษัท แอคมี จำกัด', 'tenant_id' => $this->tenant->id]);
 });
 
+it('gives a new customer the next CUST code when none is typed, and keeps the code when editing', function () {
+    createCustomer(['code' => 'CUST007']);
+    createCustomer(['code' => 'ACME']);
+
+    $this->actingAs($this->admin)->post('/customers', ['code' => '', 'name' => 'ลูกค้าใหม่'])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/customers', ['name' => 'ลูกค้าใหม่ 2'])->assertSessionHasNoErrors();
+    expect(Customer::where('name', 'like', 'ลูกค้าใหม่%')->orderBy('id')->pluck('code')->all())->toBe(['CUST008', 'CUST009']);
+
+    $customer = Customer::where('code', 'CUST008')->sole();
+    $this->actingAs($this->admin)->put("/customers/{$customer->id}", ['code' => '', 'name' => 'X'])->assertSessionHasErrors('code');
+});
+
 it('rejects a duplicate code ignoring case and a bad e-mail', function () {
     createCustomer(['code' => 'ACME']);
 

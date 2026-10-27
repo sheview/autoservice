@@ -38,6 +38,7 @@ class SearchCheckoutLines
                 ->orWhere('checkout_items.item_code', 'like', "%{$search}%")
                 ->orWhere('checkout_requests.request_no', 'like', "%{$search}%")
                 ->orWhere('checkout_requests.borrower_name', 'like', "%{$search}%")))
+            ->when(($filters['kind'] ?? 'all') !== 'all', fn (Builder $q) => $q->where('checkout_items.item_type', $filters['kind']))
             ->when(! $returns, fn (Builder $q) => $q
                 ->whereIn('checkout_requests.status', CheckoutRequest::OPEN_STATUSES)
                 ->whereIn('checkout_items.status', [CheckoutItem::STATUS_BACKORDERED, CheckoutItem::STATUS_PARTIAL])

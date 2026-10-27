@@ -7,6 +7,7 @@ import ImpersonationBanner from '@/components/ImpersonationBanner.vue';
 import ModuleTabs from '@/components/ModuleTabs.vue';
 import SampleCompanyBanner from '@/components/SampleCompanyBanner.vue';
 import SubscriptionNotice from '@/components/SubscriptionNotice.vue';
+import UploadNotice from '@/components/UploadNotice.vue';
 import type { BreadcrumbItemType } from '@/types';
 
 interface Props {
@@ -28,6 +29,7 @@ withDefaults(defineProps<Props>(), {
             <AppSidebarHeader :breadcrumbs="breadcrumbs" />
             <ModuleTabs />
             <slot />
+            <UploadNotice />
         </AppContent>
     </AppShell>
 </template>

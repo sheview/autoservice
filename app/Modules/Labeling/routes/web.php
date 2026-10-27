@@ -21,6 +21,10 @@ Route::middleware(['auth', 'verified', 'module:asset'])->group(function () {
 Route::get('q/{code}', [QrController::class, 'onHost'])->where('code', '[A-Za-z0-9_-]{1,50}')->middleware('throttle:qr-page')->name('labeling.qr');
 Route::get('t/{company}/q/{code}', [QrController::class, 'onPath'])->where(['company' => '[0-9]{1,10}', 'code' => '[A-Za-z0-9_-]{1,50}'])
     ->middleware('throttle:qr-page')->name('labeling.qr.path');
+// The device's main photo on the public page (same key as the page).
+Route::get('q/{code}/photo', [QrPublicController::class, 'photoOnHost'])->where('code', '[A-Za-z0-9_-]{1,50}')->middleware('throttle:qr-page')->name('labeling.qr.photo');
+Route::get('t/{company}/q/{code}/photo', [QrPublicController::class, 'photoOnPath'])->where(['company' => '[0-9]{1,10}', 'code' => '[A-Za-z0-9_-]{1,50}'])
+    ->middleware('throttle:qr-page')->name('labeling.qr.path.photo');
 // Reporting a problem from the public page (no sign-in).
 Route::post('q/{code}/report', [QrPublicController::class, 'reportOnHost'])->where('code', '[A-Za-z0-9_-]{1,50}')->middleware('throttle:qr-report')->name('labeling.qr.report');
 Route::post('t/{company}/q/{code}/report', [QrPublicController::class, 'reportOnPath'])->where(['company' => '[0-9]{1,10}', 'code' => '[A-Za-z0-9_-]{1,50}'])

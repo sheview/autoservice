@@ -9,11 +9,13 @@ use App\Modules\Asset\Http\Controllers\CheckoutItemController;
 use App\Modules\Asset\Http\Controllers\CheckoutRequestController;
 use App\Modules\Asset\Http\Controllers\IpCheckController;
 use App\Modules\Asset\Http\Controllers\NetworkController;
+use App\Modules\Asset\Http\Controllers\StorageLocationController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(function () {
     // Before the resource, so "export" / "imports" are not taken as an asset ulid.
     Route::get('assets/export', [AssetController::class, 'export'])->name('assets.export');
+    Route::get('assets/duplicates', [AssetController::class, 'duplicates'])->name('assets.duplicates');
     Route::get('assets/imports', [AssetImportController::class, 'index'])->name('imports.index');
     Route::post('assets/imports', [AssetImportController::class, 'store'])->name('imports.store');
     Route::get('assets/imports/template', [AssetController::class, 'template'])->name('imports.template');
@@ -74,6 +76,11 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
         ->whereNumber('attachment')->name('assets.attachments.show');
     Route::delete('assets/{asset}/attachments/{attachment}', [AssetAttachmentController::class, 'destroy'])
         ->whereNumber('attachment')->name('assets.attachments.destroy');
+
+    Route::get('storage-locations', [StorageLocationController::class, 'index'])->name('locations.index');
+    Route::post('storage-locations', [StorageLocationController::class, 'store'])->name('locations.store');
+    Route::put('storage-locations/{location}', [StorageLocationController::class, 'update'])->whereNumber('location')->name('locations.update');
+    Route::delete('storage-locations/{location}', [StorageLocationController::class, 'destroy'])->whereNumber('location')->name('locations.destroy');
 
     Route::post('asset-categories/standard', [AssetCategoryController::class, 'addStandard'])->name('categories.standard');
     Route::resource('asset-categories', AssetCategoryController::class)

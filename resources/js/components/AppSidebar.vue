@@ -47,6 +47,7 @@ import {
     UserCheck,
     UserSearch,
     Users,
+    Warehouse,
     Wrench,
     type LucideIcon,
 } from 'lucide-vue-next';
@@ -96,6 +97,7 @@ const icons: Record<string, LucideIcon> = {
     bell: Bell,
     'book-open': BookOpen,
     'scroll-text': ScrollText,
+    warehouse: Warehouse,
 };
 
 // Built on the server from config/modules.php (permission + enabled modules).

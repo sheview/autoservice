@@ -2,6 +2,7 @@
 
 namespace App\Modules\Asset\Http\Requests;
 
+use App\Modules\Asset\Actions\FindDuplicateAssets;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetSerial;
@@ -91,6 +92,7 @@ class AssetRequest extends FormRequest
             'location' => ['nullable', 'string', 'max:255'],
             'floor' => ['nullable', 'string', 'max:50'],
             'room' => ['nullable', 'string', 'max:100'],
+            'storage_location_id' => ['nullable', 'integer', Rule::exists('storage_locations', 'id')->whereNull('deleted_at')],
             // The asset this one is part of (a monitor's PC); not itself (a loop is checked in after()).
             'parent_asset_id' => ['nullable', 'integer', Rule::notIn(array_filter([$asset?->id])), Rule::exists('assets', 'id')->whereNull('deleted_at')],
             'ip_address' => ['nullable', 'ip'],
@@ -111,7 +113,10 @@ class AssetRequest extends FormRequest
             'quantity' => ['required', 'integer', 'min:1', 'max:'.self::MAX_QUANTITY],
             'unit' => ['nullable', 'string', 'max:30'],
             // Unique including deleted assets, like asset_code (the database index says the same).
-            'property_no' => ['nullable', 'string', 'max:100', Rule::unique('assets', 'property_no')->ignore($asset?->id)],
+            // Not used by another asset: checked in after() (FindDuplicateAssets), naming that asset.
+            'property_no' => ['nullable', 'string', 'max:100'],
+            // A new asset of the same name, brand, model and owner as one there: saved once confirmed.
+            'confirm_duplicate' => ['boolean'],
             'status' => ['required', Rule::in($statuses)],
             'holder_name' => ['nullable', "required_if:status,{$handedOut}", 'string', 'max:255'],
             'handed_out_on' => ['nullable', "required_if:status,{$handedOut}", 'date', 'before_or_equal:today'],
@@ -144,6 +149,7 @@ class AssetRequest extends FormRequest
                 'purchase_price', 'warranty_expires_at', 'notes',
             ])->all(),
             'category_id' => __('asset.columns.category'),
+            'storage_location_id' => __('asset.locations.field'),
             'branch_id' => __('asset.columns.branch'),
             'customer_id' => __('asset.fields.customer'),
             'owner' => __('asset.fields.owner'),
@@ -199,6 +205,7 @@ class AssetRequest extends FormRequest
                 }
             },
             fn (Validator $validator) => $this->checkSerialsTaken($validator),
+            fn (Validator $validator) => $this->checkDuplicates($validator),
             fn (Validator $validator) => $this->checkContracts($validator),
             function (Validator $validator) {
                 $user = $this->user();
@@ -225,7 +232,7 @@ class AssetRequest extends FormRequest
     public function assetData(): array
     {
         $data = collect($this->validated())
-            ->except(['serials', 'attachments', 'owner', 'holder_name', 'handed_out_on', 'contract_ids'])
+            ->except(['serials', 'attachments', 'owner', 'holder_name', 'handed_out_on', 'contract_ids', 'confirm_duplicate'])
             ->all();
         $data['purchase_price'] = Money::toSatang($data['purchase_price'] ?? null);
 
@@ -285,6 +292,35 @@ class AssetRequest extends FormRequest
 
         if (array_diff(array_map('intval', $ids), $allowed) !== []) {
             $validator->errors()->add('contract_ids', __('asset.assets.contract_not_allowed'));
+        }
+    }
+
+    /**
+     * The same device twice (FindDuplicateAssets): an equipment number, IP or MAC another asset has
+     * is refused; a new asset of the same name, brand, model and owner as one there needs
+     * confirm_duplicate. Each message names the asset it repeats.
+     */
+    private function checkDuplicates(Validator $validator): void
+    {
+        $asset = $this->route('asset');
+        $new = ! $asset instanceof Asset;
+        $duplicates = app(FindDuplicateAssets::class)->handle([
+            'property_no' => $this->input('property_no'),
+            'ip_address' => $this->input('ip_address'),
+            'mac_address' => $this->input('mac_address'),
+            'name' => $this->input('name'),
+            'brand' => $this->input('brand'),
+            'model' => $this->input('model'),
+            'customer_id' => $this->input('customer_id'),
+        ], $new ? null : $asset->id, $new && ! $this->boolean('confirm_duplicate'));
+
+        foreach ($duplicates as $duplicate) {
+            foreach ($duplicate['reasons'] as $reason) {
+                $field = $reason === 'same_model' ? 'duplicate' : $reason;
+                if (! $validator->errors()->has($field)) {
+                    $validator->errors()->add($field, __("asset.assets.duplicate_{$reason}", ['code' => $duplicate['asset_code'], 'name' => $duplicate['name']]));
+                }
+            }
         }
     }
 

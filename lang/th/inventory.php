@@ -71,6 +71,13 @@ return [
 
     'parts' => [
         'created' => 'เพิ่มอะไหล่เรียบร้อยแล้ว',
+        'initial_note' => 'รับเข้าตอนสร้างรายการ',
+        'duplicate_name' => 'ชื่อซ้ำกับอะไหล่ :code :name',
+        'duplicate_part_number' => 'Part number ซ้ำกับอะไหล่ :code :name',
+        'initial_needs_serials' => 'อะไหล่นี้ติดตาม Serial Number กรุณากรอก SN ของแต่ละชิ้นแทนจำนวน',
+        'initial_not_tracked' => 'อะไหล่นี้ไม่ได้ติดตาม Serial Number กรุณากรอกเป็นจำนวน',
+        'initial_on_create' => 'รับเข้าเริ่มต้นได้เฉพาะตอนสร้างอะไหล่ ให้บันทึกรับเข้าที่หน้ารายละเอียดแทน',
+        'initial_forbidden' => 'คุณไม่มีสิทธิ์บันทึกรับเข้าสต็อก',
         'updated' => 'บันทึกข้อมูลอะไหล่เรียบร้อยแล้ว',
         'deleted' => 'ลบอะไหล่เรียบร้อยแล้ว',
         'in_stock' => 'ลบไม่ได้ เพราะอะไหล่นี้ยังมีของคงเหลือในคลัง',
@@ -108,13 +115,6 @@ return [
             'stopped' => 'เลิกติดตาม Serial Number ของอะไหล่ :code',
             'corrected' => 'แก้ Serial Number ของอะไหล่ :code จาก :old เป็น :new',
         ],
-    ],
-
-    'categories' => [
-        'created' => 'เพิ่มหมวดอะไหล่แล้ว',
-        'updated' => 'บันทึกหมวดอะไหล่แล้ว',
-        'deleted' => 'ลบหมวดอะไหล่แล้ว',
-        'taken' => 'มีหมวดชื่อนี้อยู่แล้ว',
     ],
 
     'movements' => [
@@ -161,6 +161,9 @@ return [
         'unknown_status' => 'ไม่รู้จักสถานะ ":value"',
         'code_deleted' => 'รหัส :code เป็นของอะไหล่ที่ถูกลบไปแล้ว ใช้ซ้ำไม่ได้',
         'opening_reference' => 'ยอดยกมา (นำเข้า Excel)',
+        'unknown_category' => 'ไม่พบหมวด ":value" (ดูชื่อหมวดที่เมนู ตั้งค่า → หมวดทรัพย์สิน)',
+        'unknown_location' => 'ไม่พบสถานที่จัดเก็บ ":value" (ดูที่เมนู ตั้งค่า → สถานที่จัดเก็บ)',
+        'opening_tracked' => 'หมวดนี้ติดตาม Serial Number จึงนำเข้ายอด "คงเหลือ" ไม่ได้ ให้เว้นว่างแล้วรับเข้าพร้อม SN ที่หน้าอะไหล่',
     ],
 
     // Excel headings (export, template and import).
@@ -175,6 +178,8 @@ return [
         'qty_on_hand' => 'คงเหลือ',
         'status' => 'สถานะ',
         'notes' => 'หมายเหตุ',
+        'category' => 'หมวด',
+        'storage_location' => 'สถานที่จัดเก็บ',
     ],
 
     'statuses' => [
@@ -208,7 +213,11 @@ return [
         'reference' => 'เลขที่เอกสาร',
         'note' => 'หมายเหตุ',
         'part_id' => 'อะไหล่',
-        'part_category_id' => 'หมวดอะไหล่',
+        'asset_category_id' => 'หมวด',
+        'storage_location_id' => 'สถานที่จัดเก็บ',
+        'initial_qty' => 'จำนวนรับเข้าเริ่มต้น',
+        'initial_serials' => 'Serial Number รับเข้าเริ่มต้น',
+        'initial_serials.*' => 'Serial Number',
         'track_serial' => 'ติดตาม Serial Number',
         'serials' => 'Serial Number',
         'serial_number' => 'Serial Number',

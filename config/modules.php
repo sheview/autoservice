@@ -43,6 +43,18 @@ return [
         ['group' => 'service', 'title' => 'nav.room_access', 'route' => 'room-access.requests.index', 'icon' => 'door-open', 'permission' => 'room-access.view', 'module' => 'room_access', 'staff' => true, 'company' => true],
         ['group' => 'service', 'title' => 'nav.ip_check', 'route' => 'asset.ip-check', 'icon' => 'network', 'permission' => 'ip-check.view', 'module' => 'asset', 'staff' => true],
 
+        ['group' => 'assets', 'title' => 'nav.assets', 'route' => 'asset.assets.index', 'icon' => 'hard-drive', 'permission' => 'assets.view', 'module' => 'asset'],
+        ['group' => 'assets', 'title' => 'nav.labels', 'route' => 'labeling.labels.index', 'icon' => 'qr-code', 'permission' => 'labels.view', 'module' => 'labeling', 'staff' => true],
+
+        ['group' => 'stock', 'title' => 'nav.parts', 'route' => 'inventory.parts.index', 'icon' => 'package', 'permission' => 'parts.view', 'module' => 'inventory', 'staff' => true],
+        ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock-movements.view', 'module' => 'inventory', 'staff' => true],
+        ['group' => 'stock', 'title' => 'nav.purchase_requests', 'route' => 'inventory.purchase-requests.index', 'icon' => 'shopping-cart', 'permission' => 'purchase-requests.view', 'module' => 'inventory', 'staff' => true],
+        // Parts and assets other companies share with this one (Platform\CrossTenant).
+        ['group' => 'stock', 'title' => 'nav.shared_search', 'route' => 'platform.shared-search', 'icon' => 'scan-search', 'permission' => ['parts.view', 'assets.view'], 'shared' => ['parts.view', 'assets.view'], 'staff' => true, 'company' => true],
+
+        // Issuing parts and lending assets: one page, narrowed to parts or assets by its own tabs.
+        ['group' => 'checkouts', 'title' => 'nav.checkouts', 'route' => 'asset.requests.index', 'icon' => 'hand-helping', 'permission' => 'asset-checkouts.view', 'module' => 'asset', 'staff' => true],
+
         // Preventive maintenance: work orders opened for a contract (or cut from a plan, when rounds should be made
         // ahead), checked, approved and reported to customers.
         // "tab" = shown as a tab bar on top of the pages ("{set}.{tab}"): the sidebar keeps only the first
@@ -52,30 +64,19 @@ return [
         // work orders and the field pages still open by their own permissions).
         // "pinned": also in the sidebar (used every day), besides the set's first page.
         ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_dashboard', 'route' => 'maintenance.dashboard', 'icon' => 'gauge', 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
-        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'pinned' => true, 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
         // Customer accounts see their own customer's published reports here.
         ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_customer_reports', 'route' => 'maintenance.customer-reports.index', 'icon' => 'file-text', 'permission' => 'pm-reports.view', 'module' => 'maintenance'],
-        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'pinned' => true, 'permission' => ['pm-visits.create', 'pm-visits.review', 'pm-visits.approve'], 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_plans', 'route' => 'maintenance.plans.index', 'icon' => 'calendar-check', 'pinned' => true, 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => 'maintenance', 'staff' => true],
         // The PM schedule is a view of the one calendar on "งานของฉัน" (the PM work orders list links to it).
         ['group' => 'pm', 'tab' => 'pm.plans', 'title' => 'nav.pm_equipment', 'route' => 'maintenance.equipment.index', 'icon' => 'hard-drive', 'permission' => ['pm-plans.create', 'pm-plans.update'], 'module' => ['maintenance', 'asset'], 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.visits', 'title' => 'nav.pm_visits', 'route' => 'maintenance.visits.index', 'icon' => 'clipboard-list', 'pinned' => true, 'permission' => ['pm-visits.create', 'pm-visits.review', 'pm-visits.approve'], 'module' => 'maintenance', 'staff' => true],
+        ['group' => 'pm', 'tab' => 'pm.overview', 'title' => 'nav.pm_reports', 'route' => 'maintenance.reports.index', 'icon' => 'bar-chart-3', 'pinned' => true, 'permission' => 'pm-reports.view', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_checklists', 'route' => 'maintenance.checklists.index', 'icon' => 'list-checks', 'permission' => 'pm-checklists.manage', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_instruments', 'route' => 'maintenance.instruments.index', 'icon' => 'gauge', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true],
         ['group' => 'pm', 'tab' => 'pm.settings', 'title' => 'nav.pm_settings', 'route' => 'maintenance.settings.edit', 'icon' => 'settings', 'permission' => 'pm-settings.manage', 'module' => 'maintenance', 'staff' => true, 'company' => true],
 
-        ['group' => 'assets', 'title' => 'nav.assets', 'route' => 'asset.assets.index', 'icon' => 'hard-drive', 'permission' => 'assets.view', 'module' => 'asset'],
-        ['group' => 'assets', 'title' => 'nav.checkouts', 'route' => 'asset.requests.index', 'icon' => 'hand-helping', 'permission' => 'asset-checkouts.view', 'module' => 'asset', 'staff' => true],
-        ['group' => 'assets', 'title' => 'nav.asset_categories', 'route' => 'asset.categories.index', 'icon' => 'tags', 'permission' => 'asset-categories.view', 'module' => 'asset'],
-        ['group' => 'assets', 'title' => 'nav.labels', 'route' => 'labeling.labels.index', 'icon' => 'qr-code', 'permission' => 'labels.view', 'module' => 'labeling', 'staff' => true],
-
         ['group' => 'customers', 'title' => 'nav.customers', 'route' => 'contract.customers.index', 'icon' => 'briefcase', 'permission' => 'customers.view', 'module' => 'contract'],
         ['group' => 'customers', 'title' => 'nav.contracts', 'route' => 'contract.contracts.index', 'icon' => 'file-text', 'permission' => 'contracts.view', 'module' => 'contract'],
-
-        ['group' => 'stock', 'title' => 'nav.parts', 'route' => 'inventory.parts.index', 'icon' => 'package', 'permission' => 'parts.view', 'module' => 'inventory', 'staff' => true],
-        ['group' => 'stock', 'title' => 'nav.purchase_requests', 'route' => 'inventory.purchase-requests.index', 'icon' => 'shopping-cart', 'permission' => 'purchase-requests.view', 'module' => 'inventory', 'staff' => true],
-        // Parts and assets other companies share with this one (Platform\CrossTenant).
-        ['group' => 'stock', 'title' => 'nav.shared_search', 'route' => 'platform.shared-search', 'icon' => 'scan-search', 'permission' => ['parts.view', 'assets.view'], 'shared' => ['parts.view', 'assets.view'], 'staff' => true, 'company' => true],
-        ['group' => 'stock', 'title' => 'nav.stock_movements', 'route' => 'inventory.movements.index', 'icon' => 'arrow-left-right', 'permission' => 'stock-movements.view', 'module' => 'inventory', 'staff' => true],
 
         ['group' => 'reports', 'title' => 'nav.reports', 'route' => 'reporting.reports.index', 'icon' => 'bar-chart-3', 'permission' => 'reports.view', 'module' => 'reporting'],
         ['group' => 'reports', 'title' => 'nav.parts_issued', 'route' => 'reporting.parts-issued.index', 'icon' => 'package', 'permission' => 'reports.view', 'module' => ['reporting', 'inventory'], 'staff' => true],
@@ -96,6 +97,9 @@ return [
         ['group' => 'settings', 'tab' => 'settings.service', 'title' => 'nav.server_rooms', 'route' => 'room-access.rooms.index', 'icon' => 'server', 'permission' => 'room-access.manage', 'module' => 'room_access', 'staff' => true, 'company' => true],
         ['group' => 'settings', 'tab' => 'settings.system', 'title' => 'nav.alerts', 'route' => 'platform.alerts.edit', 'icon' => 'bell', 'permission' => 'alerts.manage', 'company' => true],
         ['group' => 'settings', 'tab' => 'settings.system', 'title' => 'nav.activity_log', 'route' => 'platform.activity-log', 'icon' => 'scroll-text', 'permission' => 'activity-log.view'],
+        // Lists behind the drop-downs of assets and parts (both share them).
+        ['group' => 'settings', 'title' => 'nav.asset_categories', 'route' => 'asset.categories.index', 'icon' => 'tags', 'permission' => 'asset-categories.view', 'module' => 'asset'],
+        ['group' => 'settings', 'title' => 'nav.storage_locations', 'route' => 'asset.locations.index', 'icon' => 'warehouse', 'permission' => 'asset-categories.view', 'module' => 'asset'],
 
         ['group' => 'platform', 'title' => 'nav.tenants', 'route' => 'platform.impersonation.index', 'icon' => 'building-2', 'permission' => 'platform.impersonate'],
         ['group' => 'platform', 'title' => 'nav.linked_staff', 'route' => 'platform.linked-staff.index', 'icon' => 'users', 'permission' => 'platform.tenants'],

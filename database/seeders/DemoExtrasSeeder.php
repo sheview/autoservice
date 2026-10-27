@@ -9,6 +9,7 @@ use App\Modules\Asset\Actions\IpRecord;
 use App\Modules\Asset\Actions\RejectCheckoutRequest;
 use App\Modules\Asset\Actions\ReserveIps;
 use App\Modules\Asset\Actions\ReturnCheckoutItem;
+use App\Modules\Asset\Actions\SaveAssetCategory;
 use App\Modules\Asset\Actions\SaveCheckoutRequest;
 use App\Modules\Asset\Actions\SaveNetwork;
 use App\Modules\Asset\Actions\SaveSubnet;
@@ -33,11 +34,9 @@ use App\Modules\Inventory\Actions\ReceivePartUnits;
 use App\Modules\Inventory\Actions\ReceivePurchase;
 use App\Modules\Inventory\Actions\ReturnPartUnits;
 use App\Modules\Inventory\Actions\SavePart;
-use App\Modules\Inventory\Actions\SavePartCategory;
 use App\Modules\Inventory\Actions\SavePurchaseRequest;
 use App\Modules\Inventory\Actions\StartTrackingSerials;
 use App\Modules\Inventory\Models\Part;
-use App\Modules\Inventory\Models\PartCategory;
 use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Labeling\Actions\RecordLabelPrint;
@@ -152,11 +151,13 @@ class DemoExtrasSeeder extends Seeder
         $this->once(RepairPreset::class, fn () => $this->repairPresets());
         $this->once(PersonalEvent::class, fn () => $this->personalEvents($helpdesk, $technicians));
 
-        $this->once(PartCategory::class, function () use ($admin, $technicians) {
+        // Parts sorted into categories once (parts share the asset categories).
+        if (! Part::query()->whereNotNull('asset_category_id')->exists()) {
             $categories = $this->partCategories();
             $serialParts = $this->serialParts($admin, $categories);
             $this->once(PurchaseRequest::class, fn () => $this->purchaseRequests($admin, $technicians[0], $serialParts['nvme']));
-        });
+            Carbon::setTestNow();
+        }
         $this->once(TicketRemovedPart::class, fn () => $this->removedParts());
 
         $this->once(Network::class, fn () => $this->ipam($technicians[0]));
@@ -292,17 +293,19 @@ class DemoExtrasSeeder extends Seeder
     // ---------------------------------------------------------------- Inventory
 
     /**
-     * Three part categories, and the existing parts sorted into them.
+     * Three categories for parts (the company's own when it has one of the name), and the existing
+     * parts sorted into them.
      *
-     * @return array<string, PartCategory>
+     * @return array<string, AssetCategory>
      */
     private function partCategories(): array
     {
-        $save = app(SavePartCategory::class);
+        $category = fn (string $name, bool $serial) => AssetCategory::query()->where('name', $name)->first()
+            ?? app(SaveAssetCategory::class)->handle(null, ['name' => $name, 'requires_serial' => $serial]);
         $categories = [
-            'hardware' => $save->handle(null, ['name' => 'อะไหล่คอมพิวเตอร์และเซิร์ฟเวอร์', 'track_serial' => true]),
-            'network' => $save->handle(null, ['name' => 'อุปกรณ์เครือข่าย', 'track_serial' => true]),
-            'supplies' => $save->handle(null, ['name' => 'วัสดุสิ้นเปลือง', 'track_serial' => false]),
+            'hardware' => $category('อะไหล่คอมพิวเตอร์และเซิร์ฟเวอร์', true),
+            'network' => $category('อุปกรณ์เครือข่าย', true),
+            'supplies' => $category('วัสดุสิ้นเปลือง', false),
         ];
 
         $map = [
@@ -315,7 +318,7 @@ class DemoExtrasSeeder extends Seeder
             // An existing part: code is required and a missing min_qty would become 0.
             app(SavePart::class)->handle($part, [
                 'code' => $part->code, 'name' => $part->name, 'unit' => $part->unit, 'min_qty' => $part->min_qty,
-                'part_category_id' => $categories[$map[$part->code]]->id,
+                'asset_category_id' => $categories[$map[$part->code]]->id,
             ]);
         }
 
@@ -326,7 +329,7 @@ class DemoExtrasSeeder extends Seeder
      * Three parts followed by serial number: two new ones received by serial, and an existing part
      * switched over. One piece of each goes into a ticket's device, and the SFP comes back.
      *
-     * @param  array<string, PartCategory>  $categories
+     * @param  array<string, AssetCategory>  $categories
      * @return array{nvme: Part, sfp: Part, hdd: ?Part}
      */
     private function serialParts(User $admin, array $categories): array
@@ -343,7 +346,7 @@ class DemoExtrasSeeder extends Seeder
         // Tracked because its category says so.
         $nvme = app(SavePart::class)->handle(null, [
             'code' => 'SSD-NVME-1T', 'name' => 'SSD NVMe 1TB', 'brand' => 'Samsung', 'part_number' => 'MZ-V8P1T0BW',
-            'unit' => 'ชิ้น', 'min_qty' => 2, 'unit_cost' => 3290 * 100, 'part_category_id' => $categories['hardware']->id,
+            'unit' => 'ชิ้น', 'min_qty' => 2, 'unit_cost' => 3290 * 100, 'asset_category_id' => $categories['hardware']->id,
         ]);
         $receiveUnits->handle($nvme, $serials('S6WRNJ0T4', 5), $admin, [
             'unit_cost' => 3290 * 100, 'reference' => 'DN-6910021', 'note' => 'รับเข้าตามใบส่งของ',
@@ -353,7 +356,7 @@ class DemoExtrasSeeder extends Seeder
         // Tracked because it was asked for.
         $sfp = app(SavePart::class)->handle(null, [
             'code' => 'SFP-1G-LX', 'name' => 'SFP 1G LX module', 'brand' => 'Cisco', 'part_number' => 'GLC-LH-SMD',
-            'unit' => 'ชิ้น', 'min_qty' => 2, 'unit_cost' => 2100 * 100, 'part_category_id' => $categories['network']->id,
+            'unit' => 'ชิ้น', 'min_qty' => 2, 'unit_cost' => 2100 * 100, 'asset_category_id' => $categories['network']->id,
             'track_serial' => true,
         ]);
         $receiveUnits->handle($sfp, $serials('FNS2231', 4), $admin, [

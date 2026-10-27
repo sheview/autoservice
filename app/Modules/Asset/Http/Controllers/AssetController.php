@@ -8,12 +8,14 @@ use App\Modules\Asset\Actions\AssetStats;
 use App\Modules\Asset\Actions\AssetSuggestions;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
+use App\Modules\Asset\Actions\FindDuplicateAssets;
 use App\Modules\Asset\Actions\IpOfAsset;
 use App\Modules\Asset\Actions\ItemRequestLines;
 use App\Modules\Asset\Actions\MoveAsset;
 use App\Modules\Asset\Actions\SameModelAssets;
 use App\Modules\Asset\Actions\SaveAsset;
 use App\Modules\Asset\Actions\SearchAssets;
+use App\Modules\Asset\Actions\StorageLocationOptions;
 use App\Modules\Asset\Exports\AssetsExport;
 use App\Modules\Asset\Http\Requests\AssetRequest;
 use App\Modules\Asset\Models\Asset;
@@ -39,6 +41,7 @@ use App\Modules\Service\Actions\RemovedPartsOfAsset;
 use App\Modules\Service\Actions\TicketLabels;
 use App\Modules\Service\Actions\TicketsForAsset;
 use App\Modules\Tenancy\Models\Branch;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +99,7 @@ class AssetController extends Controller
             'branches' => $this->branchOptions($user, 'assets.view'),
             'customers' => $this->customers(),
             'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'asset_type']),
+            'locations' => app(StorageLocationOptions::class)->handle($filters['storage_location_id']),
             'assetTypes' => AssetCategory::ASSET_TYPES,
             'statuses' => Asset::STATUSES,
             'expiringDays' => SearchAssets::EXPIRING_DAYS,
@@ -104,6 +108,8 @@ class AssetController extends Controller
                 'create' => $user->can('create', Asset::class),
                 'import' => $user->can('import', Asset::class),
                 'export' => $user->can('export', Asset::class),
+                // Categories and storage locations (Settings), the lists of the drop-downs.
+                'lists' => $user->can('viewAny', AssetCategory::class),
             ],
         ]);
     }
@@ -216,6 +222,9 @@ class AssetController extends Controller
                 'serials' => $asset->serials->pluck('serial_number'),
                 'available' => $available,
                 'category' => $asset->category?->name,
+                'storage_location' => $asset->storage_location_id
+                    ? app(StorageLocationOptions::class)->names([$asset->storage_location_id])[$asset->storage_location_id] ?? null
+                    : null,
                 'branch' => $asset->branch?->name,
                 'customer' => collect($this->customers(withTrashed: true))->firstWhere('id', $asset->customer_id)['name'] ?? null,
                 'purchased_at' => $asset->purchased_at?->toDateString(),
@@ -299,6 +308,24 @@ class AssetController extends Controller
     }
 
     /**
+     * Assets the one on the form would repeat (FindDuplicateAssets), for the form to show while
+     * typing: ?except = the asset edited (then only the blocking checks, as when saving).
+     */
+    public function duplicates(Request $request, FindDuplicateAssets $find): JsonResponse
+    {
+        abort_unless($request->user()->can('create', Asset::class) || $request->user()->can('assets.update'), 403);
+
+        $except = $request->filled('except') ? Asset::where('ulid', $request->string('except'))->value('id') : null;
+        $duplicates = $find->handle($request->only(['property_no', 'ip_address', 'mac_address', 'name', 'brand', 'model', 'customer_id']), $except, $except === null, $request->user());
+
+        return response()->json(array_map(fn (array $asset) => [
+            ...$asset,
+            'url' => $asset['viewable'] ? route('asset.assets.show', $asset['ulid']) : null,
+            'copy_url' => $asset['viewable'] ? route('asset.assets.create', ['from' => $asset['ulid']]) : null,
+        ], $duplicates));
+    }
+
+    /**
      * The assets of the list (same filters) as Excel.
      */
     public function export(Request $request, SearchAssets $search): BinaryFileResponse
@@ -347,6 +374,7 @@ class AssetController extends Controller
             'purchase' => null,
             'maxSerials' => AssetRequest::MAX_SERIALS,
             'categories' => AssetCategory::orderBy('name')->get(['id', 'name', 'code_prefix', 'requires_serial', 'spec_fields']),
+            'locations' => app(StorageLocationOptions::class)->handle($asset?->storage_location_id),
             'branches' => $this->branchOptions($user, $asset ? 'assets.update' : 'assets.create'),
             'customers' => $this->customers(),
             'statuses' => Asset::STATUSES,
@@ -411,7 +439,7 @@ class AssetController extends Controller
         return [
             ...$asset->only([
                 'ulid', 'asset_code', 'name', 'category_id', 'branch_id', 'customer_id', 'brand', 'model', 'subtype',
-                'quantity', 'unit', 'property_no', 'status', 'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes', 'specs',
+                'quantity', 'unit', 'property_no', 'status', 'location', 'storage_location_id', 'ip_address', 'mac_address', 'used_by', 'department', 'notes', 'specs',
             ]),
             'owner' => $asset->customer_id === null ? 'company' : 'customer',
             'serials' => $asset->serials()->pluck('serial_number')->all(),

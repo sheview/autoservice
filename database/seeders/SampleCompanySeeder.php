@@ -14,6 +14,7 @@ use App\Modules\Asset\Actions\ReleaseIp;
 use App\Modules\Asset\Actions\ReserveIps;
 use App\Modules\Asset\Actions\ReturnCheckoutItem;
 use App\Modules\Asset\Actions\SaveAsset;
+use App\Modules\Asset\Actions\SaveAssetCategory;
 use App\Modules\Asset\Actions\SaveCheckoutRequest;
 use App\Modules\Asset\Actions\SaveNetwork;
 use App\Modules\Asset\Actions\SaveSubnet;
@@ -44,7 +45,6 @@ use App\Modules\Inventory\Actions\ReceivePurchase;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\RemovePartUnits;
 use App\Modules\Inventory\Actions\SavePart;
-use App\Modules\Inventory\Actions\SavePartCategory;
 use App\Modules\Inventory\Actions\SavePurchaseRequest;
 use App\Modules\Inventory\Actions\VoidStockReceipt;
 use App\Modules\Inventory\Models\Part;
@@ -506,12 +506,13 @@ class SampleCompanySeeder extends Seeder
             'network' => ['อุปกรณ์เครือข่าย', true],
             'supplies' => ['วัสดุสิ้นเปลือง', false],
             'power' => ['อุปกรณ์ระบบไฟฟ้า', false],
-        ])->map(fn (array $row) => app(SavePartCategory::class)->handle(null, ['name' => $row[0], 'track_serial' => $row[1]]));
+        ])->map(fn (array $row) => AssetCategory::query()->where('name', $row[0])->first()
+            ?? app(SaveAssetCategory::class)->handle(null, ['name' => $row[0], 'requires_serial' => $row[1]]));
 
         foreach (self::PARTS as $i => [$code, $name, $brand, $partNumber, $unit, $minQty, $baht, $received, $category]) {
             $part = app(SavePart::class)->handle(null, [
                 'code' => $code, 'name' => $name, 'brand' => $brand, 'part_number' => $partNumber, 'unit' => $unit,
-                'min_qty' => $minQty, 'unit_cost' => $baht * 100, 'part_category_id' => $categories[$category]->id,
+                'min_qty' => $minQty, 'unit_cost' => $baht * 100, 'asset_category_id' => $categories[$category]->id,
                 // The network category follows serial numbers; these sample parts are counted only.
                 'track_serial' => false,
             ]);
@@ -533,7 +534,7 @@ class SampleCompanySeeder extends Seeder
         $this->at(20, 10);
         $nvme = app(SavePart::class)->handle(null, [
             'code' => 'SSD-NVME-1T', 'name' => 'SSD NVMe 1TB', 'brand' => 'Samsung', 'part_number' => 'MZ-V8P1T0BW', 'unit' => 'ชิ้น',
-            'min_qty' => 2, 'unit_cost' => 3290 * 100, 'part_category_id' => $categories['hardware']->id, 'track_serial' => true,
+            'min_qty' => 2, 'unit_cost' => 3290 * 100, 'asset_category_id' => $categories['hardware']->id, 'track_serial' => true,
         ]);
         app(ReceivePartUnits::class)->handle($nvme, array_map(fn (int $i) => sprintf('S6WRNJ0T4%05d', $i), range(1, 5)), $this->admin(), [
             'unit_cost' => 3290 * 100, 'reference' => 'DN-6910021', 'supplier' => 'บริษัท ไอทีซัพพลาย จำกัด',

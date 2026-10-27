@@ -12,6 +12,10 @@ return [
         'place_required' => 'กรุณาเลือกสาขา หรือกรอกตำแหน่งที่ตั้ง อย่างน้อยหนึ่งอย่าง',
         'serial_required' => 'หมวด :category ต้องกรอก Serial Number อย่างน้อย 1 รายการ',
         'serial_taken' => 'Serial Number :serial ซ้ำกับทรัพย์สิน :code',
+        'duplicate_property_no' => 'เลขครุภัณฑ์ซ้ำกับทรัพย์สิน :code :name',
+        'duplicate_ip_address' => 'IP Address ซ้ำกับทรัพย์สิน :code :name',
+        'duplicate_mac_address' => 'MAC Address ซ้ำกับทรัพย์สิน :code :name',
+        'duplicate_same_model' => 'ชื่อ ยี่ห้อ รุ่น และเจ้าของตรงกับทรัพย์สิน :code :name ถ้าเป็นคนละเครื่องให้ติ๊กยืนยันแล้วบันทึกอีกครั้ง',
         'purchase_serials_needed' => 'หมวด :category ต้องมี Serial Number ครบทุกเครื่อง (:count) ใส่ Serial ตอนรับของ หรือเลือกหมวดอื่น',
         'quantity_below_serials' => 'จำนวนต้องไม่น้อยกว่าจำนวน Serial Number ที่กรอก (:count)',
         'customer_required' => 'กรุณาเลือกลูกค้าที่เป็นเจ้าของทรัพย์สิน หรือเลือก "บริษัท" ถ้าเป็นของบริษัทเอง',
@@ -94,6 +98,16 @@ return [
         ],
     ],
 
+    'locations' => [
+        'created' => 'เพิ่มสถานที่จัดเก็บแล้ว',
+        'updated' => 'บันทึกสถานที่จัดเก็บแล้ว',
+        'deleted' => 'ลบสถานที่จัดเก็บแล้ว',
+        'taken' => 'มีสถานที่ชื่อนี้อยู่แล้ว',
+        'name' => 'ชื่อสถานที่',
+        'notes' => 'หมายเหตุ',
+        'field' => 'สถานที่จัดเก็บ',
+    ],
+
     'categories' => [
         'created' => 'เพิ่มหมวดทรัพย์สินเรียบร้อยแล้ว',
         'updated' => 'บันทึกหมวดทรัพย์สินเรียบร้อยแล้ว',
@@ -123,6 +137,7 @@ return [
         'too_many_rows' => 'ไฟล์มีข้อมูลเกิน :max แถว กรุณาแบ่งเป็นหลายไฟล์',
         'unknown_category' => 'ไม่พบหมวด ":value" — ใช้ชื่อหรือรหัสหมวดตามเมนู "หมวดทรัพย์สิน" หรือเพิ่มหมวดนี้ก่อน',
         'unknown_branch' => 'ไม่พบสาขา ":value"',
+        'unknown_location' => 'ไม่พบสถานที่จัดเก็บ ":value" (ดูที่เมนู ตั้งค่า → สถานที่จัดเก็บ)',
         'unknown_customer' => 'ไม่พบลูกค้า ":value"',
         'unknown_contract' => 'ไม่พบสัญญา ":value" หรือคุณไม่มีสิทธิ์แก้ไขสัญญานี้',
         'contract_other_customer' => 'สัญญา ":value" เป็นของลูกค้ารายอื่น ทรัพย์สินต้องเป็นของลูกค้าเจ้าของสัญญา',
@@ -169,6 +184,7 @@ return [
         'warranty_expires_at' => 'วันหมดประกัน',
         'notes' => 'หมายเหตุ',
         'contracts' => 'สัญญา MA (เลขที่)',
+        'storage_location' => 'สถานที่จัดเก็บ',
     ],
 
     // IP management (เช็ค IP ว่าง)

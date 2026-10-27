@@ -49,7 +49,7 @@ it('redirects to the asset page by ulid', function () {
 
 it('keeps a hand-typed code and skips it when generating', function () {
     $this->actingAs($this->admin)->post('/assets', assetPayload(['asset_code' => 'PC-00001']))->assertSessionHasNoErrors();
-    $this->actingAs($this->admin)->post('/assets', assetPayload())->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post('/assets', assetPayload(['name' => 'PC ฝ่ายขาย']))->assertSessionHasNoErrors();
 
     expect(Asset::orderBy('id')->pluck('asset_code')->all())->toBe(['PC-00001', 'PC-00002']);
 });
