@@ -117,3 +117,41 @@ it('makes the code prefix from the name when none is typed, never twice the same
     $this->actingAs($this->admin)->put("/asset-categories/{$category->id}", ['name' => 'เครื่องพิมพ์เลเซอร์'])->assertSessionHasNoErrors();
     expect($category->fresh()->code_prefix)->toBe('CAT');
 });
+
+it('merges a category that repeats another, moving its assets and parts, then removes it', function () {
+    $old = createAssetCategory(['name' => 'โน้ตบุ๊ก', 'code_prefix' => 'NB']);
+    $new = createAssetCategory(['name' => 'Notebook', 'code_prefix' => 'NOTE']);
+    $asset = createAsset($new, ['asset_code' => 'NOTE-00001']);
+    $part = createPart(['code' => 'NB-BAT', 'asset_category_id' => $new->id]);
+
+    $this->actingAs($this->admin)->post("/asset-categories/{$new->id}/merge", ['into_id' => $new->id])->assertSessionHasErrors('into_id');
+    $this->actingAs($this->admin)->post("/asset-categories/{$new->id}/merge", ['into_id' => $old->id])->assertSessionHasNoErrors();
+
+    expect($asset->fresh()->only(['category_id', 'asset_code']))->toBe(['category_id' => $old->id, 'asset_code' => 'NOTE-00001'])
+        ->and($part->fresh()->asset_category_id)->toBe($old->id)
+        ->and(AssetCategory::pluck('name')->all())->toBe(['โน้ตบุ๊ก']);
+
+    // Only who may manage categories.
+    $this->actingAs(userWithRole('helpdesk'))->post("/asset-categories/{$old->id}/merge", ['into_id' => $old->id])->assertForbidden();
+});
+
+it('removes in one go the picked categories nothing uses, never one in use', function () {
+    $ups = createAssetCategory(['name' => 'เครื่องสำรองไฟ (UPS)', 'code_prefix' => 'UPS']);
+    $keyboard = createAssetCategory(['name' => 'Keyboard', 'code_prefix' => 'KB']);
+    $withAsset = createAssetCategory(['name' => 'เราเตอร์', 'code_prefix' => 'RT']);
+    $withPart = createAssetCategory(['name' => 'สายแลน', 'code_prefix' => 'LAN']);
+    createAsset($withAsset);
+    createPart(['code' => 'LAN-1', 'asset_category_id' => $withPart->id]);
+
+    // Offered: the two unused, the everyday "Keyboard" not ticked by default.
+    $this->actingAs($this->admin)->get('/asset-categories')->assertInertia(fn (Assert $page) => $page
+        ->where('unusedCategories', [
+            ['id' => $keyboard->id, 'label' => 'Keyboard (KB)', 'suggested' => false],
+            ['id' => $ups->id, 'label' => 'เครื่องสำรองไฟ (UPS) (UPS)', 'suggested' => true],
+        ]));
+
+    $this->actingAs($this->admin)->post('/asset-categories/remove-unused', ['ids' => [$ups->id, $withAsset->id, $withPart->id]])
+        ->assertSessionHas('success', 'ลบหมวดที่ไม่ได้ใช้ 1 หมวดแล้ว');
+
+    expect(AssetCategory::orderBy('name')->pluck('name')->all())->toBe(['Keyboard', 'สายแลน', 'เราเตอร์']);
+});

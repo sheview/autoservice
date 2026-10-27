@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Modules\Asset\Actions\AddStandardCategories;
 use App\Modules\Asset\Actions\ApproveCheckoutRequest;
 use App\Modules\Asset\Actions\AssignIp;
 use App\Modules\Asset\Actions\BackorderCheckoutItem;
@@ -51,6 +52,7 @@ use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Labeling\Actions\RecordLabelPrint;
+use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Maintenance\Actions\CreatePmReportShare;
 use App\Modules\Maintenance\Actions\CreatePmWorkOrder;
 use App\Modules\Maintenance\Actions\CreateTemplateVersion;
@@ -251,7 +253,13 @@ class SampleCompanySeeder extends Seeder
                 ]);
                 // A training company: banner on every page, nothing ever sent out (TenancyServiceProvider).
                 $tenant->forceFill(['is_sample' => true])->save();
-                $this->context->run($tenant, fn () => $this->seedTenant());
+                $this->context->run($tenant, function () {
+                    // A new company starts with the everyday categories; the training one shows every
+                    // kind of equipment (data center too), with their PM templates.
+                    app(AddStandardCategories::class)->handle();
+                    app(AddStandardChecklists::class)->handle();
+                    $this->seedTenant();
+                });
             });
         } finally {
             Carbon::setTestNow();

@@ -83,6 +83,8 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::delete('storage-locations/{location}', [StorageLocationController::class, 'destroy'])->whereNumber('location')->name('locations.destroy');
 
     Route::post('asset-categories/standard', [AssetCategoryController::class, 'addStandard'])->name('categories.standard');
+    Route::post('asset-categories/remove-unused', [AssetCategoryController::class, 'removeUnused'])->name('categories.remove-unused');
+    Route::post('asset-categories/{category}/merge', [AssetCategoryController::class, 'merge'])->whereNumber('category')->name('categories.merge');
     Route::resource('asset-categories', AssetCategoryController::class)
         ->except(['show'])
         ->parameters(['asset-categories' => 'category'])

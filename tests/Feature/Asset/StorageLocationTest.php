@@ -104,3 +104,21 @@ it('keeps each company to its own locations', function () {
 
     asTenant($other, fn () => expect(StorageLocation::sole()->name)->toBe('คลังของเขา'));
 });
+
+it('keeps an asset at the storage location its location names, picked or typed', function () {
+    $store = StorageLocation::create(['name' => 'ห้อง Store ชั้น 4']);
+    $category = createAssetCategory(['name' => 'Switch', 'code_prefix' => 'SW']);
+    $post = fn (string $location, string $name) => $this->actingAs($this->admin)->post('/assets', [
+        'category_id' => $category->id, 'name' => $name, 'status' => 'in_use', 'owner' => 'company', 'location' => $location,
+    ]);
+
+    $post(' ห้อง store ชั้น 4 ', 'A')->assertSessionHasNoErrors();
+    $post('ห้องบัญชีที่ลูกค้า', 'B')->assertSessionHasNoErrors();
+    expect(Asset::where('name', 'A')->sole()->storage_location_id)->toBe($store->id)
+        ->and(Asset::where('name', 'B')->sole()->storage_location_id)->toBeNull();
+
+    // Moved from its QR page: the same rule.
+    $b = Asset::where('name', 'B')->sole();
+    $this->actingAs($this->admin)->post("/assets/{$b->ulid}/move", ['location' => 'ห้อง Store ชั้น 4'])->assertSessionHasNoErrors();
+    expect($b->fresh()->storage_location_id)->toBe($store->id);
+});

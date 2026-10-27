@@ -3,6 +3,7 @@
 use App\Modules\Asset\Actions\AddStandardCategories;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Support\StandardCategories;
+use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmTemplateAssignment;
@@ -68,14 +69,17 @@ it('adds the standard templates of the categories the company has, never over it
     $this->actingAs(userWithRole('helpdesk'))->post('/pm-checklists/standard')->assertForbidden();
 });
 
-it('gives a new company the standard templates with its categories', function () {
+it('gives a new company the standard templates of the categories it starts with', function () {
     $this->actingAs(createSuperadmin())->post('/platform/tenants', [
         'name' => 'บริษัท ใหม่ จำกัด', 'subdomain' => 'newco', 'status' => 'active',
         'admin_name' => 'คุณสมชาย', 'admin_email' => 'admin@newco.test',
         'admin_password' => 'Password-123', 'admin_password_confirmation' => 'Password-123',
     ])->assertSessionHasNoErrors();
 
-    asTenant(Tenant::where('subdomain', 'newco')->sole(), fn () => expect(PmChecklist::count())->toBe(count(StandardTemplates::all())));
+    // Every template its (everyday) categories call for, none left to add; the data center ones come with those categories.
+    asTenant(Tenant::where('subdomain', 'newco')->sole(), fn () => expect(PmChecklist::count())->toBeGreaterThan(0)
+        ->and(app(AddStandardChecklists::class)->missing())->toBe([])
+        ->and(PmChecklist::where('code', 'NW-SWITCH')->exists())->toBeTrue());
 });
 
 it('lists the equipment under PM with its last and next PM', function () {

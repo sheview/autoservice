@@ -159,7 +159,6 @@ const details: [string, (a: AssetDetail) => string | null][] = [
     ['branch', (a) => a.branch ?? t('assets.no_branch')],
     ['customer', (a) => a.customer ?? t('assets.owner_company')],
     ['location', (a) => a.location],
-    ['storage_location', (a) => a.storage_location],
     ['used_by', (a) => [a.used_by, a.department].filter(Boolean).join(' · ') || null],
     ['ip_address', (a) => a.ip_address],
     ['mac_address', (a) => a.mac_address],

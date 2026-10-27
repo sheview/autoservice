@@ -4,6 +4,7 @@ namespace App\Modules\Labeling\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetCard;
+use App\Modules\Asset\Actions\StorageLocationOptions;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Contract\Actions\ListCustomers;
@@ -98,6 +99,7 @@ class QrController extends Controller
             'openTickets' => $open,
             'history' => $tickets->filter(fn (array $t) => in_array($t['status'], [Ticket::STATUS_RESOLVED, Ticket::STATUS_CLOSED], true))->take(5)->values(),
             'branches' => $user->can('move', $asset) ? Branch::orderBy('name')->get(['id', 'name']) : [],
+            'locations' => $user->can('move', $asset) ? app(StorageLocationOptions::class)->handle() : [],
             'publicUrl' => PublicUrl::forTenant($tenant, '/q/'.rawurlencode($card['asset_code'])),
             'can' => [
                 'openTicket' => $serviceOn && $user->can('tickets.create'),

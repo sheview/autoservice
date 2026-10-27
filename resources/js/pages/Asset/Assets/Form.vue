@@ -503,17 +503,13 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
                         <div class="grid content-start gap-2">
                             <Label for="location">{{ t('assets.location') }}</Label>
-                            <Input id="location" v-model="form.location" />
+                            <!-- Picked from the storage locations (Settings) or typed: a name of the list is kept as that location -->
+                            <Input id="location" v-model="form.location" list="location_options" autocomplete="off" :placeholder="t('assets.location_placeholder')" />
+                            <datalist id="location_options">
+                                <option v-for="location in locations" :key="location.id" :value="location.name" />
+                            </datalist>
+                            <p class="text-xs text-muted-foreground">{{ t('assets.location_hint') }}</p>
                             <InputError :message="form.errors.location" />
-                        </div>
-
-                        <div class="grid content-start gap-2">
-                            <Label for="storage_location_id">{{ t('storage_locations.field') }}</Label>
-                            <select id="storage_location_id" v-model="form.storage_location_id" :class="selectClass">
-                                <option :value="null">{{ t('storage_locations.no_location') }}</option>
-                                <option v-for="location in locations" :key="location.id" :value="location.id">{{ location.name }}</option>
-                            </select>
-                            <InputError :message="form.errors.storage_location_id" />
                         </div>
                     </div>
                 </section>

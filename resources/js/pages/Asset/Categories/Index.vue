@@ -39,7 +39,30 @@ const props = defineProps<{
     can: { create: boolean; update: boolean; delete: boolean };
     // Standard categories the company does not have yet (names).
     standardMissing: string[];
+    // Every category, to merge one that repeats another (empty without asset-categories.manage).
+    allCategories: { id: number; name: string; code_prefix: string }[];
+    // Categories nothing uses; "suggested" ones (not an everyday standard name) start ticked.
+    unusedCategories: { id: number; label: string; suggested: boolean }[];
 }>();
+
+const toRemove = ref<number[]>(props.unusedCategories.filter((c) => c.suggested).map((c) => c.id));
+const removeUnused = () => {
+    if (!toRemove.value.length || !confirm(t('asset_categories.unused_confirm', { count: toRemove.value.length }))) return;
+    router.post(route('asset.categories.remove-unused'), { ids: toRemove.value }, { preserveScroll: true });
+};
+
+// Merging a category that repeats another: everything in "from" moves to "into", then "from" goes.
+const merge = ref<{ from: number | null; into: number | null }>({ from: null, into: null });
+const categoryLabel = (id: number | null) => {
+    const category = props.allCategories.find((c) => c.id === id);
+    return category ? `${category.name} (${category.code_prefix})` : '';
+};
+const submitMerge = () => {
+    const { from, into } = merge.value;
+    if (!from || !into || from === into) return;
+    if (!confirm(t('asset_categories.merge_confirm', { from: categoryLabel(from), into: categoryLabel(into) }))) return;
+    router.post(route('asset.categories.merge', from), { into_id: into }, { preserveScroll: true, onSuccess: () => (merge.value = { from: null, into: null }) });
+};
 
 // Standard categories ticked to add (all to start with).
 const picked = ref<string[]>([...props.standardMissing]);
@@ -113,6 +136,59 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     </label>
                 </div>
             </div>
+
+            <!-- Categories nothing uses: tick and remove in one go -->
+            <details v-if="unusedCategories.length" class="rounded-lg border">
+                <summary class="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium">
+                    {{ t('asset_categories.unused_title', { count: unusedCategories.length }) }}
+                </summary>
+                <div class="space-y-3 border-t p-4">
+                    <p class="text-xs text-muted-foreground">{{ t('asset_categories.unused_hint') }}</p>
+                    <div class="grid gap-x-4 gap-y-1.5 sm:grid-cols-2 lg:grid-cols-3">
+                        <label v-for="c in unusedCategories" :key="c.id" class="flex min-h-9 items-center gap-2 text-sm">
+                            <input v-model="toRemove" type="checkbox" :value="c.id" class="size-4 rounded border-input" />
+                            {{ c.label }}
+                        </label>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <Button type="button" variant="ghost" size="sm" @click="toRemove = unusedCategories.map((c) => c.id)">{{ t('asset_categories.standard_all') }}</Button>
+                        <Button type="button" variant="ghost" size="sm" @click="toRemove = []">{{ t('asset_categories.standard_none') }}</Button>
+                        <Button type="button" variant="destructive" size="sm" class="min-h-11 sm:min-h-9" :disabled="!toRemove.length" @click="removeUnused">
+                            {{ t('asset_categories.unused_button', { count: toRemove.length }) }}
+                        </Button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Two categories that are the same thing ("Notebook" / "โน้ตบุ๊ก"): fold one into the other -->
+            <details v-if="allCategories.length > 1" class="rounded-lg border">
+                <summary class="min-h-11 cursor-pointer px-4 py-3 text-sm font-medium">{{ t('asset_categories.merge_title') }}</summary>
+                <div class="space-y-3 border-t p-4">
+                    <p class="text-xs text-muted-foreground">{{ t('asset_categories.merge_hint') }}</p>
+                    <div class="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+                        <label class="grid gap-1 text-sm">
+                            {{ t('asset_categories.merge_from') }}
+                            <select v-model="merge.from" :class="selectClass">
+                                <option :value="null" disabled>{{ t('assets.choose_category') }}</option>
+                                <option v-for="c in allCategories" :key="c.id" :value="c.id">{{ c.name }} ({{ c.code_prefix }})</option>
+                            </select>
+                        </label>
+                        <label class="grid gap-1 text-sm">
+                            {{ t('asset_categories.merge_into') }}
+                            <select v-model="merge.into" :class="selectClass">
+                                <option :value="null" disabled>{{ t('assets.choose_category') }}</option>
+                                <option v-for="c in allCategories.filter((c) => c.id !== merge.from)" :key="c.id" :value="c.id">
+                                    {{ c.name }} ({{ c.code_prefix }})
+                                </option>
+                            </select>
+                        </label>
+                        <Button type="button" class="min-h-11 sm:min-h-9" :disabled="!merge.from || !merge.into" @click="submitMerge">
+                            {{ t('asset_categories.merge_button') }}
+                        </Button>
+                    </div>
+                    <InputError :message="(page.props.errors as Record<string, string>).into_id" />
+                </div>
+            </details>
 
             <div class="flex flex-wrap gap-3">
                 <Input v-model="filters.search" type="search" class="max-w-xs" :placeholder="t('asset_categories.search_placeholder')" />

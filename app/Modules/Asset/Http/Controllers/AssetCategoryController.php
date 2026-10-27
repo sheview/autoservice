@@ -5,12 +5,16 @@ namespace App\Modules\Asset\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AddStandardCategories;
 use App\Modules\Asset\Actions\DeleteAssetCategory;
+use App\Modules\Asset\Actions\MergeAssetCategories;
+use App\Modules\Asset\Actions\RemoveUnusedCategories;
 use App\Modules\Asset\Actions\SaveAssetCategory;
 use App\Modules\Asset\Http\Requests\AssetCategoryRequest;
 use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Asset\Support\StandardCategories;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,6 +68,19 @@ class AssetCategoryController extends Controller
                 'delete' => $user->can('asset-categories.manage'),
             ],
             // Standard categories the company does not have yet (names), offered to add in one go.
+            // Every category, for merging one that repeats another (only for whoever may delete them).
+            'allCategories' => $user->can('asset-categories.manage')
+                ? AssetCategory::orderBy('name')->get(['id', 'name', 'code_prefix'])
+                : [],
+            // Categories nothing uses (no asset, part or PM checklist), offered to remove in one go;
+            // "suggested" = not one of the everyday standard names.
+            'unusedCategories' => $user->can('asset-categories.manage')
+                ? app(RemoveUnusedCategories::class)->unused()->map(fn (AssetCategory $c) => [
+                    'id' => $c->id,
+                    'label' => "{$c->name} ({$c->code_prefix})",
+                    'suggested' => ! in_array(mb_strtolower($c->name), array_map('mb_strtolower', StandardCategories::everydayNames()), true),
+                ])->values()->all()
+                : [],
             'standardMissing' => $user->can('create', AssetCategory::class)
                 ? array_column(app(AddStandardCategories::class)->missing(), 'name')
                 : [],
@@ -79,6 +96,28 @@ class AssetCategoryController extends Controller
         $added = $addStandard->handle($names);
 
         return back()->with('success', __('asset.categories.standard_added', ['count' => $added]));
+    }
+
+    /** Every category nothing uses, removed in one go (RemoveUnusedCategories). */
+    public function removeUnused(Request $request, RemoveUnusedCategories $remove): RedirectResponse
+    {
+        abort_unless($request->user()->can('asset-categories.manage'), 403);
+        $ids = $request->validate(['ids' => ['required', 'array'], 'ids.*' => ['integer']])['ids'];
+
+        return back()->with('success', __('asset.categories.unused_removed', ['count' => $remove->handle(array_map('intval', $ids))]));
+    }
+
+    /** A category that repeats another: everything in it moves to ?into_id, then it goes (MergeAssetCategories). */
+    public function merge(Request $request, AssetCategory $category, MergeAssetCategories $merge): RedirectResponse
+    {
+        Gate::authorize('delete', $category);
+        $intoId = $request->validate(['into_id' => ['required', 'integer', Rule::exists('asset_categories', 'id')->whereNull('deleted_at')]],
+            attributes: ['into_id' => __('asset.categories.merge_into')])['into_id'];
+        $into = AssetCategory::findOrFail($intoId);
+
+        $moved = $merge->handle($category, $into);
+
+        return back()->with('success', __('asset.categories.merged', ['from' => $category->name, 'into' => $into->name, 'count' => $moved]));
     }
 
     public function create(): Response

@@ -55,6 +55,8 @@ const props = defineProps<{
     openTickets?: TicketRow[];
     history?: TicketRow[];
     branches?: { id: number; name: string }[];
+    // Storage locations (Settings) offered for the location when moving it.
+    locations?: { id: number; name: string }[];
     can?: { openTicket: boolean; issueParts: boolean; checkout: boolean; move: boolean };
 }>();
 
@@ -204,7 +206,16 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                         </label>
                         <label class="block space-y-1.5 text-sm">
                             <span class="font-semibold">{{ t('qr.location') }}</span>
-                            <input v-model="move.location" class="h-12 w-full rounded-xl border border-input bg-transparent px-3 text-base" />
+                            <input
+                                v-model="move.location"
+                                list="qr_location_options"
+                                autocomplete="off"
+                                :placeholder="t('assets.location_placeholder')"
+                                class="h-12 w-full rounded-xl border border-input bg-transparent px-3 text-base"
+                            />
+                            <datalist id="qr_location_options">
+                                <option v-for="location in locations ?? []" :key="location.id" :value="location.name" />
+                            </datalist>
                         </label>
                         <InputError :message="move.errors.branch_id || move.errors.location" />
                         <button type="submit" :disabled="move.processing" :class="[big, 'bg-primary text-primary-foreground']">

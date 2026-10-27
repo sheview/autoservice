@@ -10,6 +10,19 @@ namespace App\Modules\Asset\Support;
  */
 class StandardCategories
 {
+    /** What a new company starts with (by code prefix); the others are offered to pick (AddStandardCategories). */
+    public const EVERYDAY = ['AP', 'ADP', 'FD', 'KB', 'MS', 'NB', 'PTB', 'PSU', 'PR', 'RAM', 'SV', 'LIC', 'DSK', 'SW', 'TN', 'MON', 'CSM'];
+
+    /**
+     * The names of the everyday categories, in the order of all().
+     *
+     * @return list<string>
+     */
+    public static function everydayNames(): array
+    {
+        return array_values(array_column(array_filter(self::all(), fn (array $c) => in_array($c['code_prefix'], self::EVERYDAY, true)), 'name'));
+    }
+
     /**
      * @return list<array{name: string, code_prefix: string, service_line: string, asset_type: string, requires_serial: bool,
      *     spec_fields: list<array{key: string, label: string, type: string, options: list<string>, required: bool}>}>

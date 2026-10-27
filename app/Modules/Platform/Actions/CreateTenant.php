@@ -3,6 +3,7 @@
 namespace App\Modules\Platform\Actions;
 
 use App\Modules\Asset\Actions\AddStandardCategories;
+use App\Modules\Asset\Support\StandardCategories;
 use App\Modules\Identity\Actions\SaveUser;
 use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Tenancy\Models\Tenant;
@@ -46,8 +47,9 @@ class CreateTenant
                     'password' => $data['admin_password'],
                     'role' => 'admin_company',
                 ]);
-                // A ready set of asset categories and their PM checklists, which the company then changes as it likes.
-                $this->addStandardCategories->handle();
+                // The everyday asset categories and their PM checklists, which the company then changes as it
+                // likes; the other standard ones are offered on the categories page.
+                $this->addStandardCategories->handle(StandardCategories::everydayNames());
                 $this->addStandardChecklists->handle();
             });
 

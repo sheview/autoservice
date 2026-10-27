@@ -1,20 +1,26 @@
 <?php
 
+use App\Modules\Asset\Actions\AddStandardCategories;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Support\StandardCategories;
 use App\Modules\Tenancy\Models\Tenant;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('gives a new company the standard categories, which it may then change', function () {
+it('gives a new company the everyday standard categories, which it may then change', function () {
     $this->actingAs(createSuperadmin())->post('/platform/tenants', [
         'name' => 'บริษัท ใหม่ จำกัด', 'subdomain' => 'newco', 'status' => 'active',
         'admin_name' => 'คุณสมชาย', 'admin_email' => 'admin@newco.test',
         'admin_password' => 'Password-123', 'admin_password_confirmation' => 'Password-123',
     ])->assertSessionHasNoErrors();
 
-    $standard = collect(StandardCategories::all());
-    asTenant(Tenant::where('subdomain', 'newco')->sole(), function () use ($standard) {
-        expect(AssetCategory::orderBy('id')->pluck('code_prefix')->all())->toBe($standard->pluck('code_prefix')->all());
+    asTenant(Tenant::where('subdomain', 'newco')->sole(), function () {
+        expect(AssetCategory::orderBy('name')->pluck('name')->all())->toBe([
+            'Access Point', 'Adapter', 'Flashdrive', 'Keyboard', 'Mouse', 'Notebook', 'Portable', 'Power Supply', 'Printer', 'RAM',
+            'Server', 'Software', 'SSD/HDD', 'Switch', 'Toner', 'จอ Monitor', 'วัสดุสิ้นเปลือง',
+        ]);
+        // The others are offered to pick.
+        expect(array_column(app(AddStandardCategories::class)->missing(), 'name'))->toContain('เครื่องสำรองไฟ (UPS)')
+            ->and(count(StandardCategories::all()))->toBe(AssetCategory::count() + count(app(AddStandardCategories::class)->missing()));
 
         $switch = AssetCategory::where('code_prefix', 'SW')->sole();
         expect($switch->only(['name', 'service_line', 'asset_type']))->toBe(['name' => 'Switch', 'service_line' => 'network', 'asset_type' => 'hardware'])

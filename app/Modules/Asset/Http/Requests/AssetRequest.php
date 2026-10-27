@@ -3,6 +3,7 @@
 namespace App\Modules\Asset\Http\Requests;
 
 use App\Modules\Asset\Actions\FindDuplicateAssets;
+use App\Modules\Asset\Actions\StorageLocationOptions;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\AssetSerial;
@@ -72,6 +73,8 @@ class AssetRequest extends FormRequest
             ...($this->input('owner') === 'company' ? ['customer_id' => null] : []),
             ...($this->has('quantity') ? [] : ['quantity' => max(is_array($serials) ? count($serials) : 0, 1)]),
             ...($this->category()?->requires_serial && is_array($serials) ? ['quantity' => max(count($serials), 1)] : []),
+            // The location picked from (or typed as) a storage location is kept there too, for the filter.
+            ...($this->has('location') ? ['storage_location_id' => app(StorageLocationOptions::class)->idFor($this->input('location'))] : []),
         ]);
     }
 

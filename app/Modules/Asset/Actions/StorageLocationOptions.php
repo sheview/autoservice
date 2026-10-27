@@ -33,6 +33,17 @@ class StorageLocationOptions
     }
 
     /**
+     * The storage location an asset's "location" text names (picked from the list or typed the
+     * same, ignoring case and spaces at the ends); null for any other text.
+     */
+    public function idFor(?string $location): ?int
+    {
+        $text = mb_strtolower(trim((string) $location));
+
+        return $text === '' ? null : ($this->idsByName()[$text] ?? null);
+    }
+
+    /**
      * The active locations by lower-case name, for reading a name typed in an Excel file.
      *
      * @return array<string, int> lower(name) => id
