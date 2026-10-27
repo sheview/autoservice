@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CameraCapture from '@/components/CameraCapture.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { t } from '@/lib/i18n';
@@ -6,7 +7,7 @@ import { PhotoError, prepareImage } from '@/lib/image';
 import { pendingPhotos, uploadPhoto } from '@/lib/photoUpload';
 import type { SharedData } from '@/types';
 import { router, usePage } from '@inertiajs/vue3';
-import { Camera, Plus } from 'lucide-vue-next';
+import { Camera, Images, Plus } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 // A record's photos as a fixed row of slots: the first is the main photo, the rest are extras.
@@ -34,8 +35,16 @@ const failed = ref<{ slot: number; file: File; message: string }[]>([]);
 // The failures are of photos picked when the record was created (it is saved, the photos are not).
 const fromCreate = ref(false);
 
-// A phone or tablet: offer the camera next to "add" (on a computer both would open the file picker).
-const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+// A phone or tablet: an empty slot opens the camera in the page (CameraCapture: works where
+// capture="environment" is ignored), with the gallery as the second button.
+const touch = typeof window !== 'undefined' && (navigator.maxTouchPoints > 0 || !!window.matchMedia?.('(any-pointer: coarse)').matches);
+const camera = ref<InstanceType<typeof CameraCapture> | null>(null);
+// The slot the camera is taking a photo for.
+const cameraSlot = ref(0);
+const takePhoto = (slot: number) => {
+    cameraSlot.value = slot;
+    camera.value?.open();
+};
 
 const label = (slot: number) => (slot === 0 ? t('photos.main') : t('photos.extra', { number: slot }));
 const actionOf = (slot: number) => props.photos.find((photo) => photo.slot === slot)!.action;
@@ -59,12 +68,14 @@ const send = async (jobs: { slot: number; file: File }[]) => {
     router.reload({ only: ['photos'] });
 };
 
-const pick = async (slot: number, event: Event) => {
+const pick = (slot: number, event: Event) => {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (!file) return;
+    if (file) pickFile(slot, file);
+};
 
+const pickFile = async (slot: number, file: File) => {
     error.value = null;
     fromCreate.value = false;
     try {
@@ -114,7 +125,19 @@ const serverError = computed(() => (page.props.errors as Record<string, string>)
                 >
                     <img :src="photo.url" :alt="label(photo.slot)" class="size-full object-cover" loading="lazy" />
                 </a>
-                <!-- Empty: the whole box picks a photo (on a phone the system offers camera or gallery) -->
+                <!-- Empty, phone: the box opens the camera -->
+                <button
+                    v-else-if="editable && touch"
+                    type="button"
+                    class="flex aspect-square w-full flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground hover:border-primary hover:text-primary"
+                    :disabled="busy"
+                    :class="{ 'opacity-50': busy }"
+                    @click="takePhoto(photo.slot)"
+                >
+                    <Camera class="size-6" />
+                    <span class="text-sm font-medium">{{ t('photos.take') }}</span>
+                </button>
+                <!-- Empty, computer: the box picks a file -->
                 <label
                     v-else-if="editable"
                     class="flex aspect-square w-full cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed text-muted-foreground hover:border-primary hover:text-primary"
@@ -134,17 +157,10 @@ const serverError = computed(() => (page.props.errors as Record<string, string>)
                         class="inline-flex min-h-11 cursor-pointer items-center justify-center gap-1 rounded-md border px-2 text-sm font-medium hover:bg-accent"
                         :class="{ 'pointer-events-none opacity-50': busy }"
                     >
-                        <Camera v-if="!photo.url" class="size-4" />
-                        {{ photo.url ? t('photos.replace') : t('photos.take') }}
-                        <!-- Empty slot on a phone: straight to the camera; a filled one: camera or gallery -->
-                        <input
-                            type="file"
-                            accept="image/*"
-                            :capture="photo.url ? undefined : 'environment'"
-                            class="sr-only"
-                            :disabled="busy"
-                            @change="pick(photo.slot, $event)"
-                        />
+                        <Images v-if="!photo.url" class="size-4" />
+                        {{ photo.url ? t('photos.replace') : t('photos.gallery') }}
+                        <!-- Empty slot on a phone: the gallery; a filled one: camera or gallery as the phone offers -->
+                        <input type="file" accept="image/*" class="sr-only" :disabled="busy" @change="pick(photo.slot, $event)" />
                     </label>
                     <Button
                         v-if="photo.url"
@@ -181,5 +197,6 @@ const serverError = computed(() => (page.props.errors as Record<string, string>)
             </div>
         </div>
         <InputError :message="error ?? serverError" />
+        <CameraCapture ref="camera" @taken="(file) => pickFile(cameraSlot, file)" />
     </section>
 </template>

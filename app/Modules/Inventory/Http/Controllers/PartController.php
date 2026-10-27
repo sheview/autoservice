@@ -18,6 +18,7 @@ use App\Modules\Inventory\Actions\DeletePart;
 use App\Modules\Inventory\Actions\FindDuplicateParts;
 use App\Modules\Inventory\Actions\FindPartUnits;
 use App\Modules\Inventory\Actions\PartStats;
+use App\Modules\Inventory\Actions\PartSuggestions;
 use App\Modules\Inventory\Actions\PartUnitHistory;
 use App\Modules\Inventory\Actions\SavePart;
 use App\Modules\Inventory\Actions\SearchParts;
@@ -54,6 +55,7 @@ class PartController extends Controller
         $filters = SearchParts::filtersFrom($request);
         $user = $request->user();
         $parts = $search->handle($filters)->paginate(20)->withQueryString();
+        $parts->getCollection()->load('media');
         // Where each part of the page is kept (the shared storage locations).
         $locations = app(StorageLocationOptions::class)->names($parts->pluck('storage_location_id')->filter()->unique()->values()->all());
 
@@ -63,6 +65,7 @@ class PartController extends Controller
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
                 'storage_location' => $locations[$part->storage_location_id] ?? null,
+                'photo' => PhotoSlots::thumbnail($part, fn (int $slot) => route('inventory.parts.photos.show', [$part, $slot])),
             ]),
             'filters' => $filters,
             // Pieces whose serial number matches the search, with their history on the page.
@@ -118,6 +121,7 @@ class PartController extends Controller
             'categories' => app(CategoryOptions::class)->handle(),
             'locations' => app(StorageLocationOptions::class)->handle(),
             'canSerials' => request()->user()->can(self::SERIALS_PERMISSION),
+            'picks' => app(PartSuggestions::class)->handle(),
             // The first stock is entered with the part (CreatePart), by whoever may enter receipts.
             'canReceive' => request()->user()->can(StockMovement::permissionFor(StockMovement::TYPE_RECEIVE)),
             'maxInitialSerials' => PartRequest::MAX_INITIAL_SERIALS,
@@ -207,6 +211,7 @@ class PartController extends Controller
             'categories' => app(CategoryOptions::class)->handle(),
             'locations' => app(StorageLocationOptions::class)->handle($part->storage_location_id),
             'canSerials' => request()->user()->can(self::SERIALS_PERMISSION),
+            'picks' => app(PartSuggestions::class)->handle(),
         ]);
     }
 

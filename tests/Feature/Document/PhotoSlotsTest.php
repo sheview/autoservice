@@ -118,3 +118,24 @@ it('keeps photos per tenant', function () {
     expect(Media::count())->toBe(1);
     asTenant($other, fn () => expect(Media::sole()->name)->toBe('theirs'));
 });
+
+it('shows each row of the list with a small copy of its main photo, made once and gone with the photo', function (string $base) {
+    $list = str_starts_with($base, '/assets') ? ['/assets', 'assets'] : ['/parts', 'parts'];
+    $this->actingAs($this->admin)->get($list[0])->assertInertia(fn (Assert $page) => $page->where("{$list[1]}.data.0.photo", null));
+
+    $this->actingAs($this->admin)->post("{$base}/photos/0", ['photo' => UploadedFile::fake()->image('big.jpg', 1600, 1200)]);
+    $media = Media::sole();
+    $thumbUrl = url("{$base}/photos/0").'?thumb=1&v='.$media->id;
+    $this->actingAs($this->admin)->get($list[0])->assertInertia(fn (Assert $page) => $page->where("{$list[1]}.data.0.photo", $thumbUrl));
+
+    $response = $this->actingAs($this->admin)->get($thumbUrl)->assertOk()->assertHeader('Content-Type', 'image/jpeg');
+    [$width, $height] = getimagesizefromstring($response->getContent());
+    expect([$width, $height])->toBe([213, 160]);
+    $thumbPath = dirname($media->getPathRelativeToRoot()).'/__thumb.jpg';
+    Storage::disk('local')->assertExists($thumbPath);
+
+    // The full photo is still there without ?thumb, and the copy goes with the photo.
+    $this->actingAs($this->admin)->get("{$base}/photos/0")->assertOk();
+    $this->actingAs($this->admin)->delete("{$base}/photos/0");
+    Storage::disk('local')->assertMissing($thumbPath);
+})->with('records');

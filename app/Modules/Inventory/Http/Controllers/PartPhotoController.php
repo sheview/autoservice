@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Photos of a part (a main one and three extras). Whoever may see the part sees them;
@@ -26,7 +26,7 @@ class PartPhotoController extends Controller
         return $this->storePhoto($request, $part, $slot);
     }
 
-    public function show(Part $part, int $slot): StreamedResponse
+    public function show(Part $part, int $slot): Response
     {
         Gate::authorize('view', $part);
 

@@ -3,17 +3,20 @@ import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue
 import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import DuplicateMatches, { type DuplicateMatch } from '@/components/DuplicateMatches.vue';
-import PhotoPicker from '@/components/PhotoPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import LabelCodes from '@/components/LabelCodes.vue';
+import PhotoPicker from '@/components/PhotoPicker.vue';
+import QuickPicks from '@/components/QuickPicks.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useDuplicates } from '@/composables/useDuplicates';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
+import { useLabelCodes, type CodeTarget } from '@/lib/labelCodes';
 import { pendingPhotos } from '@/lib/photoUpload';
 import { similarBrand, type BrandUse } from '@/lib/similarBrand';
-import { useDuplicates } from '@/composables/useDuplicates';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { ChevronDown, Plus, X } from 'lucide-vue-next';
@@ -85,6 +88,8 @@ const props = defineProps<{
     customerContracts: Record<string, { id: number; contract_no: string; title: string; starts_on: string; ends_on: string; covering: boolean }[]>;
     brands: BrandUse[];
     subtypes: string[];
+    // The most used values, as buttons under their fields (sub-types per category).
+    picks: { units: string[]; departments: string[]; subtypes: { category_id: number; name: string }[] };
 }>();
 
 const title = props.asset ? t('assets.edit') : t('assets.create');
@@ -216,6 +221,31 @@ const moreOpen = ref(!!props.asset || (typeof window !== 'undefined' && window.m
 // Photos picked before the asset exists (PhotoPicker): uploaded by its page once it is saved.
 const photos = ref<File[]>([]);
 
+// Codes read from those photos (a label photographed): the S/N, MAC and model go into their fields.
+const codeTargets = computed<CodeTarget[]>(() => [
+    { key: 'serial', label: t('assets.serial_number'), fill: addScannedSerial },
+    { key: 'mac', label: t('assets.mac_address'), fill: (value) => (form.mac_address = value) },
+    { key: 'model', label: t('assets.model'), fill: (value) => (form.model = value) },
+    { key: 'property_no', label: t('assets.property_no'), fill: (value) => (form.property_no = value) },
+]);
+const labelCodes = useLabelCodes(
+    () => codeTargets.value,
+    (codes) => {
+        // A lone code without a prefix on a label is most likely the S/N; several are left to the user.
+        const plain = codes.filter((code) => code.kind === 'other');
+        const loneSerial = plain.length === 1 && !codes.some((code) => code.kind === 'serial');
+        let macFree = form.mac_address.trim() === '';
+        return codes.map((code) => {
+            if (code.kind === 'serial' || (code.kind === 'other' && loneSerial)) return 'serial';
+            if (code.kind === 'mac' && macFree) {
+                macFree = false;
+                return 'mac';
+            }
+            return null;
+        });
+    },
+);
+
 const addSerial = () => {
     if (form.serials.length < props.maxSerials) {
         form.serials.push({ value: '' });
@@ -243,6 +273,12 @@ const pasteSerials = (event: ClipboardEvent, index: number) => {
         row.value = serial;
     });
 };
+
+// Buttons under the fields: the brands used most, the sub-types of the chosen category.
+const brandPicks = computed(() => [...props.brands].sort((a, b) => b.count - a.count).map((brand) => brand.name));
+const subtypePicks = computed(() =>
+    props.picks.subtypes.filter((subtype) => subtype.category_id === form.category_id).map((subtype) => subtype.name),
+);
 
 // A brand that looks like a more used one ("Ciso" for "Cisco"): offered, never forced.
 const brandMatch = computed(() => (form.brand ? similarBrand(form.brand, props.brands) : null));
@@ -413,6 +449,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             </p>
 
             <form class="space-y-8" novalidate @submit.prevent="submit">
+                <!-- Creating only: photos first (a label photographed fills the S/N, MAC...), uploaded once the asset is saved -->
+                <div v-if="!asset" class="space-y-3">
+                    <PhotoPicker v-model="photos" :hint="t('photos.label_hint')" @picked="labelCodes.read" />
+                    <LabelCodes :reader="labelCodes" :targets="codeTargets" />
+                </div>
+
                 <section class="space-y-4">
                     <h3 class="text-sm font-semibold">{{ t('assets.general') }}</h3>
                     <div class="grid gap-6 sm:grid-cols-2">
@@ -504,7 +546,13 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <div class="grid content-start gap-2">
                             <Label for="location">{{ t('assets.location') }}</Label>
                             <!-- Picked from the storage locations (Settings) or typed: a name of the list is kept as that location -->
-                            <Input id="location" v-model="form.location" list="location_options" autocomplete="off" :placeholder="t('assets.location_placeholder')" />
+                            <Input
+                                id="location"
+                                v-model="form.location"
+                                list="location_options"
+                                autocomplete="off"
+                                :placeholder="t('assets.location_placeholder')"
+                            />
                             <datalist id="location_options">
                                 <option v-for="location in locations" :key="location.id" :value="location.name" />
                             </datalist>
@@ -552,7 +600,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     <InputError :message="errors.serials" />
                     <div class="flex flex-wrap items-center gap-3">
                         <!-- One device after another: each code read goes into the next empty row -->
-                        <BarcodeScanButton continuous :label="t('scan_camera.serials')" :hint="t('scan_camera.hint_serials')" @scanned="addScannedSerial" />
+                        <BarcodeScanButton
+                            continuous
+                            :label="t('scan_camera.serials')"
+                            :hint="t('scan_camera.hint_serials')"
+                            @scanned="addScannedSerial"
+                        />
                         <Button
                             type="button"
                             variant="outline"
@@ -578,6 +631,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <div class="grid content-start gap-2">
                             <Label for="unit">{{ t('assets.unit') }}</Label>
                             <Input id="unit" v-model="form.unit" :placeholder="t('assets.unit_placeholder')" autocomplete="off" />
+                            <QuickPicks v-model="form.unit" :options="picks.units" />
                             <InputError :message="form.errors.unit" />
                         </div>
                     </div>
@@ -605,9 +659,6 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
                 </section>
 
-                <!-- Creating only: photos picked now, uploaded once the asset is saved (its page shows how it went) -->
-                <PhotoPicker v-if="!asset" v-model="photos" />
-
                 <!-- Everything else, folded on a phone when creating (open when editing or on a wide screen) -->
                 <details class="group rounded-lg border" :open="moreOpen" @toggle="moreOpen = ($event.target as HTMLDetailsElement).open">
                     <summary class="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 py-2 text-sm font-semibold">
@@ -618,174 +669,201 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <ChevronDown class="size-4 shrink-0 transition-transform group-open:rotate-180" />
                     </summary>
                     <div class="space-y-8 border-t p-4">
-                <section class="space-y-4">
-                    <div class="grid gap-6 sm:grid-cols-2">
-                        <div class="grid content-start gap-2">
-                            <Label for="asset_code">{{ t('assets.asset_code') }}</Label>
-                            <Input
-                                id="asset_code"
-                                v-model="form.asset_code"
-                                class="font-mono"
-                                :placeholder="category ? `${category.code_prefix}-00001` : ''"
-                                autocomplete="off"
-                            />
-                            <p class="text-xs text-muted-foreground">{{ t('assets.asset_code_hint') }}</p>
-                            <InputError :message="form.errors.asset_code" />
-                        </div>
+                        <section class="space-y-4">
+                            <div class="grid gap-6 sm:grid-cols-2">
+                                <div class="grid content-start gap-2">
+                                    <Label for="asset_code">{{ t('assets.asset_code') }}</Label>
+                                    <Input
+                                        id="asset_code"
+                                        v-model="form.asset_code"
+                                        class="font-mono"
+                                        :placeholder="category ? `${category.code_prefix}-00001` : ''"
+                                        autocomplete="off"
+                                    />
+                                    <p class="text-xs text-muted-foreground">{{ t('assets.asset_code_hint') }}</p>
+                                    <InputError :message="form.errors.asset_code" />
+                                </div>
 
-                        <div class="grid content-start gap-2">
-                            <Label for="property_no">{{ t('assets.property_no') }}</Label>
-                            <div class="flex gap-2">
-                                <Input id="property_no" v-model="form.property_no" class="font-mono" autocomplete="off" />
-                                <BarcodeScanButton
-                                    :hint="t('scan_camera.hint_field', { field: t('assets.property_no') })"
-                                    @scanned="(text) => (form.property_no = text)"
-                                />
+                                <div class="grid content-start gap-2">
+                                    <Label for="property_no">{{ t('assets.property_no') }}</Label>
+                                    <div class="flex gap-2">
+                                        <Input id="property_no" v-model="form.property_no" class="font-mono" autocomplete="off" />
+                                        <BarcodeScanButton
+                                            :hint="t('scan_camera.hint_field', { field: t('assets.property_no') })"
+                                            @scanned="(text) => (form.property_no = text)"
+                                        />
+                                    </div>
+                                    <InputError :message="form.errors.property_no" />
+                                </div>
+
+                                <div class="grid content-start gap-2">
+                                    <Label for="brand">{{ t('assets.brand') }}</Label>
+                                    <Input
+                                        id="brand"
+                                        v-model="form.brand"
+                                        list="brand_options"
+                                        :placeholder="t('assets.brand_placeholder')"
+                                        autocomplete="off"
+                                    />
+                                    <datalist id="brand_options">
+                                        <option v-for="brand in brands" :key="brand.name" :value="brand.name" />
+                                    </datalist>
+                                    <p v-if="brandMatch" class="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                                        {{ t('assets.brand_similar', { brand: form.brand.trim(), existing: brandMatch.name }) }}
+                                        <button type="button" class="font-medium underline" @click="form.brand = brandMatch.name">
+                                            {{ t('assets.brand_use_existing', { existing: brandMatch.name }) }}
+                                        </button>
+                                    </p>
+                                    <p v-else-if="brandIsNew" class="text-xs text-muted-foreground">{{ t('assets.brand_new') }}</p>
+                                    <QuickPicks v-model="form.brand" :options="brandPicks" />
+                                    <InputError :message="form.errors.brand" />
+                                </div>
+
+                                <div class="grid content-start gap-2">
+                                    <Label for="model">{{ t('assets.model') }}</Label>
+                                    <Input id="model" v-model="form.model" />
+                                    <InputError :message="form.errors.model" />
+                                </div>
+
+                                <div class="grid content-start gap-2">
+                                    <Label for="subtype">{{ t('assets.subtype') }}</Label>
+                                    <Input
+                                        id="subtype"
+                                        v-model="form.subtype"
+                                        list="subtype_options"
+                                        :placeholder="t('assets.subtype_placeholder')"
+                                        autocomplete="off"
+                                    />
+                                    <datalist id="subtype_options">
+                                        <option v-for="subtype in subtypes" :key="subtype" :value="subtype" />
+                                    </datalist>
+                                    <QuickPicks v-model="form.subtype" :options="subtypePicks" />
+                                    <InputError :message="form.errors.subtype" />
+                                </div>
                             </div>
-                            <InputError :message="form.errors.property_no" />
-                        </div>
+                        </section>
 
-                        <div class="grid content-start gap-2">
-                            <Label for="brand">{{ t('assets.brand') }}</Label>
-                            <Input
-                                id="brand"
-                                v-model="form.brand"
-                                list="brand_options"
-                                :placeholder="t('assets.brand_placeholder')"
-                                autocomplete="off"
-                            />
-                            <datalist id="brand_options">
-                                <option v-for="brand in brands" :key="brand.name" :value="brand.name" />
-                            </datalist>
-                            <p v-if="brandMatch" class="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                                {{ t('assets.brand_similar', { brand: form.brand.trim(), existing: brandMatch.name }) }}
-                                <button type="button" class="font-medium underline" @click="form.brand = brandMatch.name">
-                                    {{ t('assets.brand_use_existing', { existing: brandMatch.name }) }}
-                                </button>
-                            </p>
-                            <p v-else-if="brandIsNew" class="text-xs text-muted-foreground">{{ t('assets.brand_new') }}</p>
-                            <InputError :message="form.errors.brand" />
-                        </div>
-
-                        <div class="grid content-start gap-2">
-                            <Label for="model">{{ t('assets.model') }}</Label>
-                            <Input id="model" v-model="form.model" />
-                            <InputError :message="form.errors.model" />
-                        </div>
-
-                        <div class="grid content-start gap-2">
-                            <Label for="subtype">{{ t('assets.subtype') }}</Label>
-                            <Input
-                                id="subtype"
-                                v-model="form.subtype"
-                                list="subtype_options"
-                                :placeholder="t('assets.subtype_placeholder')"
-                                autocomplete="off"
-                            />
-                            <datalist id="subtype_options">
-                                <option v-for="subtype in subtypes" :key="subtype" :value="subtype" />
-                            </datalist>
-                            <InputError :message="form.errors.subtype" />
-                        </div>
-                    </div>
-                </section>
-
-                <!-- Who uses the device and its network address: filled into the job sheet of a ticket -->
-                <section class="space-y-4">
-                    <div>
-                        <h3 class="text-sm font-semibold">{{ t('assets.usage') }}</h3>
-                        <p class="text-xs text-muted-foreground">{{ t('assets.usage_hint') }}</p>
-                    </div>
-                    <div class="grid gap-6 sm:grid-cols-2">
-                        <div class="grid content-start gap-2">
-                            <Label for="used_by">{{ t('assets.used_by') }}</Label>
-                            <Input id="used_by" v-model="form.used_by" autocomplete="off" />
-                            <InputError :message="form.errors.used_by" />
-                        </div>
-                        <div class="grid content-start gap-2">
-                            <Label for="department">{{ t('assets.department') }}</Label>
-                            <Input id="department" v-model="form.department" autocomplete="off" />
-                            <InputError :message="form.errors.department" />
-                        </div>
-                        <div class="grid content-start gap-2">
-                            <Label for="ip_address">{{ t('assets.ip_address') }}</Label>
-                            <Input id="ip_address" v-model="form.ip_address" class="font-mono" placeholder="192.168.1.10" autocomplete="off" />
-                            <InputError :message="form.errors.ip_address" />
-                        </div>
-                        <div class="grid content-start gap-2">
-                            <Label for="mac_address">{{ t('assets.mac_address') }}</Label>
-                            <div class="flex gap-2">
-                                <Input id="mac_address" v-model="form.mac_address" class="font-mono" placeholder="AA:BB:CC:DD:EE:FF" autocomplete="off" />
-                                <BarcodeScanButton
-                                    :hint="t('scan_camera.hint_field', { field: t('assets.mac_address') })"
-                                    @scanned="(text) => (form.mac_address = text)"
-                                />
+                        <!-- Who uses the device and its network address: filled into the job sheet of a ticket -->
+                        <section class="space-y-4">
+                            <div>
+                                <h3 class="text-sm font-semibold">{{ t('assets.usage') }}</h3>
+                                <p class="text-xs text-muted-foreground">{{ t('assets.usage_hint') }}</p>
                             </div>
-                            <InputError :message="form.errors.mac_address" />
-                        </div>
-                    </div>
-                </section>
+                            <div class="grid gap-6 sm:grid-cols-2">
+                                <div class="grid content-start gap-2">
+                                    <Label for="used_by">{{ t('assets.used_by') }}</Label>
+                                    <Input id="used_by" v-model="form.used_by" autocomplete="off" />
+                                    <InputError :message="form.errors.used_by" />
+                                </div>
+                                <div class="grid content-start gap-2">
+                                    <Label for="department">{{ t('assets.department') }}</Label>
+                                    <Input id="department" v-model="form.department" autocomplete="off" />
+                                    <QuickPicks v-model="form.department" :options="picks.departments" />
+                                    <InputError :message="form.errors.department" />
+                                </div>
+                                <div class="grid content-start gap-2">
+                                    <Label for="ip_address">{{ t('assets.ip_address') }}</Label>
+                                    <Input
+                                        id="ip_address"
+                                        v-model="form.ip_address"
+                                        class="font-mono"
+                                        placeholder="192.168.1.10"
+                                        autocomplete="off"
+                                    />
+                                    <InputError :message="form.errors.ip_address" />
+                                </div>
+                                <div class="grid content-start gap-2">
+                                    <Label for="mac_address">{{ t('assets.mac_address') }}</Label>
+                                    <div class="flex gap-2">
+                                        <Input
+                                            id="mac_address"
+                                            v-model="form.mac_address"
+                                            class="font-mono"
+                                            placeholder="AA:BB:CC:DD:EE:FF"
+                                            autocomplete="off"
+                                        />
+                                        <BarcodeScanButton
+                                            :hint="t('scan_camera.hint_field', { field: t('assets.mac_address') })"
+                                            @scanned="(text) => (form.mac_address = text)"
+                                        />
+                                    </div>
+                                    <InputError :message="form.errors.mac_address" />
+                                </div>
+                            </div>
+                        </section>
 
-                <section v-if="optionalSpecs.length" class="space-y-4">
-                    <h3 class="text-sm font-semibold">{{ t('assets.specs') }}</h3>
-                    <div class="grid gap-6 sm:grid-cols-2">
-                        <div v-for="field in optionalSpecs" :key="field.key" class="grid content-start gap-2">
-                            <Label :for="`spec_${field.key}`"> {{ field.label }}<span v-if="field.required" class="text-red-600"> *</span> </Label>
-                            <select v-if="field.type === 'select'" :id="`spec_${field.key}`" v-model="form.specs[field.key]" :class="selectClass">
-                                <option :value="undefined">{{ t('common.none') }}</option>
-                                <option v-for="option in field.options" :key="option" :value="option">{{ option }}</option>
-                            </select>
-                            <Input
-                                v-else
-                                :id="`spec_${field.key}`"
-                                v-model="form.specs[field.key]"
-                                :type="field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'"
-                                :step="field.type === 'number' ? 'any' : undefined"
+                        <section v-if="optionalSpecs.length" class="space-y-4">
+                            <h3 class="text-sm font-semibold">{{ t('assets.specs') }}</h3>
+                            <div class="grid gap-6 sm:grid-cols-2">
+                                <div v-for="field in optionalSpecs" :key="field.key" class="grid content-start gap-2">
+                                    <Label :for="`spec_${field.key}`">
+                                        {{ field.label }}<span v-if="field.required" class="text-red-600"> *</span>
+                                    </Label>
+                                    <select
+                                        v-if="field.type === 'select'"
+                                        :id="`spec_${field.key}`"
+                                        v-model="form.specs[field.key]"
+                                        :class="selectClass"
+                                    >
+                                        <option :value="undefined">{{ t('common.none') }}</option>
+                                        <option v-for="option in field.options" :key="option" :value="option">{{ option }}</option>
+                                    </select>
+                                    <Input
+                                        v-else
+                                        :id="`spec_${field.key}`"
+                                        v-model="form.specs[field.key]"
+                                        :type="field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'"
+                                        :step="field.type === 'number' ? 'any' : undefined"
+                                    />
+                                    <InputError :message="specError(field.key)" />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="space-y-4">
+                            <h3 class="text-sm font-semibold">{{ t('assets.purchase') }}</h3>
+                            <div class="grid gap-6 sm:grid-cols-3">
+                                <div class="grid content-start gap-2">
+                                    <Label for="purchased_at">{{ t('assets.purchased_at') }}</Label>
+                                    <Input id="purchased_at" v-model="form.purchased_at" type="date" />
+                                    <InputError :message="form.errors.purchased_at" />
+                                </div>
+                                <div class="grid content-start gap-2">
+                                    <Label for="purchase_price">{{ t('assets.purchase_price') }}</Label>
+                                    <Input id="purchase_price" v-model="form.purchase_price" type="number" min="0" step="0.01" />
+                                    <InputError :message="form.errors.purchase_price" />
+                                </div>
+                                <div class="grid content-start gap-2">
+                                    <Label for="warranty_expires_at">
+                                        {{ t('assets.warranty_expires_at') }}<span v-if="form.purchased_at" class="text-red-600"> *</span>
+                                    </Label>
+                                    <Input
+                                        id="warranty_expires_at"
+                                        v-model="form.warranty_expires_at"
+                                        type="date"
+                                        :min="form.purchased_at || undefined"
+                                    />
+                                    <InputError :message="form.errors.warranty_expires_at" />
+                                </div>
+                            </div>
+                        </section>
+
+                        <div class="grid content-start gap-2">
+                            <Label for="notes">{{ t('assets.notes') }}</Label>
+                            <textarea
+                                id="notes"
+                                v-model="form.notes"
+                                rows="3"
+                                class="shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                             />
-                            <InputError :message="specError(field.key)" />
+                            <InputError :message="form.errors.notes" />
                         </div>
-                    </div>
-                </section>
 
-                <section class="space-y-4">
-                    <h3 class="text-sm font-semibold">{{ t('assets.purchase') }}</h3>
-                    <div class="grid gap-6 sm:grid-cols-3">
-                        <div class="grid content-start gap-2">
-                            <Label for="purchased_at">{{ t('assets.purchased_at') }}</Label>
-                            <Input id="purchased_at" v-model="form.purchased_at" type="date" />
-                            <InputError :message="form.errors.purchased_at" />
-                        </div>
-                        <div class="grid content-start gap-2">
-                            <Label for="purchase_price">{{ t('assets.purchase_price') }}</Label>
-                            <Input id="purchase_price" v-model="form.purchase_price" type="number" min="0" step="0.01" />
-                            <InputError :message="form.errors.purchase_price" />
-                        </div>
-                        <div class="grid content-start gap-2">
-                            <Label for="warranty_expires_at">
-                                {{ t('assets.warranty_expires_at') }}<span v-if="form.purchased_at" class="text-red-600"> *</span>
-                            </Label>
-                            <Input id="warranty_expires_at" v-model="form.warranty_expires_at" type="date" :min="form.purchased_at || undefined" />
-                            <InputError :message="form.errors.warranty_expires_at" />
-                        </div>
-                    </div>
-                </section>
-
-                <div class="grid content-start gap-2">
-                    <Label for="notes">{{ t('assets.notes') }}</Label>
-                    <textarea
-                        id="notes"
-                        v-model="form.notes"
-                        rows="3"
-                        class="shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    />
-                    <InputError :message="form.errors.notes" />
-                </div>
-
-                <section id="attachments" class="space-y-2">
-                    <AttachmentList v-if="asset" :attachments="attachments" can-delete />
-                    <h3 v-else class="text-sm font-semibold">{{ t('attachments.title') }}</h3>
-                    <AttachmentPicker v-model="form.attachments" :errors="errors" />
-                </section>
+                        <section id="attachments" class="space-y-2">
+                            <AttachmentList v-if="asset" :attachments="attachments" can-delete />
+                            <h3 v-else class="text-sm font-semibold">{{ t('attachments.title') }}</h3>
+                            <AttachmentPicker v-model="form.attachments" :errors="errors" />
+                        </section>
                     </div>
                 </details>
 

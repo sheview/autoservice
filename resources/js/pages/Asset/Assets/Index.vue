@@ -2,6 +2,7 @@
 import AssetStatusBadge from '@/components/AssetStatusBadge.vue';
 import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import Heading from '@/components/Heading.vue';
+import ListThumb from '@/components/ListThumb.vue';
 import Pagination from '@/components/Pagination.vue';
 import StatTile from '@/components/StatTile.vue';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,8 @@ interface AssetRow {
     quantity: number;
     available: number;
     unit: string | null;
+    // The main photo, small (null: none).
+    photo: string | null;
 }
 
 interface Filters {
@@ -214,11 +217,16 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <tbody>
                         <tr v-for="asset in assets.data" :key="asset.ulid" class="border-t">
                             <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">
-                                <Link :href="route('asset.assets.show', asset.ulid)" class="text-primary underline-offset-4 hover:underline">
-                                    {{ asset.asset_code }}
-                                </Link>
-                                <div v-if="asset.property_no" class="text-muted-foreground">
-                                    {{ t('assets.property_no_short') }} {{ asset.property_no }}
+                                <div class="flex items-center gap-3">
+                                    <ListThumb :src="asset.photo" :alt="asset.name" />
+                                    <div>
+                                        <Link :href="route('asset.assets.show', asset.ulid)" class="text-primary underline-offset-4 hover:underline">
+                                            {{ asset.asset_code }}
+                                        </Link>
+                                        <div v-if="asset.property_no" class="text-muted-foreground">
+                                            {{ t('assets.property_no_short') }} {{ asset.property_no }}
+                                        </div>
+                                    </div>
                                 </div>
                             </td>
                             <td class="px-4 py-2">

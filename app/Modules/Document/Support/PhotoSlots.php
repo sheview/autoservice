@@ -31,6 +31,19 @@ class PhotoSlots
     }
 
     /**
+     * The address of the small copy of the main photo (PhotoThumbnail), for a list, or null when
+     * it has none. Load the media of the page's records first (->load('media')).
+     *
+     * @param  Closure(int): string  $url  the address of a slot
+     */
+    public static function thumbnail(HasMedia $model, Closure $url): ?string
+    {
+        $media = self::find($model, 0);
+
+        return $media ? $url(0).'?thumb=1&v='.$media->id : null;
+    }
+
+    /**
      * Every slot, filled or not, for the page.
      *
      * @param  Closure(int): string  $url  the address of a slot (view, upload and delete share it)

@@ -2,6 +2,7 @@
 import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import ListThumb from '@/components/ListThumb.vue';
 import Pagination from '@/components/Pagination.vue';
 import SerialHits, { type SerialHit } from '@/components/SerialHits.vue';
 import StatTile from '@/components/StatTile.vue';
@@ -29,6 +30,8 @@ interface PartRow {
     is_active: boolean;
     low: boolean;
     track_serial: boolean;
+    // The main photo, small (null: none).
+    photo: string | null;
 }
 
 interface Filters {
@@ -219,9 +222,12 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     <tbody>
                         <tr v-for="part in parts.data" :key="part.id" class="border-t">
                             <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">
-                                <Link :href="route('inventory.parts.show', part.id)" class="text-primary underline-offset-4 hover:underline">
-                                    {{ part.code }}
-                                </Link>
+                                <div class="flex items-center gap-3">
+                                    <ListThumb :src="part.photo" :alt="part.name" />
+                                    <Link :href="route('inventory.parts.show', part.id)" class="text-primary underline-offset-4 hover:underline">
+                                        {{ part.code }}
+                                    </Link>
+                                </div>
                             </td>
                             <td class="px-4 py-2">
                                 <div class="font-medium">

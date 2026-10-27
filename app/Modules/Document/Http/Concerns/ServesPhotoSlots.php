@@ -3,13 +3,14 @@
 namespace App\Modules\Document\Http\Concerns;
 
 use App\Modules\Document\Actions\DeletePhotoSlot;
+use App\Modules\Document\Actions\PhotoThumbnail;
 use App\Modules\Document\Actions\SavePhotoSlot;
 use App\Modules\Document\Support\PhotoSlots;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Spatie\MediaLibrary\HasMedia;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * The three things a photo controller does with a slot, once it has checked the permission on
@@ -30,10 +31,15 @@ trait ServesPhotoSlots
             : back()->with('success', __('ui.photos.saved'));
     }
 
-    protected function showPhoto(HasMedia $model, int $slot): StreamedResponse
+    /** ?thumb=1: the small copy for a list (PhotoThumbnail), or the photo itself when none can be made. */
+    protected function showPhoto(HasMedia $model, int $slot): Response
     {
         $media = PhotoSlots::find($model, $slot);
         abort_if($media === null, 404);
+
+        if (request()->boolean('thumb') && ($thumb = app(PhotoThumbnail::class)->handle($media)) !== null) {
+            return response($thumb, 200, ['Content-Type' => 'image/jpeg', 'Cache-Control' => 'private, max-age=86400']);
+        }
 
         return response()->streamDownload(
             fn () => fpassthru($media->stream()),

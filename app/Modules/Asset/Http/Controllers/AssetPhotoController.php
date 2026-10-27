@@ -9,7 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Photos of an asset (a main one and three extras). Whoever may see the asset sees them;
@@ -26,7 +26,7 @@ class AssetPhotoController extends Controller
         return $this->storePhoto($request, $asset, $slot);
     }
 
-    public function show(Asset $asset, int $slot): StreamedResponse
+    public function show(Asset $asset, int $slot): Response
     {
         Gate::authorize('view', $asset);
 

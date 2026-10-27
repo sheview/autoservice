@@ -72,6 +72,7 @@ class AssetController extends Controller
             ->with(['category:id,name', 'branch:id,name'])
             ->paginate(20)
             ->withQueryString();
+        $assets->getCollection()->load('media');
         // Held by request lines asked for, approved or out; the rest of each asset is available.
         $held = $heldQuantities->handle($assets->getCollection()->modelKeys());
 
@@ -91,6 +92,7 @@ class AssetController extends Controller
                 'customer' => $customerNames[$asset->customer_id] ?? null,
                 'status' => $asset->status,
                 'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
+                'photo' => PhotoSlots::thumbnail($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
             ]);
 
         return Inertia::render('Asset/Assets/Index', [
