@@ -56,7 +56,7 @@ it('keeps parts and assets at a location, filters the lists by it and shows it',
     expect($part->storage_location_id)->toBe($main->id);
 
     $this->actingAs($this->admin)->get("/parts?storage_location_id={$main->id}")->assertInertia(fn (Assert $page) => $page
-        ->where('parts.total', 1)->where('parts.data.0.code', 'TN-1'));
+        ->where('parts.total', 1)->where('parts.data.0.code', 'TN-1')->where('parts.data.0.storage_location', 'คลังหลัก'));
     $this->actingAs($this->admin)->get("/parts/{$part->id}")->assertInertia(fn (Assert $page) => $page->where('part.storage_location', 'คลังหลัก'));
 
     $asset = createAsset($category, ['storage_location_id' => $main->id]);

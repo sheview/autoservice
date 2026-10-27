@@ -53,12 +53,16 @@ class PartController extends Controller
 
         $filters = SearchParts::filtersFrom($request);
         $user = $request->user();
+        $parts = $search->handle($filters)->paginate(20)->withQueryString();
+        // Where each part of the page is kept (the shared storage locations).
+        $locations = app(StorageLocationOptions::class)->names($parts->pluck('storage_location_id')->filter()->unique()->values()->all());
 
         return Inertia::render('Inventory/Parts/Index', [
-            'parts' => $search->handle($filters)->paginate(20)->withQueryString()->through(fn (Part $part) => [
+            'parts' => $parts->through(fn (Part $part) => [
                 ...$part->only(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'min_qty', 'qty_on_hand', 'is_active', 'track_serial']),
                 'unit_cost' => Money::toBaht($part->unit_cost),
                 'low' => $part->isLow(),
+                'storage_location' => $locations[$part->storage_location_id] ?? null,
             ]),
             'filters' => $filters,
             // Pieces whose serial number matches the search, with their history on the page.

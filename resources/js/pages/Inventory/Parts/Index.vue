@@ -23,6 +23,7 @@ interface PartRow {
     brand: string | null;
     unit: string;
     min_qty: number;
+    storage_location: string | null;
     qty_on_hand: number;
     unit_cost: string | null;
     is_active: boolean;
@@ -84,7 +85,7 @@ const columns = [
     { key: 'code', sortable: true, right: false },
     { key: 'name', sortable: true, right: false },
     { key: 'qty_on_hand', sortable: true, right: true },
-    { key: 'min_qty', sortable: false, right: true },
+    { key: 'storage_location', sortable: false, right: false },
     { key: 'unit_cost', sortable: true, right: true },
 ];
 
@@ -249,9 +250,7 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 <span class="font-medium">{{ part.qty_on_hand.toLocaleString('th-TH') }}</span>
                                 <span class="text-muted-foreground"> {{ part.unit }}</span>
                             </td>
-                            <td class="px-4 py-2 text-right text-muted-foreground">
-                                {{ part.min_qty > 0 ? part.min_qty.toLocaleString('th-TH') : t('common.none') }}
-                            </td>
+                            <td class="px-4 py-2 text-muted-foreground">{{ part.storage_location ?? t('common.none') }}</td>
                             <td class="whitespace-nowrap px-4 py-2 text-right">{{ money(part.unit_cost) }}</td>
                             <td class="px-4 py-2">
                                 <span :class="part.is_active ? '' : 'text-muted-foreground'">
