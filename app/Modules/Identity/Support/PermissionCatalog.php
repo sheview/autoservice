@@ -262,7 +262,8 @@ class PermissionCatalog
                 'dashboard.view' => 'all',
                 'purchase-requests.view' => 'all', 'purchase-requests.create' => 'all', 'purchase-requests.update' => 'own',
                 'purchase-requests.receive' => 'all',
-                'assets.view' => 'all', 'assets.create' => 'all',
+                // Fixes and removes what it registered (or anyone did); every change is in the activity log.
+                'assets.view' => 'all', 'assets.create' => 'all', 'assets.update' => 'all', 'assets.delete' => 'all',
                 'asset-categories.view' => 'all',
                 'asset-checkouts.view' => 'all', 'asset-checkouts.create' => 'all', 'asset-checkouts.fulfill' => 'all',
                 'parts.view' => 'all', 'parts.create' => 'all', 'parts.update' => 'all',

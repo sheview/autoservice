@@ -398,6 +398,25 @@ const submit = () => {
 const errors = computed(() => form.errors as Record<string, string>);
 const specError = (key: string) => errors.value[`specs.${key}`];
 
+// Location: one of the storage locations, or typed ("other", or a saved place that is not in the list).
+const OTHER_LOCATION = '__other__';
+const typingLocation = ref(form.location !== '' && !props.locations.some((location) => location.name === form.location));
+const locationChoice = computed({
+    get: () => form.location,
+    set: (value: string) => {
+        if (value === OTHER_LOCATION) {
+            form.location = '';
+            typingLocation.value = true;
+        } else {
+            form.location = value;
+        }
+    },
+});
+const pickLocation = () => {
+    typingLocation.value = false;
+    if (!props.locations.some((location) => location.name === form.location)) form.location = '';
+};
+
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>
 
@@ -439,6 +458,36 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <Input id="name" v-model="form.name" autocomplete="off" />
                             <InputError :message="form.errors.name" />
                         </div>
+
+                        <div class="grid content-start gap-2">
+                            <Label for="brand">{{ t('assets.brand') }}</Label>
+                            <Input
+                                id="brand"
+                                v-model="form.brand"
+                                list="brand_options"
+                                :placeholder="t('assets.brand_placeholder')"
+                                autocomplete="off"
+                            />
+                            <datalist id="brand_options">
+                                <option v-for="brand in brands" :key="brand.name" :value="brand.name" />
+                            </datalist>
+                            <p v-if="brandMatch" class="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
+                                {{ t('assets.brand_similar', { brand: form.brand.trim(), existing: brandMatch.name }) }}
+                                <button type="button" class="font-medium underline" @click="form.brand = brandMatch.name">
+                                    {{ t('assets.brand_use_existing', { existing: brandMatch.name }) }}
+                                </button>
+                            </p>
+                            <p v-else-if="brandIsNew" class="text-xs text-muted-foreground">{{ t('assets.brand_new') }}</p>
+                            <QuickPicks v-model="form.brand" :options="brandPicks" />
+                            <InputError :message="form.errors.brand" />
+                        </div>
+
+                        <div class="grid content-start gap-2">
+                            <Label for="model">{{ t('assets.model') }}</Label>
+                            <Input id="model" v-model="form.model" />
+                            <InputError :message="form.errors.model" />
+                        </div>
+
                         <!-- Already there: open or copy it instead of typing it again -->
                         <DuplicateMatches v-if="duplicateMatches.length" class="sm:col-span-2" :matches="duplicateMatches" />
 
@@ -512,17 +561,24 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
 
                         <div class="grid content-start gap-2">
                             <Label for="location">{{ t('assets.location') }}</Label>
-                            <!-- Picked from the storage locations (Settings) or typed: a name of the list is kept as that location -->
-                            <Input
-                                id="location"
-                                v-model="form.location"
-                                list="location_options"
-                                autocomplete="off"
-                                :placeholder="t('assets.location_placeholder')"
-                            />
-                            <datalist id="location_options">
-                                <option v-for="location in locations" :key="location.id" :value="location.name" />
-                            </datalist>
+                            <!-- Picked from the storage locations (Settings), or "other" to type it (a name of the list is kept as that location) -->
+                            <select v-if="locations.length && !typingLocation" id="location" v-model="locationChoice" :class="selectClass">
+                                <option value="">{{ t('assets.location_choose') }}</option>
+                                <option v-for="location in locations" :key="location.id" :value="location.name">{{ location.name }}</option>
+                                <option :value="OTHER_LOCATION">{{ t('assets.location_other') }}</option>
+                            </select>
+                            <div v-else class="flex gap-2">
+                                <Input
+                                    id="location"
+                                    v-model="form.location"
+                                    class="min-w-0 flex-1"
+                                    autocomplete="off"
+                                    :placeholder="t('assets.location_placeholder')"
+                                />
+                                <Button v-if="locations.length" type="button" variant="outline" @click="pickLocation">{{
+                                    t('assets.location_pick')
+                                }}</Button>
+                            </div>
                             <p class="text-xs text-muted-foreground">{{ t('assets.location_hint') }}</p>
                             <InputError :message="form.errors.location" />
                         </div>
@@ -661,35 +717,6 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                                         />
                                     </div>
                                     <InputError :message="form.errors.property_no" />
-                                </div>
-
-                                <div class="grid content-start gap-2">
-                                    <Label for="brand">{{ t('assets.brand') }}</Label>
-                                    <Input
-                                        id="brand"
-                                        v-model="form.brand"
-                                        list="brand_options"
-                                        :placeholder="t('assets.brand_placeholder')"
-                                        autocomplete="off"
-                                    />
-                                    <datalist id="brand_options">
-                                        <option v-for="brand in brands" :key="brand.name" :value="brand.name" />
-                                    </datalist>
-                                    <p v-if="brandMatch" class="flex flex-wrap items-center gap-2 text-xs text-amber-700 dark:text-amber-400">
-                                        {{ t('assets.brand_similar', { brand: form.brand.trim(), existing: brandMatch.name }) }}
-                                        <button type="button" class="font-medium underline" @click="form.brand = brandMatch.name">
-                                            {{ t('assets.brand_use_existing', { existing: brandMatch.name }) }}
-                                        </button>
-                                    </p>
-                                    <p v-else-if="brandIsNew" class="text-xs text-muted-foreground">{{ t('assets.brand_new') }}</p>
-                                    <QuickPicks v-model="form.brand" :options="brandPicks" />
-                                    <InputError :message="form.errors.brand" />
-                                </div>
-
-                                <div class="grid content-start gap-2">
-                                    <Label for="model">{{ t('assets.model') }}</Label>
-                                    <Input id="model" v-model="form.model" />
-                                    <InputError :message="form.errors.model" />
                                 </div>
 
                                 <div class="grid content-start gap-2">

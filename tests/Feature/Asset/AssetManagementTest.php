@@ -130,6 +130,24 @@ it('shows, updates and soft-deletes an asset, logging who did it', function () {
         ->and(Asset::withTrashed()->find($asset->id))->not->toBeNull();
 });
 
+it('lets purchasing edit and delete an asset, each change logged with who did it', function () {
+    $buyer = userWithRole('purchasing', ['name' => 'Buyer Ploy']);
+    $asset = createAsset($this->pc, ['specs' => ['cpu' => 'x']]);
+
+    $this->actingAs($buyer)->get("/assets/{$asset->ulid}")
+        ->assertInertia(fn (Assert $page) => $page->where('can.update', true)->where('can.delete', true));
+    $this->actingAs($buyer)->put("/assets/{$asset->ulid}", assetPayload(['brand' => 'Dell', 'model' => 'OptiPlex 7010']))
+        ->assertSessionHasNoErrors();
+    $this->actingAs($buyer)->delete("/assets/{$asset->ulid}")->assertRedirect('/assets');
+
+    $logs = Activity::where('subject_type', $asset->getMorphClass())->where('subject_id', $asset->id)->orderBy('id')->get();
+    expect($logs->pluck('event')->all())->toBe(['created', 'updated', 'deleted'])
+        ->and($logs[1]->properties['attributes']['brand'])->toBe('Dell')
+        ->and($logs[1]->properties['actor']['name'])->toBe('Buyer Ploy')
+        ->and($logs[2]->properties['actor']['name'])->toBe('Buyer Ploy')
+        ->and(Asset::withTrashed()->find($asset->id)->trashed())->toBeTrue();
+});
+
 it('does not find an asset by its numeric id', function () {
     $asset = createAsset($this->pc, ['specs' => ['cpu' => 'x']]);
 

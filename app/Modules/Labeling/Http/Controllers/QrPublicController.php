@@ -4,6 +4,7 @@ namespace App\Modules\Labeling\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\PublicAssetLabel;
+use App\Modules\Contract\Actions\ContractsForAsset;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicUrl;
 use App\Modules\Platform\Support\Turnstile;
@@ -22,7 +23,8 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * The public side of an asset's QR page (no sign-in): what the device is, its warranty and main photo, a form to
+ * The public side of an asset's QR page (no sign-in): what the device is, its warranty, its MA contract
+ * (number and period only) and main photo, a form to
  * report a problem with it (or, if a job is already running for it, a link to follow that job),
  * and a way for staff to sign in and come back. An unknown company, an unknown code and a wrong
  * key all give the same page, after the same lookup. Nothing here uses the staff's session or rights.
@@ -39,7 +41,7 @@ class QrPublicController extends Controller
     {
         $tenant = $this->usable($tenant);
         $key = $this->key($request);
-        [$asset, $running, $presets, $hasPhoto] = $this->context->run($tenant, function () use ($tenant, $code, $key) {
+        [$asset, $running, $presets, $hasPhoto, $contract] = $this->context->run($tenant, function () use ($tenant, $code, $key) {
             $asset = $this->label->handle($code, $key);
             $serviceOn = $asset && $this->modules->enabled('service', $tenant);
 
@@ -48,6 +50,7 @@ class QrPublicController extends Controller
                 $serviceOn ? app(OpenTicketOfAsset::class)->handle($asset['id']) : null,
                 $serviceOn ? app(RepairPresetList::class)->handle()['symptom'] : [],
                 $asset !== null && $this->label->photo($code, $key) !== null,
+                $asset && $this->modules->enabled('contract', $tenant) ? $this->contract($asset['id']) : null,
             ];
         });
 
@@ -58,6 +61,8 @@ class QrPublicController extends Controller
                 ...collect($asset)->except('id')->all(),
                 'photo' => $hasPhoto ? url($request->path().'/photo').'?k='.urlencode($key) : null,
             ] : null,
+            // The MA contract of the device: its number and period, never its title or customer.
+            'contract' => $contract,
             // A job already running for the device: follow it instead of reporting it again.
             'running' => $running ? PublicUrl::forTenant($tenant, '/track/'.$running->tracking_token) : null,
             'canReport' => $asset !== null && $this->modules->enabled('service', $tenant),
@@ -152,6 +157,19 @@ class QrPublicController extends Controller
             ['Content-Type' => $media->mime_type, 'Cache-Control' => 'private, max-age=3600'],
             'inline',
         );
+    }
+
+    /**
+     * The contract covering the device today, else the latest one it was or will be in; null when none.
+     *
+     * @return array{contract_no: string, starts_on: string, ends_on: string, phase: string}|null
+     */
+    private function contract(int $assetId): ?array
+    {
+        $contracts = app(ContractsForAsset::class)->handle($assetId);
+        $contract = collect($contracts)->firstWhere('covering', true) ?? $contracts[0] ?? null;
+
+        return $contract ? collect($contract)->only(['contract_no', 'starts_on', 'ends_on', 'phase'])->all() : null;
     }
 
     private function usable(?Tenant $tenant): ?Tenant

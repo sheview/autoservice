@@ -100,6 +100,23 @@ it('shows anyone else what the device is and its warranty, never where it is or 
     $this->actingAs($outsider)->get("{$this->url}?k={$this->key}")->assertInertia(fn (Assert $page) => $page->component('Labeling/QrPublic'));
 });
 
+it('shows on the public page the MA contract of the device, its number and period only', function () {
+    $this->get("{$this->url}?k={$this->key}")->assertInertia(fn (Assert $page) => $page->where('contract', null));
+
+    $old = createContract($this->customer, ['contract_no' => 'MA-OLD', 'starts_on' => now()->subYears(2)->toDateString(), 'ends_on' => now()->subYear()->toDateString()]);
+    $old->contractAssets()->create(['asset_id' => $this->asset->id]);
+    $this->get("{$this->url}?k={$this->key}")->assertInertia(fn (Assert $page) => $page->where('contract.contract_no', 'MA-OLD')->where('contract.phase', 'expired'));
+
+    $running = createContract($this->customer, ['contract_no' => 'MA-2569-001', 'title' => 'Secret title']);
+    $running->contractAssets()->create(['asset_id' => $this->asset->id]);
+    $response = $this->get("{$this->url}?k={$this->key}")->assertInertia(fn (Assert $page) => $page->where('contract', [
+        'contract_no' => 'MA-2569-001', 'starts_on' => $running->starts_on->toDateString(), 'ends_on' => $running->ends_on->toDateString(), 'phase' => 'active',
+    ]));
+    expect($response->getContent())->not->toContain('Secret title')->not->toContain('Acme');
+
+    $this->get("{$this->url}?k=wrongkey")->assertInertia(fn (Assert $page) => $page->where('contract', null));
+});
+
 it('brings staff back to the same device after signing in', function () {
     $this->get("{$this->url}?k={$this->key}")->assertInertia(fn (Assert $page) => $page->where('signIn', url("t/001/q/{$this->asset->asset_code}/staff").'?k='.$this->key));
 

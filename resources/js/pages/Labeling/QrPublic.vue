@@ -23,6 +23,8 @@ const props = defineProps<{
         warranty: 'none' | 'active' | 'expiring' | 'expired';
         photo: string | null;
     } | null;
+    // The MA contract: covering today, else the latest one (null: none, or the module is off).
+    contract: { contract_no: string; starts_on: string; ends_on: string; phase: 'upcoming' | 'active' | 'expiring' | 'expired' } | null;
     running: string | null;
     canReport: boolean;
     symptoms: string[];
@@ -110,6 +112,7 @@ const warrantyClass: Record<string, string> = {
     expiring: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200',
     expired: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200',
 };
+const contractClass: Record<string, string> = { ...warrantyClass, upcoming: warrantyClass.none };
 
 const input =
     'h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-base outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-100 dark:border-slate-700 dark:bg-slate-900';
@@ -139,6 +142,15 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                 </div>
                 <div class="rounded-xl px-3 py-2 text-sm font-semibold" :class="warrantyClass[asset.warranty]">
                     {{ t(`qr.warranty_states.${asset.warranty}`, { date: date(asset.warranty_expires_at) }) }}
+                </div>
+                <div class="rounded-xl px-3 py-2 text-sm font-semibold" :class="contractClass[contract?.phase ?? 'none']">
+                    {{
+                        t(`qr.contract_states.${contract?.phase ?? 'none'}`, {
+                            no: contract?.contract_no ?? '',
+                            from: date(contract?.starts_on ?? null),
+                            to: date(contract?.ends_on ?? null),
+                        })
+                    }}
                 </div>
                 <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-sm">
                     <template v-if="asset.brand">
