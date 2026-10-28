@@ -3,7 +3,6 @@ import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import DuplicateMatches, { type DuplicateMatch } from '@/components/DuplicateMatches.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import LabelCodes from '@/components/LabelCodes.vue';
 import PhotoPicker from '@/components/PhotoPicker.vue';
 import QuickPicks from '@/components/QuickPicks.vue';
 import SerialInputs from '@/components/SerialInputs.vue';
@@ -13,7 +12,6 @@ import { Label } from '@/components/ui/label';
 import { useDuplicates } from '@/composables/useDuplicates';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
-import { useLabelCodes, type CodeTarget } from '@/lib/labelCodes';
 import { pendingPhotos } from '@/lib/photoUpload';
 import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
@@ -112,44 +110,6 @@ const duplicateMatches = computed<DuplicateMatch[]>(() =>
 // (PhotoSlots pending-key), so a failed photo never loses the part.
 const photos = ref<File[]>([]);
 
-// Codes read from those photos (a box label photographed): the part number, and the S/N of a part
-// followed by serial into the first stock.
-const serialsOnForm = computed(() => !props.part && !!props.canReceive && form.track_serial);
-const codeTargets = computed<CodeTarget[]>(() => [
-    { key: 'part_number', label: t('parts.part_number'), fill: (value) => (form.part_number = value) },
-    ...(serialsOnForm.value
-        ? [
-              {
-                  key: 'serial',
-                  label: t('parts.sn_badge'),
-                  fill: (value: string) => {
-                      const serials = form.initial_serials.filter((serial) => serial.trim() !== '');
-                      if (!serials.some((serial) => serial.toLowerCase() === value.toLowerCase())) form.initial_serials = [...serials, value];
-                  },
-              },
-          ]
-        : []),
-]);
-const labelCodes = useLabelCodes(
-    () => codeTargets.value,
-    (codes) => {
-        let partNumberFree = form.part_number.trim() === '';
-        const plain = codes.filter((code) => code.kind === 'other');
-        return codes.map((code) => {
-            if (code.kind === 'serial') return serialsOnForm.value ? 'serial' : null;
-            // A lone code without a prefix: the part number while it is empty, else a serial.
-            if (code.kind === 'part_number' || (code.kind === 'other' && plain.length === 1)) {
-                if (partNumberFree) {
-                    partNumberFree = false;
-                    return 'part_number';
-                }
-                return code.kind === 'other' && serialsOnForm.value ? 'serial' : null;
-            }
-            return null;
-        });
-    },
-);
-
 // A new part takes its category's setting until it is changed here.
 watch(
     () => form.asset_category_id,
@@ -186,12 +146,6 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
             <Heading :title="title" />
 
             <form class="space-y-6" @submit.prevent="submit">
-                <!-- Creating only: photos first (a box label photographed fills the part number), sent once the part is saved -->
-                <div v-if="!part" class="space-y-3">
-                    <PhotoPicker v-model="photos" :hint="t('photos.label_hint')" @picked="labelCodes.read" />
-                    <LabelCodes :reader="labelCodes" :targets="codeTargets" />
-                </div>
-
                 <div class="grid gap-6 sm:grid-cols-3">
                     <div class="grid content-start gap-2">
                         <Label for="code" :required="!!part">{{ t('parts.code') }}</Label>
@@ -333,6 +287,12 @@ const textareaClass = 'w-full rounded-md border border-input bg-transparent px-3
                     <input v-model="form.is_active" type="checkbox" class="size-4 rounded border-input" />
                     {{ t('parts.is_active') }}
                 </label>
+
+                <!-- Creating only: photos last, taken once the form is filled in; sent once the part is saved -->
+                <section v-if="!part" class="space-y-2">
+                    <h3 class="text-sm font-semibold">{{ t('photos.title') }}</h3>
+                    <PhotoPicker v-model="photos" />
+                </section>
 
                 <div class="flex items-center gap-3">
                     <Button :disabled="form.processing">{{ t('common.save') }}</Button>

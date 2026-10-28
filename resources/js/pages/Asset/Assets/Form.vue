@@ -5,7 +5,6 @@ import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import DuplicateMatches, { type DuplicateMatch } from '@/components/DuplicateMatches.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import LabelCodes from '@/components/LabelCodes.vue';
 import PhotoPicker from '@/components/PhotoPicker.vue';
 import QuickPicks from '@/components/QuickPicks.vue';
 import { Button } from '@/components/ui/button';
@@ -14,7 +13,6 @@ import { Label } from '@/components/ui/label';
 import { useDuplicates } from '@/composables/useDuplicates';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
-import { useLabelCodes, type CodeTarget } from '@/lib/labelCodes';
 import { pendingPhotos } from '@/lib/photoUpload';
 import { similarBrand, type BrandUse } from '@/lib/similarBrand';
 import type { BreadcrumbItem } from '@/types';
@@ -221,31 +219,6 @@ const moreOpen = ref(!!props.asset || (typeof window !== 'undefined' && window.m
 // Photos picked before the asset exists (PhotoPicker): uploaded by its page once it is saved.
 const photos = ref<File[]>([]);
 
-// Codes read from those photos (a label photographed): the S/N, MAC and model go into their fields.
-const codeTargets = computed<CodeTarget[]>(() => [
-    { key: 'serial', label: t('assets.serial_number'), fill: addScannedSerial },
-    { key: 'mac', label: t('assets.mac_address'), fill: (value) => (form.mac_address = value) },
-    { key: 'model', label: t('assets.model'), fill: (value) => (form.model = value) },
-    { key: 'property_no', label: t('assets.property_no'), fill: (value) => (form.property_no = value) },
-]);
-const labelCodes = useLabelCodes(
-    () => codeTargets.value,
-    (codes) => {
-        // A lone code without a prefix on a label is most likely the S/N; several are left to the user.
-        const plain = codes.filter((code) => code.kind === 'other');
-        const loneSerial = plain.length === 1 && !codes.some((code) => code.kind === 'serial');
-        let macFree = form.mac_address.trim() === '';
-        return codes.map((code) => {
-            if (code.kind === 'serial' || (code.kind === 'other' && loneSerial)) return 'serial';
-            if (code.kind === 'mac' && macFree) {
-                macFree = false;
-                return 'mac';
-            }
-            return null;
-        });
-    },
-);
-
 const addSerial = () => {
     if (form.serials.length < props.maxSerials) {
         form.serials.push({ value: '' });
@@ -449,12 +422,6 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             </p>
 
             <form class="space-y-8" novalidate @submit.prevent="submit">
-                <!-- Creating only: photos first (a label photographed fills the S/N, MAC...), uploaded once the asset is saved -->
-                <div v-if="!asset" class="space-y-3">
-                    <PhotoPicker v-model="photos" :hint="t('photos.label_hint')" @picked="labelCodes.read" />
-                    <LabelCodes :reader="labelCodes" :targets="codeTargets" />
-                </div>
-
                 <section class="space-y-4">
                     <h3 class="text-sm font-semibold">{{ t('assets.general') }}</h3>
                     <div class="grid gap-6 sm:grid-cols-2">
@@ -866,6 +833,12 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         </section>
                     </div>
                 </details>
+
+                <!-- Creating only: photos last, taken once the form is filled in; uploaded once the asset is saved -->
+                <section v-if="!asset" class="space-y-2">
+                    <h3 class="text-sm font-semibold">{{ t('photos.title') }}</h3>
+                    <PhotoPicker v-model="photos" />
+                </section>
 
                 <!-- Before saving: a same-model warning (shown by the name) is passed by confirming -->
                 <div v-if="(!asset && onlyWarnings) || errors.duplicate" class="space-y-2">
