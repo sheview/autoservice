@@ -4,7 +4,7 @@ import TurnstileWidget from '@/components/TurnstileWidget.vue';
 import { t } from '@/lib/i18n';
 import { Head, useForm } from '@inertiajs/vue3';
 import { Camera, Check, LogIn, Plus, QrCode, Send, Trash2, Wrench } from 'lucide-vue-next';
-import { nextTick, ref } from 'vue';
+import { computed, nextTick, ref } from 'vue';
 
 // The public side of an asset's QR code: no sign-in, so no app layout. What the device is first
 // (PublicAssetLabel: never where it is or who uses it), then "report a problem" at the end, which
@@ -44,6 +44,25 @@ const form = useForm({
     website: '', // never shown: robots fill it in
     'cf-turnstile-response': '',
 });
+
+// Who reported last time on this phone: filled in again, so the next report is only the symptoms.
+const CONTACT_KEY = 'qr-report-contact';
+const savedContact = (() => {
+    try {
+        const saved = JSON.parse(localStorage.getItem(CONTACT_KEY) ?? 'null');
+        return saved && typeof saved.name === 'string' && (saved.phone || saved.email) ? saved : null;
+    } catch {
+        return null;
+    }
+})();
+if (savedContact) {
+    form.name = savedContact.name;
+    form.phone = savedContact.phone ?? '';
+    form.email = savedContact.email ?? '';
+}
+// The fields are shown when nothing is saved, when changing it, or when the server found a problem in them.
+const editingContact = ref(!savedContact);
+const contactOpen = computed(() => editingContact.value || !!(form.errors.name || form.errors.phone || form.errors.email));
 
 const chips = ref([...props.symptoms]);
 const typed = ref('');
@@ -93,7 +112,15 @@ const removePhoto = (i: number) => {
     previews.value.splice(i, 1);
 };
 
-const submit = () => props.action && form.post(props.action, { forceFormData: true, preserveScroll: true });
+const submit = () => {
+    if (!props.action) return;
+    try {
+        localStorage.setItem(CONTACT_KEY, JSON.stringify({ name: form.name.trim(), phone: form.phone.trim(), email: form.email.trim() }));
+    } catch {
+        // private mode / storage off: asked again next time
+    }
+    form.post(props.action, { forceFormData: true, preserveScroll: true });
+};
 
 // The form opens from the button at the end of the page.
 const reporting = ref(false);
@@ -232,12 +259,26 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                     />
                 </div>
 
-                <label class="block space-y-1.5">
+                <!-- Saved on this phone from the last report: shown, changed only when asked -->
+                <div v-if="!contactOpen" class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900">
+                    <div class="min-w-0">
+                        <div class="text-muted-foreground">{{ t('qr.reporter') }}</div>
+                        <div class="truncate font-semibold">{{ [form.name, form.phone || form.email].filter(Boolean).join(' · ') }}</div>
+                    </div>
+                    <button
+                        type="button"
+                        class="shrink-0 text-sm font-medium text-violet-700 underline dark:text-violet-300"
+                        @click="editingContact = true"
+                    >
+                        {{ t('qr.reporter_change') }}
+                    </button>
+                </div>
+                <label v-if="contactOpen" class="block space-y-1.5">
                     <span class="font-semibold">{{ t('qr.name') }} <span class="text-red-600">*</span></span>
                     <input v-model="form.name" :class="input" maxlength="100" autocomplete="name" required />
                     <InputError :message="form.errors.name" />
                 </label>
-                <div class="space-y-1.5">
+                <div v-if="contactOpen" class="space-y-1.5">
                     <div class="grid gap-3 sm:grid-cols-2">
                         <label class="block space-y-1.5">
                             <span class="font-semibold">{{ t('qr.phone') }}</span>
