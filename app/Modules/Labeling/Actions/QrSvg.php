@@ -12,11 +12,11 @@ use chillerlan\QRCode\QROptions;
  */
 class QrSvg
 {
-    private ?QRCode $qr = null;
+    private ?QROptions $options = null;
 
     public function handle(string $text): string
     {
-        $this->qr ??= new QRCode(new QROptions([
+        $this->options ??= new QROptions([
             'eccLevel' => EccLevel::M,
             'outputBase64' => false,
             'svgAddXmlHeader' => false,
@@ -25,8 +25,10 @@ class QrSvg
             'quietzoneSize' => 2,
             'drawLightModules' => false,
             'connectPaths' => true,
-        ]));
+        ]);
 
-        return $this->qr->render($text);
+        // A new QRCode each time: one that is reused keeps the text of every code before it
+        // (render() adds a data segment), so each label after the first held all the earlier links.
+        return (new QRCode($this->options))->render($text);
     }
 }

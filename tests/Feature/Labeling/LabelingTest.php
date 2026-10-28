@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Identity\Models\Role;
+use App\Modules\Labeling\Actions\QrSvg;
 use App\Modules\Labeling\Models\AssetLabelPrint;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicUrl;
@@ -53,6 +54,15 @@ it('renders the print page with a QR code that opens the scan page', function ()
     $this->actingAs($this->tech)->get('/labels/print?assets=')->assertNotFound();
     $this->actingAs($this->tech)->get("/labels/print?assets={$this->a1->ulid}&template=huge")->assertNotFound();
     $this->actingAs($this->tech)->get('/labels/print?assets='.implode(',', array_fill(0, 301, $this->a1->ulid)))->assertNotFound();
+});
+
+it('puts only its own link in the QR code of each label, not those of the labels before it', function () {
+    $own = fn ($asset) => (new QrSvg)->handle(PublicUrl::forTenant($this->tenant, "/q/{$asset->asset_code}?k={$asset->fresh()->public_key}"));
+
+    $this->actingAs($this->tech)->get("/labels/print?assets={$this->a1->ulid},{$this->a2->ulid}")
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('labels.0.qr', $own($this->a1))
+            ->where('labels.1.qr', $own($this->a2)));
 });
 
 it('only labels assets the user may see', function () {
