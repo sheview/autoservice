@@ -96,15 +96,15 @@ class QrPublicController extends Controller
             'symptoms.*' => ['required', 'string', 'max:100'],
             'note' => ['nullable', 'string', 'max:1000'],
             'name' => ['required', 'string', 'max:100'],
-            'phone' => ['nullable', 'required_without:email', 'string', 'max:30', 'regex:/^[0-9+\-() ]{6,30}$/'],
-            'email' => ['nullable', 'required_without:phone', 'email:rfc', 'max:150'],
+            // A phone number always: the technician calls back; the e-mail only gets the tracking link.
+            'phone' => ['required', 'string', 'max:30', 'regex:/^[0-9+\-() ]{6,30}$/'],
+            'email' => ['nullable', 'email:rfc', 'max:150'],
             'photos' => ['array', 'max:'.self::MAX_PHOTOS],
             'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PHOTO_KB],
             // A field people never see: filled in, it is a robot.
             'website' => ['nullable', 'string'],
         ], [
-            'phone.required_without' => __('service.reported.contact_required'),
-            'email.required_without' => __('service.reported.contact_required'),
+            'phone.required' => __('service.reported.contact_required'),
             'symptoms.required' => __('service.reported.symptom_required'),
         ], __('service.reported.fields'))->validate();
 

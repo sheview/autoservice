@@ -50,7 +50,7 @@ const CONTACT_KEY = 'qr-report-contact';
 const savedContact = (() => {
     try {
         const saved = JSON.parse(localStorage.getItem(CONTACT_KEY) ?? 'null');
-        return saved && typeof saved.name === 'string' && (saved.phone || saved.email) ? saved : null;
+        return saved && typeof saved.name === 'string' && saved.name && saved.phone ? saved : null;
     } catch {
         return null;
     }
@@ -263,7 +263,7 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                 <div v-if="!contactOpen" class="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm dark:bg-slate-900">
                     <div class="min-w-0">
                         <div class="text-muted-foreground">{{ t('qr.reporter') }}</div>
-                        <div class="truncate font-semibold">{{ [form.name, form.phone || form.email].filter(Boolean).join(' · ') }}</div>
+                        <div class="truncate font-semibold">{{ [form.name, form.phone].filter(Boolean).join(' · ') }}</div>
                     </div>
                     <button
                         type="button"
@@ -281,8 +281,8 @@ const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl 
                 <div v-if="contactOpen" class="space-y-1.5">
                     <div class="grid gap-3 sm:grid-cols-2">
                         <label class="block space-y-1.5">
-                            <span class="font-semibold">{{ t('qr.phone') }}</span>
-                            <input v-model="form.phone" :class="input" type="tel" inputmode="tel" maxlength="30" autocomplete="tel" />
+                            <span class="font-semibold">{{ t('qr.phone') }} <span class="text-red-600">*</span></span>
+                            <input v-model="form.phone" :class="input" type="tel" inputmode="tel" maxlength="30" autocomplete="tel" required />
                         </label>
                         <label class="block space-y-1.5">
                             <span class="font-semibold">{{ t('qr.email') }}</span>

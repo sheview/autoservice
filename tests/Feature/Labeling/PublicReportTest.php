@@ -61,9 +61,9 @@ it('opens no second ticket for a device already being looked after', function ()
 it('trusts nothing from the public form', function () {
     // Many tries in a row here: the rate limits have their own test.
     $this->withoutMiddleware(ThrottleRequests::class);
-    ($this->report)(['phone' => null])->assertSessionHasErrors(['phone', 'email']);
+    ($this->report)(['phone' => null, 'email' => 'cust@example.com'])->assertSessionHasErrors('phone');                // an e-mail alone is not enough
     ($this->report)(['symptoms' => []])->assertSessionHasErrors('symptoms');
-    ($this->report)(['email' => 'not-an-email', 'phone' => null])->assertSessionHasErrors('email');
+    ($this->report)(['email' => 'not-an-email'])->assertSessionHasErrors('email');
     ($this->report)(['photos' => [UploadedFile::fake()->create('virus.exe', 10)]])->assertSessionHasErrors('photos.0');
     expect(Ticket::count())->toBe(0);
 

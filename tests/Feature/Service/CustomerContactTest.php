@@ -17,7 +17,7 @@ beforeEach(function () {
     $this->asset = createAsset(createAssetCategory());
     $this->key = $this->asset->fresh()->public_key;
     $this->report = fn (array $data = []) => $this->post("/t/001/q/{$this->asset->asset_code}/report?k={$this->key}", $data + [
-        'symptoms' => ['เปิดไม่ติด'], 'name' => 'Khun Customer', 'email' => 'cust@example.com',
+        'symptoms' => ['เปิดไม่ติด'], 'name' => 'Khun Customer', 'phone' => '0812345678', 'email' => 'cust@example.com',
     ]);
 });
 
