@@ -121,3 +121,30 @@ it('leaves the approver off the signature block until they sign, and lets them s
     $this->actingAs($this->admin)->get("{$this->url}/pdf")->assertOk();
     expect(sheetSent())->toContain($approverBox)->toContain('grid-template-columns: repeat(3,');
 });
+
+it('turns the equipment table when it has many fields: a row per field, six pieces to a table', function () {
+    $checks = fn (string $answer) => array_map(fn (int $n) => ['key' => "c{$n}", 'label' => "Check System Status {$n}", 'type' => 'pass_fail', 'answer' => $answer], range(1, 7));
+    $items = array_map(fn (int $n) => [
+        'asset' => ['asset_code' => sprintf('AP-%05d', $n), 'name' => "Access Point {$n}"],
+        'checks' => $checks($n === 2 ? 'fail' : 'pass'),
+        'result' => $n === 2 ? 'failed' : 'passed',
+        'note' => null,
+    ], range(1, 7));
+
+    $html = view('documents.partials.pm-sheet-grouped', ['items' => $items])->render();
+
+    // 7 pieces: two tables, each field a row (its label written once per table)
+    expect(substr_count($html, 'class="grouped turned"'))->toBe(2)
+        ->and(substr_count($html, 'Check System Status 1<'))->toBe(2)
+        ->and($html)->toContain('AP-00007')->toContain('รายการตรวจ')->toContain('#b91c1c')
+        // the second table keeps the width of six pieces
+        ->and(substr_count($html, 'class="blank"'))->toBe(5 * (1 + 7 + 2));
+
+    // one piece: one table as wide as it, no empty columns
+    expect(view('documents.partials.pm-sheet-grouped', ['items' => [$items[0]]])->render())->not->toContain('class="blank"');
+
+    // few fields: a column per field, as before
+    $few = array_map(fn (array $item) => ['checks' => array_slice($item['checks'], 0, 3)] + $item, $items);
+    expect(view('documents.partials.pm-sheet-grouped', ['items' => $few])->render())
+        ->toContain('class="grouped"')->not->toContain('turned');
+});

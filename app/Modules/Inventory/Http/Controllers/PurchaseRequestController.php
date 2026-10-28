@@ -18,6 +18,7 @@ use App\Modules\Inventory\Actions\MovePurchaseBatch;
 use App\Modules\Inventory\Actions\MovePurchaseRequest;
 use App\Modules\Inventory\Actions\OpenPurchaseRequests;
 use App\Modules\Inventory\Actions\PurchaseBatchOf;
+use App\Modules\Inventory\Actions\PurchaseItemSuggestions;
 use App\Modules\Inventory\Actions\SavePurchaseRequest;
 use App\Modules\Inventory\Actions\SearchPurchaseRequests;
 use App\Modules\Inventory\Http\Requests\PurchaseRequestRequest;
@@ -32,6 +33,7 @@ use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
 use App\Modules\Tenancy\Support\CompanyProfile;
 use App\Modules\Tenancy\Support\TenantContext;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -96,6 +98,14 @@ class PurchaseRequestController extends Controller
             'maxLinks' => PurchaseRequest::MAX_LINKS,
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle(null, $request->user(), 'purchase-requests.create') : [],
         ]);
+    }
+
+    /** What to suggest while the item name is typed (?q=): parts in stock and items bought before. */
+    public function suggestions(Request $request, PurchaseItemSuggestions $suggestions): JsonResponse
+    {
+        Gate::authorize('create', PurchaseRequest::class);
+
+        return response()->json($suggestions->handle($request->user(), $request->string('q')->trim()->limit(100, '')->value()));
     }
 
     /** One item, or several asked for together (one request each, in one batch). */

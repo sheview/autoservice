@@ -1644,6 +1644,13 @@ return [
         'pr_no' => 'เลขที่',
         'item_name' => 'รายการที่ต้องการ',
         'item_placeholder' => 'เช่น Notebook สำหรับงานบัญชี',
+        'suggest' => [
+            'title' => 'แนะนำ (เลือกเพื่อเติมหน่วย ราคา และประเภทให้)',
+            'part' => 'อะไหล่ในระบบ',
+            'purchase' => 'เคยขอซื้อ',
+            'on_hand' => 'คงเหลือ :qty :unit',
+            'price' => ':price บาท',
+        ],
         'description_field' => 'รายละเอียด / สเปก',
         'description_placeholder' => 'สเปกที่ต้องการ เช่น RAM 16GB, SSD 512GB, จอ 14 นิ้ว',
         'quantity' => 'จำนวน',
@@ -4203,6 +4210,8 @@ return [
         'item_placeholder' => 'พิมพ์รหัส ชื่อ รุ่น หรือ Serial ของทรัพย์สิน หรือรหัส/ชื่ออะไหล่',
         'item_placeholder_assets' => 'พิมพ์รหัส ชื่อ รุ่น หรือ Serial ของทรัพย์สิน',
         'searching' => 'กำลังค้นหา...',
+        'frequent' => 'ที่เบิกบ่อย',
+        'frequent_hide' => 'ซ่อนรายการที่เบิกบ่อย',
         'groups' => [
             'assets' => 'ทรัพย์สิน',
             'parts' => 'อะไหล่',

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import ListThumb from '@/components/ListThumb.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -58,6 +59,7 @@ interface Line {
     note: string;
     // Bought on this purchase request: handing it out counts there.
     purchase_request_id: number | null;
+    photo: string | null;
 }
 
 const page = usePage<SharedData>();
@@ -88,6 +90,7 @@ const lineFrom = (option: CheckoutItemOption): Line => ({
     due_return_date: '',
     note: '',
     purchase_request_id: null,
+    photo: option.photo,
 });
 
 const initialLines = (): Line[] => {
@@ -107,6 +110,7 @@ const initialLines = (): Line[] => {
             due_return_date: item.due_return_date ?? '',
             note: item.note ?? '',
             purchase_request_id: item.purchase_request_id,
+            photo: null,
         }));
     }
     return props.firstItem ? [lineFrom(props.firstItem)] : [];
@@ -209,6 +213,27 @@ watch(itemSearch, () => {
     }, 300);
 });
 
+// Nothing typed: what the company asks for most, shown when the box is entered (looked up once).
+const frequent = ref<{ assets: CheckoutItemOption[]; parts: CheckoutItemOption[] } | null>(null);
+const showFrequent = ref(false);
+const openFrequent = async () => {
+    if (itemSearch.value.trim() !== '' || full.value) return;
+    showFrequent.value = true;
+    if (frequent.value) return;
+    try {
+        frequent.value = await getJson(route('asset.requests.items'));
+    } catch {
+        frequent.value = { assets: [], parts: [] };
+    }
+};
+// The list under the box: the search results, else the frequent items (when there are any).
+const suggesting = computed(() => itemResults.value === null);
+const shownItems = computed(() => {
+    if (itemResults.value) return itemResults.value;
+    const f = frequent.value;
+    return showFrequent.value && f && f.assets.length + f.parts.length > 0 ? f : null;
+});
+
 const sameItem = (line: Line, option: CheckoutItemOption) =>
     line.item_type === option.item_type && (option.item_type === 'asset' ? line.asset_id === option.asset_id : line.part_id === option.part_id);
 const added = (option: CheckoutItemOption) => lines.value.some((line) => sameItem(line, option));
@@ -244,6 +269,7 @@ onMounted(() => {
                 line.available = option.available;
                 line.lot = option.lot;
                 line.detail = option.detail;
+                line.photo = option.photo;
             }
         } catch {
             // Leave it unknown: the server checks again on save.
@@ -470,18 +496,32 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                         autocomplete="off"
                         :disabled="full"
                         :placeholder="partsEnabled ? t('requests.item_placeholder') : t('requests.item_placeholder_assets')"
+                        @focus="openFrequent"
+                        @click="openFrequent"
                     />
                     <p v-if="full" class="text-xs text-amber-700 dark:text-amber-400">{{ t('requests.lines_full', { max: maxItems }) }}</p>
                     <p v-if="searching" class="text-xs text-muted-foreground">{{ t('requests.searching') }}</p>
-                    <div v-else-if="itemResults" class="max-h-80 overflow-y-auto rounded-md border">
+                    <div v-else-if="shownItems" class="max-h-96 overflow-y-auto rounded-md border">
+                        <div v-if="suggesting" class="flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold">
+                            {{ t('requests.frequent') }}
+                            <button
+                                type="button"
+                                class="text-muted-foreground hover:text-foreground"
+                                :aria-label="t('requests.frequent_hide')"
+                                @click="showFrequent = false"
+                            >
+                                <X class="h-4 w-4" />
+                            </button>
+                        </div>
                         <template v-for="group in ['assets', 'parts'] as const" :key="group">
-                            <template v-if="itemResults[group].length">
+                            <template v-if="shownItems[group].length">
                                 <div class="bg-muted/50 px-3 py-1 text-xs font-medium">{{ t(`requests.groups.${group}`) }}</div>
                                 <div
-                                    v-for="option in itemResults[group]"
+                                    v-for="option in shownItems[group]"
                                     :key="`${option.item_type}-${option.asset_id ?? option.part_id}`"
                                     class="flex items-center gap-3 border-t px-3 py-2 text-sm"
                                 >
+                                    <ListThumb :src="option.photo" :alt="option.name" />
                                     <div class="min-w-0 flex-1">
                                         <span class="font-mono text-xs">{{ option.code }}</span>
                                         {{ option.name }}
@@ -513,7 +553,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                             </template>
                         </template>
                         <div
-                            v-if="itemResults.assets.length === 0 && itemResults.parts.length === 0"
+                            v-if="!suggesting && shownItems.assets.length === 0 && shownItems.parts.length === 0"
                             class="space-y-2 px-3 py-4 text-center text-sm text-muted-foreground"
                         >
                             <p>{{ t('requests.no_items_found') }}</p>
@@ -542,6 +582,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                     class="space-y-3 rounded-md border p-3"
                 >
                     <div class="flex items-start gap-3">
+                        <ListThumb :src="line.photo" :alt="line.name" />
                         <div class="min-w-0 flex-1">
                             <div class="text-xs text-muted-foreground">{{ t(`requests.item_types.${line.item_type}`) }}</div>
                             <div class="text-sm">

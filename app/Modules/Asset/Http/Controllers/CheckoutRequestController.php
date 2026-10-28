@@ -8,6 +8,7 @@ use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Actions\CancelCheckoutRequest;
 use App\Modules\Asset\Actions\CloseCheckoutRequest;
 use App\Modules\Asset\Actions\ConfirmCheckoutReceipt;
+use App\Modules\Asset\Actions\FrequentCheckoutItems;
 use App\Modules\Asset\Actions\FulfillCheckoutRequest;
 use App\Modules\Asset\Actions\RejectCheckoutRequest;
 use App\Modules\Asset\Actions\ReturnCheckoutRequest;
@@ -28,6 +29,7 @@ use App\Modules\Contract\Actions\ContractOptions;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
+use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\FindPartUnits;
@@ -318,25 +320,39 @@ class CheckoutRequestController extends Controller
         return back()->with('success', __('asset.requests.closed', ['no' => $checkout->request_no]));
     }
 
-    /** Assets that may be asked for and parts, for the line picker (?q=). */
+    /**
+     * Assets that may be asked for and parts, for the line picker (?q=). Nothing typed: what the
+     * company asks for most (FrequentCheckoutItems), most often first.
+     */
     public function items(Request $request, AssetHeldQuantities $held, PartsForCheckout $parts): JsonResponse
     {
         Gate::authorize('create', CheckoutRequest::class);
         $search = $request->string('q')->trim()->value();
+        $inventory = $this->modules->enabled('inventory');
 
-        $assets = SearchAssets::askableBy(Asset::query(), $request->user())
-            ->whereIn('status', [Asset::STATUS_IN_USE, Asset::STATUS_SPARE])
-            ->when($search !== '', fn ($q) => $q->where(fn ($q) => $q
-                ->where('asset_code', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%")
-                ->orWhere('serial_number', 'like', "%{$search}%")->orWhere('model', 'like', "%{$search}%")))
-            ->orderBy('name')->limit(30)->get();
+        if ($search === '') {
+            $frequent = collect(app(FrequentCheckoutItems::class)->handle());
+            $assetIds = $frequent->where('item_type', CheckoutItem::TYPE_ASSET)->pluck('id')->all();
+            $partIds = $frequent->where('item_type', CheckoutItem::TYPE_PART)->pluck('id')->all();
+            $assets = $assetIds === [] ? collect() : SearchAssets::askableBy(Asset::query(), $request->user())
+                ->whereKey($assetIds)->whereIn('status', [Asset::STATUS_IN_USE, Asset::STATUS_SPARE])->with('media')->get()
+                ->sortBy(fn (Asset $asset) => array_search($asset->id, $assetIds, true));
+            $partRows = $partIds === [] || ! $inventory ? [] : $parts->handle($partIds);
+            $partRows = array_filter(array_map(fn (int $id) => $partRows[$id] ?? null, $partIds), fn (?array $part) => $part !== null && $part['is_active']);
+        } else {
+            $assets = SearchAssets::askableBy(Asset::query(), $request->user())
+                ->whereIn('status', [Asset::STATUS_IN_USE, Asset::STATUS_SPARE])
+                ->where(fn ($q) => $q
+                    ->where('asset_code', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('serial_number', 'like', "%{$search}%")->orWhere('model', 'like', "%{$search}%"))
+                ->orderBy('name')->limit(30)->with('media')->get();
+            $partRows = $inventory ? $parts->handle(null, $search) : [];
+        }
         $heldBy = $held->handle($assets->pluck('id')->all());
 
         return response()->json([
             'assets' => $assets->map(fn (Asset $asset) => $this->assetOption($asset, $heldBy[$asset->id] ?? 0))->values(),
-            'parts' => $this->modules->enabled('inventory')
-                ? collect($parts->handle(null, $search))->map(fn (array $part) => $this->partOption($part))->values()
-                : [],
+            'parts' => collect($partRows)->map(fn (array $part) => $this->partOption($part))->values(),
         ]);
     }
 
@@ -511,6 +527,10 @@ class CheckoutRequestController extends Controller
             'unit' => $asset->unit,
             'lot' => (int) $asset->quantity > 1,
             'available' => max(0, (int) $asset->quantity - $held),
+            // Only for whoever may open it (the photo address checks the same).
+            'photo' => request()->user()?->can('view', $asset)
+                ? PhotoSlots::thumbnail($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot]))
+                : null,
         ];
     }
 
@@ -528,6 +548,7 @@ class CheckoutRequestController extends Controller
             'unit' => $part['unit'],
             'lot' => true,
             'available' => $part['qty_on_hand'],
+            'photo' => $part['photo'],
         ];
     }
 

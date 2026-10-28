@@ -247,3 +247,28 @@ it('lets the approver approve or turn down a whole batch in one go', function ()
     $other = userWithRole('admin_company', [], createTenant('other'));
     $this->actingAs($other)->post("/purchase-requests/{$first->ulid}/move-batch", ['action' => 'approve'])->assertNotFound();
 });
+
+it('suggests parts in stock and items bought before while the item name is typed', function () {
+    createPart(['code' => 'NB-BAG', 'name' => 'Notebook bag', 'unit' => 'ใบ', 'unit_cost' => 45000], stock: 3);
+    $this->actingAs($this->staff)->post('/purchase-requests', $this->payload)->assertSessionHasNoErrors();
+    // asked for again: suggested once, the latest
+    $this->actingAs($this->staff)->post('/purchase-requests', [...$this->payload, 'unit_price' => '24000'])->assertSessionHasNoErrors();
+    $mine = PurchaseRequest::latest('id')->first();
+
+    $this->actingAs($this->admin)->getJson('/purchase-requests/suggestions?q=noteb')->assertOk()->assertJson([
+        ['source' => 'part', 'code' => 'NB-BAG', 'name' => 'Notebook bag', 'unit' => 'ใบ', 'unit_price' => '450.00', 'item_kind' => 'part', 'on_hand' => 3],
+        ['source' => 'purchase', 'code' => $mine->pr_no, 'name' => 'Notebook for accounting', 'unit' => 'เครื่อง', 'unit_price' => '24000.00',
+            'description' => 'RAM 16GB', 'links' => ['https://shop.example.com/lenovo-e14']],
+    ])->assertJsonCount(2);
+
+    // one letter is too little to suggest
+    $this->actingAs($this->admin)->getJson('/purchase-requests/suggestions?q=n')->assertExactJson([]);
+
+    // scope own: only one's own requests are suggested
+    $desk = userWithRole('technician', ['name' => 'Other Tech']);
+    expect(collect($this->actingAs($desk)->getJson('/purchase-requests/suggestions?q=noteb')->json())->where('source', 'purchase'))->toBeEmpty();
+
+    // another company sees none of it
+    $other = userWithRole('admin_company', [], createTenant('other'));
+    $this->actingAs($other)->getJson('/purchase-requests/suggestions?q=noteb')->assertExactJson([]);
+});

@@ -2,7 +2,9 @@
 
 namespace App\Modules\Inventory\Actions;
 
+use App\Modules\Document\Support\PhotoSlots;
 use App\Modules\Inventory\Models\Part;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Parts as plain arrays for the issue/loan requests (Asset module): by id, or found by a search
@@ -15,7 +17,7 @@ class PartsForCheckout
     /**
      * @param  list<int>|null  $ids  these parts (deleted and inactive ones too); null = search
      * @return array<int, array{id: int, code: string, name: string, part_number: string|null, brand: string|null, unit: string,
-     *     qty_on_hand: int, unit_cost: int|null, is_active: bool, track_serial: bool}> keyed by id
+     *     qty_on_hand: int, unit_cost: int|null, is_active: bool, track_serial: bool, photo: string|null}> keyed by id
      */
     public function handle(?array $ids = null, string $search = ''): array
     {
@@ -28,8 +30,10 @@ class PartsForCheckout
                     ->orWhere('part_number', 'like', "%{$search}%")))
                 ->orderBy('name')
                 ->limit(self::LIMIT);
+        // The photo only for whoever may open it (the photo address checks the same).
+        $photos = Gate::allows('viewAny', Part::class);
 
-        return $query->get(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'qty_on_hand', 'unit_cost', 'is_active', 'track_serial'])
+        return $query->with('media')->get(['id', 'code', 'name', 'part_number', 'brand', 'unit', 'qty_on_hand', 'unit_cost', 'is_active', 'track_serial'])
             ->mapWithKeys(fn (Part $part) => [$part->id => [
                 'id' => $part->id,
                 'code' => $part->code,
@@ -42,6 +46,7 @@ class PartsForCheckout
                 'is_active' => (bool) $part->is_active,
                 // Issued by choosing pieces (serial numbers), not by a quantity.
                 'track_serial' => (bool) $part->track_serial,
+                'photo' => $photos ? PhotoSlots::thumbnail($part, fn (int $slot) => route('inventory.parts.photos.show', [$part, $slot])) : null,
             ]])
             ->all();
     }

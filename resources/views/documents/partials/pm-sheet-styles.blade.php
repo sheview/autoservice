@@ -24,6 +24,12 @@
     .pm-grid th, .pm-grid td { border: 1px solid #ccc; padding: 1px 4px; font-size: 9pt; text-align: center; }
     .pm-grid td:first-child { text-align: left; }
     .grouped th, .grouped td { font-size: 8.5pt; padding: 2px 3px; }
+    .grouped.turned { margin-bottom: 5mm; }
+    .grouped.turned th, .grouped.turned td { font-size: 9.5pt; padding: 3px 5px; }
+    .grouped.turned .code { font-family: monospace; white-space: nowrap; }
+    .grouped.turned tbody th { text-align: left; }
+    .grouped.turned tbody tr { break-inside: avoid; }
+    .grouped.turned .blank { background: #fafafa; }
     .draft-mark { color: #b91c1c; border: 1px solid #b91c1c; padding: 0 6px; font-weight: 700; }
     .photos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
     .photos img { width: 100%; height: 40mm; object-fit: cover; border: 1px solid #ccc; }

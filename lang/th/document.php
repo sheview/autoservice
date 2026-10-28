@@ -295,6 +295,7 @@ return [
         'pending' => 'ยังไม่ตรวจ',
         'equipment_list' => 'รายการอุปกรณ์',
         'equipment' => 'อุปกรณ์',
+        'check_item' => 'รายการตรวจ',
         'result' => 'ผล',
         'failures' => 'ข้อที่ผิดปกติ',
         'instrument' => 'เครื่องมือวัด',

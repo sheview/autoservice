@@ -3,6 +3,7 @@ import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue
 import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PurchaseItemInput, { type PurchaseItemSuggestion } from '@/components/PurchaseItemInput.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -85,6 +86,23 @@ const removeExtraLink = (item: ExtraItem, index: number) => {
     if (item.links.length === 0) item.links.push('');
 };
 
+// A suggestion picked for the item name: its unit, price and kind; its description and links
+// only where nothing is written yet.
+type ItemFields = Pick<ExtraItem, 'unit' | 'unit_price' | 'description' | 'links' | 'item_kind' | 'asset_category_id'>;
+const applySuggestion = (item: ItemFields, suggestion: PurchaseItemSuggestion) => {
+    if (suggestion.unit) item.unit = suggestion.unit;
+    if (suggestion.unit_price !== null) item.unit_price = suggestion.unit_price;
+    if (
+        suggestion.item_kind === 'part' ||
+        (suggestion.item_kind === 'asset' && props.categories.some((c) => c.id === suggestion.asset_category_id))
+    ) {
+        item.item_kind = suggestion.item_kind;
+        item.asset_category_id = suggestion.asset_category_id;
+    }
+    if (!item.description.trim() && suggestion.description) item.description = suggestion.description;
+    if (item.links.every((link) => !link.trim()) && suggestion.links.length) item.links = suggestion.links.slice(0, props.maxLinks);
+};
+
 const total = computed(() => {
     const price = Number(form.unit_price);
     return form.unit_price === '' || Number.isNaN(price)
@@ -143,7 +161,13 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
                     <div class="grid content-start gap-2 sm:col-span-2">
                         <Label for="item_name">{{ t('purchase_requests.item_name') }}<span class="text-red-600"> *</span></Label>
-                        <Input id="item_name" v-model="form.item_name" required :placeholder="t('purchase_requests.item_placeholder')" />
+                        <PurchaseItemInput
+                            id="item_name"
+                            v-model="form.item_name"
+                            required
+                            :placeholder="t('purchase_requests.item_placeholder')"
+                            @pick="applySuggestion(form, $event)"
+                        />
                         <InputError :message="form.errors.item_name" />
                     </div>
                     <div class="grid content-start gap-2">
@@ -269,7 +293,12 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                             <div class="grid content-start gap-2 sm:col-span-2">
                                 <Label :for="`extra_${index}_name`">{{ t('purchase_requests.item_name') }}<span class="text-red-600"> *</span></Label>
-                                <Input :id="`extra_${index}_name`" v-model="item.item_name" required />
+                                <PurchaseItemInput
+                                    :id="`extra_${index}_name`"
+                                    v-model="item.item_name"
+                                    required
+                                    @pick="applySuggestion(item, $event)"
+                                />
                                 <InputError :message="itemError(index, 'item_name')" />
                             </div>
                             <div class="grid content-start gap-2">

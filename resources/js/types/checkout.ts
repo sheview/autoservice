@@ -114,6 +114,8 @@ export interface CheckoutItemOption {
     // Asked for by quantity (a lot asset or a part); otherwise one.
     lot: boolean;
     available: number;
+    // The main photo, small (null: none, or the user may not open it).
+    photo: string | null;
 }
 
 // The issue/loan panel on an asset or part page.

@@ -7,7 +7,9 @@ use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Inventory\Models\StockMovement;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -473,4 +475,30 @@ it('offers the customers of the company as the department of a request', functio
     // A name typed by hand is kept as it is.
     ($this->send)([($this->asset)($this->notebook)], ['borrower_department' => 'ฝ่ายขาย'])->assertSessionHasNoErrors();
     expect(CheckoutRequest::sole()->borrower_department)->toBe('ฝ่ายขาย');
+});
+
+it('suggests what the company asks for most before anything is typed, with photos for those who may see them', function () {
+    Storage::fake('local');
+    ($this->send)([($this->part)(1), ($this->asset)($this->notebook)], ['ticket_id' => $this->ticket->id])->assertSessionHasNoErrors();
+    ($this->send)([($this->part)(2)], ['ticket_id' => $this->ticket->id])->assertSessionHasNoErrors();
+    // a draft is not asked for yet
+    ($this->send)([($this->asset)($this->cables)], ['submit' => false])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/parts/{$this->ram->id}/photos/0", ['photo' => UploadedFile::fake()->image('ram.jpg')])
+        ->assertSessionHasNoErrors();
+
+    $frequent = $this->actingAs($this->desk)->getJson('/checkout-requests/items')->assertOk();
+    expect(collect($frequent->json('parts'))->pluck('part_id')->all())->toBe([$this->ram->id])
+        ->and(collect($frequent->json('assets'))->pluck('asset_id')->all())->toBe([$this->notebook->id])
+        ->and($frequent->json('parts.0.photo'))->toStartWith(url("/parts/{$this->ram->id}/photos/0").'?thumb=1')
+        ->and($frequent->json('assets.0.photo'))->toBeNull();
+
+    // typed: the search as before, with the photo too
+    expect($this->actingAs($this->desk)->getJson('/checkout-requests/items?q=RAM')->json('parts.0.photo'))->not->toBeNull();
+
+    // someone who may not open parts gets no photo address (it would not load)
+    expect($this->actingAs($this->staff)->getJson('/checkout-requests/items')->json('parts.0.photo'))->toBeNull();
+
+    // another company has its own history
+    $other = userWithRole('admin_company', [], createTenant('other'));
+    $this->actingAs($other)->getJson('/checkout-requests/items')->assertExactJson(['assets' => [], 'parts' => []]);
 });

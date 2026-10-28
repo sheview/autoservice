@@ -44,6 +44,7 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     Route::post('stock-receipts', [StockReceiptController::class, 'store'])->name('stock-receipts.store');
 
     // Purchase requests
+    Route::get('purchase-requests/suggestions', [PurchaseRequestController::class, 'suggestions'])->name('purchase-requests.suggestions');
     Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);
     Route::post('purchase-requests/{purchase_request}/move', [PurchaseRequestController::class, 'move'])->name('purchase-requests.move');
     Route::post('purchase-requests/{purchase_request}/move-batch', [PurchaseRequestController::class, 'moveBatch'])->name('purchase-requests.move-batch');
