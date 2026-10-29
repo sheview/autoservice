@@ -5,7 +5,7 @@ import { ref, watch, type Ref } from 'vue';
  * after the last key): `routeName` answers JSON for the query from `params` (empty values left
  * out; nothing to check = no request). An answer older than the latest is dropped.
  */
-export function useDuplicates<T>(routeName: string, params: () => Record<string, string | number | null | undefined>): Ref<T[]> {
+export function useDuplicates<T>(routeName: string, params: () => Record<string, string | number | string[] | null | undefined>): Ref<T[]> {
     const matches = ref<T[]>([]) as Ref<T[]>;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let latest = 0;
@@ -14,7 +14,11 @@ export function useDuplicates<T>(routeName: string, params: () => Record<string,
         params,
         (values) => {
             clearTimeout(timer);
-            const query = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== null && value !== undefined && String(value).trim() !== ''));
+            const query = Object.fromEntries(
+                Object.entries(values).filter(([, value]) =>
+                    Array.isArray(value) ? value.length > 0 : value !== null && value !== undefined && String(value).trim() !== '',
+                ),
+            );
             const checks = Object.keys(query).filter((key) => key !== 'except');
             if (!checks.length) {
                 matches.value = [];

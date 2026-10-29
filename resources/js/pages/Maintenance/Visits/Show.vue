@@ -14,7 +14,7 @@ import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { FileSpreadsheet, FileUp, Printer } from 'lucide-vue-next';
+import { FileSpreadsheet, FileUp, Printer, Share2 } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 
 interface Signature {
@@ -199,6 +199,8 @@ const addPicked = () =>
         { preserveScroll: true, onSuccess: () => ((picked.value = []), (search.value = '')) },
     );
 
+const sharePanel = ref<InstanceType<typeof PmSharePanel> | null>(null);
+
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm';
 </script>
@@ -229,13 +231,9 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                             ><Printer class="mr-1.5 h-4 w-4" />{{ t('pm_visits.print') }}</a
                         >
                     </Button>
-                    <Button variant="outline" as-child>
-                        <a
-                            :href="route('maintenance.visits.sheet', { visit: visit.ulid, print: 1, copy: 'customer' })"
-                            target="_blank"
-                            rel="noopener"
-                            >{{ t('pm_visits.print_customer') }}</a
-                        >
+                    <!-- The customer sees the report by a link (the share panel below), not a second print -->
+                    <Button v-if="can.share" variant="outline" @click="sharePanel?.start()">
+                        <Share2 class="mr-1.5 h-4 w-4" />{{ t('pm_visits.share_customer') }}
                     </Button>
                     <!-- The results as Excel; filled in, brought back while the work is going on -->
                     <Button variant="outline" as-child>
@@ -510,6 +508,7 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
             <!-- Customers' links to the published report -->
             <PmSharePanel
                 v-if="can.share || shares.length"
+                ref="sharePanel"
                 :visit-ulid="visit.ulid"
                 :shares="shares"
                 :can-share="can.share"

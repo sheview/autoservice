@@ -92,10 +92,22 @@ const breadcrumbs: BreadcrumbItem[] = [
 const done = computed(() => live.value.filter((i) => i.result !== 'pending').length);
 const percent = computed(() => (live.value.length ? Math.round((done.value / live.value.length) * 100) : 0));
 
+// Any part of anything about the equipment: code, name, serial, brand, model, IP, room... ("002" finds SW-00002).
 const search = ref('');
+// Several technicians share a work order: each picks what is left to check, or looks back at what is done.
+const SHOWS = ['all', 'pending', 'checked'] as const;
+const show = ref<(typeof SHOWS)[number]>('all');
+const checked = (item: FieldItem) => item.result !== 'pending';
+const counts = computed(() => ({ all: live.value.length, pending: live.value.length - done.value, checked: done.value }));
+// Taken when the button is pressed: a row being filled in does not vanish the moment it is saved.
+const shown = ref<Set<number> | null>(null);
+const pick = (option: (typeof SHOWS)[number]) => {
+    show.value = option;
+    shown.value = option === 'all' ? null : new Set(live.value.filter((item) => (option === 'checked') === checked(item)).map((item) => item.id));
+};
 const matches = (item: FieldItem, term: string) =>
-    !term ||
-    [item.asset?.asset_code, item.asset?.name, item.asset?.serial_number, item.asset?.property_no].some((v) => v?.toLowerCase().includes(term));
+    (shown.value === null || shown.value.has(item.id)) &&
+    (!term || Object.values(item.asset ?? {}).some((v) => v !== null && v !== undefined && String(v).toLowerCase().includes(term)));
 // Floor, then room (else its location as written).
 const placeOf = (item: FieldItem) => {
     const a = item.asset;
@@ -163,7 +175,6 @@ const pass = async (ids: number[]) => {
 // Scanning a sticker (or typing a code): to the row in the table, or to the equipment's form.
 const highlighted = ref<number | null>(null);
 const scanMessage = ref('');
-const typedCode = ref('');
 let unmark: ReturnType<typeof setTimeout> | undefined;
 const goTo = async (text: string) => {
     scanMessage.value = '';
@@ -175,6 +186,11 @@ const goTo = async (text: string) => {
         scanMessage.value = t('pm_field.scan_not_here', { code: key?.code ?? text });
         return;
     }
+    await openItem(item);
+};
+// Its own form, or its row in the table (lit up for a moment).
+const openItem = async (item: FieldItem) => {
+    scanMessage.value = '';
     if (!inTable(item)) {
         if (props.visit.working) router.visit(route('maintenance.field.item', [props.visit.ulid, item.id]));
         else scanMessage.value = t('pm_field.not_working');
@@ -187,9 +203,11 @@ const goTo = async (text: string) => {
     clearTimeout(unmark);
     unmark = setTimeout(() => (highlighted.value = null), 4000);
 };
-const goToTyped = () => {
-    if (typedCode.value.trim()) goTo(typedCode.value);
-    typedCode.value = '';
+// Enter in the search: the one piece it finds is opened (the list stays filtered otherwise).
+const openSearched = () => {
+    const term = search.value.trim().toLowerCase();
+    const found = term ? live.value.filter((item) => matches(item, term)) : [];
+    if (found.length === 1) openItem(found[0]);
 };
 
 const time = (iso: string | null) => (iso ? new Date(iso).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '');
@@ -260,14 +278,28 @@ const errors = computed(() => page.props.errors as Record<string, string>);
                 <p v-if="done === items.length" class="text-sm font-medium text-green-700 dark:text-green-300">{{ t('pm_field.all_done') }}</p>
             </div>
 
-            <!-- Find equipment: search, scan its QR sticker, or type its code -->
-            <div class="flex flex-wrap gap-2">
-                <Input v-if="items.length > 5" v-model="search" type="search" class="h-11 min-w-48 flex-1" :placeholder="t('pm_field.search')" />
-                <form class="flex gap-2" @submit.prevent="goToTyped">
-                    <Input v-model="typedCode" class="h-11 w-36" :placeholder="t('pm_field.go_to_code')" />
-                    <BarcodeScanButton class="h-11" @scanned="goTo" />
-                </form>
+            <!-- Find equipment: type any part of anything about it, or scan its QR sticker -->
+            <form class="flex gap-2" @submit.prevent="openSearched">
+                <Input v-model="search" type="search" enterkeyhint="search" class="h-11 min-w-0 flex-1" :placeholder="t('pm_field.search')" />
+                <BarcodeScanButton class="h-11" @scanned="goTo" />
+            </form>
+            <div class="flex flex-wrap gap-2" role="group" :aria-label="t('pm_field.show')">
+                <Button
+                    v-for="option in SHOWS"
+                    :key="option"
+                    type="button"
+                    size="sm"
+                    class="h-10"
+                    :variant="show === option ? 'default' : 'outline'"
+                    :aria-pressed="show === option"
+                    @click="pick(option)"
+                >
+                    {{ t(`pm_field.shows.${option}`) }} ({{ counts[option] }})
+                </Button>
             </div>
+            <p v-if="(search.trim() || show !== 'all') && !groups.length && !tableSections.some((s) => s.places.length)" class="text-sm text-muted-foreground">
+                {{ t('pm_field.search_none') }}
+            </p>
             <p v-if="scanMessage" class="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
                 {{ scanMessage }}
             </p>

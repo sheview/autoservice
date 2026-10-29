@@ -85,6 +85,8 @@ type PartDuplicate = {
     unit: string;
     qty_on_hand: number;
     reasons: string[];
+    // The same part (saving is refused), or one that may be it (a hint).
+    blocking: boolean;
     url: string;
 };
 const duplicates = useDuplicates<PartDuplicate>('inventory.parts.duplicates', () => ({
@@ -98,7 +100,7 @@ const duplicateMatches = computed<DuplicateMatch[]>(() =>
         title: `${part.code} ${part.name}`,
         detail: [part.part_number, part.brand, t('duplicates.stock', { qty: part.qty_on_hand, unit: part.unit })].filter(Boolean).join(' · '),
         reasons: part.reasons,
-        blocking: true,
+        blocking: part.blocking,
         actions: [
             ...(props.part ? [] : [{ label: t('duplicates.receive'), href: `${part.url}#stock-form` }]),
             { label: t('duplicates.open'), href: part.url },

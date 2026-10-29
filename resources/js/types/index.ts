@@ -76,6 +76,8 @@ export interface Paginated<T> {
     total: number;
     prev_page_url: string | null;
     next_page_url: string | null;
+    // Laravel's page links: "previous", the numbers (null url = "..."), "next".
+    links?: { url: string | null; label: string; active: boolean }[];
 }
 
 export type BreadcrumbItemType = BreadcrumbItem;

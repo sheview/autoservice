@@ -165,8 +165,8 @@ class DemoSeeder extends Seeder
     private const CHECKLISTS = [
         null => ['PM ทั่วไป', [['look', 'ตรวจสภาพภายนอก', 'check'], ['clean', 'ทำความสะอาด', 'check'], ['remark', 'ข้อสังเกต', 'text']]],
         'PC' => ['PM คอมพิวเตอร์', [['clean', 'เป่าฝุ่นภายในเครื่อง', 'check'], ['update', 'อัปเดต Windows / Antivirus', 'check'], ['disk_free_gb', 'พื้นที่ดิสก์คงเหลือ (GB)', 'number']]],
-        'SW' => ['PM สวิตช์', [['fan', 'ตรวจพัดลมและอุณหภูมิ', 'check'], ['log', 'ตรวจ log error', 'check'], ['firmware', 'เวอร์ชัน firmware', 'text']]],
-        'SV' => ['PM เซิร์ฟเวอร์', [['raid', 'สถานะ RAID ปกติ', 'check'], ['psu', 'Power supply ทั้งสองชุดทำงาน', 'check'], ['temp_c', 'อุณหภูมิ (°C)', 'number']]],
+        'SW' => ['PM สวิตช์', [['fan', 'ตรวจพัดลมและอุณหภูมิ', 'pass_fail'], ['log', 'ตรวจ log error', 'pass_fail'], ['firmware', 'เวอร์ชัน firmware', 'text']]],
+        'SV' => ['PM เซิร์ฟเวอร์', [['raid', 'สถานะ RAID', 'pass_fail'], ['psu', 'Power supply ทั้งสองชุดทำงาน', 'pass_fail'], ['temp_c', 'อุณหภูมิ (°C)', 'number']]],
     ];
 
     /** Spare parts: [code, name, brand, part number, unit, reorder point, cost in baht, pieces received]. */

@@ -167,6 +167,7 @@ const duplicates = useDuplicates<AssetDuplicate>('asset.assets.duplicates', () =
     brand: form.brand,
     model: form.model,
     customer_id: form.owner === 'customer' ? form.customer_id : null,
+    serials: form.serials.map((row) => row.value.trim()).filter((value) => value !== ''),
     except: props.asset?.ulid,
 }));
 const duplicateMatches = computed<DuplicateMatch[]>(() =>
@@ -182,7 +183,10 @@ const duplicateMatches = computed<DuplicateMatch[]>(() =>
         ],
     })),
 );
-const onlyWarnings = computed(() => duplicateMatches.value.length > 0 && !duplicateMatches.value.some((match) => match.blocking));
+// Saving asks to confirm only "same model" (the server's check); the "may be the same" hints never stop it.
+const onlyWarnings = computed(
+    () => duplicateMatches.value.some((match) => match.reasons.includes('same_model')) && !duplicateMatches.value.some((match) => match.blocking),
+);
 
 // The chosen customer's contracts; the ones running today are ticked, so a new device is not left out of its MA.
 const contractChoices = computed(() =>

@@ -17,6 +17,7 @@ use App\Modules\Inventory\Actions\CreatePart;
 use App\Modules\Inventory\Actions\DeletePart;
 use App\Modules\Inventory\Actions\FindDuplicateParts;
 use App\Modules\Inventory\Actions\FindPartUnits;
+use App\Modules\Inventory\Actions\FindSimilarParts;
 use App\Modules\Inventory\Actions\PartStats;
 use App\Modules\Inventory\Actions\PartSuggestions;
 use App\Modules\Inventory\Actions\PartUnitHistory;
@@ -54,7 +55,7 @@ class PartController extends Controller
 
         $filters = SearchParts::filtersFrom($request);
         $user = $request->user();
-        $parts = $search->handle($filters)->paginate(20)->withQueryString();
+        $parts = $search->handle($filters)->paginate(50)->withQueryString();
         $parts->getCollection()->load('media');
         // Where each part of the page is kept (the shared storage locations).
         $locations = app(StorageLocationOptions::class)->names($parts->pluck('storage_location_id')->filter()->unique()->values()->all());
@@ -90,15 +91,21 @@ class PartController extends Controller
 
     /**
      * Parts the one on the form would repeat (?name, ?part_number, ?except = the part edited), for
-     * the form to show while typing.
+     * the form to show while typing: the same ones (blocking, as when saving), then those that
+     * may be the same (FindSimilarParts, a hint only).
      */
-    public function duplicates(Request $request, FindDuplicateParts $find): JsonResponse
+    public function duplicates(Request $request, FindDuplicateParts $find, FindSimilarParts $similar): JsonResponse
     {
         abort_unless($request->user()->can('create', Part::class) || $request->user()->can('parts.update'), 403);
 
-        $duplicates = $find->handle($request->string('name')->value(), $request->string('part_number')->value(), $request->integer('except') ?: null);
+        $name = $request->string('name')->value();
+        $number = $request->string('part_number')->value();
+        $except = $request->integer('except') ?: null;
+        $same = array_map(fn (array $part) => [...$part, 'blocking' => true], $find->handle($name, $number, $except));
+        $alike = array_map(fn (array $part) => [...$part, 'blocking' => false],
+            $similar->handle($name, $number, array_values(array_filter([$except, ...array_column($same, 'id')]))));
 
-        return response()->json(array_map(fn (array $part) => [...$part, 'url' => route('inventory.parts.show', $part['id'])], $duplicates));
+        return response()->json(array_map(fn (array $part) => [...$part, 'url' => route('inventory.parts.show', $part['id'])], [...$same, ...$alike]));
     }
 
     /**

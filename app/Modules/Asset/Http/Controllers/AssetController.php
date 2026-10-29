@@ -9,6 +9,7 @@ use App\Modules\Asset\Actions\AssetSuggestions;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
 use App\Modules\Asset\Actions\FindDuplicateAssets;
+use App\Modules\Asset\Actions\FindSimilarAssets;
 use App\Modules\Asset\Actions\IpOfAsset;
 use App\Modules\Asset\Actions\ItemRequestLines;
 use App\Modules\Asset\Actions\MoveAsset;
@@ -70,7 +71,7 @@ class AssetController extends Controller
 
         $assets = $search->handle($user, $filters)
             ->with(['category:id,name', 'branch:id,name'])
-            ->paginate(20)
+            ->paginate(50)
             ->withQueryString();
         $assets->getCollection()->load('media');
         // Held by request lines asked for, approved or out; the rest of each asset is available.
@@ -313,12 +314,19 @@ class AssetController extends Controller
      * Assets the one on the form would repeat (FindDuplicateAssets), for the form to show while
      * typing: ?except = the asset edited (then only the blocking checks, as when saving).
      */
-    public function duplicates(Request $request, FindDuplicateAssets $find): JsonResponse
+    public function duplicates(Request $request, FindDuplicateAssets $find, FindSimilarAssets $similar): JsonResponse
     {
         abort_unless($request->user()->can('create', Asset::class) || $request->user()->can('assets.update'), 403);
 
         $except = $request->filled('except') ? Asset::where('ulid', $request->string('except'))->value('id') : null;
         $duplicates = $find->handle($request->only(['property_no', 'ip_address', 'mac_address', 'name', 'brand', 'model', 'customer_id']), $except, $except === null, $request->user());
+        // Then those that may be the same device (?serials[]=), a hint only.
+        $shown = Asset::query()->whereIn('ulid', array_column($duplicates, 'ulid'))->pluck('id')->all();
+        $duplicates = [...$duplicates, ...$similar->handle(
+            [...$request->only(['name', 'brand', 'model', 'customer_id']), 'serials' => (array) $request->input('serials', [])],
+            array_values(array_filter([$except, ...$shown])),
+            $request->user(),
+        )];
 
         return response()->json(array_map(fn (array $asset) => [
             ...$asset,

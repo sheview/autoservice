@@ -55,6 +55,14 @@ const revoke = (share: PmShare) =>
     confirm(t('pm_shares.confirm_revoke')) &&
     router.delete(route('maintenance.visits.shares.destroy', [props.visitUlid, share.id]), { preserveScroll: true });
 
+// "Share with the customer" elsewhere on the page: brings the panel into view, ready to make a link.
+const root = ref<HTMLElement | null>(null);
+const start = () => {
+    if (props.canShare) open.value = true;
+    root.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+defineExpose({ start });
+
 const copied = ref(false);
 const copy = async () => {
     if (!newLink.value) return;
@@ -71,7 +79,7 @@ const stateClass: Record<string, string> = {
 </script>
 
 <template>
-    <section class="space-y-3 rounded-md border p-4">
+    <section ref="root" class="scroll-mt-4 space-y-3 rounded-md border p-4">
         <div class="flex flex-wrap items-start justify-between gap-2">
             <div>
                 <h3 class="flex items-center gap-2 font-semibold"><Link2 class="h-4 w-4" />{{ t('pm_shares.title') }}</h3>
