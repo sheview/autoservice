@@ -39,7 +39,7 @@ class ReturnCheckoutPart
 
             $this->returnPart->handle((int) $item->part_id, $qty, $unitIds, $actor, $reason, [
                 'checkout_item_id' => $item->id,
-                'ticket_id' => $request->ticket_id,
+                'ticket_id' => $item->ticketId(),
                 'reference' => $request->request_no,
             ]);
 

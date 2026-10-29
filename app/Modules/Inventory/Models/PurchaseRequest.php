@@ -18,7 +18,9 @@ use Spatie\MediaLibrary\InteractsWithMedia;
  * pending → approved → ordered → partially_received → received → registered → issued, or
  * rejected / cancelled (PurchaseWorkflow). Delivered in one or more receipts; qty_received,
  * qty_registered and qty_issued count how far it got. unit_price is an estimate in satang; links
- * are the product pages; quotations are attached (HasAttachments).
+ * are the product pages; quotations are attached (HasAttachments). It says what it is for
+ * (ItemPurpose), for which customer and ticket; a replacement keeps the broken unit's serial or a
+ * photo of it (REPLACED_PHOTO).
  */
 #[UsePolicy(PurchaseRequestPolicy::class)]
 class PurchaseRequest extends Model implements HasMedia
@@ -62,8 +64,12 @@ class PurchaseRequest extends Model implements HasMedia
     /** At most this many product links. */
     public const MAX_LINKS = 5;
 
+    /** The photo of the broken unit it replaces. */
+    public const REPLACED_PHOTO = 'replaced_photo';
+
     protected $fillable = [
         'pr_no', 'batch', 'contract_id', 'checkout_request_id', 'status', 'item_name', 'description', 'quantity', 'qty_received', 'qty_registered', 'qty_issued', 'unit', 'item_kind', 'asset_category_id', 'unit_price', 'links', 'reason', 'needed_by',
+        'purpose', 'purpose_other', 'for_internal', 'customer_name', 'ticket_id', 'replaced_serial',
         'requested_by', 'requested_by_name', 'decided_by', 'decided_by_name', 'decided_at', 'decision_note',
         'ordered_by_name', 'ordered_at', 'order_note', 'received_by_name', 'received_at', 'receive_note',
     ];
@@ -85,6 +91,8 @@ class PurchaseRequest extends Model implements HasMedia
             'qty_registered' => 'integer',
             'qty_issued' => 'integer',
             'unit_price' => 'integer',
+            'for_internal' => 'boolean',
+            'ticket_id' => 'integer',
             'links' => 'array',
             'needed_by' => 'date',
             'decided_at' => 'datetime',
@@ -116,5 +124,7 @@ class PurchaseRequest extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->registerAttachmentCollection();
+        $this->addMediaCollection(self::REPLACED_PHOTO)->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
     }
 }

@@ -43,6 +43,19 @@ export interface CheckoutLineRow {
     // The purchase request it waits for, or that bought what it hands out.
     purchase_request_id: number | null;
     purchase_request: { ulid: string; pr_no: string; status: string } | null;
+    // What it is for (ItemPurpose), for whom and on which job; the broken unit it replaces.
+    purpose: string | null;
+    purpose_other: string | null;
+    purpose_label: string | null;
+    for_internal: boolean;
+    customer_name: string | null;
+    contract_id: number | null;
+    contract: { id: number; contract_no: string; title: string } | null;
+    ticket_id: number | null;
+    ticket: CheckoutTicketOption | null;
+    replaced_serial: string | null;
+    replaced_photo_id: number | null;
+    replaced_photo_url: string | null;
     // The request page: each hand-out of this line.
     // received_at: the receiver confirmed it; receipt_issue: they said it was short / never came.
     fulfillments?: {

@@ -9,16 +9,21 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * An issue/loan request with lines (CheckoutItem): draft → pending → approved → partial →
  * fulfilled → closed, or rejected / cancelled. After approval the status follows the lines
- * (CheckoutStatus::refresh). Public URLs use "ulid".
+ * (CheckoutStatus::refresh). Public URLs use "ulid". Photos of the broken units its lines replace
+ * are the "replaced_photos" media collection (each line keeps the id of its own).
  */
 #[UsePolicy(CheckoutRequestPolicy::class)]
-class CheckoutRequest extends Model
+class CheckoutRequest extends Model implements HasMedia
 {
-    use BelongsToTenant, HasUlids, SoftDeletes;
+    use BelongsToTenant, HasUlids, InteractsWithMedia, SoftDeletes;
+
+    public const REPLACED_PHOTOS = 'replaced_photos';
 
     public const STATUS_DRAFT = 'draft';
 
@@ -82,5 +87,11 @@ class CheckoutRequest extends Model
     public function items(): HasMany
     {
         return $this->hasMany(CheckoutItem::class, 'request_id')->orderBy('id');
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection(self::REPLACED_PHOTOS)
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
     }
 }

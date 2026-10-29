@@ -441,6 +441,26 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     <dt class="text-xs text-muted-foreground">{{ t('purchase_requests.description_field') }}</dt>
                     <dd class="whitespace-pre-line">{{ request.description }}</dd>
                 </div>
+                <div v-if="request.purpose_label" class="sm:col-span-2 lg:col-span-4">
+                    <dt class="text-xs text-muted-foreground">{{ t('item_purpose.purpose') }}</dt>
+                    <dd class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span class="rounded bg-primary/10 px-1.5 text-sm text-primary">{{ request.purpose_label }}</span>
+                        <span v-if="request.for_internal">{{ t('item_purpose.internal') }}</span>
+                        <span v-else-if="request.customer_name">{{ t('item_purpose.customer') }}: {{ request.customer_name }}</span>
+                        <Link
+                            v-if="request.ticket"
+                            :href="route('service.tickets.show', request.ticket.ulid)"
+                            class="font-mono text-primary underline-offset-4 hover:underline"
+                            >{{ request.ticket.ticket_no }}</Link
+                        >
+                        <span v-if="request.replaced_serial" class="text-sm"
+                            >{{ t('item_purpose.serial') }}: <span class="font-mono">{{ request.replaced_serial }}</span></span
+                        >
+                        <a v-if="request.replaced_photo_url" :href="request.replaced_photo_url" target="_blank" rel="noopener">
+                            <img :src="request.replaced_photo_url" :alt="t('item_purpose.photo')" class="h-14 w-14 rounded border object-cover" />
+                        </a>
+                    </dd>
+                </div>
                 <div v-if="request.reason" class="sm:col-span-2 lg:col-span-4">
                     <dt class="text-xs text-muted-foreground">{{ t('purchase_requests.reason') }}</dt>
                     <dd class="whitespace-pre-line">{{ request.reason }}</dd>

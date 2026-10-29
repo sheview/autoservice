@@ -29,7 +29,7 @@ beforeEach(function () {
             'contract_id' => $data['contract_id'] ?? null,
             'submit' => true,
             'items' => [[
-                'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => $data['quantity'] ?? 1,
+                'purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => $data['quantity'] ?? 1,
                 'checkout_type' => $data['type'] ?? 'issue', 'due_return_date' => $data['due_on'] ?? null,
             ]],
         ])->assertSessionHasNoErrors();
@@ -37,7 +37,7 @@ beforeEach(function () {
         return CheckoutRequest::latest('id')->first();
     };
     $this->buy = fn ($user, array $data = []) => $this->actingAs($user)->post('/purchase-requests', $data + [
-        'item_name' => 'SFP module', 'quantity' => 2, 'unit' => 'ชิ้น', 'unit_price' => '1500.00',
+        'purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'SFP module', 'quantity' => 2, 'unit' => 'ชิ้น', 'unit_price' => '1500.00',
         'links' => ['https://shop.example.com/sfp'], 'reason' => 'Uplink', 'needed_by' => '2026-11-01',
     ])->assertSessionHasNoErrors();
 });
@@ -187,7 +187,7 @@ it('is for office staff, follows the modules and never shows another tenant', fu
         CheckoutRequest::create([
             'contract_id' => $contract->id, 'request_no' => 'CR-X', 'status' => CheckoutRequest::STATUS_PENDING,
             'borrower_user_id' => $user->id, 'borrower_name' => 'Other Tech', 'requester_id' => $user->id,
-        ])->items()->create(['item_type' => 'asset', 'asset_id' => $asset->id, 'item_name' => $asset->name, 'qty_requested' => 1]);
+        ])->items()->create(['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $asset->id, 'item_name' => $asset->name, 'qty_requested' => 1]);
 
         return compact('contract', 'user');
     });

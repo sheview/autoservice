@@ -24,7 +24,8 @@ class HandOutPurchase
     ) {}
 
     /**
-     * @param  array{id: int, pr_no: string, requested_by: int|null, contract_id: int|null, checkout_request_id: int|null,
+     * @param  array{id: int, pr_no: string, requested_by: int|null, contract_id: int|null, checkout_request_id: int|null, ticket_id?: int|null,
+     *     purpose?: string|null, purpose_other?: string|null, for_internal?: bool, customer_name?: string|null, replaced_serial?: string|null,
      *     lines: list<array{item_type: string, id: int, qty: int, unit_ids?: list<int>}>}  $purchase  from PurchaseIssueLines
      */
     public function handle(array $purchase, User $actor): CheckoutRequest
@@ -33,7 +34,7 @@ class HandOutPurchase
             throw ValidationException::withMessages(['hand_out' => __('asset.requests.nothing_to_hand_out')]);
         }
         $source = $purchase['checkout_request_id'] ? CheckoutRequest::query()->find($purchase['checkout_request_id']) : null;
-        $ticketId = $source?->ticket_id;
+        $ticketId = $purchase['ticket_id'] ?? $source?->ticket_id;
         if ($ticketId === null && collect($purchase['lines'])->contains('item_type', CheckoutItem::TYPE_PART)) {
             throw ValidationException::withMessages(['hand_out' => __('asset.requests.hand_out_needs_ticket')]);
         }
@@ -55,6 +56,12 @@ class HandOutPurchase
                     'checkout_type' => CheckoutItem::ISSUE,
                     'qty' => $line['qty'],
                     'purchase_request_id' => $purchase['id'],
+                    // For what it was bought for.
+                    'purpose' => $purchase['purpose'] ?? null,
+                    'purpose_other' => $purchase['purpose_other'] ?? null,
+                    'for_internal' => $purchase['for_internal'] ?? false,
+                    'customer_name' => $purchase['customer_name'] ?? null,
+                    'replaced_serial' => $purchase['replaced_serial'] ?? null,
                 ])->all(),
             ], $actor);
 

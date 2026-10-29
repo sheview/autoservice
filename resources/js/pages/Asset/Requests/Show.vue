@@ -322,7 +322,8 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     <dt class="text-xs text-muted-foreground">{{ t('requests.needed_by') }}</dt>
                     <dd>{{ request.needed_by ?? '-' }}</dd>
                 </div>
-                <div v-if="request.ticket">
+                <!-- Older requests: one ticket for all lines (newer lines show their own) -->
+                <div v-if="request.ticket && !request.items.some((l) => l.ticket)">
                     <dt class="text-xs text-muted-foreground">{{ t('requests.ticket') }}</dt>
                     <dd>
                         <Link :href="route('service.tickets.show', request.ticket.ulid)" class="text-primary underline-offset-4 hover:underline">
@@ -377,6 +378,25 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                         <span v-else class="font-mono text-xs">{{ line.item_code }}</span>
                                         <div>{{ line.item_name }}</div>
                                         <div v-if="line.note" class="text-xs text-muted-foreground">{{ line.note }}</div>
+                                        <!-- What it is for, for whom, on which job; the unit it replaces -->
+                                        <div v-if="line.purpose_label || line.customer_name || line.for_internal || line.ticket" class="mt-1 flex flex-wrap gap-x-2 text-xs">
+                                            <span v-if="line.purpose_label" class="rounded bg-primary/10 px-1.5 text-primary">{{ line.purpose_label }}</span>
+                                            <span v-if="line.for_internal" class="text-muted-foreground">{{ t('item_purpose.internal') }}</span>
+                                            <span v-else-if="line.customer_name" class="text-muted-foreground">{{ line.customer_name }}</span>
+                                            <span v-if="line.contract" class="text-muted-foreground">{{ line.contract.contract_no }}</span>
+                                            <Link
+                                                v-if="line.ticket"
+                                                :href="route('service.tickets.show', line.ticket.ulid)"
+                                                class="font-mono text-primary underline-offset-4 hover:underline"
+                                                >{{ line.ticket.ticket_no }}</Link
+                                            >
+                                        </div>
+                                        <div v-if="line.replaced_serial || line.replaced_photo_url" class="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span v-if="line.replaced_serial">{{ t('item_purpose.serial') }}: <span class="font-mono">{{ line.replaced_serial }}</span></span>
+                                            <a v-if="line.replaced_photo_url" :href="line.replaced_photo_url" target="_blank" rel="noopener">
+                                                <img :src="line.replaced_photo_url" :alt="t('item_purpose.photo')" class="h-10 w-10 rounded border object-cover" />
+                                            </a>
+                                        </div>
                                         <div v-if="line.on_hand !== null" class="text-xs text-muted-foreground">
                                             {{ t('requests.on_hand', { qty: line.on_hand, unit: line.unit ?? '' }) }}
                                             <span v-if="line.track_serial" class="ml-1 rounded bg-primary/10 px-1 font-mono text-primary">{{

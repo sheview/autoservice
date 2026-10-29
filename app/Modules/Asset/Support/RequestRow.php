@@ -4,6 +4,7 @@ namespace App\Modules\Asset\Support;
 
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Platform\Support\ItemPurpose;
 
 /**
  * An issue/loan request and its lines as the pages get them (resources/js/types/checkout.ts
@@ -16,10 +17,14 @@ class RequestRow
      * @param  array<string, mixed>  $extra  e.g. ticket, contract, can
      * @param  array<int, array{ulid: string, pr_no: string, status: string}>  $purchases  by purchase request id
      * @param  array<int, int>  $onHand  part id => quantity on hand
+     * @param  array<int, array<string, mixed>>  $tickets  the lines' tickets by id (TicketsForCheckout)
+     * @param  array<int, array<string, mixed>>  $contracts  the lines' projects by id (ContractLabels)
      * @return array<string, mixed>
      */
-    public static function of(CheckoutRequest $request, array $extra = [], array $purchases = [], array $onHand = []): array
+    public static function of(CheckoutRequest $request, array $extra = [], array $purchases = [], array $onHand = [], array $tickets = [], array $contracts = []): array
     {
+        $request->items->each->setRelation('request', $request);
+
         return [
             ...$request->only([
                 'ulid', 'request_no', 'status', 'requester_id', 'requester_name', 'borrower_user_id', 'borrower_name',
@@ -31,7 +36,7 @@ class RequestRow
             'submitted_at' => $request->submitted_at?->toIso8601String(),
             'approved_at' => $request->approved_at?->toIso8601String(),
             'closed_at' => $request->closed_at?->toIso8601String(),
-            'items' => $request->items->map(fn (CheckoutItem $item) => self::item($item, $purchases, $onHand))->values()->all(),
+            'items' => $request->items->map(fn (CheckoutItem $item) => self::item($item, $purchases, $onHand, $tickets, $contracts))->values()->all(),
             ...$extra,
         ];
     }
@@ -39,16 +44,25 @@ class RequestRow
     /**
      * @param  array<int, array{ulid: string, pr_no: string, status: string}>  $purchases
      * @param  array<int, int>  $onHand
+     * @param  array<int, array<string, mixed>>  $tickets
+     * @param  array<int, array<string, mixed>>  $contracts
      * @return array<string, mixed>
      */
-    public static function item(CheckoutItem $item, array $purchases = [], array $onHand = []): array
+    public static function item(CheckoutItem $item, array $purchases = [], array $onHand = [], array $tickets = [], array $contracts = []): array
     {
         return [
             ...$item->only([
                 'id', 'item_type', 'asset_id', 'part_id', 'item_code', 'item_name', 'unit', 'checkout_type',
                 'qty_requested', 'qty_approved', 'qty_fulfilled', 'qty_returned', 'status', 'return_condition',
                 'returned_by_name', 'reject_reason', 'note', 'purchase_request_id',
+                'purpose', 'purpose_other', 'for_internal', 'customer_name', 'contract_id', 'ticket_id', 'replaced_serial', 'replaced_photo_id',
             ]),
+            'purpose_label' => ItemPurpose::label($item->purpose, $item->purpose_other),
+            'ticket' => $item->ticket_id ? ($tickets[$item->ticket_id] ?? null) : null,
+            'contract' => $item->contract_id ? ($contracts[$item->contract_id] ?? null) : null,
+            'replaced_photo_url' => $item->replaced_photo_id
+                ? route('asset.requests.replaced-photo', [$item->request->ulid, $item->replaced_photo_id])
+                : null,
             'asset_ulid' => $item->item_type === CheckoutItem::TYPE_ASSET ? $item->asset?->ulid : null,
             'due_return_date' => $item->due_return_date?->toDateString(),
             'returned_at' => $item->returned_at?->toIso8601String(),

@@ -25,7 +25,7 @@ beforeEach(function () {
     $this->staff = userWithRole('technician', ['name' => 'Somchai Tech']);
     $this->notebooks = createAssetCategory(['name' => 'Notebook', 'requires_serial' => true]);
     $this->payload = [
-        'item_name' => 'Notebook Lenovo E14', 'quantity' => 3, 'unit' => 'เครื่อง', 'unit_price' => '25000',
+        'purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Notebook Lenovo E14', 'quantity' => 3, 'unit' => 'เครื่อง', 'unit_price' => '25000',
         'links' => ['https://shop.example.com/e14'], 'reason' => 'New staff', 'needed_by' => '2026-10-20',
         'item_kind' => 'asset', 'asset_category_id' => $this->notebooks->id,
     ];
@@ -173,7 +173,7 @@ it('ties the purchase to the issue/loan draft it was asked from, and hands it ou
     // nothing to hand out was found: the draft is kept and the purchase request opens for it
     $this->actingAs($this->staff)->post('/checkout-requests', [
         'purpose' => 'New staff', 'submit' => true, 'then_purchase' => 'Notebook Lenovo E14',
-        'items' => [['item_type' => 'asset', 'asset_id' => $spare->id, 'qty' => 1, 'checkout_type' => 'issue']],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $spare->id, 'qty' => 1, 'checkout_type' => 'issue']],
     ])->assertRedirect();
     $draft = CheckoutRequest::sole();
     expect($draft->status)->toBe('draft');
@@ -199,9 +199,9 @@ it('ties the purchase to the issue/loan draft it was asked from, and hands it ou
 
     // with a line that is not from the purchase it still waits for an approver
     $lines = [
-        ['item_type' => 'asset', 'asset_id' => $spare->id, 'qty' => 1, 'checkout_type' => 'issue'],
-        ['item_type' => 'asset', 'asset_id' => $first->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id],
-        ['item_type' => 'asset', 'asset_id' => $second->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id],
+        ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $spare->id, 'qty' => 1, 'checkout_type' => 'issue'],
+        ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $first->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id],
+        ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $second->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id],
     ];
     $this->actingAs($this->staff)->put("/checkout-requests/{$draft->ulid}", ['purpose' => 'New staff', 'submit' => true, 'items' => $lines])->assertSessionHasNoErrors();
     expect($draft->fresh()->status)->toBe('pending');
@@ -221,7 +221,7 @@ it('approves at once a request of only what an approved purchase bought', functi
     $notebook = Asset::where('name', 'Notebook Lenovo E14')->sole();
     $send = fn (int $qty) => $this->actingAs($this->buyer)->post('/checkout-requests', [
         'borrower_user_id' => $this->staff->id, 'purpose' => 'x', 'submit' => true,
-        'items' => [['item_type' => 'asset', 'asset_id' => $notebook->id, 'qty' => $qty, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id]],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $notebook->id, 'qty' => $qty, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id]],
     ]);
 
     $send(1)->assertSessionHasNoErrors();
@@ -281,7 +281,7 @@ it('offers to hand out only the devices still free, whichever went out first', f
     // the second device goes out on a request of its own
     $this->actingAs($this->buyer)->post('/checkout-requests', [
         'borrower_user_id' => $this->staff->id, 'purpose' => 'x', 'submit' => true,
-        'items' => [['item_type' => 'asset', 'asset_id' => $second->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id]],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $second->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id]],
     ])->assertSessionHasNoErrors();
     $this->actingAs($this->buyer)->post('/checkout-items/'.CheckoutRequest::sole()->items()->sole()->id.'/fulfill', ['qty' => 1]);
 

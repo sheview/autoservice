@@ -9,6 +9,7 @@ use App\Modules\Asset\Actions\CheckoutRequestRef;
 use App\Modules\Asset\Actions\CheckoutsForPurchase;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ContractOptions;
+use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Document\Actions\RenderPdf;
 use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Document\Http\Concerns\ServesAttachments;
@@ -29,8 +30,10 @@ use App\Modules\Inventory\Models\PurchaseRequestEvent;
 use App\Modules\Inventory\Policies\PurchaseRequestPolicy;
 use App\Modules\Inventory\Support\PurchaseRequestRow;
 use App\Modules\Inventory\Support\PurchaseWorkflow;
+use App\Modules\Platform\Support\ItemPurpose;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\Money;
+use App\Modules\Service\Actions\TicketsForCheckout;
 use App\Modules\Tenancy\Support\CompanyProfile;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -97,6 +100,7 @@ class PurchaseRequestController extends Controller
             'categories' => $this->categoryOptions($modules),
             'maxLinks' => PurchaseRequest::MAX_LINKS,
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle(null, $request->user(), 'purchase-requests.create') : [],
+            ...$this->purposeProps($request->user(), $modules, null),
         ]);
     }
 
@@ -106,6 +110,26 @@ class PurchaseRequestController extends Controller
         Gate::authorize('create', PurchaseRequest::class);
 
         return response()->json($suggestions->handle($request->user(), $request->string('q')->trim()->limit(100, '')->value()));
+    }
+
+    /** Open tickets the user may see, for an item's ticket (?q=; Service module). */
+    public function tickets(Request $request, Modules $modules, TicketsForCheckout $tickets): JsonResponse
+    {
+        Gate::authorize('create', PurchaseRequest::class);
+
+        return response()->json($modules->enabled('service') ? array_values($tickets->handle($request->user(), null, $request->string('q')->trim()->value())) : []);
+    }
+
+    /** The photo of the broken unit it replaces. */
+    public function replacedPhoto(PurchaseRequest $purchaseRequest): StreamedResponse
+    {
+        Gate::authorize('view', $purchaseRequest);
+        $photo = $purchaseRequest->getFirstMedia(PurchaseRequest::REPLACED_PHOTO);
+        abort_if($photo === null, 404);
+
+        return response()->stream(fn () => fpassthru($photo->stream()), 200, [
+            'Content-Type' => $photo->mime_type, 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400',
+        ]);
     }
 
     /** One item, or several asked for together (one request each, in one batch). */
@@ -133,7 +157,8 @@ class PurchaseRequestController extends Controller
         $canReceive = PurchaseWorkflow::receivable($purchaseRequest) && $user->can('receive', $purchaseRequest);
 
         return Inertia::render('Inventory/PurchaseRequests/Show', [
-            'request' => PurchaseRequestRow::of($purchaseRequest),
+            'request' => [...PurchaseRequestRow::of($purchaseRequest),
+                'ticket' => $this->ticketOf($purchaseRequest, $user, $modules), 'replaced_photo_url' => $this->replacedPhotoUrl($purchaseRequest)],
             'receipts' => $receipts->map(fn (PurchaseReceipt $receipt) => PurchaseRequestRow::receipt($receipt, $assets))->values(),
             'events' => $purchaseRequest->events->map(fn (PurchaseRequestEvent $event) => PurchaseRequestRow::event($event))->values(),
             // The issue/loan requests it was asked from and handed out on, with their papers.
@@ -181,6 +206,7 @@ class PurchaseRequestController extends Controller
             'categories' => $this->categoryOptions($modules),
             'maxLinks' => PurchaseRequest::MAX_LINKS,
             'contracts' => $modules->enabled('contract') ? app(ContractOptions::class)->handle($purchaseRequest->contract_id, request()->user(), 'purchase-requests.create') : [],
+            ...$this->purposeProps(request()->user(), $modules, $purchaseRequest),
         ]);
     }
 
@@ -282,6 +308,42 @@ class PurchaseRequestController extends Controller
             'decidable' => collect(MovePurchaseBatch::ACTIONS)->mapWithKeys(fn (string $action) => [$action => $items
                 ->filter(fn (PurchaseRequest $item) => PurchaseWorkflow::allows($item, $action) && $user->can('move', [$item, $action]))->count()])->all(),
         ];
+    }
+
+    /**
+     * What the form needs for what each item is for: the purposes, the customers (Contract module;
+     * a customer account only its own) and, on an edit, its ticket and photo.
+     *
+     * @return array<string, mixed>
+     */
+    private function purposeProps(User $user, Modules $modules, ?PurchaseRequest $pr): array
+    {
+        return [
+            'purposes' => ItemPurpose::ALL,
+            'customers' => $modules->enabled('contract')
+                ? collect(app(ListCustomers::class)->handle())
+                    ->filter(fn (array $c) => $user->customer_id === null || $c['id'] === $user->customer_id)
+                    ->map(fn (array $c) => ['id' => $c['id'], 'name' => $c['name']])->values()->all()
+                : [],
+            'servicesEnabled' => $modules->enabled('service'),
+            'ticket' => $pr ? $this->ticketOf($pr, $user, $modules) : null,
+            'replacedPhotoUrl' => $pr ? $this->replacedPhotoUrl($pr) : null,
+        ];
+    }
+
+    /** @return array<string, mixed>|null the ticket it is for, when the user may see it */
+    private function ticketOf(PurchaseRequest $pr, User $user, Modules $modules): ?array
+    {
+        return $pr->ticket_id && $modules->enabled('service')
+            ? (app(TicketsForCheckout::class)->handle($user, [$pr->ticket_id])[$pr->ticket_id] ?? null)
+            : null;
+    }
+
+    private function replacedPhotoUrl(PurchaseRequest $pr): ?string
+    {
+        $photo = $pr->getFirstMedia(PurchaseRequest::REPLACED_PHOTO);
+
+        return $photo ? route('inventory.purchase-requests.replaced-photo', [$pr, 'v' => $photo->id]) : null;
     }
 
     private function categoryOptions(Modules $modules): array

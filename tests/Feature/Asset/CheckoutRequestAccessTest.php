@@ -30,7 +30,7 @@ beforeEach(function () {
     $this->fan = createPart(['code' => 'FAN', 'name' => 'Fan', 'unit' => 'ตัว']);
     $this->ticket = openTicket($this->desk);
 
-    $this->line = fn (Asset $asset, array $line = []) => $line + ['item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => 1, 'checkout_type' => 'issue'];
+    $this->line = fn (Asset $asset, array $line = []) => $line + ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => 1, 'checkout_type' => 'issue'];
     $this->send = function (array $items, array $data = [], $user = null): CheckoutRequest {
         $this->actingAs($user ?? $this->desk)->post('/checkout-requests', $data + [
             'borrower_user_id' => $this->staff->id, 'submit' => true, 'items' => $items,
@@ -149,7 +149,7 @@ it('keeps each company to its own requests', function () {
 it('lists by tab, with search, filters, sort and pages', function () {
     $waiting = ($this->send)([($this->line)($this->notebook)], ['needed_by' => '2026-10-20', 'purpose' => 'Training room']);
     $toHand = ($this->approve)(($this->send)([($this->line)($this->projector)], ['needed_by' => '2026-10-05']));
-    $owed = ($this->approve)(($this->send)([['item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]));
+    $owed = ($this->approve)(($this->send)([['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]));
     $this->actingAs($this->desk)->post('/checkout-items/'.$owed->items()->sole()->id.'/backorder')->assertSessionHasNoErrors();
     $lent = ($this->approve)(($this->send)([($this->line)($this->cables, ['qty' => 3, 'checkout_type' => 'loan', 'due_return_date' => '2026-10-03'])], ['borrower_user_id' => null, 'borrower_name' => 'Contractor Lek']));
     $this->actingAs($this->desk)->post('/checkout-items/'.$lent->items()->sole()->id.'/fulfill', ['qty' => 3])->assertSessionHasNoErrors();
@@ -200,7 +200,7 @@ it('alerts when a request is sent, and when a backordered part comes into stock'
     Queue::fake();
     ($this->alertsOn)(['checkout_requested', 'checkout_approved', 'checkout_restocked']);
 
-    $request = ($this->send)([['item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]);
+    $request = ($this->send)([['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]);
     Queue::assertPushed(DeliverAlert::class, fn (DeliverAlert $job) => $job->event === 'checkout_requested'
         && str_contains($job->title, $request->request_no) && str_contains($job->body, 'Fan × 2'));
 
@@ -221,7 +221,7 @@ it('alerts once each about late approvals, late backorders and loans past due', 
     $this->actingAs($this->desk)->post('/checkout-items/'.$lent->items()->sole()->id.'/fulfill', ['qty' => 1]);
     // received (not confirming is its own alert: CheckoutReceiptTest)
     $this->actingAs($this->staff)->post("/checkout-requests/{$lent->ulid}/confirm-receipt")->assertSessionHasNoErrors();
-    $owed = ($this->approve)(($this->send)([['item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]));
+    $owed = ($this->approve)(($this->send)([['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->fan->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]));
     $this->actingAs($this->desk)->post('/checkout-items/'.$owed->items()->sole()->id.'/backorder');
     $waiting = ($this->send)([($this->line)($this->projector)]);
 

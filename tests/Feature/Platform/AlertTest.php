@@ -84,7 +84,7 @@ it('alerts on LINE, Telegram and e-mail when an asset is asked for and approved'
     // a technician asks for themself (asset-checkouts.request)
     $this->actingAs($this->tech)->post('/checkout-requests', [
         'submit' => true,
-        'items' => [['item_type' => 'asset', 'asset_id' => $this->asset->id, 'qty' => 1, 'checkout_type' => 'loan', 'due_return_date' => '2026-10-10']],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $this->asset->id, 'qty' => 1, 'checkout_type' => 'loan', 'due_return_date' => '2026-10-10']],
     ])->assertSessionHasNoErrors();
     $request = CheckoutRequest::sole();
 

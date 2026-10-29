@@ -39,11 +39,18 @@ class BackorderCheckoutItem
                     'unit' => $item->unit ?? __('asset.requests.unit_default'),
                     'reason' => __('asset.requests.backorder_reason', ['no' => $request->request_no, 'borrower' => $request->borrower_name]),
                     'needed_by' => $request->needed_by?->isFuture() ? $request->needed_by->toDateString() : now()->addDays(7)->toDateString(),
-                    'contract_id' => $request->contract_id,
+                    'contract_id' => $item->contract_id ?? $request->contract_id,
                     'checkout_request_id' => $request->id,
                     // A part goes back into stock of that part when it comes (found by its name).
                     'item_kind' => $item->item_type === CheckoutItem::TYPE_PART ? 'part' : null,
                     'links' => [],
+                    // Bought for what the line is for (the photo stays on the request).
+                    'purpose' => $item->purpose,
+                    'purpose_other' => $item->purpose_other,
+                    'for_internal' => $item->for_internal,
+                    'customer_name' => $item->customer_name,
+                    'ticket_id' => $item->ticketId(),
+                    'replaced_serial' => $item->replaced_serial,
                 ], $actor);
                 $item->purchase_request_id = $purchase->id;
             }

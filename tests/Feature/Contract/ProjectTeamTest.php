@@ -139,12 +139,12 @@ it('checks on the server that a team member asks only for the projects of their 
     $this->travelTo('2026-10-01 10:00');
     $sfp = createPart(['code' => 'SFP'], stock: 3);
     $purchase = fn (int $contractId) => $this->actingAs($this->tech)->post('/purchase-requests', [
-        'item_name' => 'Switch 24 port', 'quantity' => 1, 'unit' => 'เครื่อง', 'links' => ['https://shop.example.com/switch'],
+        'purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Switch 24 port', 'quantity' => 1, 'unit' => 'เครื่อง', 'links' => ['https://shop.example.com/switch'],
         'reason' => 'Replace the broken one', 'needed_by' => '2026-11-01', 'contract_id' => $contractId,
     ]);
     $checkout = fn (int $contractId) => $this->actingAs($this->tech)->post('/checkout-requests', [
         'purpose' => 'Spare', 'needed_by' => '2026-10-10', 'submit' => false, 'contract_id' => $contractId,
-        'items' => [['item_type' => 'part', 'part_id' => $sfp->id, 'qty' => 1]],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $sfp->id, 'qty' => 1]],
     ]);
 
     // on no team yet: any project, as before

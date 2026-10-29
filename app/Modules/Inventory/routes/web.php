@@ -45,6 +45,7 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
 
     // Purchase requests
     Route::get('purchase-requests/suggestions', [PurchaseRequestController::class, 'suggestions'])->name('purchase-requests.suggestions');
+    Route::get('purchase-requests/tickets', [PurchaseRequestController::class, 'tickets'])->name('purchase-requests.tickets');
     Route::resource('purchase-requests', PurchaseRequestController::class)->except(['destroy']);
     Route::post('purchase-requests/{purchase_request}/move', [PurchaseRequestController::class, 'move'])->name('purchase-requests.move');
     Route::post('purchase-requests/{purchase_request}/move-batch', [PurchaseRequestController::class, 'moveBatch'])->name('purchase-requests.move-batch');
@@ -53,6 +54,7 @@ Route::middleware(['auth', 'verified', 'module:inventory'])->name('inventory.')-
     Route::post('purchase-requests/{purchase_request}/hand-out', [PurchaseReceiptController::class, 'handOut'])->name('purchase-requests.hand-out');
     Route::post('purchase-requests/{purchase_request}/receipts/{receipt}/register', [PurchaseReceiptController::class, 'register'])
         ->whereNumber('receipt')->name('purchase-requests.receipts.register');
+    Route::get('purchase-requests/{purchase_request}/replaced-photo', [PurchaseRequestController::class, 'replacedPhoto'])->name('purchase-requests.replaced-photo');
     Route::get('purchase-requests/{purchase_request}/print', [PurchaseRequestController::class, 'print'])->name('purchase-requests.print');
     Route::get('purchase-requests/{purchase_request}/pdf', [PurchaseRequestController::class, 'pdf'])->name('purchase-requests.pdf');
     Route::post('purchase-requests/{purchase_request}/attachments', [PurchaseRequestController::class, 'storeAttachment'])

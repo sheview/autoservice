@@ -6,6 +6,7 @@ use App\Modules\Inventory\Models\PurchaseReceipt;
 use App\Modules\Inventory\Models\PurchaseReceiptAsset;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Inventory\Models\PurchaseRequestEvent;
+use App\Modules\Platform\Support\ItemPurpose;
 use App\Modules\Platform\Support\Money;
 
 /**
@@ -23,7 +24,9 @@ class PurchaseRequestRow
                 'ulid', 'pr_no', 'contract_id', 'checkout_request_id', 'status', 'item_name', 'description',
                 'quantity', 'qty_received', 'qty_registered', 'qty_issued', 'unit', 'item_kind', 'asset_category_id', 'links', 'reason', 'requested_by', 'requested_by_name',
                 'decided_by_name', 'decision_note', 'ordered_by_name', 'order_note', 'received_by_name', 'receive_note',
+                'purpose', 'purpose_other', 'for_internal', 'customer_name', 'ticket_id', 'replaced_serial',
             ]),
+            'purpose_label' => ItemPurpose::label($request->purpose, $request->purpose_other),
             'unit_price' => Money::toBaht($request->unit_price),
             'total' => $request->unit_price === null ? null : Money::toBaht($request->unit_price * $request->quantity),
             'needed_by' => $request->needed_by?->toDateString(),

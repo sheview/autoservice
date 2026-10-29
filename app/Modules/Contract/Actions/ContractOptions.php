@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 class ContractOptions
 {
     /**
-     * @return list<array{id: int, label: string}>
+     * @return list<array{id: int, customer_id: int|null, customer_name: string|null, label: string}>
      */
     public function handle(?int $current = null, ?User $user = null, ?string $permission = null): array
     {
@@ -34,6 +34,9 @@ class ContractOptions
             ->get(['id', 'customer_id', 'contract_no', 'title'])
             ->map(fn (Contract $contract) => [
                 'id' => $contract->id,
+                // Whose it is: a form line picks the project among its customer's.
+                'customer_id' => $contract->customer_id === null ? null : (int) $contract->customer_id,
+                'customer_name' => $contract->customer?->name,
                 'label' => collect([
                     $contract->contract_no,
                     $contract->title,

@@ -38,6 +38,7 @@ use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Inventory\Actions\PurchaseIssueLines;
 use App\Modules\Inventory\Actions\PurchaseRequestLabels;
 use App\Modules\Platform\CrossTenant\SharedRequests;
+use App\Modules\Platform\Support\ItemPurpose;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketsForCheckout;
 use App\Modules\Tenancy\Support\CompanyProfile;
@@ -51,6 +52,7 @@ use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Issue/loan requests with lines (checkout-schema.md): the list and its queues (to approve, to
@@ -145,12 +147,12 @@ class CheckoutRequestController extends Controller
         $serials = $partRows === [] ? [] : app(IssuedPartSerials::class)->handle($checkout->items->where('item_type', CheckoutItem::TYPE_PART)->pluck('id')->all());
         $purchases = $this->modules->enabled('inventory') ? app(PurchaseRequestLabels::class)->handle($checkout->items->pluck('purchase_request_id')->all()) : [];
 
+        $tickets = $this->ticketsOf($checkout, $user);
         $row = RequestRow::of($checkout, [
-            'ticket' => $checkout->ticket_id && $this->modules->enabled('service')
-                ? (app(TicketsForCheckout::class)->handle($user, [$checkout->ticket_id])[$checkout->ticket_id] ?? null) : null,
+            'ticket' => $checkout->ticket_id ? ($tickets[$checkout->ticket_id] ?? null) : null,
             'contract' => $checkout->contract_id && $this->modules->enabled('contract')
                 ? (app(ContractLabels::class)->handle([$checkout->contract_id])[$checkout->contract_id] ?? null) : null,
-        ], $purchases, $onHand);
+        ], $purchases, $onHand, $tickets, $this->contractsOf($checkout));
         $row['items'] = collect($row['items'])->map(fn (array $item) => [
             ...$item,
             'fulfillments' => $checkout->items->firstWhere('id', $item['id'])->fulfillments
@@ -190,7 +192,8 @@ class CheckoutRequestController extends Controller
         $held = app(AssetHeldQuantities::class)->handle($checkout->items->pluck('asset_id')->filter()->all());
         $partIds = $checkout->items->where('item_type', CheckoutItem::TYPE_PART)->pluck('part_id')->all();
         $parts = $partIds === [] || ! $this->modules->enabled('inventory') ? [] : app(PartsForCheckout::class)->handle($partIds);
-        $row = RequestRow::of($checkout);
+        $tickets = $this->ticketsOf($checkout, $request->user());
+        $row = RequestRow::of($checkout, tickets: $tickets);
         $row['items'] = collect($row['items'])->map(function (array $item) use ($checkout, $held, $parts) {
             $line = $checkout->items->firstWhere('id', $item['id']);
             $asset = $line->item_type === CheckoutItem::TYPE_ASSET ? $line->asset : null;
@@ -206,7 +209,8 @@ class CheckoutRequestController extends Controller
             'request' => $row,
             ...$this->formProps($request, $checkout->contract_id),
             'firstItem' => null,
-            'ticket' => $checkout->ticket_id ? (app(TicketsForCheckout::class)->handle($request->user(), [$checkout->ticket_id])[$checkout->ticket_id] ?? null) : null,
+            // The request's ticket: the one a new line starts with.
+            'ticket' => $checkout->ticket_id ? ($tickets[$checkout->ticket_id] ?? null) : null,
             // ?purchase_request=: the draft it was asked from gets what the purchase brought.
             'purchase' => $this->purchaseItems($request),
         ]);
@@ -364,6 +368,18 @@ class CheckoutRequestController extends Controller
         return response()->json($this->modules->enabled('service') ? array_values($tickets->handle($request->user(), null, $request->string('q')->trim()->value())) : []);
     }
 
+    /** The photo of the broken unit a line replaces. */
+    public function replacedPhoto(CheckoutRequest $checkout, int $media): StreamedResponse
+    {
+        Gate::authorize('view', $checkout);
+        $photo = $checkout->getMedia(CheckoutRequest::REPLACED_PHOTOS)->firstWhere('id', $media);
+        abort_if($photo === null, 404);
+
+        return response()->stream(fn () => fpassthru($photo->stream()), 200, [
+            'Content-Type' => $photo->mime_type, 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
     /** The form as an A4 page for the browser to print (works without the PDF service). */
     public function print(Request $request, CheckoutRequest $checkout, TenantContext $context): View
     {
@@ -459,13 +475,15 @@ class CheckoutRequestController extends Controller
                 ? app(UsersWithPermission::class)->handle('assets.view')->sortBy('name')->map(fn ($u) => $u->only(['id', 'name']))->values()
                 : [],
             'contracts' => $this->modules->enabled('contract') ? app(ContractOptions::class)->handle($contractId, $user, 'asset-checkouts.request') : [],
-            // "Department" is picked from the customers (their name is kept; typing another is still possible).
-            // A customer account only sees its own.
+            // Each line's customer is picked from these (their name is kept; typing another is still
+            // possible), or follows the line's ticket. A customer account only sees its own.
             'customers' => $this->modules->enabled('contract')
                 ? collect(app(ListCustomers::class)->handle())
                     ->filter(fn (array $c) => $user->customer_id === null || $c['id'] === $user->customer_id)
-                    ->pluck('name')->values()->all()
+                    ->map(fn (array $c) => ['id' => $c['id'], 'name' => $c['name']])->values()->all()
                 : [],
+            'purposes' => ItemPurpose::ALL,
+            'servicesEnabled' => $this->modules->enabled('service'),
             'partsEnabled' => $this->modules->enabled('inventory'),
             'maxItems' => CheckoutRequestForm::MAX_ITEMS,
             // Nothing free to hand out: offer to open a purchase request for it instead.
@@ -509,6 +527,14 @@ class CheckoutRequestController extends Controller
             'pr_no' => $purchase['pr_no'],
             'borrower_user_id' => $purchase['requested_by'],
             'contract_id' => $purchase['contract_id'],
+            // What it was bought for: the lines start with it.
+            'purpose' => $purchase['purpose'],
+            'purpose_other' => $purchase['purpose_other'],
+            'for_internal' => $purchase['for_internal'],
+            'customer_name' => $purchase['customer_name'],
+            'replaced_serial' => $purchase['replaced_serial'],
+            'ticket' => $purchase['ticket_id'] && $this->modules->enabled('service')
+                ? (app(TicketsForCheckout::class)->handle($request->user(), [$purchase['ticket_id']])[$purchase['ticket_id']] ?? null) : null,
             'items' => $items,
         ];
     }
@@ -567,6 +593,30 @@ class CheckoutRequestController extends Controller
             ...RequestRow::item($item, $purchases, $onHand),
             'request' => $item->request->only(['ulid', 'request_no', 'status', 'borrower_name', 'requester_name']) + ['needed_by' => $item->request->needed_by?->toDateString()],
         ]);
+    }
+
+    /**
+     * The tickets of the request and its lines the user may see, by id (Service module).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function ticketsOf(CheckoutRequest $checkout, User $user): array
+    {
+        $ids = $checkout->items->pluck('ticket_id')->push($checkout->ticket_id)->filter()->unique()->values()->all();
+
+        return $ids === [] || ! $this->modules->enabled('service') ? [] : app(TicketsForCheckout::class)->handle($user, $ids);
+    }
+
+    /**
+     * The projects of the request's lines, by id (Contract module).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function contractsOf(CheckoutRequest $checkout): array
+    {
+        $ids = $checkout->items->pluck('contract_id')->filter()->unique()->values()->all();
+
+        return $ids === [] || ! $this->modules->enabled('contract') ? [] : app(ContractLabels::class)->handle($ids);
     }
 
     /** Printed by whoever may see it, once approved (it is the hand-over paper). */

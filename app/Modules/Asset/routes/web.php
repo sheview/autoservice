@@ -58,6 +58,8 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     foreach (['submit', 'approve', 'reject', 'cancel', 'close'] as $action) {
         Route::post("checkout-requests/{checkout}/{$action}", [CheckoutRequestController::class, $action])->name("requests.{$action}");
     }
+    Route::get('checkout-requests/{checkout}/replaced-photos/{media}', [CheckoutRequestController::class, 'replacedPhoto'])
+        ->whereNumber('media')->name('requests.replaced-photo');
     Route::get('checkout-requests/{checkout}/print', [CheckoutRequestController::class, 'print'])->name('requests.print');
     Route::get('checkout-requests/{checkout}/pdf', [CheckoutRequestController::class, 'pdf'])->name('requests.pdf');
     // What was handed out, as a delivery note.

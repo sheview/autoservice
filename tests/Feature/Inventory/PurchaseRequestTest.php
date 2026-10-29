@@ -14,7 +14,7 @@ beforeEach(function () {
     $this->staff = userWithRole('technician', ['name' => 'Somchai Office']);
     grantTo('technician', ['purchase-requests.update'], 'own');
     $this->payload = [
-        'item_name' => 'Notebook for accounting', 'description' => 'RAM 16GB', 'quantity' => 2, 'unit' => 'เครื่อง',
+        'purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Notebook for accounting', 'description' => 'RAM 16GB', 'quantity' => 2, 'unit' => 'เครื่อง',
         'unit_price' => '25900.50', 'links' => ['https://shop.example.com/lenovo-e14', ''], 'reason' => 'New staff', 'needed_by' => '2026-11-01',
     ];
 });
@@ -41,10 +41,10 @@ it('lets staff ask to buy something, with product links and a quotation', functi
         ->where('can.update', true));
 });
 
-it('requires what, how many, by when, why and at least one product link', function () {
+it('requires what, how many, by when, what for and at least one product link', function () {
     $this->actingAs($this->staff)->post('/purchase-requests', [
         'unit' => 'เครื่อง', 'item_name' => '', 'quantity' => null, 'needed_by' => null, 'reason' => '', 'links' => ['', '  '],
-    ])->assertSessionHasErrors(['item_name', 'quantity', 'needed_by', 'reason', 'links']);
+    ])->assertSessionHasErrors(['item_name', 'quantity', 'needed_by', 'purpose', 'links']);
 
     // a date in the past is not a date to need it by
     $this->actingAs($this->staff)->post('/purchase-requests', [...$this->payload, 'needed_by' => '2026-09-30'])->assertSessionHasErrors('needed_by');
@@ -184,8 +184,8 @@ it('asks for several items on one form: one request each, sharing the reason, da
         ...$this->payload,
         'attachments' => [UploadedFile::fake()->createWithContent('quote.pdf', "%PDF-1.4\n%%EOF")],
         'extra_items' => [
-            ['item_name' => 'Mouse', 'quantity' => 2, 'unit' => 'ตัว', 'unit_price' => '350', 'links' => ['https://shop.example.com/mouse', ''], 'item_kind' => 'part'],
-            ['item_name' => 'Keyboard', 'quantity' => 1, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/keyboard']],
+            ['purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Mouse', 'quantity' => 2, 'unit' => 'ตัว', 'unit_price' => '350', 'links' => ['https://shop.example.com/mouse', ''], 'item_kind' => 'part'],
+            ['purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Keyboard', 'quantity' => 1, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/keyboard']],
         ],
     ])->assertSessionHasNoErrors()->assertSessionHas('success');
 
@@ -223,8 +223,8 @@ it('checks every extra item, and asks for one alone without a batch', function (
 
 it('lets the approver approve or turn down a whole batch in one go', function () {
     $this->actingAs($this->staff)->post('/purchase-requests', [...$this->payload, 'extra_items' => [
-        ['item_name' => 'Mouse', 'quantity' => 2, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/mouse']],
-        ['item_name' => 'Keyboard', 'quantity' => 1, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/keyboard']],
+        ['purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Mouse', 'quantity' => 2, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/mouse']],
+        ['purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'Keyboard', 'quantity' => 1, 'unit' => 'ตัว', 'links' => ['https://shop.example.com/keyboard']],
     ]])->assertSessionHasNoErrors();
     [$first, $second, $third] = PurchaseRequest::orderBy('id')->get()->all();
 

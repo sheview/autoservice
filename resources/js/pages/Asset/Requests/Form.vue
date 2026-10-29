@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import ItemPurposeFields, { type ItemPurposeContract, type ItemPurposeValue, purposeLike } from '@/components/ItemPurposeFields.vue';
 import ListThumb from '@/components/ListThumb.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,20 +11,25 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import type { CheckoutItemOption, CheckoutRequestRow, CheckoutTicketOption } from '@/types/checkout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Plus, ShoppingCart, Trash2, X } from 'lucide-vue-next';
+import { CopyCheck, Plus, ShoppingCart, Trash2, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 /**
  * Writing an issue/loan request with several lines (assets and parts): saved as a draft or sent
- * for approval. Parts are used on a job, so a request with parts needs its ticket.
+ * for approval. Each line says what it is for, for which customer and on which ticket (a new line
+ * starts with those of the line before); parts are used on a job, so a part line needs its ticket.
+ * Replacing a broken unit needs its serial or a photo.
  */
 const props = defineProps<{
     // Editing a draft; null = a new request.
     request: CheckoutRequestRow | null;
     borrowers: { id: number; name: string }[];
-    contracts: { id: number; label: string }[];
-    // Names of the customers, for "department" (empty: the field is typed).
-    customers: string[];
+    // The projects a line can be for, with their customer.
+    contracts: ItemPurposeContract[];
+    // The customers a line can be for (empty: the field is typed).
+    customers: { id: number; name: string }[];
+    purposes: string[];
+    servicesEnabled: boolean;
     partsEnabled: boolean;
     maxItems: number;
     // May open a purchase request for what is not there (or not free).
@@ -38,6 +44,12 @@ const props = defineProps<{
         pr_no: string;
         borrower_user_id: number | null;
         contract_id: number | null;
+        purpose: string | null;
+        purpose_other: string | null;
+        for_internal: boolean;
+        customer_name: string | null;
+        replaced_serial: string | null;
+        ticket: CheckoutTicketOption | null;
         items: (CheckoutItemOption & { qty: number; purchase_request_id: number })[];
     } | null;
 }>();
@@ -60,6 +72,10 @@ interface Line {
     // Bought on this purchase request: handing it out counts there.
     purchase_request_id: number | null;
     photo: string | null;
+    // What it is for, for whom and on which job.
+    about: ItemPurposeValue;
+    // A saved draft: the photo of the broken unit it has.
+    kept_photo_id: number | null;
 }
 
 const page = usePage<SharedData>();
@@ -75,7 +91,13 @@ const breadcrumbs: BreadcrumbItem[] = [
         : [{ title: t('requests.new'), href: route('asset.requests.create') }]),
 ];
 
-const lineFrom = (option: CheckoutItemOption): Line => ({
+// A new line is for what the last one is for (the first: the ticket the page was opened with).
+const nextAbout = (): ItemPurposeValue => {
+    const last = lines.value.at(-1)?.about;
+    return last ? purposeLike(last) : { ...purposeLike(undefined), ticket: props.ticket };
+};
+
+const lineFrom = (option: CheckoutItemOption, about: ItemPurposeValue = nextAbout()): Line => ({
     item_type: option.item_type,
     asset_id: option.asset_id,
     part_id: option.part_id,
@@ -91,6 +113,8 @@ const lineFrom = (option: CheckoutItemOption): Line => ({
     note: '',
     purchase_request_id: null,
     photo: option.photo,
+    about,
+    kept_photo_id: null,
 });
 
 const initialLines = (): Line[] => {
@@ -111,19 +135,44 @@ const initialLines = (): Line[] => {
             note: item.note ?? '',
             purchase_request_id: item.purchase_request_id,
             photo: null,
+            about: {
+                purpose: item.purpose ?? '',
+                purpose_other: item.purpose_other ?? '',
+                for_internal: item.for_internal,
+                customer_name: item.customer_name ?? '',
+                contract_id: item.contract_id,
+                // The line's ticket; a line from before has only the request's.
+                ticket: item.ticket ?? (item.ticket_id === null ? props.ticket : null),
+                replaced_serial: item.replaced_serial ?? '',
+                replaced_photo: null,
+                replaced_photo_url: item.replaced_photo_url,
+            },
+            kept_photo_id: item.replaced_photo_id,
         }));
     }
-    return props.firstItem ? [lineFrom(props.firstItem)] : [];
+    return props.firstItem ? [lineFrom(props.firstItem, { ...purposeLike(undefined), ticket: props.ticket })] : [];
 };
 
-// What the purchase brought, added to the lines (once each).
-const purchaseLines = (): Line[] =>
-    (props.purchase?.items ?? []).map((option) => ({
-        ...lineFrom(option),
+// What the purchase brought, added to the lines (once each), for what it was bought for.
+const purchaseLines = (): Line[] => {
+    const p = props.purchase;
+    const about = (): ItemPurposeValue => ({
+        ...purposeLike(undefined),
+        purpose: p?.purpose ?? '',
+        purpose_other: p?.purpose_other ?? '',
+        for_internal: p?.for_internal ?? false,
+        customer_name: p?.customer_name ?? '',
+        contract_id: p?.contract_id ?? null,
+        ticket: p?.ticket ?? null,
+        replaced_serial: p?.replaced_serial ?? '',
+    });
+    return (p?.items ?? []).map((option) => ({
+        ...lineFrom(option, about()),
         checkout_type: 'issue',
         qty: option.lot ? option.qty : 1,
         purchase_request_id: option.purchase_request_id,
     }));
+};
 
 const r = props.request;
 const borrowerKind = ref<'staff' | 'other'>(r && r.borrower_user_id === null ? 'other' : 'staff');
@@ -140,18 +189,10 @@ const form = useForm({
             ? me.id
             : null) as number | null,
     borrower_name: r && r.borrower_user_id === null ? r.borrower_name : '',
-    borrower_department: r?.borrower_department ?? '',
     borrower_phone: r?.borrower_phone ?? '',
-    contract_id: (r ? r.contract_id : (props.purchase?.contract_id ?? null)) as number | null,
-    purpose: r?.purpose ?? '',
     needed_by: r?.needed_by ?? '',
 });
 
-// --- Ticket ---------------------------------------------------------------------------------
-const chosenTicket = ref<CheckoutTicketOption | null>(props.ticket);
-const ticketSearch = ref('');
-const ticketResults = ref<CheckoutTicketOption[]>([]);
-const ticketOpen = ref(false);
 // The lines, kept beside the form (its data type cannot hold them); sent by save().
 const lines = ref<Line[]>(initialLines());
 for (const line of purchaseLines()) {
@@ -163,30 +204,19 @@ for (const line of purchaseLines()) {
         lines.value.push(line);
     }
 }
-const hasParts = computed(() => lines.value.some((line) => line.item_type === 'part'));
+const ticketsUrl = props.servicesEnabled ? route('asset.requests.tickets') : null;
+
+// "Same for every line": what this line is for, for whom and on which job (not its evidence).
+const applyToAll = (from: Line) =>
+    lines.value.forEach((line) => {
+        if (line === from) return;
+        line.about = { ...line.about, ...purposeLike(from.about), replaced_serial: line.about.replaced_serial, replaced_photo: line.about.replaced_photo, replaced_photo_url: line.about.replaced_photo_url };
+    });
 
 const getJson = async <T,>(url: string): Promise<T> => {
     const response = await fetch(url, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
     if (!response.ok) throw new Error(String(response.status));
     return (await response.json()) as T;
-};
-
-let ticketTimer: ReturnType<typeof setTimeout> | undefined;
-const findTickets = () => {
-    clearTimeout(ticketTimer);
-    ticketTimer = setTimeout(async () => {
-        try {
-            ticketResults.value = await getJson<CheckoutTicketOption[]>(route('asset.requests.tickets', { q: ticketSearch.value }));
-            ticketOpen.value = true;
-        } catch {
-            ticketResults.value = [];
-        }
-    }, 300);
-};
-const pickTicket = (ticket: CheckoutTicketOption) => {
-    chosenTicket.value = ticket;
-    ticketOpen.value = false;
-    ticketSearch.value = '';
 };
 
 // --- Line picker ----------------------------------------------------------------------------
@@ -277,25 +307,37 @@ onMounted(() => {
     });
 });
 
+// The purpose fields show their own messages; the rest are listed under the line.
+const PURPOSE_FIELDS = ['purpose', 'purpose_other', 'customer_name', 'ticket_id', 'replaced_serial', 'replaced_photo'];
 const lineErrors = (index: number) =>
     Object.entries(form.errors as Record<string, string>)
-        .filter(([key]) => key === `items.${index}` || key.startsWith(`items.${index}.`))
+        .filter(([key]) => key === `items.${index}` || (key.startsWith(`items.${index}.`) && !PURPOSE_FIELDS.includes(key.slice(`items.${index}.`.length))))
         .map(([, message]) => message);
+const purposeErrors = (index: number): Record<string, string | undefined> =>
+    Object.fromEntries(PURPOSE_FIELDS.map((field) => [field, (form.errors as Record<string, string>)[`items.${index}.${field}`]]));
 
 // --- Save -----------------------------------------------------------------------------------
 const save = (submit: boolean, thenPurchase: string | null = null) => {
     form.transform((data) => ({
         borrower_user_id: !props.can.forOthers ? me.id : borrowerKind.value === 'staff' ? data.borrower_user_id : null,
         borrower_name: props.can.forOthers && borrowerKind.value === 'other' ? data.borrower_name : null,
-        borrower_department: data.borrower_department || null,
         borrower_phone: data.borrower_phone || null,
-        ticket_id: chosenTicket.value?.id ?? null,
-        contract_id: data.contract_id,
-        purpose: data.purpose || null,
         needed_by: data.needed_by || null,
         submit,
         then_purchase: thenPurchase,
+        // Files go as a form: a change is a POST that says PUT.
+        ...(props.request ? { _method: 'put' } : {}),
         items: lines.value.map((line) => ({
+            purpose: line.about.purpose || null,
+            purpose_other: line.about.purpose === 'other' ? line.about.purpose_other || null : null,
+            for_internal: line.about.for_internal,
+            customer_name: line.about.for_internal ? null : line.about.customer_name || null,
+            contract_id: line.about.for_internal ? null : line.about.contract_id,
+            ticket_id: line.about.ticket?.id ?? null,
+            replaced_serial: line.about.replaced_serial.trim() || null,
+            replaced_photo: line.about.replaced_photo,
+            // The photo the draft has, unless replaced or taken off.
+            replaced_photo_id: !line.about.replaced_photo && line.about.replaced_photo_url ? line.kept_photo_id : null,
             item_type: line.item_type,
             asset_id: line.asset_id,
             part_id: line.part_id,
@@ -307,31 +349,13 @@ const save = (submit: boolean, thenPurchase: string | null = null) => {
         })),
     }));
     if (props.request) {
-        form.put(route('asset.requests.update', props.request.ulid), { preserveScroll: true });
+        form.post(route('asset.requests.update', props.request.ulid), { preserveScroll: true });
     } else {
         form.post(route('asset.requests.store'), { preserveScroll: true });
     }
 };
 
 const today = new Date().toLocaleDateString('sv-SE');
-// Department: one of the customers, or typed ("other", or a saved name that is not a customer).
-const OTHER_DEPARTMENT = '__other__';
-const typingDepartment = ref(form.borrower_department !== '' && !props.customers.includes(form.borrower_department));
-const departmentChoice = computed({
-    get: () => form.borrower_department,
-    set: (value: string) => {
-        if (value === OTHER_DEPARTMENT) {
-            form.borrower_department = '';
-            typingDepartment.value = true;
-        } else {
-            form.borrower_department = value;
-        }
-    },
-});
-const pickDepartment = () => {
-    typingDepartment.value = false;
-    if (!props.customers.includes(form.borrower_department)) form.borrower_department = '';
-};
 
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 const title = props.request ? t('requests.edit_title', { no: props.request.request_no }) : t('requests.new');
@@ -386,21 +410,6 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                 </div>
 
                 <div class="grid content-start gap-2">
-                    <Label for="borrower_department">{{ t('requests.borrower_department') }}</Label>
-                    <select v-if="customers.length && !typingDepartment" id="borrower_department" v-model="departmentChoice" :class="selectClass">
-                        <option value="">{{ t('requests.choose_department') }}</option>
-                        <option v-for="name in customers" :key="name" :value="name">{{ name }}</option>
-                        <option :value="OTHER_DEPARTMENT">{{ t('requests.department_other') }}</option>
-                    </select>
-                    <div v-else class="flex gap-2">
-                        <Input id="borrower_department" v-model="form.borrower_department" class="min-w-0 flex-1" />
-                        <Button v-if="customers.length" type="button" variant="outline" @click="pickDepartment">{{
-                            t('requests.department_pick')
-                        }}</Button>
-                    </div>
-                    <InputError :message="form.errors.borrower_department" />
-                </div>
-                <div class="grid content-start gap-2">
                     <Label for="borrower_phone">{{ t('requests.borrower_phone') }}</Label>
                     <Input id="borrower_phone" v-model="form.borrower_phone" type="tel" />
                     <InputError :message="form.errors.borrower_phone" />
@@ -409,74 +418,6 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                     <Label for="needed_by">{{ t('requests.needed_by') }}</Label>
                     <Input id="needed_by" v-model="form.needed_by" type="date" :min="today" />
                     <InputError :message="form.errors.needed_by" />
-                </div>
-                <div v-if="contracts.length" class="grid content-start gap-2">
-                    <Label for="contract_id">{{ t('requests.contract') }}</Label>
-                    <select id="contract_id" v-model="form.contract_id" :class="selectClass">
-                        <option :value="null">{{ t('requests.no_contract') }}</option>
-                        <option v-for="contract in contracts" :key="contract.id" :value="contract.id">{{ contract.label }}</option>
-                    </select>
-                    <InputError :message="form.errors.contract_id" />
-                </div>
-
-                <!-- Ticket -->
-                <div class="grid content-start gap-2 sm:col-span-2">
-                    <Label for="ticket_search" :required="hasParts">{{ t('requests.ticket') }}</Label>
-                    <div v-if="chosenTicket" class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
-                        <span class="font-mono text-xs">{{ chosenTicket.ticket_no }}</span>
-                        <span class="flex-1">{{ chosenTicket.title }}</span>
-                        <button
-                            type="button"
-                            class="text-muted-foreground hover:text-foreground"
-                            :aria-label="t('requests.clear_ticket')"
-                            @click="chosenTicket = null"
-                        >
-                            <X class="h-4 w-4" />
-                        </button>
-                    </div>
-                    <div v-else class="relative">
-                        <Input
-                            id="ticket_search"
-                            v-model="ticketSearch"
-                            type="search"
-                            autocomplete="off"
-                            :placeholder="t('requests.ticket_placeholder')"
-                            @input="findTickets"
-                            @focus="findTickets"
-                        />
-                        <ul v-if="ticketOpen" class="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border bg-background shadow-md">
-                            <li v-for="ticket in ticketResults" :key="ticket.id">
-                                <button
-                                    type="button"
-                                    class="flex w-full gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
-                                    @click="pickTicket(ticket)"
-                                >
-                                    <span class="font-mono text-xs">{{ ticket.ticket_no }}</span>
-                                    <span>{{ ticket.title }}</span>
-                                </button>
-                            </li>
-                            <li v-if="ticketResults.length === 0" class="px-3 py-2 text-sm text-muted-foreground">{{ t('requests.no_tickets') }}</li>
-                        </ul>
-                    </div>
-                    <p
-                        v-if="hasParts && !chosenTicket"
-                        class="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200"
-                    >
-                        {{ t('requests.ticket_required') }}
-                    </p>
-                    <p v-else class="text-xs text-muted-foreground">{{ t('requests.ticket_hint') }}</p>
-                    <InputError :message="(form.errors as Record<string, string>).ticket_id" />
-                </div>
-
-                <div class="grid content-start gap-2 sm:col-span-2">
-                    <Label for="purpose">{{ t('requests.purpose') }}</Label>
-                    <textarea
-                        id="purpose"
-                        v-model="form.purpose"
-                        rows="2"
-                        class="shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    />
-                    <InputError :message="form.errors.purpose" />
                 </div>
             </section>
 
@@ -575,6 +516,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
 
                 <InputError :message="(form.errors as Record<string, string>).items" />
                 <p v-if="lines.length === 0" class="text-sm text-muted-foreground">{{ t('requests.no_lines_yet') }}</p>
+                <p v-else class="text-xs text-muted-foreground">{{ t('item_purpose.copy_hint') }}</p>
 
                 <div
                     v-for="(line, index) in lines"
@@ -630,6 +572,26 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                             <Input :id="`note-${index}`" v-model="line.note" />
                         </div>
                     </div>
+
+                    <ItemPurposeFields
+                        v-model="line.about"
+                        :id="`line-${index}`"
+                        :purposes="purposes"
+                        :customers="customers"
+                        :contracts="contracts"
+                        :tickets-url="ticketsUrl"
+                        :ticket-required="line.item_type === 'part'"
+                        :errors="purposeErrors(index)"
+                    />
+                    <button
+                        v-if="lines.length > 1"
+                        type="button"
+                        class="inline-flex items-center gap-1 text-xs text-primary underline-offset-4 hover:underline"
+                        @click="applyToAll(line)"
+                    >
+                        <CopyCheck class="h-3 w-3" />
+                        {{ t('item_purpose.apply_all') }}
+                    </button>
 
                     <p
                         v-if="line.available !== null && (line.lot ? line.qty : 1) > line.available"

@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Hands out (some of) an approved line. A part comes out of stock against the request's ticket
+ * Hands out (some of) an approved line. A part comes out of stock against the line's ticket
  * (its cost goes to the job); no more than is on hand. A part followed by serial number goes by
  * the pieces chosen (in stock, as many as handed out), tied to this line and hand-over. An asset is handed over (a single asset
  * becomes "in use" by the borrower). What is still missing afterwards is backordered when the
@@ -54,8 +54,9 @@ class FulfillCheckoutItem
             if ($item->item_type === CheckoutItem::TYPE_PART) {
                 // Refuses more than is on hand (the part row is locked meanwhile).
                 // A request of another company has no ticket here: the note names the request (and so them).
-                $movement = $this->issuePart->handle($request->ticket_id ? (int) $request->ticket_id : null, (int) $item->part_id, $qty, $actor,
-                    __('asset.requests.issued_for', ['no' => $request->request_no]).($request->ticket_id ? '' : ' · '.$request->requester_name),
+                $ticketId = $item->ticketId();
+                $movement = $this->issuePart->handle($ticketId, (int) $item->part_id, $qty, $actor,
+                    __('asset.requests.issued_for', ['no' => $request->request_no]).($ticketId ? '' : ' · '.$request->requester_name),
                     unitIds: $unitIds,
                     links: ['checkout_item_id' => $item->id, 'checkout_fulfillment_id' => $fulfillment->id, 'reference' => $request->request_no]);
                 $fulfillment->update(['stock_movement_id' => $movement->id]);

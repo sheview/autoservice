@@ -88,4 +88,26 @@ return [
         'lookup_misses' => 'พบการค้นหาสถานะงานซ่อมที่ไม่พบข้อมูล :count ครั้งภายใน :minutes นาที จาก IP :ip (อาจเป็นการไล่เดาเลขที่)',
         'captcha_failed' => 'กรุณายืนยันว่าไม่ใช่โปรแกรมอัตโนมัติ แล้วลองอีกครั้ง',
     ],
+    // Why an item is asked for (issue/loan lines, purchase items).
+    'item_purpose' => [
+        'options' => [
+            'replace' => 'ทดแทน',
+            'customer_swap' => 'เปลี่ยนให้ลูกค้า',
+            'project_spare' => 'สำรองในโครงการ',
+            'delivery' => 'ส่งมอบงาน',
+            'other' => 'อื่น ๆ',
+        ],
+        'evidence_required' => 'ต้องแนบรูปหรือกรอก S/N ของเครื่องที่เสีย',
+        'project_required' => 'กรุณาเลือกโครงการ (สัญญา MA) ของลูกค้ารายนี้',
+        'fields' => [
+            'purpose' => 'วัตถุประสงค์',
+            'purpose_other' => 'วัตถุประสงค์ (ระบุ)',
+            'for_internal' => 'ใช้ภายในบริษัท',
+            'customer_name' => 'ลูกค้า',
+            'contract_id' => 'โครงการ (สัญญา MA)',
+            'ticket_id' => 'ใบงาน',
+            'replaced_serial' => 'S/N เครื่องที่เสีย',
+            'replaced_photo' => 'รูปเครื่องที่เสีย',
+        ],
+    ],
 ];

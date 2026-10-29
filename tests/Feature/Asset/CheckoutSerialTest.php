@@ -24,7 +24,7 @@ beforeEach(function () {
     $this->approved = function (int $qty) {
         $this->actingAs($this->desk)->post('/checkout-requests', [
             'borrower_user_id' => $this->staff->id, 'purpose' => 'Replace disks', 'needed_by' => '2026-10-10', 'submit' => true,
-            'ticket_id' => $this->ticket->id, 'items' => [['item_type' => 'part', 'part_id' => $this->ssd->id, 'qty' => $qty]],
+            'ticket_id' => $this->ticket->id, 'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ssd->id, 'qty' => $qty]],
         ])->assertSessionHasNoErrors();
         $request = CheckoutRequest::latest('id')->first();
         $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
@@ -62,7 +62,7 @@ it('prints the serials of the pieces handed out, as written then, many to a line
     $bulk = createTrackedPart(['code' => 'NIC', 'name' => 'Network card'], $serials);
     $this->actingAs($this->desk)->post('/checkout-requests', [
         'borrower_user_id' => $this->staff->id, 'purpose' => 'Rollout', 'needed_by' => '2026-10-10', 'submit' => true, 'ticket_id' => $this->ticket->id,
-        'items' => [['item_type' => 'part', 'part_id' => $this->ssd->id, 'qty' => 2], ['item_type' => 'part', 'part_id' => $bulk->id, 'qty' => 30]],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ssd->id, 'qty' => 2], ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $bulk->id, 'qty' => 30]],
     ])->assertSessionHasNoErrors();
     $request = CheckoutRequest::latest('id')->first();
     $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
@@ -113,7 +113,7 @@ it('takes pieces back with a reason, into stock, and the papers become a correct
 it('holds no piece for a request cancelled before anything is handed out', function () {
     $this->actingAs($this->desk)->post('/checkout-requests', [
         'borrower_user_id' => $this->staff->id, 'purpose' => 'x', 'needed_by' => '2026-10-10', 'submit' => true, 'ticket_id' => $this->ticket->id,
-        'items' => [['item_type' => 'part', 'part_id' => $this->ssd->id, 'qty' => 2]],
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ssd->id, 'qty' => 2]],
     ]);
     $request = CheckoutRequest::latest('id')->first();
     $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/cancel")->assertSessionHasNoErrors();

@@ -30,8 +30,8 @@ beforeEach(function () {
     $this->ram = createPart(['code' => 'RAM8', 'name' => 'RAM 8GB', 'unit' => 'แผง', 'unit_cost' => 50000], stock: 5);
     $this->ticket = openTicket($this->desk, ['title' => 'PC slow']);
 
-    $this->asset = fn (Asset $asset, array $line = []) => $line + ['item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => 1, 'checkout_type' => 'issue'];
-    $this->part = fn (int $qty, array $line = []) => $line + ['item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => $qty];
+    $this->asset = fn (Asset $asset, array $line = []) => $line + ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => 1, 'checkout_type' => 'issue'];
+    $this->part = fn (int $qty, array $line = []) => $line + ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => $qty];
     // Sends a request as helpdesk for the staff member (submit = false keeps it a draft).
     $this->send = fn (array $items, array $data = [], $user = null) => $this->actingAs($user ?? $this->desk)->post('/checkout-requests', $data + [
         'borrower_user_id' => $this->staff->id, 'purpose' => 'New staff', 'needed_by' => '2026-10-10', 'submit' => true, 'items' => $items,
@@ -95,7 +95,7 @@ it('offers a purchase request on the form to those who may open one', function (
 });
 
 it('checks the lines: parts need the ticket, loans a due date, assets enough left', function () {
-    ($this->send)([($this->part)(2)])->assertSessionHasErrors('ticket_id');
+    ($this->send)([($this->part)(2)])->assertSessionHasErrors('items.0.ticket_id');
     ($this->send)([($this->asset)($this->notebook, ['checkout_type' => 'loan'])])->assertSessionHasErrors('items.0');
     ($this->send)([])->assertSessionHasErrors('items');
     ($this->send)([($this->part)(2)], ['ticket_id' => 999999])->assertSessionHasErrors('ticket_id');
@@ -262,7 +262,7 @@ it('hands out a lot in parts, then gives up the rest with a reason and closes', 
 
 it('issues parts out of stock against the ticket, backorders what is short and orders it', function () {
     $ssd = createPart(['code' => 'SSD1', 'name' => 'SSD 1TB', 'unit' => 'ลูก'], stock: 2);
-    $request = ($this->approved)([($this->part)(4), ['item_type' => 'part', 'part_id' => $ssd->id, 'qty' => 6]], ['ticket_id' => $this->ticket->id]);
+    $request = ($this->approved)([($this->part)(4), ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $ssd->id, 'qty' => 6]], ['ticket_id' => $this->ticket->id]);
     [$ramLine, $ssdLine] = $request->items->all();
 
     // some of the RAM: enough left in stock for the rest, so it is partly handed out
@@ -318,7 +318,7 @@ it('issues parts out of stock against the ticket, backorders what is short and o
 
 it('backorders by hand, and readies a line with nothing handed out yet when stock comes in', function () {
     $empty = createPart(['code' => 'FAN', 'name' => 'Fan', 'unit' => 'ตัว']);
-    $request = ($this->approved)([['item_type' => 'part', 'part_id' => $empty->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]);
+    $request = ($this->approved)([['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $empty->id, 'qty' => 2]], ['ticket_id' => $this->ticket->id]);
     $line = $request->items()->sole();
 
     $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/backorder")->assertSessionHasNoErrors();
@@ -464,13 +464,13 @@ it('narrows the list to parts issued or assets lent', function () {
     $list('nope')->assertInertia(fn (Assert $page) => $page->where('requests.total', 2)->where('filters.kind', 'all'));
 });
 
-it('offers the customers of the company as the department of a request', function () {
+it('offers the customers of the company for the lines of a request', function () {
     createCustomer(['name' => 'ACME Co.']);
     createCustomer(['name' => 'Beta Ltd.']);
     asTenant(createTenant('other'), fn () => createCustomer(['name' => 'ของบริษัทอื่น']));
 
     $this->actingAs($this->desk)->get('/checkout-requests/create')
-        ->assertInertia(fn (Assert $page) => $page->where('customers', ['ACME Co.', 'Beta Ltd.']));
+        ->assertInertia(fn (Assert $page) => $page->where('customers', fn ($customers) => collect($customers)->pluck('name')->all() === ['ACME Co.', 'Beta Ltd.']));
 
     // A name typed by hand is kept as it is.
     ($this->send)([($this->asset)($this->notebook)], ['borrower_department' => 'ฝ่ายขาย'])->assertSessionHasNoErrors();

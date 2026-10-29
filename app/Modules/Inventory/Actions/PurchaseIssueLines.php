@@ -21,6 +21,7 @@ class PurchaseIssueLines
 {
     /**
      * @return array{id: int, ulid: string, pr_no: string, requested_by: int|null, contract_id: int|null, checkout_request_id: int|null,
+     *     ticket_id: int|null, purpose: string|null, purpose_other: string|null, for_internal: bool, customer_name: string|null, replaced_serial: string|null,
      *     lines: list<array{item_type: string, id: int, qty: int, unit_ids?: list<int>}>}|null  unit_ids: the pieces of a part
      *     followed by serial number (those of the delivery first, still in stock)
      */
@@ -71,7 +72,8 @@ class PurchaseIssueLines
         }
 
         return [
-            ...$request->only(['id', 'ulid', 'pr_no', 'requested_by', 'contract_id', 'checkout_request_id']),
+            ...$request->only(['id', 'ulid', 'pr_no', 'requested_by', 'contract_id', 'checkout_request_id',
+                'ticket_id', 'purpose', 'purpose_other', 'for_internal', 'customer_name', 'replaced_serial']),
             'lines' => $lines,
         ];
     }

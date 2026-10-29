@@ -84,7 +84,7 @@ it('leaves a purchase request\'s receipt to the request, and needs the right to 
 
     $buyer = userWithRole('purchasing');
     $this->actingAs($buyer)->post('/purchase-requests', [
-        'item_name' => 'LAN cable', 'quantity' => 5, 'unit' => 'pcs', 'unit_price' => '10', 'reason' => 'stock', 'item_kind' => 'part',
+        'purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'LAN cable', 'quantity' => 5, 'unit' => 'pcs', 'unit_price' => '10', 'reason' => 'stock', 'item_kind' => 'part',
         'links' => ['https://shop.example.com/cable'], 'needed_by' => now()->addWeek()->toDateString(),
     ])->assertSessionHasNoErrors();
     PurchaseReceipt::create([

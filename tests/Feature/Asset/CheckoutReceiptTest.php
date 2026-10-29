@@ -26,7 +26,7 @@ beforeEach(function () {
     $this->handedOut = function (int $qty = 2, array $data = []): CheckoutRequest {
         $this->actingAs($this->desk)->post('/checkout-requests', $data + [
             'borrower_user_id' => $this->staff->id, 'ticket_id' => $this->ticket->id, 'submit' => true,
-            'items' => [['item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => $qty]],
+            'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => $qty]],
         ])->assertSessionHasNoErrors();
         $request = CheckoutRequest::latest('id')->first();
         $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
@@ -139,7 +139,7 @@ it('keeps each company to its own hand-outs', function () {
         $part = createPart(['code' => 'X1', 'name' => 'Theirs'], stock: 2);
         $this->actingAs($user)->post('/checkout-requests', [
             'borrower_user_id' => $user->id, 'submit' => true, 'ticket_id' => openTicket($user)->id,
-            'items' => [['item_type' => 'part', 'part_id' => $part->id, 'qty' => 1]],
+            'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $part->id, 'qty' => 1]],
         ])->assertSessionHasNoErrors();
 
         return CheckoutRequest::latest('id')->first();

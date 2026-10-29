@@ -46,6 +46,17 @@ export interface PurchaseRequestRow {
     received_by_name: string | null;
     received_at: string | null;
     receive_note: string | null;
+    // What it is for (ItemPurpose), for whom and on which job; the broken unit it replaces.
+    purpose: string | null;
+    purpose_other: string | null;
+    purpose_label: string | null;
+    for_internal: boolean;
+    customer_name: string | null;
+    ticket_id: number | null;
+    replaced_serial: string | null;
+    // Its own page.
+    ticket?: { id: number; ulid: string; ticket_no: string; title: string; customer_id: number | null } | null;
+    replaced_photo_url?: string | null;
 }
 
 // One delivery, and what it was registered as.

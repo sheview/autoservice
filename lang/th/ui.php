@@ -1685,6 +1685,7 @@ return [
         'remove_item' => 'ลบรายการนี้',
         'remove_link' => 'ลบลิงก์นี้',
         'reason' => 'เหตุผลที่ขอซื้อ',
+        'reason_more' => 'รายละเอียดเพิ่มเติม (ถ้ามี)',
         'needed_by' => 'ต้องการใช้ภายใน',
         'quotations' => 'ใบเสนอราคา / เอกสารประกอบ',
         'requested_by' => 'ผู้ขอ',
@@ -4093,6 +4094,42 @@ return [
     ],
 
     // Issue/loan requests with several lines (assets and parts)
+    // What each requested / purchased item is for (components/ItemPurposeFields.vue).
+    'item_purpose' => [
+        'purpose' => 'วัตถุประสงค์',
+        'pick' => '— เลือกวัตถุประสงค์ —',
+        'options' => [
+            'replace' => 'ทดแทน',
+            'customer_swap' => 'เปลี่ยนให้ลูกค้า',
+            'project_spare' => 'สำรองในโครงการ',
+            'delivery' => 'ส่งมอบงาน',
+            'other' => 'อื่น ๆ ระบุ',
+        ],
+        'other_placeholder' => 'ระบุวัตถุประสงค์',
+        'customer' => 'ลูกค้า',
+        'customer_pick' => '— เลือกลูกค้า / ใช้ภายในบริษัท —',
+        'customer_other' => 'อื่น ๆ (พิมพ์เอง)',
+        'customer_list' => 'เลือกจากรายชื่อ',
+        'internal' => 'ใช้ภายในบริษัท',
+        'contract' => 'โครงการ (สัญญา MA)',
+        'contract_pick' => '— เลือกโครงการ —',
+        'ticket' => 'ใบงาน',
+        'ticket_placeholder' => 'ค้นหาเลขที่หรือหัวข้อใบงาน',
+        'ticket_part_hint' => 'อะไหล่ต้องระบุใบงาน (ค่าอะไหล่จะลงที่งานนั้น)',
+        'no_tickets' => 'ไม่พบใบงานที่เปิดอยู่',
+        'clear_ticket' => 'เอาใบงานออก',
+        'evidence' => 'เครื่องที่เสีย — กรอก S/N หรือแนบรูป อย่างใดอย่างหนึ่ง',
+        'serial' => 'S/N เครื่องที่เสีย',
+        'serial_scan_hint' => 'สแกนบาร์โค้ด S/N บนเครื่องที่เสีย',
+        'photo' => 'รูปเครื่องที่เสีย',
+        'photo_add' => 'ถ่าย / เลือกรูป',
+        'photo_change' => 'เปลี่ยนรูป',
+        'photo_remove' => 'เอารูปออก',
+        'evidence_missing' => 'ต้องแนบรูปหรือกรอก S/N ของเครื่องที่เสีย',
+        'copy_hint' => 'รายการที่เพิ่มใหม่จะใช้วัตถุประสงค์ ลูกค้า โครงการ และใบงานเดียวกับรายการก่อนหน้าให้ แก้เฉพาะรายการที่ต่างได้',
+        'apply_all' => 'ใช้วัตถุประสงค์ ลูกค้า โครงการ และใบงานนี้กับทุกรายการ',
+    ],
+
     'requests' => [
         'stats' => [
             'open' => 'คำขอที่ยังไม่ปิด',

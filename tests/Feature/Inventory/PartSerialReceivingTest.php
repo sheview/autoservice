@@ -23,7 +23,7 @@ beforeEach(function () {
     // A purchase request for parts, approved.
     $this->approved = function (array $data = []) {
         $this->actingAs($this->buyer)->post('/purchase-requests', [
-            'item_name' => 'SSD 1TB', 'quantity' => 3, 'unit' => 'pcs', 'unit_price' => '2500', 'reason' => 'stock', 'item_kind' => 'part',
+            'purpose' => 'delivery', 'for_internal' => true, 'item_name' => 'SSD 1TB', 'quantity' => 3, 'unit' => 'pcs', 'unit_price' => '2500', 'reason' => 'stock', 'item_kind' => 'part',
             'links' => ['https://shop.example.com/ssd'], 'needed_by' => now()->addWeek()->toDateString(), ...$data,
         ])->assertSessionHasNoErrors();
         $pr = PurchaseRequest::latest('id')->first();
@@ -112,7 +112,7 @@ it('hands a tracked part bought for a job to whoever asked, with the very pieces
 
     $this->actingAs($desk)->post('/checkout-requests', [
         'borrower_user_id' => $desk->id, 'purpose' => 'Disk for job', 'submit' => true, 'ticket_id' => $ticket->id,
-        'then_purchase' => 'SSD 1TB', 'items' => [['item_type' => 'part', 'part_id' => $this->cable->id, 'qty' => 1]],
+        'then_purchase' => 'SSD 1TB', 'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->cable->id, 'qty' => 1]],
     ]);
     $draft = CheckoutRequest::latest('id')->first();
     $pr = ($this->approved)(['checkout_request_id' => $draft->id, 'quantity' => 2]);

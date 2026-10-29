@@ -3,6 +3,7 @@ import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue
 import AttachmentPicker from '@/components/AttachmentPicker.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import ItemPurposeFields, { type ItemPurposeContract, type ItemPurposeValue, purposeLike } from '@/components/ItemPurposeFields.vue';
 import PurchaseItemInput, { type PurchaseItemSuggestion } from '@/components/PurchaseItemInput.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,10 +11,11 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem } from '@/types';
+import type { CheckoutTicketOption } from '@/types/checkout';
 import type { PurchaseRequestRow } from '@/types/purchase';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import { Link2, Plus, Trash2, X } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps<{
     request: PurchaseRequestRow | null;
@@ -24,8 +26,14 @@ const props = defineProps<{
     // Asset categories, for what it goes into the system as; none = assets are off.
     categories: { id: number; name: string }[];
     maxLinks: number;
-    // Projects (MA contracts) the purchase can be for; none = the field is hidden.
-    contracts: { id: number; label: string }[];
+    // Projects (MA contracts) an item can be for, with their customer.
+    contracts: ItemPurposeContract[];
+    // What each item is for: the purposes, the customers, and (an edit) its ticket and photo.
+    purposes: string[];
+    customers: { id: number; name: string }[];
+    servicesEnabled: boolean;
+    ticket: CheckoutTicketOption | null;
+    replacedPhotoUrl: string | null;
 }>();
 
 const title = props.request ? t('purchase_requests.edit') : t('purchase_requests.create');
@@ -44,11 +52,27 @@ type ExtraItem = {
     links: string[];
     item_kind: 'asset' | 'part' | null;
     asset_category_id: number | null;
+    // What it is for, for whom and on which job.
+    about: ItemPurposeValue;
 };
+
+// What the first item is for (the edited request's own, else empty).
+const r = props.request;
+const firstAbout = ref<ItemPurposeValue>({
+    ...purposeLike(undefined),
+    purpose: r?.purpose ?? '',
+    purpose_other: r?.purpose_other ?? '',
+    for_internal: r?.for_internal ?? false,
+    customer_name: r?.customer_name ?? '',
+    contract_id: r?.contract_id ?? null,
+    ticket: props.ticket,
+    replaced_serial: r?.replaced_serial ?? '',
+    replaced_photo_url: props.replacedPhotoUrl,
+});
+const ticketsUrl = props.servicesEnabled ? route('inventory.purchase-requests.tickets') : null;
 
 const form = useForm({
     item_name: props.request?.item_name ?? props.item,
-    contract_id: props.request?.contract_id ?? (null as number | null),
     description: props.request?.description ?? '',
     quantity: props.request?.quantity ?? 1,
     unit: props.request?.unit ?? t('purchase_requests.unit_default'),
@@ -78,6 +102,8 @@ const addItem = () =>
         links: [''],
         item_kind: null,
         asset_category_id: null,
+        // For what the item before is for (change only what differs).
+        about: purposeLike(form.extra_items.at(-1)?.about ?? firstAbout.value),
     });
 const removeItem = (index: number) => form.extra_items.splice(index, 1);
 const addExtraLink = (item: ExtraItem) => item.links.length < props.maxLinks && item.links.push('');
@@ -89,6 +115,18 @@ const removeExtraLink = (item: ExtraItem, index: number) => {
 // A suggestion picked for the item name: its unit, price and kind; its description and links
 // only where nothing is written yet.
 type ItemFields = Pick<ExtraItem, 'unit' | 'unit_price' | 'description' | 'links' | 'item_kind' | 'asset_category_id'>;
+
+// One item's purpose fields as sent (the photo only when a new one was picked).
+const aboutData = (about: ItemPurposeValue) => ({
+    purpose: about.purpose || null,
+    purpose_other: about.purpose === 'other' ? about.purpose_other || null : null,
+    for_internal: about.for_internal,
+    customer_name: about.for_internal ? null : about.customer_name || null,
+    contract_id: about.for_internal ? null : about.contract_id,
+    ticket_id: about.ticket?.id ?? null,
+    replaced_serial: about.replaced_serial.trim() || null,
+    ...(about.replaced_photo ? { replaced_photo: about.replaced_photo } : {}),
+});
 const applySuggestion = (item: ItemFields, suggestion: PurchaseItemSuggestion) => {
     if (suggestion.unit) item.unit = suggestion.unit;
     if (suggestion.unit_price !== null) item.unit_price = suggestion.unit_price;
@@ -121,12 +159,17 @@ const submit = () => {
     // The issue/loan request it was asked from is set only when it is opened.
     const transformed = form.transform(({ checkout_request_id, extra_items, ...data }) => ({
         ...data,
+        ...aboutData(firstAbout.value),
         links: data.links.map((link) => link.trim()).filter(Boolean),
         ...(props.request
             ? { _method: 'put' }
             : {
                   checkout_request_id,
-                  extra_items: extra_items.map((item) => ({ ...item, links: item.links.map((link) => link.trim()).filter(Boolean) })),
+                  extra_items: extra_items.map(({ about, ...item }) => ({
+                      ...item,
+                      ...aboutData(about),
+                      links: item.links.map((link) => link.trim()).filter(Boolean),
+                  })),
               }),
     }));
     if (props.request) {
@@ -139,6 +182,9 @@ const submit = () => {
 const errors = computed(() => form.errors as Record<string, string>);
 const linkError = (index: number) => errors.value[`links.${index}`];
 const itemError = (index: number, field: string) => errors.value[`extra_items.${index}.${field}`];
+const PURPOSE_FIELDS = ['purpose', 'purpose_other', 'customer_name', 'ticket_id', 'replaced_serial', 'replaced_photo'];
+const purposeErrors = (prefix: string): Record<string, string | undefined> =>
+    Object.fromEntries(PURPOSE_FIELDS.map((field) => [field, errors.value[`${prefix}${field}`]]));
 const today = new Date().toLocaleDateString('sv-SE');
 const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm';
 </script>
@@ -203,19 +249,17 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                         <Input id="needed_by" v-model="form.needed_by" type="date" required :min="request ? undefined : today" />
                         <InputError :message="form.errors.needed_by" />
                     </div>
-                    <div v-if="contracts.length" class="grid content-start gap-2 sm:col-span-2">
-                        <Label for="contract_id">{{ t('purchase_requests.contract') }}</Label>
-                        <select
-                            id="contract_id"
-                            v-model="form.contract_id"
-                            class="shadow-xs h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                        >
-                            <option :value="null">{{ t('purchase_requests.no_contract') }}</option>
-                            <option v-for="contract in contracts" :key="contract.id" :value="contract.id">{{ contract.label }}</option>
-                        </select>
-                        <InputError :message="form.errors.contract_id" />
-                    </div>
                 </div>
+
+                <ItemPurposeFields
+                    id="item"
+                    v-model="firstAbout"
+                    :purposes="purposes"
+                    :customers="customers"
+                    :contracts="contracts"
+                    :tickets-url="ticketsUrl"
+                    :errors="purposeErrors('')"
+                />
 
                 <!-- What it goes into the system as when it arrives -->
                 <section class="space-y-2">
@@ -345,6 +389,15 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                                 <InputError :message="itemError(index, 'asset_category_id')" />
                             </div>
                         </div>
+                        <ItemPurposeFields
+                            :id="`extra_${index}`"
+                            v-model="item.about"
+                            :purposes="purposes"
+                            :customers="customers"
+                    :contracts="contracts"
+                            :tickets-url="ticketsUrl"
+                            :errors="purposeErrors(`extra_items.${index}.`)"
+                        />
                         <div class="space-y-2">
                             <Label>{{ t('purchase_requests.links') }}<span class="text-red-600"> *</span></Label>
                             <div v-for="(link, linkIndex) in item.links" :key="linkIndex" class="space-y-1">
@@ -388,8 +441,8 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 </section>
 
                 <div class="grid content-start gap-2">
-                    <Label for="reason">{{ t('purchase_requests.reason') }}<span class="text-red-600"> *</span></Label>
-                    <textarea id="reason" v-model="form.reason" rows="3" required :class="textareaClass" />
+                    <Label for="reason">{{ t('purchase_requests.reason_more') }}</Label>
+                    <textarea id="reason" v-model="form.reason" rows="3" :class="textareaClass" />
                     <InputError :message="form.errors.reason" />
                 </div>
 

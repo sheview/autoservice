@@ -9,7 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * A line of a checkout request: an asset (issued or lent; a lot asset by quantity) or a part
- * (issued against the request's ticket). pending → approved → partial → fulfilled, or
+ * (issued against the line's ticket, else the request's). Each line says what it is for
+ * (ItemPurpose), for which customer; a replacement keeps the broken unit's serial or photo. pending → approved → partial → fulfilled, or
  * backordered (not enough to hand out) / rejected (with a reason) / cancelled. The part itself
  * lives in the Inventory module: the line keeps its code, name and unit.
  */
@@ -55,6 +56,7 @@ class CheckoutItem extends Model
         'qty_requested', 'qty_approved', 'qty_fulfilled', 'qty_returned', 'status', 'due_return_date',
         'returned_at', 'returned_by_name', 'return_condition', 'reject_reason', 'purchase_request_id', 'note',
         'backorder_alerted_at', 'overdue_alerted_at',
+        'purpose', 'purpose_other', 'for_internal', 'customer_name', 'contract_id', 'ticket_id', 'replaced_serial', 'replaced_photo_id',
     ];
 
     protected $attributes = ['status' => self::STATUS_PENDING, 'checkout_type' => self::ISSUE, 'qty_fulfilled' => 0, 'qty_returned' => 0];
@@ -66,11 +68,23 @@ class CheckoutItem extends Model
             'qty_approved' => 'integer',
             'qty_fulfilled' => 'integer',
             'qty_returned' => 'integer',
+            'for_internal' => 'boolean',
+            'contract_id' => 'integer',
+            'ticket_id' => 'integer',
+            'replaced_photo_id' => 'integer',
             'due_return_date' => 'date',
             'returned_at' => 'datetime',
             'backorder_alerted_at' => 'datetime',
             'overdue_alerted_at' => 'datetime',
         ];
+    }
+
+    /** The ticket the line is used on: its own, else the request's (lines from before had only that). */
+    public function ticketId(): ?int
+    {
+        $id = $this->ticket_id ?? $this->request?->ticket_id;
+
+        return $id === null ? null : (int) $id;
     }
 
     public function request(): BelongsTo
