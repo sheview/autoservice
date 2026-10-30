@@ -5,6 +5,7 @@ namespace App\Modules\Service\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Contract\Actions\SignatureRequirement;
+use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\AssetWarranty;
@@ -21,7 +22,8 @@ use Inertia\Response;
 
 /**
  * Closing a job on a phone, on one scrolling page (QuickCloseTicket): who may finish the job
- * (TicketPolicy::resolve — the assignee or a dispatcher) may use it. Parts need parts.issue too.
+ * (TicketPolicy::resolve — the assignee or a dispatcher) may use it. Parts are asked for on an issue
+ * request sent for approval, so they need the right to ask for one (canRequestParts).
  */
 class TicketCloseController extends Controller
 {
@@ -48,7 +50,7 @@ class TicketCloseController extends Controller
             ],
             'presets' => $presets->handle(),
             'signatureRequired' => $signature->handle($ticket->customer_id, $ticket->contract_id),
-            'canIssueParts' => $this->modules->enabled('inventory') && $user->can('parts.issue'),
+            'canRequestParts' => $this->canRequestParts($user),
             'partOptions' => fn () => $search === '' || ! $this->modules->enabled('inventory') ? [] : array_values($parts->handle(null, $search)),
             'warrantyStatuses' => Ticket::WARRANTY_STATUSES,
             'dispositions' => TicketRemovedPart::DISPOSITIONS,
@@ -71,9 +73,6 @@ class TicketCloseController extends Controller
             'parts' => ['array', 'max:30'],
             'parts.*.part_id' => ['required', 'integer'],
             'parts.*.qty' => ['required', 'integer', 'min:1', 'max:10000'],
-            // A part followed by serial number: the pieces used (scanned or chosen).
-            'parts.*.unit_ids' => ['array', 'max:10000'],
-            'parts.*.unit_ids.*' => ['integer'],
             // Pieces taken out of the device: a note, not stock.
             'removed' => ['array', 'max:20'],
             'removed.*.item_name' => ['required', 'string', 'max:255'],
@@ -92,7 +91,7 @@ class TicketCloseController extends Controller
             'after.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PHOTO_KB],
         ], attributes: __('service.quick_close.fields'));
 
-        if (! empty($data['parts']) && ! ($this->modules->enabled('inventory') && $user->can('parts.issue'))) {
+        if (! empty($data['parts']) && ! $this->canRequestParts($user)) {
             abort(403);
         }
         if (blank($data['symptoms'] ?? []) && blank($data['solutions'] ?? []) && blank($data['note'] ?? null)) {
@@ -105,6 +104,14 @@ class TicketCloseController extends Controller
             'solutions' => $data['solutions'] ?? [],
         ], ['before' => $request->file('before', []), 'after' => $request->file('after', [])]);
 
-        return redirect()->route('service.tickets.show', $ticket)->with('success', __('service.quick_close.done', ['no' => $ticket->ticket_no]));
+        return redirect()->route('service.tickets.show', $ticket)->with('success', __('service.quick_close.done', ['no' => $ticket->ticket_no])
+            .(empty($data['parts']) ? '' : ' '.__('service.quick_close.parts_requested')));
+    }
+
+    /** Parts (Inventory module) are asked for on an issue request (Asset module): staff who may ask for one. */
+    public static function canRequestParts(User $user): bool
+    {
+        return app(Modules::class)->enabled('inventory') && $user->customer_id === null
+            && ($user->can('asset-checkouts.request') || $user->can('asset-checkouts.create'));
     }
 }

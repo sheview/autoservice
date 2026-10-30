@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -107,10 +108,14 @@ it('lets a central technician work on tickets without being the assignee', funct
     $this->actingAs($this->centralTech)->get('/reports')->assertForbidden();
     $this->actingAs($this->centralTech)->get('/users')->assertForbidden();
 
-    // takes a part for the job, like a local technician
+    // asks for a part for the job, like a local technician (stock moves once it is approved and handed out)
     $part = createPart(stock: 2);
-    $this->actingAs($this->centralTech)->post("{$url}/parts", ['part_id' => $part->id, 'quantity' => 1])->assertSessionHasNoErrors();
-    expect($part->fresh()->qty_on_hand)->toBe(1);
+    $this->actingAs($this->centralTech)->post('/checkout-requests', [
+        'ticket_id' => $this->ticket->id, 'submit' => true,
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $part->id, 'qty' => 1]],
+    ])->assertSessionHasNoErrors();
+    expect($part->fresh()->qty_on_hand)->toBe(2)
+        ->and(CheckoutRequest::where('ticket_id', $this->ticket->id)->value('status'))->toBe(CheckoutRequest::STATUS_PENDING);
     $this->actingAs($this->centralTech)->post("/parts/{$part->id}/movements", ['type' => 'receive', 'quantity' => 5])->assertForbidden();
 
     // and closes the resolved job (tickets.close)

@@ -10,13 +10,16 @@ use App\Modules\Asset\Support\CheckoutStatus;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\IssuePartToTicket;
 use App\Modules\Inventory\Actions\PartsForCheckout;
+use App\Modules\Platform\Support\Modules;
+use App\Modules\Service\Actions\TicketAssetId;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Hands out (some of) an approved line. A part comes out of stock against the line's ticket
  * (its cost goes to the job); no more than is on hand. A part followed by serial number goes by
- * the pieces chosen (in stock, as many as handed out), tied to this line and hand-over. An asset is handed over (a single asset
+ * the pieces chosen (in stock, as many as handed out), tied to this line and hand-over and put
+ * into the ticket's device (its page shows what went in). An asset is handed over (a single asset
  * becomes "in use" by the borrower). What is still missing afterwards is backordered when the
  * stock cannot cover it, otherwise the line stays partly handed out. When that was the last thing
  * to hand out and nothing is lent, the request is closed (a loan closes once all of it is back).
@@ -27,6 +30,8 @@ class FulfillCheckoutItem
         private IssuePartToTicket $issuePart,
         private PartsForCheckout $parts,
         private CloseCheckoutRequest $close,
+        private Modules $modules,
+        private TicketAssetId $ticketAsset,
     ) {}
 
     /**
@@ -58,7 +63,8 @@ class FulfillCheckoutItem
                 $movement = $this->issuePart->handle($ticketId, (int) $item->part_id, $qty, $actor,
                     __('asset.requests.issued_for', ['no' => $request->request_no]).($ticketId ? '' : ' · '.$request->requester_name),
                     unitIds: $unitIds,
-                    links: ['checkout_item_id' => $item->id, 'checkout_fulfillment_id' => $fulfillment->id, 'reference' => $request->request_no]);
+                    links: ['checkout_item_id' => $item->id, 'checkout_fulfillment_id' => $fulfillment->id, 'reference' => $request->request_no,
+                        'asset_id' => $ticketId && $this->modules->enabled('service') ? $this->ticketAsset->handle($ticketId) : null]);
                 $fulfillment->update(['stock_movement_id' => $movement->id]);
             } else {
                 $asset = Asset::query()->lockForUpdate()->find($item->asset_id);

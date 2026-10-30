@@ -23,27 +23,29 @@ beforeEach(function () {
     $this->roller = createPart(['code' => 'ROLLER'], stock: 5);
 });
 
-it('lets a technician (parts.issue own) take parts only for their own tickets', function () {
-    // the colleague may see and update every ticket, but issues parts only to their own
+it('lets a technician (parts.issue own) give back parts only of their own tickets', function () {
+    // the colleague may see and update every ticket, but handles the parts only of their own
     setRoleScope('technician', 'all', ['tickets.view', 'tickets.update']);
+    issueToTicket($this->ticket, $this->roller, 2, $this->tech);
 
     $this->actingAs($this->otherTech)->get("/tickets/{$this->ticket->ulid}")
-        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('parts.canIssue', false));
-    $this->actingAs($this->otherTech)->post("/tickets/{$this->ticket->ulid}/parts", ['part_id' => $this->roller->id, 'quantity' => 1])
+        ->assertOk()->assertInertia(fn (Assert $page) => $page->where('parts.canReturn', false));
+    $this->actingAs($this->otherTech)->post("/tickets/{$this->ticket->ulid}/parts/return", ['part_id' => $this->roller->id, 'quantity' => 1])
         ->assertForbidden();
 
     $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}")
-        ->assertInertia(fn (Assert $page) => $page->where('parts.canIssue', true));
-    $this->actingAs($this->tech)->post("/tickets/{$this->ticket->ulid}/parts", ['part_id' => $this->roller->id, 'quantity' => 1])
+        ->assertInertia(fn (Assert $page) => $page->where('parts.canReturn', true));
+    $this->actingAs($this->tech)->post("/tickets/{$this->ticket->ulid}/parts/return", ['part_id' => $this->roller->id, 'quantity' => 1])
         ->assertSessionHasNoErrors();
 });
 
-it('needs parts.issue to take parts for a ticket', function () {
+it('needs parts.issue to give back parts of a ticket', function () {
     $user = userWithRole('user');
     $mine = openTicket($user, ['title' => 'My PC']);
     grantTo('user', ['tickets.update'], 'own');
+    issueToTicket($mine, $this->roller, 1, $this->tech);
 
-    $this->actingAs($user)->post("/tickets/{$mine->ulid}/parts", ['part_id' => $this->roller->id, 'quantity' => 1])->assertForbidden();
+    $this->actingAs($user)->post("/tickets/{$mine->ulid}/parts/return", ['part_id' => $this->roller->id, 'quantity' => 1])->assertForbidden();
 });
 
 it('only tells dispatchers about tickets within their scope', function () {

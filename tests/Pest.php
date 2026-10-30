@@ -10,6 +10,7 @@ use App\Modules\Identity\Actions\SyncRoleGrants;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\PermissionCatalog;
+use App\Modules\Inventory\Actions\IssuePartToTicket;
 use App\Modules\Inventory\Actions\ReceivePartUnits;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Actions\SavePart;
@@ -319,6 +320,17 @@ function openTicket(User $actor, array $attributes = [], bool $warrantyChecked =
 function checkWarranty(Ticket $ticket, User $actor, string $status = 'out_of_warranty'): Ticket
 {
     return app(CheckTicketWarranty::class)->handle($ticket, $actor, $status, null);
+}
+
+/**
+ * Takes $qty of $part out of stock for $ticket, as handing out an issue request for the job does
+ * (IssuePartToTicket; old records were also taken straight from the ticket page).
+ *
+ * @param  list<int>  $unitIds
+ */
+function issueToTicket(Ticket $ticket, Part $part, int $qty, User $actor, string $type = StockMovement::TYPE_ISSUE, array $unitIds = []): StockMovement
+{
+    return app(IssuePartToTicket::class)->handle($ticket->id, $part->id, $qty, $actor, null, $type, $unitIds, ['asset_id' => $ticket->asset_id]);
 }
 
 /**

@@ -58,6 +58,7 @@ return [
         'auto_approved' => 'อนุมัติอัตโนมัติ (อะไหล่ไม่เกินวงเงิน)',
         'all_lines_rejected' => 'ทุกรายการไม่ได้รับอนุมัติ',
         'issued_for' => 'จ่ายตามใบเบิก :no',
+        'for_ticket' => 'ใช้ซ่อมตามใบงาน :no',
         'backorder_reason' => 'ค้างจ่ายตามใบเบิก :no (:borrower)',
         'unit_default' => 'ชิ้น',
         'not_draft' => 'ใบนี้ส่งไปแล้ว แก้ไขไม่ได้',

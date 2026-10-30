@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\AssignTicket;
@@ -7,8 +8,14 @@ use App\Modules\Service\Actions\MoveTicket;
 use Inertia\Testing\AssertableInertia as Assert;
 use Laravel\Pennant\Feature;
 
+/*
+ * Parts on a ticket: asked for on an issue request for the job (approved, then handed out, which
+ * takes them out of stock), listed on the ticket, and given back to stock from it.
+ */
+
 beforeEach(function () {
     $this->helpdesk = userWithRole('helpdesk');
+    $this->admin = userWithRole('admin_company');
     $this->tech = userWithRole('technician', ['name' => 'Tech One']);
     $this->customer = createCustomer();
     $this->ticket = openTicket($this->helpdesk, ['customer_id' => $this->customer->id]);
@@ -18,45 +25,43 @@ beforeEach(function () {
     $this->url = "/tickets/{$this->ticket->ulid}";
 });
 
-it('lets the technician take parts for a ticket and shows them on the ticket', function () {
-    $this->actingAs($this->tech)->get($this->url)
-        ->assertInertia(fn (Assert $page) => $page->component('Service/Tickets/Show')
-            ->where('parts.items', [])
-            ->where('parts.canIssue', true)
-            ->where('parts.options.0', ['id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'qty_on_hand' => 5, 'track_serial' => false]));
+it('takes parts out of stock only once the request for the job is approved and handed out', function () {
+    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
+        ->component('Service/Tickets/Show')
+        ->where('parts.items', [])
+        ->where('parts.requests', [])
+        ->where('parts.requestUrl', route('asset.requests.create', ['ticket' => $this->ticket->id])));
 
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 2])->assertSessionHasNoErrors();
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasNoErrors();
+    // no taking parts straight from the ticket any more
+    expect($this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1])->status())->toBeIn([404, 405]);
 
-    expect($this->ram->fresh()->qty_on_hand)->toBe(2)
-        ->and(StockMovement::where('ticket_id', $this->ticket->id)->get(['type', 'quantity', 'user_name'])->toArray())->toBe([
-            ['type' => 'issue', 'quantity' => -2, 'user_name' => 'Tech One'],
-            ['type' => 'issue', 'quantity' => -1, 'user_name' => 'Tech One'],
-        ]);
+    $this->actingAs($this->tech)->post('/checkout-requests', [
+        'ticket_id' => $this->ticket->id, 'submit' => true,
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => 2]],
+    ])->assertSessionHasNoErrors();
+    $request = CheckoutRequest::latest('id')->first();
 
-    $this->actingAs($this->tech)->get($this->url)
-        ->assertInertia(fn (Assert $page) => $page
-            ->where('parts.items', [['part_id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'quantity' => 3, 'types' => ['issue'], 'track_serial' => false, 'units' => []]])
-            ->where('parts.options.0.qty_on_hand', 2));
+    // waiting for approval: on the ticket, nothing out of stock
+    expect($this->ram->fresh()->qty_on_hand)->toBe(5);
+    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
+        ->where('parts.items', [])
+        ->where('parts.requests.0.request_no', $request->request_no)
+        ->where('parts.requests.0.status', CheckoutRequest::STATUS_PENDING));
 
-    // the ledger links the movement to the ticket
-    $this->actingAs($this->helpdesk)->get("/parts/{$this->ram->id}")
-        ->assertInertia(fn (Assert $page) => $page->where('movements.data.0.ticket.ticket_no', $this->ticket->ticket_no));
-});
+    $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
+    expect($this->ram->fresh()->qty_on_hand)->toBe(5);
 
-it('rejects more than the stock, an inactive part and an unknown part', function () {
-    $inactive = createPart(['is_active' => false], stock: 3);
+    $this->actingAs($this->helpdesk)->post("/checkout-items/{$request->items()->first()->id}/fulfill", ['qty' => 2])->assertSessionHasNoErrors();
 
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 6])->assertSessionHasErrors('quantity');
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $inactive->id, 'quantity' => 1])->assertSessionHasErrors('part_id');
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => 999999, 'quantity' => 1])->assertSessionHasErrors('part_id');
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 0])->assertSessionHasErrors('quantity');
-
-    expect(StockMovement::whereNotNull('ticket_id')->count())->toBe(0);
+    expect($this->ram->fresh()->qty_on_hand)->toBe(3)
+        ->and(StockMovement::where('ticket_id', $this->ticket->id)->get(['type', 'quantity'])->toArray())->toBe([['type' => 'issue', 'quantity' => -2]]);
+    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
+        ->where('parts.items', [['part_id' => $this->ram->id, 'code' => 'RAM', 'name' => 'Memory', 'unit' => 'pcs', 'quantity' => 2, 'types' => ['issue'], 'track_serial' => false, 'units' => []]])
+        ->where('parts.requests.0.status', fn ($status) => in_array($status, [CheckoutRequest::STATUS_FULFILLED, CheckoutRequest::STATUS_CLOSED], true)));
 });
 
 it('returns parts to stock, at most what the ticket still holds', function () {
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 3]);
+    issueToTicket($this->ticket, $this->ram, 3, $this->tech);
 
     $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 4])->assertSessionHasErrors('quantity');
     $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasNoErrors();
@@ -73,54 +78,46 @@ it('returns parts to stock, at most what the ticket still holds', function () {
 
     // a part issued to another ticket cannot be returned from this one
     $elsewhere = openTicket($this->helpdesk);
-    app(AssignTicket::class)->handle($elsewhere, $this->tech->id, $this->helpdesk);
-    $this->actingAs($this->tech)->post("/tickets/{$elsewhere->ulid}/parts", ['part_id' => $this->ram->id, 'quantity' => 1]);
+    issueToTicket($elsewhere, $this->ram, 1, $this->tech);
     $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasErrors('quantity');
 });
 
-it('only lets staff who work on the ticket and may issue stock book parts', function () {
+it('only lets staff who work on the ticket give parts back, and shows customers nothing about stock', function () {
+    issueToTicket($this->ticket, $this->ram, 1, $this->tech);
     $payload = ['part_id' => $this->ram->id, 'quantity' => 1];
 
     // a technician who is not on the ticket (parts.issue scope own) may not
-    $this->actingAs(userWithRole('technician'))->post("{$this->url}/parts", $payload)->assertForbidden();
+    $this->actingAs(userWithRole('technician'))->post("{$this->url}/parts/return", $payload)->assertForbidden();
 
     // a customer account sees its ticket but nothing about stock
     $client = userWithRole('customer_it', ['customer_id' => $this->customer->id]);
     $this->actingAs($client)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts', null));
-    $this->actingAs($client)->post("{$this->url}/parts", $payload)->assertForbidden();
+    $this->actingAs($client)->post("{$this->url}/parts/return", $payload)->assertForbidden();
 
-    expect($this->ram->fresh()->qty_on_hand)->toBe(5);
+    expect($this->ram->fresh()->qty_on_hand)->toBe(4);
 });
 
-it('stops booking parts once the ticket is closed or cancelled', function () {
+it('stops asking for parts once the ticket is closed or cancelled', function () {
     app(MoveTicket::class)->handle($this->ticket, 'cancel', $this->helpdesk, 'duplicate');
 
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasErrors('part_id');
-    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts.canIssue', false));
+    $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts.requestUrl', null));
 });
 
-it('lends parts and puts in spares for a ticket, and takes them back after the job is closed', function () {
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1, 'type' => 'loan'])->assertSessionHasNoErrors();
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 2, 'type' => 'spare'])->assertSessionHasNoErrors();
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1, 'type' => 'receive'])->assertSessionHasErrors('type');
-
-    expect($this->ram->fresh()->qty_on_hand)->toBe(2)
-        ->and(StockMovement::where('ticket_id', $this->ticket->id)->orderBy('id')->get(['type', 'quantity'])->toArray())
-        ->toBe([['type' => 'loan', 'quantity' => -1], ['type' => 'spare', 'quantity' => -2]]);
+it('takes back lent parts and spares after the job is closed', function () {
+    issueToTicket($this->ticket, $this->ram, 1, $this->tech, StockMovement::TYPE_LOAN);
+    issueToTicket($this->ticket, $this->ram, 2, $this->tech, StockMovement::TYPE_SPARE);
 
     $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
-        ->where('parts.types', ['issue', 'loan', 'spare'])
         ->where('parts.items.0.quantity', 3)
         ->where('parts.items.0.types', ['loan', 'spare']));
 
-    // the job is closed; nothing more can be taken, but what was lent still comes back
+    // the job is closed; nothing more can be asked for, but what was lent still comes back
     app(MoveTicket::class)->handle($this->ticket, 'start', $this->tech);
     app(MoveTicket::class)->handle($this->ticket, 'resolve', $this->tech);
-    app(MoveTicket::class)->handle($this->ticket, 'approve', userWithRole('admin_company'));
+    app(MoveTicket::class)->handle($this->ticket, 'approve', $this->admin);
 
     $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page
-        ->where('parts.canIssue', false)->where('parts.canReturn', true));
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1, 'type' => 'loan'])->assertSessionHasErrors('part_id');
+        ->where('parts.requestUrl', null)->where('parts.canReturn', true));
     $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 3])->assertSessionHasNoErrors();
     $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 1])->assertSessionHasErrors('quantity');
 
@@ -131,5 +128,5 @@ it('drops the parts section when the inventory module is switched off', function
     Feature::for($this->tenant)->deactivate(Modules::feature('inventory'));
 
     $this->actingAs($this->tech)->get($this->url)->assertInertia(fn (Assert $page) => $page->where('parts', null));
-    $this->actingAs($this->tech)->post("{$this->url}/parts", ['part_id' => $this->ram->id, 'quantity' => 1])->assertNotFound();
+    $this->actingAs($this->tech)->post("{$this->url}/parts/return", ['part_id' => $this->ram->id, 'quantity' => 1])->assertNotFound();
 });

@@ -56,7 +56,6 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
         ->whereNumber('attachment')->name('tickets.attachments.destroy');
 
     Route::middleware('module:inventory')->group(function () {
-        Route::post('tickets/{ticket}/parts', [TicketPartController::class, 'store'])->name('tickets.parts.store');
         Route::post('tickets/{ticket}/parts/return', [TicketPartController::class, 'giveBack'])->name('tickets.parts.return');
     });
 

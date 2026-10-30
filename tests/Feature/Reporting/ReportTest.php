@@ -48,7 +48,7 @@ it('sums up tickets, customers, technicians, parts and surveys of the period', f
     // closed, and its survey answered
     $ram = createPart(['code' => 'RAM', 'name' => 'Memory', 'unit_cost' => 100000, 'min_qty' => 9], stock: 10);
     $this->travelTo('2026-06-02 11:30');
-    $this->actingAs($this->tech)->post("/tickets/{$closed->ulid}/parts", ['part_id' => $ram->id, 'quantity' => 3]);
+    issueToTicket($closed, $ram, 3, $this->tech);
     $this->actingAs($this->tech)->post("/tickets/{$closed->ulid}/parts/return", ['part_id' => $ram->id, 'quantity' => 1]);
     $this->travelTo('2026-06-02 12:00');
     app(MoveTicket::class)->handle($closed, 'resolve', $this->tech);
@@ -227,7 +227,7 @@ it('shows a customer account only the figures of its own customer, without stock
 it('exports the report of the period as an Excel workbook', function () {
     $closed = ($this->ticket)('2026-06-02 09:00', ['assign', 'start']);
     $ram = createPart(['code' => 'RAM', 'name' => 'Memory', 'unit_cost' => 50000], stock: 4);
-    $this->actingAs($this->tech)->post("/tickets/{$closed->ulid}/parts", ['part_id' => $ram->id, 'quantity' => 1]);
+    issueToTicket($closed, $ram, 1, $this->tech);
     app(MoveTicket::class)->handle($closed, 'resolve', $this->tech);
     app(MoveTicket::class)->handle($closed, 'approve', $this->admin);
 

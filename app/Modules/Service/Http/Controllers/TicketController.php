@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Asset\Actions\AssetDevices;
 use App\Modules\Asset\Actions\AssetSummaries;
+use App\Modules\Asset\Actions\CheckoutRequestsOfTicket;
 use App\Modules\Asset\Actions\IpChoices;
 use App\Modules\Asset\Actions\IpLabels;
 use App\Modules\Asset\Actions\IpOfAsset;
@@ -20,7 +21,6 @@ use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
-use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\TicketParts;
 use App\Modules\Labeling\Actions\QrSvg;
 use App\Modules\Platform\CrossTenant\ForwardedTickets;
@@ -164,7 +164,7 @@ class TicketController extends Controller
         ContractLabels $contractLabels,
         UsersWithPermission $usersWithPermission,
         TicketParts $ticketParts,
-        IssuableParts $issuableParts,
+        CheckoutRequestsOfTicket $checkoutRequests,
         SurveyOfTicket $surveyOfTicket,
         QrSvg $qrSvg,
         IpLabels $ipLabels,
@@ -178,7 +178,8 @@ class TicketController extends Controller
         Gate::authorize('view', $ticket);
 
         $user = $request->user();
-        $canIssueParts = TicketPartController::allows($user, $ticket) && in_array($ticket->status, TicketPartController::STATUSES, true);
+        // Parts are asked for on an issue request for the job (approved, then handed out from stock).
+        $canRequestParts = TicketCloseController::canRequestParts($user) && in_array($ticket->status, TicketPartController::STATUSES, true);
         $names = $this->userNames->handle([$ticket->assignee_id, $ticket->reported_by]);
         $asset = $ticket->asset_id ? ($assetDetails->handle([$ticket->asset_id])[$ticket->asset_id] ?? null) : null;
         $device = $asset ? ($assetDevices->handle([$asset['id']])[$asset['id']] ?? null) : null;
@@ -284,9 +285,8 @@ class TicketController extends Controller
             // Spare parts used on the job (Inventory module); null = the user does not see stock.
             'parts' => $this->modules->enabled('inventory') && $user->can('parts.view') ? [
                 'items' => $ticketParts->handle($ticket->id),
-                'options' => $canIssueParts ? $issuableParts->handle() : [],
-                'types' => IssuableParts::TYPES,
-                'canIssue' => $canIssueParts,
+                'requests' => $user->customer_id === null ? $checkoutRequests->handle($ticket->id, $user) : [],
+                'requestUrl' => $canRequestParts ? route('asset.requests.create', ['ticket' => $ticket->id]) : null,
                 // Loans and spares may come back after the job is closed.
                 'canReturn' => TicketPartController::allows($user, $ticket),
             ] : null,

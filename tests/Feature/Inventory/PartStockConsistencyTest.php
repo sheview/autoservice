@@ -1,6 +1,5 @@
 <?php
 
-use App\Modules\Inventory\Actions\IssuableParts;
 use App\Modules\Inventory\Actions\IssuePartUnits;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Inventory\Actions\RemovePartUnits;
@@ -10,7 +9,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 
 /*
  * One stock figure for a part followed by serial number: the pieces in stock. The part list, its
- * page, the receiving page, the issue/loan requests and the ticket page all read that same
+ * page, the receiving page and the issue/loan requests all read that same
  * number after every kind of change.
  */
 
@@ -24,8 +23,7 @@ it('shows the same stock everywhere after receiving, issuing, taking back and ta
         $pieces = PartUnit::where('part_id', $ssd->id)->where('status', 'in_stock')->count();
         expect($pieces)->toBe($expected)
             ->and($ssd->fresh()->qty_on_hand)->toBe($expected)
-            ->and(app(PartsForCheckout::class)->handle([$ssd->id])[$ssd->id]['qty_on_hand'])->toBe($expected)
-            ->and(collect(app(IssuableParts::class)->handle())->firstWhere('id', $ssd->id)['qty_on_hand'] ?? 0)->toBe($expected);
+            ->and(app(PartsForCheckout::class)->handle([$ssd->id])[$ssd->id]['qty_on_hand'])->toBe($expected);
 
         $this->actingAs($admin)->get('/parts?search=SSD')->assertInertia(fn (Assert $page) => $page->where('parts.data.0.qty_on_hand', $expected));
         $this->actingAs($admin)->get("/parts/{$ssd->id}")->assertInertia(fn (Assert $page) => $page->where('part.qty_on_hand', $expected));

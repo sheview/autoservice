@@ -2,7 +2,7 @@
 import AttachmentList, { type Attachment } from '@/components/AttachmentList.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
-import PartUnitPicker from '@/components/PartUnitPicker.vue';
+import RequestStatusBadge from '@/components/RequestStatusBadge.vue';
 import SharedRequestList, { type SharedRequestRow } from '@/components/SharedRequestList.vue';
 import SlaBadge from '@/components/SlaBadge.vue';
 import StarRating from '@/components/StarRating.vue';
@@ -22,6 +22,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, SharedData } from '@/types';
+import type { CheckoutRequestRow } from '@/types/checkout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { CircleCheck, Printer } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
@@ -104,15 +105,6 @@ interface TicketPart {
     units: { id: number; serial_number: string }[];
 }
 
-interface PartOption {
-    id: number;
-    code: string;
-    name: string;
-    unit: string;
-    qty_on_hand: number;
-    track_serial: boolean;
-}
-
 interface TicketSurvey {
     answered: boolean;
     score: number | null;
@@ -133,7 +125,9 @@ const props = defineProps<{
     actions: string[];
     needsComment: string[];
     assignees: { id: number; name: string }[] | null;
-    parts: { items: TicketPart[]; options: PartOption[]; types: string[]; canIssue: boolean; canReturn: boolean } | null;
+    // Parts on the job: those handed out (items) and the issue requests for it, which go through
+    // approval before stock moves; requestUrl opens a new one (null = the user may not ask).
+    parts: { items: TicketPart[]; requests: CheckoutRequestRow[]; requestUrl: string | null; canReturn: boolean } | null;
     // Links for working without an account; null = the user may not manage them.
     fieldLinks: InstanceType<typeof TicketFieldLinks>['$props']['links'] | null;
     removedParts: {
@@ -271,16 +265,6 @@ const copyLink = async () => {
 };
 
 // --- spare parts (Inventory module) --------------------------------------------
-const issue = useForm({ part_id: null as number | null, quantity: 1, type: 'issue', unit_ids: [] as number[] });
-const issueTracked = computed(() => props.parts?.options.find((o) => o.id === issue.part_id)?.track_serial ?? false);
-const issuePart = () =>
-    issue
-        .transform((data) => (issueTracked.value ? { ...data, quantity: data.unit_ids.length } : { ...data, unit_ids: [] }))
-        .post(route('service.tickets.parts.store', props.ticket.ulid), {
-            preserveScroll: true,
-            onSuccess: () => issue.reset(),
-        });
-
 // A part followed by serial number comes back by its pieces, ticked here.
 const returning = ref<number | null>(null);
 const returnUnits = ref<number[]>([]);
@@ -615,57 +599,30 @@ const stepBar = computed(() => {
                         </ul>
                         <p v-else class="text-sm text-muted-foreground">{{ t('ticket_parts.none') }}</p>
 
-                        <form v-if="parts.canIssue && parts.options.length" class="flex flex-wrap items-end gap-2" @submit.prevent="issuePart">
-                            <div class="grid min-w-0 flex-1 gap-1">
-                                <label for="part" class="text-xs text-muted-foreground">{{ t('ticket_parts.part') }}</label>
-                                <select
-                                    id="part"
-                                    v-model="issue.part_id"
-                                    required
-                                    class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
+                        <!-- Issue requests for this job: stock moves once one is approved and handed out -->
+                        <div class="flex items-center justify-between gap-2">
+                            <h4 class="text-xs font-medium text-muted-foreground">{{ t('ticket_parts.requests_title') }}</h4>
+                            <Button v-if="parts.requestUrl" size="sm" variant="outline" as-child>
+                                <Link :href="parts.requestUrl">+ {{ t('ticket_parts.request') }}</Link>
+                            </Button>
+                        </div>
+                        <ul v-if="parts.requests.length" class="divide-y rounded-md border text-sm">
+                            <li v-for="request in parts.requests" :key="request.ulid" class="flex flex-wrap items-center gap-2 px-3 py-2">
+                                <Link
+                                    :href="route('asset.requests.show', request.ulid)"
+                                    class="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                                    >{{ request.request_no }}</Link
                                 >
-                                    <option :value="null" disabled>{{ t('ticket_parts.select') }}</option>
-                                    <option v-for="option in parts.options" :key="option.id" :value="option.id">
-                                        {{ option.code }} {{ option.name }} ({{
-                                            t('ticket_parts.available', { qty: option.qty_on_hand, unit: option.unit })
-                                        }})
-                                    </option>
-                                </select>
-                            </div>
-                            <div class="grid gap-1">
-                                <label for="part_type" class="text-xs text-muted-foreground">{{ t('ticket_parts.type') }}</label>
-                                <select id="part_type" v-model="issue.type" class="h-9 rounded-md border border-input bg-transparent px-2 text-sm">
-                                    <option v-for="type in parts.types" :key="type" :value="type">{{ t(`stock_movements.types.${type}`) }}</option>
-                                </select>
-                            </div>
-                            <div v-if="issueTracked && issue.part_id" class="w-full">
-                                <PartUnitPicker v-model="issue.unit_ids" :part-id="issue.part_id" />
-                            </div>
-                            <div v-else class="grid w-24 gap-1">
-                                <label for="part_quantity" class="text-xs text-muted-foreground">{{ t('ticket_parts.quantity') }}</label>
-                                <input
-                                    id="part_quantity"
-                                    v-model="issue.quantity"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    required
-                                    class="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm"
-                                />
-                            </div>
-                            <Button
-                                size="sm"
-                                class="h-9"
-                                :disabled="issue.processing || issue.part_id === null || (issueTracked && !issue.unit_ids.length)"
-                                >{{ t('ticket_parts.issue') }}</Button
-                            >
-                        </form>
-                        <p v-else-if="parts.canIssue" class="text-sm text-muted-foreground">{{ t('ticket_parts.no_stock') }}</p>
+                                <span class="min-w-0 flex-1 truncate">{{
+                                    request.items.map((item) => `${item.item_name} × ${item.qty_requested}`).join(', ')
+                                }}</span>
+                                <span class="text-xs text-muted-foreground">{{ dateTime(request.requested_at) }}</span>
+                                <RequestStatusBadge :status="request.status" />
+                            </li>
+                        </ul>
+                        <p v-else class="text-sm text-muted-foreground">{{ t('ticket_parts.no_requests') }}</p>
                         <InputError
                             :message="
-                                issue.errors.part_id ??
-                                issue.errors.quantity ??
-                                (issue.errors as Record<string, string>).unit_ids ??
                                 (page.props.errors as Record<string, string>).unit_ids ??
                                 (page.props.errors as Record<string, string>).quantity ??
                                 (page.props.errors as Record<string, string>).part_id

@@ -27,7 +27,7 @@ it('renders the job sheet with the work notes and the parts used, without intern
     $this->actingAs($this->tech)->post("/tickets/{$this->ticket->ulid}/comments", ['body' => 'เปลี่ยนลูกยางดึงกระดาษ']);
     $this->actingAs($this->tech)->post("/tickets/{$this->ticket->ulid}/comments", ['body' => 'ลูกค้าค้างชำระ', 'is_internal' => true]);
     $roller = createPart(['code' => 'ROLLER', 'name' => 'Pickup roller'], stock: 5);
-    $this->actingAs($this->tech)->post("/tickets/{$this->ticket->ulid}/parts", ['part_id' => $roller->id, 'quantity' => 2]);
+    issueToTicket($this->ticket, $roller, 2, $this->tech);
 
     $this->actingAs($this->tech)->get($this->url)->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Service/Tickets/Print')

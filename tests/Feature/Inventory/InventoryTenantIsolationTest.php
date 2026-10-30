@@ -35,16 +35,19 @@ it('returns 404 for parts of another tenant and leaves their stock alone', funct
     asTenant($this->other, fn () => expect(Part::first()->only(['name', 'qty_on_hand']))->toBe(['name' => 'Their memory', 'qty_on_hand' => 9]));
 });
 
-it('cannot book a part of another tenant on a ticket, nor a part on their ticket', function () {
+it('cannot ask for a part of another tenant for a ticket, nor give a part back to their ticket', function () {
     $tech = userWithRole('technician');
     $ticket = openTicket($this->admin);
     app(AssignTicket::class)->handle($ticket, $tech->id, $this->admin);
+    $line = fn (Part $part) => ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $part->id, 'qty' => 1];
 
-    $this->actingAs($tech)->post("/tickets/{$ticket->ulid}/parts", ['part_id' => $this->theirs->id, 'quantity' => 1])
-        ->assertSessionHasErrors('part_id');
+    $this->actingAs($tech)->post('/checkout-requests', ['ticket_id' => $ticket->id, 'submit' => true, 'items' => [$line($this->theirs)]])
+        ->assertSessionHasErrors();
 
     $theirTicket = asTenant($this->other, fn () => openTicket(userWithRole('helpdesk')));
-    $this->actingAs($tech)->post("/tickets/{$theirTicket->ulid}/parts", ['part_id' => $this->mine->id, 'quantity' => 1])->assertNotFound();
+    $this->actingAs($tech)->post('/checkout-requests', ['ticket_id' => $theirTicket->id, 'submit' => true, 'items' => [$line($this->mine)]])
+        ->assertSessionHasErrors('ticket_id');
+    $this->actingAs($tech)->post("/tickets/{$theirTicket->ulid}/parts/return", ['part_id' => $this->mine->id, 'quantity' => 1])->assertNotFound();
 
     expect($this->mine->fresh()->qty_on_hand)->toBe(4);
     asTenant($this->other, fn () => expect(Part::first()->qty_on_hand)->toBe(9));

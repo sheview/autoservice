@@ -1,5 +1,8 @@
 <?php
 
+use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Identity\Actions\SyncRoleGrants;
+use App\Modules\Identity\Models\Role;
 use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\StockMovement;
 use App\Modules\Service\Actions\AssignTicket;
@@ -25,11 +28,12 @@ beforeEach(function () {
     $this->signature = 'data:image/png;base64,'.base64_encode(UploadedFile::fake()->image('s.png', 10, 10)->getContent());
 });
 
-it('closes a job in one go: report, photos, parts from stock, place, then resolved', function () {
+it('closes a job in one go: report, photos, parts asked for, place, then resolved', function () {
     $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}/close")->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Service/Tickets/Close')
         ->where('presets.symptom', fn ($list) => in_array('เปิดไม่ติด', collect($list)->all(), true))
         ->where('signatureRequired', false)
+        ->where('canRequestParts', true)
         ->where('ticket.warranty_checked', false));
 
     ($this->close)([
@@ -46,17 +50,39 @@ it('closes a job in one go: report, photos, parts from stock, place, then resolv
         ->and($ticket->warranty_status)->toBe('out_of_warranty')
         ->and((float) $ticket->closed_lat)->toBe(13.7563)
         ->and($ticket->getMedia(Ticket::PHOTOS)->map(fn ($m) => $m->getCustomProperty('stage'))->sort()->values()->all())->toBe(['after', 'after', 'before'])
-        ->and(Part::find($this->part->id)->qty_on_hand)->toBe(1)
-        ->and((int) StockMovement::where('ticket_id', $ticket->id)->sum('quantity'))->toBe(-2);
+        // the parts wait on an issue request for the job: no stock moves until it is handed out
+        ->and(Part::find($this->part->id)->qty_on_hand)->toBe(3)
+        ->and(StockMovement::where('ticket_id', $ticket->id)->count())->toBe(0);
+
+    $request = CheckoutRequest::with('items')->sole();
+    expect($request->only(['ticket_id', 'status', 'requester_id', 'borrower_user_id']))->toBe([
+        'ticket_id' => $ticket->id, 'status' => CheckoutRequest::STATUS_PENDING, 'requester_id' => $this->tech->id, 'borrower_user_id' => $this->tech->id,
+    ])
+        ->and($request->items->sole()->only(['part_id', 'qty_requested', 'ticket_id', 'for_internal', 'customer_name']))->toBe([
+            'part_id' => $this->part->id, 'qty_requested' => 2, 'ticket_id' => $ticket->id, 'for_internal' => false, 'customer_name' => 'Acme',
+        ]);
+    $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('parts.requests.0.request_no', $request->request_no));
 });
 
-it('moves no stock and closes nothing when a part is short', function () {
+it('asks for more than is in stock: what is missing is owed when handed out', function () {
     ($this->close)(['parts' => [['part_id' => $this->part->id, 'qty' => 2], ['part_id' => $this->part->id, 'qty' => 2]]])
-        ->assertSessionHasErrors('parts');
+        ->assertSessionHasNoErrors();
 
-    expect($this->ticket->fresh()->status)->toBe(Ticket::STATUS_ASSIGNED)
+    expect($this->ticket->fresh()->status)->toBe(Ticket::STATUS_RESOLVED)
         ->and(Part::find($this->part->id)->qty_on_hand)->toBe(3)
-        ->and(StockMovement::where('ticket_id', $this->ticket->id)->count())->toBe(0);
+        ->and(CheckoutRequest::sole()->items()->sum('qty_requested'))->toEqual(4);
+});
+
+it('takes parts only from whoever may ask for them', function () {
+    $sync = app(SyncRoleGrants::class);
+    $role = Role::findByName('technician');
+    $sync->handle($role, array_diff_key($sync->grantsOf($role), array_flip(['asset-checkouts.request', 'asset-checkouts.create'])));
+
+    $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}/close")->assertInertia(fn (Assert $page) => $page->where('canRequestParts', false));
+    ($this->close)(['parts' => [['part_id' => $this->part->id, 'qty' => 1]]])->assertForbidden();
+
+    expect(CheckoutRequest::count())->toBe(0);
 });
 
 it('needs the customer to sign when their customer or contract asks for it', function () {

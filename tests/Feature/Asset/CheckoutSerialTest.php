@@ -121,11 +121,11 @@ it('holds no piece for a request cancelled before anything is handed out', funct
     expect(PartUnit::where('status', 'in_stock')->count())->toBe(4)->and($this->ssd->fresh()->qty_on_hand)->toBe(4);
 });
 
-it('issues and takes back pieces on the ticket page, tied to the job and its device', function () {
+it('shows the pieces handed out for the job on the ticket page, and takes them back there', function () {
     $post = fn (string $path, array $data) => $this->actingAs($this->desk)->post("/tickets/{$this->ticket->ulid}/parts{$path}", $data);
 
-    $post('', ['part_id' => $this->ssd->id, 'quantity' => 1])->assertSessionHasErrors('unit_ids');
-    $post('', ['part_id' => $this->ssd->id, 'quantity' => 1, 'unit_ids' => [($this->unit)('S-2')]])->assertSessionHasNoErrors();
+    $line = ($this->approved)(1)->items->first();
+    ($this->fulfill)($line, ['qty' => 1, 'unit_ids' => [($this->unit)('S-2')]])->assertSessionHasNoErrors();
 
     expect(PartUnit::find(($this->unit)('S-2'))->only(['status', 'ticket_id', 'asset_id']))
         ->toBe(['status' => 'issued', 'ticket_id' => $this->ticket->id, 'asset_id' => $this->ticket->asset_id]);

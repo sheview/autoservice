@@ -2,10 +2,10 @@
 
 namespace App\Modules\Service\Actions;
 
+use App\Modules\Asset\Actions\RequestPartsForTicket;
+use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Contract\Actions\SignatureRequirement;
 use App\Modules\Identity\Models\User;
-use App\Modules\Inventory\Actions\IssuePartToTicket;
-use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketRemovedPart;
 use Illuminate\Http\UploadedFile;
@@ -14,11 +14,11 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Finishing a job on a phone in one go: what was wrong and what fixed it, photos before and
- * after, the parts used (taken from stock against the ticket; a part followed by serial number by
- * the pieces chosen, which go into the job's device), the pieces taken out of the device (a note),
+ * after, the parts used (asked for on an issue request for the ticket, sent for approval: stock
+ * moves when it is handed out, like any request), the pieces taken out of the device (a note),
  * the customer's signature when their contract or customer asks for it, and where the technician
  * was — then the job is done (resolved), which tells whoever confirms it (and the company's alert
- * channels) as usual. All or nothing: a part short of stock stops everything before any stock moves.
+ * channels) as usual. All or nothing.
  */
 class QuickCloseTicket
 {
@@ -28,15 +28,15 @@ class QuickCloseTicket
         private MoveTicket $moveTicket,
         private CheckTicketWarranty $checkWarranty,
         private SaveRepairReport $saveReport,
-        private IssuePartToTicket $issuePart,
-        private PartsForCheckout $parts,
+        private RequestPartsForTicket $requestParts,
+        private ListCustomers $customers,
         private SignatureRequirement $signatureRequirement,
         private AssetWarranty $assetWarranty,
     ) {}
 
     /**
      * @param  array{symptoms: list<string>, solutions: list<string>, note?: string|null, warranty_status?: string|null,
-     *     parts?: list<array{part_id: int, qty: int, unit_ids?: list<int>}>, signer_name?: string|null, signature?: string|null,
+     *     parts?: list<array{part_id: int, qty: int}>, signer_name?: string|null, signature?: string|null,
      *     approver_name?: string|null, lat?: float|null, lng?: float|null,
      *     removed?: list<array{item_name: string, serial_number?: string|null, problem?: string|null, disposition: string}>}  $data  validated
      * @param  array{before?: list<UploadedFile>, after?: list<UploadedFile>}  $photos
@@ -63,8 +63,6 @@ class QuickCloseTicket
             throw ValidationException::withMessages(['warranty_status' => __('service.tickets.warranty_first')]);
         }
 
-        $this->checkStock($data['parts'] ?? []);
-
         return DB::transaction(function () use ($ticket, $actor, $data, $photos, $approver, $fromAsset) {
             if ($fromAsset !== null) {
                 $this->checkWarranty->handle($ticket, $actor, $fromAsset['status'], $fromAsset['expires_on'], fromAsset: true);
@@ -72,9 +70,14 @@ class QuickCloseTicket
                 $this->checkWarranty->handle($ticket, $actor, $data['warranty_status'], null);
             }
 
-            foreach ($data['parts'] ?? [] as $line) {
-                $this->issuePart->handle($ticket->id, (int) $line['part_id'], (int) $line['qty'], $actor, __('service.quick_close.part_note'),
-                    unitIds: $line['unit_ids'] ?? [], links: ['asset_id' => $ticket->asset_id]);
+            if (! empty($data['parts'])) {
+                $customer = $ticket->customer_id ? collect($this->customers->handle(true))->firstWhere('id', $ticket->customer_id) : null;
+                $this->requestParts->handle([
+                    'id' => $ticket->id,
+                    'ticket_no' => $ticket->ticket_no,
+                    'contract_id' => $ticket->contract_id,
+                    'customer_name' => $customer['name'] ?? null,
+                ], $data['parts'], $actor);
             }
 
             foreach ($data['removed'] ?? [] as $piece) {
@@ -120,39 +123,5 @@ class QuickCloseTicket
 
             return $this->moveTicket->handle($ticket, 'resolve', $actor);
         });
-    }
-
-    /**
-     * Every part asked for must be in stock, all of them, before any stock moves; a part followed
-     * by serial number needs a piece chosen for each one used.
-     *
-     * @param  list<array{part_id: int, qty: int, unit_ids?: list<int>}>  $lines
-     */
-    private function checkStock(array $lines): void
-    {
-        if ($lines === []) {
-            return;
-        }
-        $wanted = collect($lines)->groupBy('part_id')->map(fn ($group) => $group->sum('qty'));
-        $parts = $this->parts->handle($wanted->keys()->map(fn ($id) => (int) $id)->all());
-
-        $short = $wanted->map(function (int $qty, $id) use ($parts) {
-            $part = $parts[(int) $id] ?? null;
-
-            return $part === null || ! $part['is_active'] || $part['qty_on_hand'] < $qty
-                ? __('service.quick_close.short', ['name' => $part['name'] ?? '#'.$id, 'have' => $part['qty_on_hand'] ?? 0, 'unit' => $part['unit'] ?? ''])
-                : null;
-        })->filter();
-
-        if ($short->isNotEmpty()) {
-            throw ValidationException::withMessages(['parts' => $short->implode(' · ')]);
-        }
-
-        foreach ($lines as $line) {
-            $part = $parts[(int) $line['part_id']];
-            if ($part['track_serial'] && count(array_unique($line['unit_ids'] ?? [])) !== (int) $line['qty']) {
-                throw ValidationException::withMessages(['parts' => __('inventory.units.pick_count', ['name' => $part['name'], 'count' => $line['qty']])]);
-            }
-        }
     }
 }
