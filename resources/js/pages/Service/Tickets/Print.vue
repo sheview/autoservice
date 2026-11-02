@@ -4,7 +4,7 @@ import { documentDateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft, FileDown, Printer } from 'lucide-vue-next';
-import { onBeforeUnmount, onMounted } from 'vue';
+import { onBeforeUnmount, onMounted, ref } from 'vue';
 
 // The job sheet of a ticket: one A4 page printed with the browser. No app layout or navigation.
 // Same layout as resources/views/documents/ticket.blade.php (the PDF): change both together.
@@ -62,13 +62,38 @@ const props = defineProps<{
 
 const print = () => window.print();
 
+// The sheet is one A4 page however much was written on it: when its content runs taller than the
+// page (A4 less margins, a little under as the signature blocks may not break), it is scaled down to
+// fit while printing, no smaller than 70% so it stays readable. On screen the sheet is already as wide
+// as the printed page (210mm less 14mm padding each side), so it is measured as it stands.
+const sheet = ref<HTMLElement | null>(null);
+const pxPerMm = 96 / 25.4;
+const fitToPage = () => {
+    const el = sheet.value;
+    const first = el?.firstElementChild;
+    const last = el?.lastElementChild;
+    if (!el || !first || !last) return;
+    el.style.zoom = '';
+    const height = (last.getBoundingClientRect().bottom - first.getBoundingClientRect().top) / pxPerMm;
+    el.style.zoom = String(Math.max(0.7, Math.min(1, 265 / height)));
+};
+const unfit = () => {
+    if (sheet.value) sheet.value.style.zoom = '';
+};
+
 // @page cannot be scoped to a component, so the page size goes in a <style> of its own while this page is open.
 let style: HTMLStyleElement | null = null;
 onMounted(() => {
     style = document.head.appendChild(document.createElement('style'));
     style.textContent = '@page { size: A4; margin: 12mm 14mm; }';
+    window.addEventListener('beforeprint', fitToPage);
+    window.addEventListener('afterprint', unfit);
 });
-onBeforeUnmount(() => style?.remove());
+onBeforeUnmount(() => {
+    style?.remove();
+    window.removeEventListener('beforeprint', fitToPage);
+    window.removeEventListener('afterprint', unfit);
+});
 
 const blank = '.'.repeat(40);
 const ticket = props.ticket;
@@ -172,7 +197,7 @@ const blankRows = 2;
         </div>
 
         <div class="flex justify-center p-6 print:block print:p-0">
-            <article class="sheet bg-white text-[10pt] leading-snug text-black shadow print:shadow-none">
+            <article ref="sheet" class="sheet bg-white text-[10pt] leading-snug text-black shadow print:shadow-none">
                 <header class="flex items-start justify-between gap-6 border-b-2 border-black pb-2">
                     <div class="flex items-start gap-3">
                         <img v-if="logo" :src="logo" alt="" class="h-[16mm] max-w-[40mm] object-contain" />
@@ -194,7 +219,7 @@ const blankRows = 2;
                     </div>
                 </header>
 
-                <section class="mt-2.5 grid grid-cols-4 gap-2 text-[9.5pt]">
+                <section class="mt-1.5 grid grid-cols-4 gap-2 text-[9.5pt]">
                     <div v-for="time in times" :key="time.label" class="border border-gray-400 px-2 py-1">
                         <p class="text-gray-600">{{ t(time.label) }}</p>
                         <p>{{ documentDateTime(time.value) }}</p>
@@ -202,7 +227,7 @@ const blankRows = 2;
                 </section>
 
                 <!-- Who asked for the service, and how the job is handled -->
-                <section class="mt-2.5">
+                <section class="mt-1.5">
                     <h2 class="mb-1 border-b border-black pb-0.5 font-semibold">{{ t('ticket_print.requester') }}</h2>
                     <div class="grid grid-cols-2 gap-x-7 gap-y-0.5">
                         <div v-for="fact in requester" :key="fact.label" class="flex gap-2">
@@ -213,7 +238,7 @@ const blankRows = 2;
                 </section>
 
                 <!-- The device: from the asset register, or as told when it is not registered -->
-                <section class="mt-2.5">
+                <section class="mt-1.5">
                     <h2 class="mb-1 border-b border-black pb-0.5 font-semibold">
                         {{ t('ticket_print.device') }}
                         <span class="text-[9pt] font-normal text-gray-600">
@@ -238,7 +263,7 @@ const blankRows = 2;
                     </div>
                 </section>
 
-                <section class="mt-2.5">
+                <section class="mt-1.5">
                     <h2 class="mb-1 border-b border-black pb-0.5 font-semibold">{{ t('ticket_print.problem') }}</h2>
                     <div class="min-h-[15mm] border border-gray-400 px-2 py-1.5">
                         <p class="font-medium">{{ ticket.title }}</p>
@@ -247,7 +272,7 @@ const blankRows = 2;
                 </section>
 
                 <!-- The customer's side asks for the repair and approves it -->
-                <section class="signatures mt-3 grid grid-cols-2 gap-10 text-center">
+                <section class="signatures mt-1.5 grid grid-cols-2 gap-10 text-center">
                     <div v-for="sign in requestSigns" :key="sign.role">
                         <p class="flex h-[26px] items-end gap-1.5">
                             <span>{{ t('ticket_print.sign') }}</span>
@@ -260,7 +285,7 @@ const blankRows = 2;
                 </section>
 
                 <!-- What the technician found and did -->
-                <section class="mt-2.5">
+                <section class="mt-1.5">
                     <h2 class="mb-1 border-b border-black pb-0.5 font-semibold">{{ t('ticket_print.staff_section') }}</h2>
                     <div class="flex gap-2">
                         <span class="w-28 shrink-0 text-gray-600">{{ t('ticket_print.cause') }}</span>
@@ -283,7 +308,7 @@ const blankRows = 2;
                     </div>
                 </section>
 
-                <section class="mt-2.5">
+                <section class="mt-1.5">
                     <h2 class="mb-1 border-b border-black pb-0.5 font-semibold">{{ t('ticket_print.parts') }}</h2>
                     <table class="w-full border-collapse">
                         <thead>
@@ -313,7 +338,7 @@ const blankRows = 2;
                 </section>
 
                 <!-- The technician says it is done, the customer that the device came back right -->
-                <section class="signatures mt-3 grid grid-cols-2 gap-10 text-center">
+                <section class="signatures mt-1.5 grid grid-cols-2 gap-10 text-center">
                     <div v-for="sign in doneSigns" :key="sign.role">
                         <p class="font-semibold">{{ sign.caption }}</p>
                         <img v-if="sign.image" :src="sign.image" alt="" class="mx-auto -mb-6 h-[16mm] object-contain" />
@@ -327,7 +352,7 @@ const blankRows = 2;
                     </div>
                 </section>
 
-                <section v-if="rating !== null" class="rating mt-2.5">
+                <section v-if="rating !== null" class="rating mt-1.5">
                     <h2 class="mb-1 border-b border-black pb-0.5 font-semibold">{{ t('ticket_print.rating') }}</h2>
                     <div class="grid grid-cols-2 gap-x-6 gap-y-0.5">
                         <p v-for="score in levels" :key="score">
@@ -343,7 +368,7 @@ const blankRows = 2;
                     </div>
                 </section>
 
-                <footer class="mt-4 flex justify-between gap-4 text-[8.5pt] text-gray-500">
+                <footer class="mt-1.5 flex justify-between gap-4 text-[8.5pt] text-gray-500">
                     <span v-if="serviceProvider">{{ t('ticket_print.service_provider', { name: serviceProvider }) }}</span>
                     <span>{{ t('ticket_print.printed_at', { at: documentDateTime(new Date().toISOString()) }) }}</span>
                 </footer>

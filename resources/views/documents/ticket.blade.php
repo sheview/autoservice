@@ -13,21 +13,21 @@
 
 @section('content')
     <style>
-        body { font-size: 10pt; line-height: 1.35; }
-        .sheet section { margin-top: 8px; }
+        body { font-size: 10pt; line-height: 1.3; }
+        .sheet section { margin-top: 6px; }
         .sheet h2 { font-size: 10pt; border-bottom: 1px solid #000; padding-bottom: 1px; margin-bottom: 4px; }
         .sheet .times { margin-top: 8px; }
         .sheet .facts { margin-top: 0; row-gap: 2px; }
         .sheet .fact .label { width: 110px; }
         .sheet .box { padding: 3px 8px; }
         .sheet th, .sheet td { padding: 2px 6px; }
-        .sheet .signatures { margin-top: 10px; gap: 40px; }
+        .sheet .signatures { margin-top: 6px; gap: 40px; }
         .sign-row { display: flex; align-items: flex-end; gap: 6px; height: 26px; }
         .sign-row .sign-line { flex: 1; height: auto; margin: 0; border-bottom: 1px dotted #000; }
         .caption { font-weight: 600; margin-bottom: 2px; }
         .checkbox { display: inline-block; width: 11px; height: 11px; border: 1px solid #000; text-align: center; line-height: 10px; font-size: 8.5pt; vertical-align: -1px; }
         .rating-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1px 20px; font-size: 9.5pt; }
-        .footer { margin-top: 10px; }
+        .footer { margin-top: 6px; }
         @if ($form)
             /* The blank sheet has more lines to write on: a little less space between parts keeps it on one A4 page. */
             .sheet section { margin-top: 5px; }
@@ -232,4 +232,24 @@
             </section>
         @endif
     </div>
+
+    <script>
+        // The job sheet is one A4 page, however much was written on it: when it runs longer, the whole
+        // sheet is scaled down to fit (no smaller than 70%, so it stays readable). Measured at the width
+        // of the printed page (A4 less margins); the height left is a little under A4 less margins, as
+        // the signature blocks may not break across pages. Again once the Thai font has loaded.
+        (() => {
+            const pxPerMm = 96 / 25.4;
+            const fit = () => {
+                const body = document.body;
+                body.style.zoom = '';
+                body.style.width = '182mm';
+                const height = body.getBoundingClientRect().height / pxPerMm;
+                body.style.width = '';
+                body.style.zoom = String(Math.max(0.7, Math.min(1, 265 / height)));
+            };
+            document.addEventListener('DOMContentLoaded', fit);
+            document.fonts?.ready.then(fit);
+        })();
+    </script>
 @endsection
