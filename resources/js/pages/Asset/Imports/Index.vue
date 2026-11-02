@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
+import ImportProgress from '@/components/ImportProgress.vue';
 import InputError from '@/components/InputError.vue';
 import Pagination from '@/components/Pagination.vue';
 import { Button } from '@/components/ui/button';
@@ -156,6 +157,11 @@ const statusClass: Record<string, string> = {
                                     {{ t(`asset_imports.statuses.${item.status}`) }}
                                 </td>
                                 <td class="px-4 py-2">
+                                    <ImportProgress
+                                        v-if="item.status === 'processing'"
+                                        :total="item.total_rows"
+                                        :done="item.created_rows + item.updated_rows + item.failed_rows"
+                                    />
                                     <div v-if="item.status === 'done'">
                                         {{
                                             t('asset_imports.summary', {

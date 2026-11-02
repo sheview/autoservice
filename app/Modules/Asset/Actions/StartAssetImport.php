@@ -12,11 +12,12 @@ use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Stores an uploaded asset Excel file and queues ImportAssetsJob for it. Another module asking for
+ * Stores an uploaded asset Excel file and runs ImportAssetsJob for it once the response is sent. Another module asking for
  * an import (a PM plan) passes its context: see ImportAssets.
  */
 class StartAssetImport
@@ -48,7 +49,16 @@ class StartAssetImport
             'context' => $context ?: null,
         ]);
 
-        ImportAssetsJob::dispatch($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id, $this->contracts($user));
+        // Run right after the response is sent, in this request: shared hosting (Plesk) often has no
+        // queue worker, and a queued import would wait there forever. The page polls the progress
+        // meanwhile; ExpireStuckAssetImports gives up on one that never started or stopped half way.
+        $job = new ImportAssetsJob($import->id, DataScope::of($user, 'assets.import') === PermissionCatalog::SCOPE_ALL, $user->branch_id, $this->contracts($user));
+        $tenant = $this->context->tenant();
+        app()->terminating(function () use ($job, $tenant) {
+            ignore_user_abort(true);
+            @set_time_limit($job->timeout);
+            $this->context->run($tenant, fn () => Bus::dispatchNow($job));
+        });
 
         return $import;
     }

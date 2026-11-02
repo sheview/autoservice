@@ -1,6 +1,9 @@
 <?php
 
+use App\Modules\Asset\Actions\ExpireStuckAssetImports;
+use App\Modules\Asset\Actions\ImportAssets;
 use App\Modules\Asset\Actions\SaveAsset;
+use App\Modules\Asset\Jobs\ImportAssetsJob;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetImport;
 use App\Modules\Asset\Models\StorageLocation;
@@ -8,6 +11,7 @@ use App\Modules\Asset\Support\AssetSheet;
 use App\Modules\Identity\Models\Role;
 use App\Modules\Tenancy\Models\Branch;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
@@ -48,6 +52,24 @@ function sheetRows(string $path): array
 }
 
 const HEADINGS = ['รหัสทรัพย์สิน', 'ชื่อ', 'หมวด', 'สาขา', 'สถานะ', 'วันที่ซื้อ', 'ราคาซื้อ (บาท)', 'CPU [spec.cpu]', 'RAM [spec.ram_gb]'];
+
+it('saves how far an import is while it runs', function () {
+    $seen = [];
+    AssetImport::updated(function (AssetImport $import) use (&$seen) {
+        if ($import->status === AssetImport::STATUS_PROCESSING) {
+            $seen[] = [$import->total_rows, $import->created_rows + $import->updated_rows + $import->failed_rows];
+        }
+    });
+
+    $rows = array_map(fn (int $n) => [null, "เครื่อง {$n}", 'คอมพิวเตอร์', null, null, null, null, 'Core i5', null], range(1, 30));
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([HEADINGS, ...$rows])])->assertSessionHasNoErrors();
+
+    $import = AssetImport::first();
+    expect($seen)->toContain([30, 0], [30, ImportAssets::PROGRESS_EVERY])
+        ->and($import->status)->toBe(AssetImport::STATUS_DONE)
+        ->and($import->total_rows)->toBe(30)
+        ->and($import->created_rows)->toBe(30);
+});
 
 it('finds a category by its code or the short name before or inside its brackets', function () {
     $ups = createAssetCategory(['name' => 'เครื่องสำรองไฟ (UPS)', 'code_prefix' => 'UPS']);
@@ -259,4 +281,40 @@ it('imports and exports the storage location by name, and refuses an IP or equip
     $rows = sheetRows($this->actingAs($this->admin)->get('/assets/export')->getFile()->getPathname());
     $column = array_search('สถานที่จัดเก็บ', $rows[0], true);
     expect(collect($rows)->firstWhere(1, 'Spare PC')[$column])->toBe('คลังหลัก');
+});
+
+it('imports right after the upload, with no queue worker', function () {
+    Queue::fake(); // nothing takes jobs from the queue
+
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([HEADINGS, [null, 'Desktop 1', 'คอมพิวเตอร์', null, null, null, null, 'Core i5', null]])])
+        ->assertSessionHasNoErrors();
+
+    Queue::assertNotPushed(ImportAssetsJob::class);
+    expect(AssetImport::sole()->only(['status', 'created_rows']))->toBe(['status' => AssetImport::STATUS_DONE, 'created_rows' => 1])
+        ->and(Asset::where('name', 'Desktop 1')->exists())->toBeTrue();
+});
+
+it('gives up on an import that never started or stopped half way, so none waits forever', function () {
+    $never = AssetImport::create(['file_name' => 'a.xlsx', 'file_path' => 'x/a.xlsx']);
+    $stopped = AssetImport::create(['file_name' => 'b.xlsx', 'file_path' => 'x/b.xlsx']);
+    $stopped->forceFill(['status' => AssetImport::STATUS_PROCESSING])->save();
+    $this->travel(ExpireStuckAssetImports::START_WITHIN_MINUTES + 1)->minutes();
+    $fresh = AssetImport::create(['file_name' => 'c.xlsx', 'file_path' => 'x/c.xlsx']);
+
+    $this->actingAs($this->admin)->get('/assets/imports')->assertOk();
+
+    // Started 6 minutes ago and quiet since: still running as far as anyone knows.
+    expect($never->fresh()->status)->toBe(AssetImport::STATUS_FAILED)
+        ->and($never->fresh()->errors[0]['messages'])->toBe([__('asset.imports.never_started')])
+        ->and($stopped->fresh()->status)->toBe(AssetImport::STATUS_PROCESSING)
+        ->and($fresh->fresh()->status)->toBe(AssetImport::STATUS_PENDING);
+
+    $this->travel(ExpireStuckAssetImports::QUIET_MINUTES)->minutes();
+    $this->actingAs($this->admin)->get('/assets/imports');
+    expect($stopped->fresh()->status)->toBe(AssetImport::STATUS_FAILED)
+        ->and($stopped->fresh()->errors[0]['messages'])->toBe([__('asset.imports.stopped')]);
+
+    // A copy of the job left in a queue finds the import taken and does nothing.
+    app(ImportAssets::class)->handle($stopped->fresh(), true, null);
+    expect($stopped->fresh()->status)->toBe(AssetImport::STATUS_FAILED);
 });

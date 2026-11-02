@@ -43,6 +43,9 @@ class ImportAssets
     /** At most this many row errors are kept on the import. */
     public const MAX_ERRORS = 200;
 
+    /** The counts are saved every this many rows, for the page's progress bar. */
+    public const PROGRESS_EVERY = 25;
+
     /** @var Collection<string, AssetCategory> lower(name) => category */
     private Collection $categories;
 
@@ -81,7 +84,12 @@ class ImportAssets
     {
         $this->contracts = $contracts;
         $this->context = $import->context ?? [];
-        $import->update(['status' => AssetImport::STATUS_PROCESSING]);
+        // Claimed once: a copy of the job left in a queue (from before imports ran after the response)
+        // finds it taken and does nothing.
+        if (AssetImport::whereKey($import->id)->where('status', AssetImport::STATUS_PENDING)->update(['status' => AssetImport::STATUS_PROCESSING]) === 0) {
+            return;
+        }
+        $import->refresh();
 
         try {
             $rows = Excel::toCollection(null, $import->file_path, 'local')->first() ?? collect();
@@ -116,6 +124,7 @@ class ImportAssets
         }
 
         $this->loadLookups();
+        $import->update(['total_rows' => $dataRows->count()]);
         $counts = ['created_rows' => 0, 'updated_rows' => 0, 'failed_rows' => 0];
         $errors = [];
 
@@ -143,11 +152,14 @@ class ImportAssets
             } else {
                 $counts[$result]++;
             }
+
+            if (array_sum($counts) % self::PROGRESS_EVERY === 0) {
+                $import->update($counts);
+            }
         }
 
         $import->update($counts + [
             'status' => AssetImport::STATUS_DONE,
-            'total_rows' => $dataRows->count(),
             'errors' => $errors,
             'finished_at' => now(),
         ]);

@@ -16,6 +16,8 @@ class AssetImportsFor
      */
     public function handle(string $contextKey, int $value, int $limit = 10): array
     {
+        app(ExpireStuckAssetImports::class)->handle();
+
         return AssetImport::query()
             ->where("context->{$contextKey}", $value)
             ->latest('id')

@@ -3,6 +3,7 @@
 namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\ExpireStuckAssetImports;
 use App\Modules\Asset\Actions\ImportAssets;
 use App\Modules\Asset\Actions\StartAssetImport;
 use App\Modules\Asset\Http\Requests\AssetImportRequest;
@@ -20,9 +21,11 @@ use Inertia\Response;
 
 class AssetImportController extends Controller
 {
-    public function index(Request $request, Modules $modules, ListCustomers $listCustomers, EditableContracts $editableContracts): Response
+    public function index(Request $request, Modules $modules, ListCustomers $listCustomers, EditableContracts $editableContracts, ExpireStuckAssetImports $expireStuck): Response
     {
         Gate::authorize('import', Asset::class);
+
+        $expireStuck->handle();
 
         $imports = AssetImport::query()->latest('id')->paginate(10);
         // Uploaders outside this tenant (an impersonating superadmin) are not readable here and show no name.

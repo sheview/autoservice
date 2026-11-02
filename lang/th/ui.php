@@ -1103,6 +1103,8 @@ return [
         'uploaded_at' => 'เวลา',
         'result' => 'ผลลัพธ์',
         'summary' => 'ทั้งหมด :total · เพิ่ม :created · อัปเดต :updated · ผิดพลาด :failed',
+        'progress' => ':percent% (:done จาก :total แถว)',
+        'reading' => 'กำลังอ่านไฟล์',
         'row' => 'แถว :row',
         'show_errors' => 'ดูข้อผิดพลาด',
         'statuses' => [
