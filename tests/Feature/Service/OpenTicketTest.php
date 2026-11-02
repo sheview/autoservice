@@ -51,6 +51,7 @@ it('opens a ticket with a number, the contract SLA and business-hour due times',
         ->and($ticket->resolve_due_at->format('Y-m-d H:i'))->toBe('2026-06-15 11:00')
         ->and($ticket->events()->pluck('type')->all())->toBe(['created']);
 
+    $ticket->update(['status' => Ticket::STATUS_CLOSED]); // a device has one ticket at a time
     $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['title' => 'Second']));
     expect(Ticket::latest('id')->first()->ticket_no)->toBe('TK001-2569-00002');
 });
@@ -72,6 +73,7 @@ it('opens an out-of-contract ticket without SLA', function () {
         ->and($ticket->resolve_due_at)->toBeNull();
 
     // no SLA for the chosen priority either
+    $ticket->update(['status' => Ticket::STATUS_CLOSED]); // a device has one ticket at a time
     $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['priority' => 'low']));
     expect(Ticket::latest('id')->first()->only(['contract_id', 'resolve_due_at']))
         ->toBe(['contract_id' => $this->contract->id, 'resolve_due_at' => null]);
@@ -146,4 +148,29 @@ it('forbids opening tickets without tickets.create', function () {
 
     $this->actingAs($nobody)->get('/tickets/create')->assertForbidden();
     $this->actingAs($nobody)->post('/tickets', ticketPayload())->assertForbidden();
+});
+
+it('opens no second ticket for a device until the old one is closed or cancelled', function () {
+    $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload())->assertSessionHasNoErrors();
+    $first = Ticket::first();
+
+    // Still running, and resolved but not yet closed: refused, naming the old ticket.
+    foreach ([Ticket::STATUS_NEW, Ticket::STATUS_RESOLVED] as $status) {
+        $first->forceFill(['status' => $status])->save();
+        $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['title' => 'Again']))
+            ->assertSessionHasErrors(['asset_id' => __('service.tickets.asset_has_open', ['no' => $first->ticket_no])]);
+    }
+    expect(Ticket::count())->toBe(1);
+
+    // Another device, or a job typed in without an asset, is not held up.
+    $other = createAsset(createAssetCategory(), ['customer_id' => $this->customer->id]);
+    $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['asset_id' => $other->id, 'contract_id' => null]))->assertSessionHasNoErrors();
+    $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['asset_id' => null, 'contract_id' => null, 'device_name' => 'PC', 'device_brand' => 'Dell', 'device_model' => 'OptiPlex', 'device_serial' => 'SN1']))->assertSessionHasNoErrors();
+
+    // Closed (or cancelled): a new ticket for the device opens.
+    foreach ([Ticket::STATUS_CLOSED, Ticket::STATUS_CANCELLED] as $status) {
+        Ticket::where('asset_id', $this->asset->id)->update(['status' => $status]);
+        $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['title' => "After {$status}"]))->assertSessionHasNoErrors();
+    }
+    expect(Ticket::where('asset_id', $this->asset->id)->count())->toBe(3);
 });

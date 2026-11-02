@@ -116,8 +116,8 @@ it('counts SLA results, PM rounds and assets', function () {
     ]);
     $contract->contractAssets()->create(['asset_id' => $asset->id]);
 
-    // started after 2 hours (response breached), resolved after 3 (resolve breached)
-    ($this->ticket)('2026-06-03 09:00', ['assign', 'start', 'resolve'], ['asset_id' => $asset->id, 'contract_id' => $contract->id]);
+    // started after 2 hours (response breached), resolved after 3 (resolve breached); closed, so the device may get a new ticket
+    ($this->ticket)('2026-06-03 09:00', ['assign', 'start', 'resolve', 'approve'], ['asset_id' => $asset->id, 'contract_id' => $contract->id]);
     // opened 30 minutes ago: both clocks still running
     ($this->ticket)('2026-06-20 09:30', [], ['asset_id' => $asset->id, 'contract_id' => $contract->id]);
 

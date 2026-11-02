@@ -128,6 +128,22 @@ it('opens a repair ticket for an asset found with an issue', function () {
             ->where('items.1.ticket.ticket_no', $ticket->ticket_no));
 });
 
+it('opens no repair ticket from PM for a device whose last ticket is not closed yet', function () {
+    $running = openTicket(userWithRole('helpdesk'), ['asset_id' => $this->printer->id, 'customer_id' => $this->customer->id]);
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/start");
+    $item = itemOf($this->visit, $this->printer->id);
+    $this->actingAs($this->tech)->put("/pm-visits/{$this->visit->ulid}/items/{$item->id}", ['result' => 'failed', 'note' => 'ดึงกระดาษไม่เข้า']);
+
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/items/{$item->id}/ticket", ['priority' => 'medium'])
+        ->assertSessionHasErrors(['item' => __('service.tickets.asset_has_open', ['no' => $running->ticket_no])]);
+    expect(Ticket::count())->toBe(1);
+
+    $running->update(['status' => Ticket::STATUS_CLOSED]);
+    $this->actingAs($this->tech)->post("/pm-visits/{$this->visit->ulid}/items/{$item->id}/ticket", ['priority' => 'medium'])
+        ->assertSessionHasNoErrors();
+    expect(Ticket::count())->toBe(2);
+});
+
 it('lets only the assignee or a PM manager work on a round', function () {
     $otherTech = userWithRole('technician');
 

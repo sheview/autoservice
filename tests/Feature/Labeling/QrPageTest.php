@@ -32,9 +32,10 @@ beforeEach(function () {
 });
 
 it('shows signed-in staff the whole device, its jobs and what they may do next', function () {
-    $open = openTicket($this->helpdesk, ['asset_id' => $this->asset->id, 'customer_id' => $this->customer->id]);
+    // A device has one ticket at a time: the old one is closed before the next is opened.
     $done = openTicket($this->helpdesk, ['asset_id' => $this->asset->id, 'customer_id' => $this->customer->id]);
     $done->forceFill(['status' => Ticket::STATUS_CLOSED])->save();
+    $open = openTicket($this->helpdesk, ['asset_id' => $this->asset->id, 'customer_id' => $this->customer->id]);
 
     foreach ([$this->url, "/q/{$this->asset->asset_code}"] as $url) {
         $this->actingAs($this->tech)->get($url)->assertOk()->assertInertia(fn (Assert $page) => $page

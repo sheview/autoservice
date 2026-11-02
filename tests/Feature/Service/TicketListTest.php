@@ -22,9 +22,15 @@ beforeEach(function () {
     $contract->contractAssets()->create(['asset_id' => $northAsset->id]);
     $contract->contractAssets()->create(['asset_id' => $southAsset->id]);
 
-    $open = fn (string $title, array $extra = []) => openTicket($this->helpdesk, $extra + [
-        'title' => $title, 'customer_id' => $customer->id, 'asset_id' => $northAsset->id, 'contract_id' => $contract->id,
-    ]);
+    // Each job on a device of its own (a device has one ticket at a time), in the north unless told.
+    $open = function (string $title, array $extra = []) use ($customer, $contract) {
+        if (! isset($extra['asset_id'])) {
+            $extra['asset_id'] = createAsset(createAssetCategory(), ['customer_id' => $customer->id, 'branch_id' => $this->north->id])->id;
+            $contract->contractAssets()->create(['asset_id' => $extra['asset_id']]);
+        }
+
+        return openTicket($this->helpdesk, $extra + ['title' => $title, 'customer_id' => $customer->id, 'contract_id' => $contract->id]);
+    };
 
     $this->urgent = $open('Urgent north', ['priority' => 'critical']);
     $this->calm = $open('Calm north', ['priority' => 'low', 'assignee_id' => $this->tech->id]);

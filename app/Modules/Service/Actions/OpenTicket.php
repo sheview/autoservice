@@ -12,6 +12,7 @@ use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketEvent;
 use App\Modules\Service\Support\TicketSla;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Opens a ticket: number, branch (from the asset), SLA copied from the covering contract,
@@ -28,6 +29,7 @@ class OpenTicket
         private RecordTicketEvent $recordEvent,
         private UserNames $userNames,
         private NotifyTicketEvent $notify,
+        private OpenTicketOfAsset $openTicketOfAsset,
     ) {}
 
     /**
@@ -41,6 +43,15 @@ class OpenTicket
     public function handle(User $actor, array $data): Ticket
     {
         return DB::transaction(function () use ($actor, $data) {
+            // One ticket at a time per device: the old one is closed (or cancelled) first. Under a lock
+            // on the asset, for two people opening at once.
+            if (isset($data['asset_id'])) {
+                DB::table('assets')->where('tenant_id', $actor->tenant_id)->where('id', $data['asset_id'])->lockForUpdate()->first();
+                if ($open = $this->openTicketOfAsset->handle($data['asset_id'], untilClosed: true)) {
+                    throw ValidationException::withMessages(['asset_id' => __('service.tickets.asset_has_open', ['no' => $open->ticket_no])]);
+                }
+            }
+
             $asset = isset($data['asset_id']) ? ($this->assetDetails->handle([$data['asset_id']])[$data['asset_id']] ?? null) : null;
 
             $ticket = new Ticket(collect($data)->except('assignee_id')->all());

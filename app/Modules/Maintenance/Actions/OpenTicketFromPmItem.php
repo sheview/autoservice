@@ -6,6 +6,7 @@ use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Service\Actions\OpenTicket;
+use App\Modules\Service\Actions\OpenTicketOfAsset;
 use App\Modules\Service\Models\Ticket;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -20,12 +21,17 @@ class OpenTicketFromPmItem
     public function __construct(
         private OpenTicket $openTicket,
         private AssetDetails $assetDetails,
+        private OpenTicketOfAsset $openTicketOfAsset,
     ) {}
 
     public function handle(PmVisitItem $item, User $actor, string $priority): Ticket
     {
         if ($item->result !== PmVisitItem::RESULT_FAILED || $item->ticket_id !== null) {
             throw ValidationException::withMessages(['item' => __('maintenance.visits.cannot_open_ticket')]);
+        }
+        // The device already has a ticket not yet closed: no second one (OpenTicket checks it again under a lock).
+        if ($open = $this->openTicketOfAsset->handle($item->asset_id, untilClosed: true)) {
+            throw ValidationException::withMessages(['item' => __('service.tickets.asset_has_open', ['no' => $open->ticket_no])]);
         }
 
         return DB::transaction(function () use ($item, $actor, $priority) {
