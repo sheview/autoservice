@@ -23,7 +23,9 @@ interface AssetRow {
     serial_number: string | null;
     property_no: string | null;
     category: string | null;
-    branch: string | null;
+    location: string | null;
+    floor: string | null;
+    room: string | null;
     customer: string | null;
     used_by: string | null;
     department: string | null;
@@ -87,7 +89,7 @@ const columns = [
     { key: 'asset_code', sortable: true },
     { key: 'name', sortable: true },
     { key: 'category', sortable: false },
-    { key: 'branch', sortable: false },
+    { key: 'location', sortable: true },
     // Customers exist only when the contract module is on.
     ...(props.customers.length ? [{ key: 'customer', sortable: false }] : []),
     { key: 'user', sortable: false },
@@ -241,7 +243,19 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 </div>
                             </td>
                             <td class="px-4 py-2">{{ asset.category ?? t('common.none') }}</td>
-                            <td class="px-4 py-2">{{ asset.branch ?? t('assets.no_branch') }}</td>
+                            <td class="px-4 py-2">
+                                <div>{{ asset.location ?? t('common.none') }}</div>
+                                <div v-if="asset.floor || asset.room" class="text-xs text-muted-foreground">
+                                    {{
+                                        [
+                                            asset.floor && t('assets.floor_short', { floor: asset.floor }),
+                                            asset.room && t('assets.room_short', { room: asset.room }),
+                                        ]
+                                            .filter(Boolean)
+                                            .join(' · ')
+                                    }}
+                                </div>
+                            </td>
                             <td v-if="customers.length" class="px-4 py-2">{{ asset.customer ?? t('common.none') }}</td>
                             <td class="px-4 py-2">
                                 <div v-if="asset.used_by">{{ asset.used_by }}</div>

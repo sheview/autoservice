@@ -6,6 +6,7 @@ use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Asset\Models\StorageLocation;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -18,7 +19,7 @@ use Illuminate\Http\Request;
  */
 class SearchAssets
 {
-    public const SORTABLE = ['asset_code', 'name', 'status', 'purchased_at', 'warranty_expires_at', 'created_at'];
+    public const SORTABLE = ['asset_code', 'name', 'location', 'status', 'purchased_at', 'warranty_expires_at', 'created_at'];
 
     public const WARRANTY_FILTERS = ['active', 'expiring', 'expired', 'none'];
 
@@ -70,7 +71,11 @@ class SearchAssets
             ->when($filters['branch_id'] ?? null, fn (Builder $q, $id) => $q->where('branch_id', $id))
             ->when($filters['customer_id'] ?? null, fn (Builder $q, $id) => $q->where('customer_id', $id))
             ->when($filters['category_id'] ?? null, fn (Builder $q, $id) => $q->where('category_id', $id))
-            ->when($filters['storage_location_id'] ?? null, fn (Builder $q, $id) => $q->where('storage_location_id', $id))
+            // Kept there, or not kept anywhere yet but its location names it (typed or imported).
+            ->when($filters['storage_location_id'] ?? null, fn (Builder $q, $id) => $q->where(fn ($q) => $q
+                ->where('storage_location_id', $id)
+                ->orWhere(fn ($q) => $q->whereNull('storage_location_id')
+                    ->whereIn('location', StorageLocation::query()->select('name')->whereKey($id)))))
             ->when($filters['asset_type'] ?? null, fn (Builder $q, $type) => $q->whereHas('category', fn (Builder $q) => $q->where('asset_type', $type)))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
             ->when(($filters['warranty'] ?? null) === 'active', fn (Builder $q) => $q->where('warranty_expires_at', '>=', $today))

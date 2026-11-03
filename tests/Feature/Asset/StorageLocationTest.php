@@ -145,3 +145,22 @@ it('keeps an imported asset at the storage location its location names, and link
     expect(Asset::where('name', 'Acer N19Q7')->value('storage_location_id'))->toBe(StorageLocation::where('name', 'ITBTD-ชั้น 4')->value('id'))
         ->and(Asset::where('name', 'Huawei')->value('storage_location_id'))->toBeNull();
 });
+
+it('finds by storage location the assets whose location names it, even when not linked yet, and sorts by location', function () {
+    $floor1 = StorageLocation::create(['name' => 'ITBTD-ชั้น 1']);
+    $category = createAssetCategory();
+    createAsset($category, ['name' => 'Linked', 'location' => 'ห้องอื่น', 'storage_location_id' => $floor1->id]);
+    createAsset($category, ['name' => 'Typed only', 'location' => 'itbtd-ชั้น 1', 'floor' => '1', 'room' => '101']);
+    createAsset($category, ['name' => 'Elsewhere', 'location' => 'ITBTD-ชั้น 4']);
+    // kept at another store: its location text does not move it
+    createAsset($category, ['name' => 'Other store', 'location' => 'ITBTD-ชั้น 1', 'storage_location_id' => StorageLocation::create(['name' => 'คลัง'])->id]);
+
+    $this->actingAs($this->admin)->get("/assets?storage_location_id={$floor1->id}&sort=location")
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('assets.total', 2)
+            ->where('assets.data.0.name', 'Typed only')
+            ->where('assets.data.0.location', 'itbtd-ชั้น 1')
+            ->where('assets.data.0.floor', '1')
+            ->where('assets.data.0.room', '101')
+            ->where('assets.data.1.name', 'Linked'));
+});

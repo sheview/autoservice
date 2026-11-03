@@ -71,7 +71,7 @@ class AssetController extends Controller
         $customerNames = collect($this->customers(withTrashed: true))->pluck('name', 'id');
 
         $assets = $search->handle($user, $filters)
-            ->with(['category:id,name', 'branch:id,name'])
+            ->with(['category:id,name'])
             ->paginate(50)
             ->withQueryString();
         $assets->getCollection()->load('media');
@@ -92,7 +92,9 @@ class AssetController extends Controller
                 'serial_number' => $asset->serial_number,
                 'property_no' => $asset->property_no,
                 'category' => $asset->category?->name,
-                'branch' => $asset->branch?->name,
+                'location' => $asset->location,
+                'floor' => $asset->floor,
+                'room' => $asset->room,
                 'customer' => $customerNames[$asset->customer_id] ?? null,
                 'used_by' => $asset->used_by,
                 'department' => $asset->department,

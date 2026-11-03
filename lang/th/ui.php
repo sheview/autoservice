@@ -924,6 +924,8 @@ return [
         'holder_issue' => 'เบิกโดย :name',
         'holder_due' => 'คืน :date',
         'holders_more' => '+ อีก :count คน',
+        'floor_short' => 'ชั้น :floor',
+        'room_short' => 'ห้อง :room',
         'available_of' => 'คงเหลือ :available จาก :total',
         'quantity_from_serials' => 'จำนวน :count (นับจาก Serial)',
         'unit' => 'หน่วย',
