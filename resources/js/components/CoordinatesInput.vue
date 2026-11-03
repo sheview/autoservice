@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { mapsUrl, parseCoordinates } from '@/lib/coordinates';
 import { t } from '@/lib/i18n';
-import { ExternalLink, LocateFixed, X } from 'lucide-vue-next';
-import { ref, watch } from 'vue';
+import { ExternalLink, LocateFixed, MapPin, X } from 'lucide-vue-next';
+import { defineAsyncComponent, ref, watch } from 'vue';
+
+// Leaflet loads only when the map is opened.
+const PinPicker = defineAsyncComponent(() => import('@/components/PinPicker.vue'));
 
 /**
  * A place on the map as lat / lng: typed as "13.75, 100.50", pasted as a Google Maps link,
- * or taken from the device's location. Both empty = no place.
+ * taken from the device's location, or picked on a map. Both empty = no place.
  */
 const lat = defineModel<string>('lat', { required: true });
 const lng = defineModel<string>('lng', { required: true });
@@ -19,6 +22,7 @@ const text = ref(lat.value && lng.value ? `${lat.value}, ${lng.value}` : '');
 const invalid = ref(false);
 const locating = ref(false);
 const locateError = ref('');
+const picking = ref(false);
 
 // Saved from outside (form reset or another record): show what the form now holds.
 watch([lat, lng], ([newLat, newLng]) => {
@@ -38,6 +42,11 @@ const read = () => {
 
 // The pasted text is in the box only after the paste event.
 const readAfterPaste = () => setTimeout(read);
+
+const pick = (pickedLat: string, pickedLng: string) => {
+    text.value = `${pickedLat}, ${pickedLng}`;
+    read();
+};
 
 const clear = () => {
     text.value = '';
@@ -82,6 +91,10 @@ const locate = () => {
                 <LocateFixed class="h-4 w-4" />
                 {{ locating ? t('coordinates.locating') : t('coordinates.locate') }}
             </Button>
+            <Button type="button" variant="outline" @click="picking = !picking">
+                <MapPin class="h-4 w-4" />
+                {{ picking ? t('map.hide_map') : t('map.pick_on_map') }}
+            </Button>
             <Button v-if="lat && lng" type="button" variant="outline" as-child>
                 <a :href="mapsUrl(lat, lng)" target="_blank" rel="noopener">
                     <ExternalLink class="h-4 w-4" />
@@ -92,6 +105,7 @@ const locate = () => {
                 <X class="h-4 w-4" />
             </Button>
         </div>
+        <PinPicker v-if="picking" :lat="lat" :lng="lng" @pick="pick" />
         <p class="text-xs text-muted-foreground">{{ t('coordinates.hint') }}</p>
         <InputError :message="invalid ? t('coordinates.invalid') : locateError || error" />
     </div>

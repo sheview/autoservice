@@ -154,6 +154,39 @@ class SampleCompanySeeder extends Seeder
         ['code' => 'HDY', 'name' => 'สาขาหาดใหญ่', 'province' => 'สงขลา'],
     ];
 
+    /** Where each branch is on the map (by code). */
+    private const BRANCH_PLACES = [
+        'BKK' => [13.7279000, 100.5241000],
+        'CNX' => [18.7883000, 98.9853000],
+        'KKC' => [16.4322000, 102.8236000],
+        'HDY' => [7.0086000, 100.4747000],
+    ];
+
+    /**
+     * Each customer's sites on the map: [name, province, lat, lng]. The first is the site made
+     * with the customer (CUSTOMERS); the others are added when missing.
+     */
+    private const SITE_PLACES = [
+        [
+            ['สำนักงานใหญ่ สีลม', 'กรุงเทพมหานคร', 13.7246000, 100.5300000],
+            ['สาขาบางนา', 'กรุงเทพมหานคร', 13.6680000, 100.6340000],
+            ['สาขาพัทยา', 'ชลบุรี', 12.9276000, 100.8771000],
+        ],
+        [
+            ['อาคารผู้ป่วยนอก', 'เชียงใหม่', 18.7905000, 98.9740000],
+            ['คลินิกสาขาลำพูน', 'ลำพูน', 18.5745000, 99.0087000],
+        ],
+        [
+            ['คลังสินค้า 1', 'ขอนแก่น', 16.4730000, 102.8150000],
+            ['คลังสินค้า 2 แหลมฉบัง', 'ชลบุรี', 13.0827000, 100.9170000],
+            ['ศูนย์กระจายสินค้าอุดรธานี', 'อุดรธานี', 17.4138000, 102.7872000],
+        ],
+        [
+            ['ศูนย์คอมพิวเตอร์', 'สงขลา', 7.0070000, 100.4980000],
+            ['วิทยาเขตภูเก็ต', 'ภูเก็ต', 7.8930000, 98.3530000],
+        ],
+    ];
+
     /** [name, tax id, contact, phone, site name, site note, branch index]. */
     private const CUSTOMERS = [
         ['บริษัท ตัวอย่างค้าปลีก จำกัด (มหาชน)', '0107500000011', 'คุณสมศรี ใจดี', '02-111-1111', 'สำนักงานใหญ่ สีลม', 'ติดต่อ รปภ. ชั้น 1 ก่อนขึ้นอาคาร', 0],
@@ -227,6 +260,8 @@ class SampleCompanySeeder extends Seeder
         if ($existing = Tenant::query()->where('subdomain', self::SUBDOMAIN)->first()) {
             // Made before the flag existed: still marked, so it stays quiet and shows its banner.
             $existing->forceFill(['is_sample' => true])->save();
+            // Made before branches and sites had places: put them on the map (only what is missing).
+            $this->context->run($existing, fn () => $this->places());
             $this->command?->info(self::NAME.' มีอยู่แล้ว: ไม่ได้เพิ่มข้อมูล');
 
             return;
@@ -276,6 +311,7 @@ class SampleCompanySeeder extends Seeder
         $branches = collect(self::BRANCHES)->map(fn (array $branch) => app(SaveBranch::class)->handle(null, $branch));
         $this->people($branches);
         $this->customers($branches);
+        $this->places();
         $this->assets($branches);
         $this->contracts();
 
@@ -311,6 +347,32 @@ class SampleCompanySeeder extends Seeder
     }
 
     // ---------------------------------------------------------------- People, customers, assets, contracts
+
+    /**
+     * Branches and customer sites on the map: coordinates where none are set yet, and the extra
+     * sites when missing. Safe to run again (the company already exists on every deploy).
+     */
+    private function places(): void
+    {
+        foreach (self::BRANCH_PLACES as $code => [$lat, $lng]) {
+            Branch::query()->where('code', $code)->whereNull('lat')->update(['lat' => $lat, 'lng' => $lng]);
+        }
+
+        foreach (self::SITE_PLACES as $i => $sites) {
+            $customer = Customer::query()->where('code', sprintf('CUST%03d', $i + 1))->first();
+            if ($customer === null) {
+                continue;
+            }
+            foreach ($sites as [$name, $province, $lat, $lng]) {
+                $site = CustomerSite::query()->where('customer_id', $customer->id)->where('name', $name)->first();
+                if ($site === null) {
+                    app(SaveSite::class)->handle($customer, null, ['name' => $name, 'address' => 'ที่ตั้งของ '.$name, 'province' => $province, 'lat' => $lat, 'lng' => $lng]);
+                } elseif ($site->lat === null) {
+                    $site->update(['province' => $province, 'lat' => $lat, 'lng' => $lng]);
+                }
+            }
+        }
+    }
 
     private function people(Collection $branches): void
     {

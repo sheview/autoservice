@@ -13,7 +13,10 @@ import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { AlarmClock, CalendarCheck, CalendarClock, FileWarning, Inbox, PackageX, UserCheck, UserX } from 'lucide-vue-next';
 import type { Component } from 'vue';
-import { computed, ref } from 'vue';
+import { computed, defineAsyncComponent, ref } from 'vue';
+
+// Leaflet loads only on the map tab.
+const PlaceMap = defineAsyncComponent(() => import('@/components/PlaceMap.vue'));
 
 // The home page: what needs attention now. Each card is null when the user may not see it.
 const props = defineProps<{
@@ -41,7 +44,10 @@ const props = defineProps<{
     } | null;
     // The platform's own workspace: its customer companies (null inside a company).
     platform: InstanceType<typeof PlatformOverview>['$props']['platform'] | null;
-    can: { createTicket: boolean; reports: boolean };
+    can: { createTicket: boolean; reports: boolean; map: boolean };
+    // "map": the map of branches and customer sites (data only on that tab).
+    tab: 'overview' | 'map';
+    map: InstanceType<typeof PlaceMap>['$props'] | null;
 }>();
 
 const page = usePage<SharedData>();
@@ -198,105 +204,124 @@ const charts = computed(() => {
                 </div>
             </div>
 
-            <div v-if="tiles.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatTile
-                    v-for="tile in tiles"
-                    :key="tile.key"
-                    :href="tile.href"
-                    :label="tile.label"
-                    :value="tile.value"
-                    :icon="LOOK[tile.key]?.icon"
-                    :tone="LOOK[tile.key]?.tone"
-                    :alert="tile.alert"
-                />
-            </div>
+            <nav v-if="can.map" class="flex gap-1 border-b">
+                <Link
+                    v-for="option in ['overview', 'map'] as const"
+                    :key="option"
+                    :href="option === 'map' ? route('dashboard', { tab: 'map' }) : route('dashboard')"
+                    class="-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-colors"
+                    :class="tab === option ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'"
+                    preserve-scroll
+                >
+                    {{ option === 'map' ? t('map.title') : t('map.tab_overview') }}
+                </Link>
+            </nav>
 
-            <section v-if="trends && charts" class="space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <h2 class="text-sm font-semibold">{{ t('dashboard.charts.title') }}</h2>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <div class="inline-flex rounded-md border p-0.5" role="group">
-                            <button
-                                v-for="option in ['monthly', 'yearly'] as const"
-                                :key="option"
-                                type="button"
-                                class="rounded px-3 py-1 text-sm transition-colors"
-                                :class="period === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'"
-                                :aria-pressed="period === option"
-                                @click="period = option"
+            <PlaceMap v-if="tab === 'map' && map" v-bind="map" />
+
+            <template v-else>
+                <div v-if="tiles.length" class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <StatTile
+                        v-for="tile in tiles"
+                        :key="tile.key"
+                        :href="tile.href"
+                        :label="tile.label"
+                        :value="tile.value"
+                        :icon="LOOK[tile.key]?.icon"
+                        :tone="LOOK[tile.key]?.tone"
+                        :alert="tile.alert"
+                    />
+                </div>
+
+                <section v-if="trends && charts" class="space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <h2 class="text-sm font-semibold">{{ t('dashboard.charts.title') }}</h2>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <div class="inline-flex rounded-md border p-0.5" role="group">
+                                <button
+                                    v-for="option in ['monthly', 'yearly'] as const"
+                                    :key="option"
+                                    type="button"
+                                    class="rounded px-3 py-1 text-sm transition-colors"
+                                    :class="period === option ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted'"
+                                    :aria-pressed="period === option"
+                                    @click="period = option"
+                                >
+                                    {{ t(`dashboard.charts.${option}`) }}
+                                </button>
+                            </div>
+                            <select
+                                :value="trends.year"
+                                :aria-label="t('dashboard.charts.year')"
+                                class="shadow-xs h-9 rounded-md border border-input bg-transparent px-3 text-sm"
+                                @change="pickYear"
                             >
-                                {{ t(`dashboard.charts.${option}`) }}
-                            </button>
+                                <option v-for="year in trends.years" :key="year" :value="year">{{ year }}</option>
+                            </select>
                         </div>
-                        <select
-                            :value="trends.year"
-                            :aria-label="t('dashboard.charts.year')"
-                            class="shadow-xs h-9 rounded-md border border-input bg-transparent px-3 text-sm"
-                            @change="pickYear"
-                        >
-                            <option v-for="year in trends.years" :key="year" :value="year">{{ year }}</option>
-                        </select>
                     </div>
-                </div>
-                <div class="grid gap-4 lg:grid-cols-2">
-                    <ColumnChart v-if="charts.tickets" v-bind="charts.tickets" />
-                    <div v-if="charts.assets" class="space-y-1">
-                        <ColumnChart v-bind="charts.assets" stacked />
-                        <p class="text-xs text-muted-foreground">{{ t('dashboard.charts.assets_hint') }}</p>
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <ColumnChart v-if="charts.tickets" v-bind="charts.tickets" />
+                        <div v-if="charts.assets" class="space-y-1">
+                            <ColumnChart v-bind="charts.assets" stacked />
+                            <p class="text-xs text-muted-foreground">{{ t('dashboard.charts.assets_hint') }}</p>
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            <div class="grid gap-6 lg:grid-cols-3">
-                <section v-if="tickets" class="space-y-2 lg:col-span-2">
-                    <div class="flex items-center justify-between">
-                        <h2 class="text-sm font-semibold">{{ t('dashboard.recent_tickets') }}</h2>
-                        <Link :href="route('service.tickets.index')" class="text-sm text-primary underline-offset-4 hover:underline">
-                            {{ t('dashboard.view_all') }}
-                        </Link>
-                    </div>
-                    <ul v-if="tickets.recent.length" class="divide-y rounded-md border text-sm">
-                        <li v-for="ticket in tickets.recent" :key="ticket.ulid">
-                            <Link
-                                :href="route('service.tickets.show', ticket.ulid)"
-                                class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 hover:bg-muted/40"
-                            >
-                                <span class="min-w-0">
-                                    <span class="font-mono text-xs text-muted-foreground">{{ ticket.ticket_no }}</span>
-                                    <span class="ml-2">{{ ticket.title }}</span>
-                                    <span class="ml-2 text-xs text-muted-foreground">{{ dateTime(ticket.created_at) }}</span>
-                                </span>
-                                <span class="flex items-center gap-2">
-                                    <TicketPriorityBadge :priority="ticket.priority" />
-                                    <TicketStatusBadge :status="ticket.status" />
-                                </span>
+                <div class="grid gap-6 lg:grid-cols-3">
+                    <section v-if="tickets" class="space-y-2 lg:col-span-2">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-sm font-semibold">{{ t('dashboard.recent_tickets') }}</h2>
+                            <Link :href="route('service.tickets.index')" class="text-sm text-primary underline-offset-4 hover:underline">
+                                {{ t('dashboard.view_all') }}
                             </Link>
-                        </li>
-                    </ul>
-                    <p v-else class="rounded-md border px-4 py-6 text-center text-sm text-muted-foreground">{{ t('dashboard.no_open_tickets') }}</p>
-                </section>
-
-                <section v-if="surveys" class="space-y-2">
-                    <h2 class="text-sm font-semibold">{{ t('dashboard.satisfaction') }}</h2>
-                    <div class="rounded-md border p-4">
-                        <p class="text-2xl font-semibold">
-                            {{ surveys.average === null ? t('common.none') : surveys.average.toFixed(2) }}
-                            <span class="text-sm font-normal text-muted-foreground">{{ t('surveys.summary.out_of', { max: 5 }) }}</span>
+                        </div>
+                        <ul v-if="tickets.recent.length" class="divide-y rounded-md border text-sm">
+                            <li v-for="ticket in tickets.recent" :key="ticket.ulid">
+                                <Link
+                                    :href="route('service.tickets.show', ticket.ulid)"
+                                    class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 hover:bg-muted/40"
+                                >
+                                    <span class="min-w-0">
+                                        <span class="font-mono text-xs text-muted-foreground">{{ ticket.ticket_no }}</span>
+                                        <span class="ml-2">{{ ticket.title }}</span>
+                                        <span class="ml-2 text-xs text-muted-foreground">{{ dateTime(ticket.created_at) }}</span>
+                                    </span>
+                                    <span class="flex items-center gap-2">
+                                        <TicketPriorityBadge :priority="ticket.priority" />
+                                        <TicketStatusBadge :status="ticket.status" />
+                                    </span>
+                                </Link>
+                            </li>
+                        </ul>
+                        <p v-else class="rounded-md border px-4 py-6 text-center text-sm text-muted-foreground">
+                            {{ t('dashboard.no_open_tickets') }}
                         </p>
-                        <StarRating :model-value="surveys.average === null ? null : Math.round(surveys.average)" />
-                        <p class="mt-1 text-xs text-muted-foreground">
-                            {{ t('surveys.summary.answered_of', { answered: surveys.answered, sent: surveys.sent }) }} ·
-                            {{ t('dashboard.this_month') }}
-                        </p>
-                    </div>
-                </section>
-            </div>
+                    </section>
 
-            <PlatformOverview v-if="platform" :platform="platform" />
+                    <section v-if="surveys" class="space-y-2">
+                        <h2 class="text-sm font-semibold">{{ t('dashboard.satisfaction') }}</h2>
+                        <div class="rounded-md border p-4">
+                            <p class="text-2xl font-semibold">
+                                {{ surveys.average === null ? t('common.none') : surveys.average.toFixed(2) }}
+                                <span class="text-sm font-normal text-muted-foreground">{{ t('surveys.summary.out_of', { max: 5 }) }}</span>
+                            </p>
+                            <StarRating :model-value="surveys.average === null ? null : Math.round(surveys.average)" />
+                            <p class="mt-1 text-xs text-muted-foreground">
+                                {{ t('surveys.summary.answered_of', { answered: surveys.answered, sent: surveys.sent }) }} ·
+                                {{ t('dashboard.this_month') }}
+                            </p>
+                        </div>
+                    </section>
+                </div>
 
-            <p v-else-if="!tiles.length && !tickets" class="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
-                {{ page.props.tenant?.is_platform ? t('dashboard.platform_hint') : t('dashboard.nothing') }}
-            </p>
+                <PlatformOverview v-if="platform" :platform="platform" />
+
+                <p v-else-if="!tiles.length && !tickets" class="rounded-md border px-4 py-8 text-center text-sm text-muted-foreground">
+                    {{ page.props.tenant?.is_platform ? t('dashboard.platform_hint') : t('dashboard.nothing') }}
+                </p>
+            </template>
         </div>
     </AppLayout>
 </template>

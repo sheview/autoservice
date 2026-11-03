@@ -4,6 +4,7 @@ namespace App\Modules\Platform\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetTrend;
+use App\Modules\Contract\Actions\MapPlaces;
 use App\Modules\Contract\Actions\SearchContracts;
 use App\Modules\Identity\Support\DataScope;
 use App\Modules\Identity\Support\PermissionCatalog;
@@ -27,7 +28,8 @@ use Inertia\Response;
  * null when its module is off or the user lacks its permission; each card counts only what the
  * user may see (the scoped searches of its module, e.g. a technician's own work). The platform
  * tenant has no company data, so its users get the shortcuts only. Without dashboard.view the
- * user is sent to the first page of their menu.
+ * user is sent to the first page of their menu. ?tab=map shows the map of branches and customer
+ * sites instead (its data is only loaded on that tab).
  */
 class DashboardController extends Controller
 {
@@ -49,6 +51,7 @@ class DashboardController extends Controller
         PartTrend $partTrend,
         TenantContext $context,
         PlatformDashboard $platformDashboard,
+        MapPlaces $mapPlaces,
     ): Response|RedirectResponse {
         $user = $request->user();
         // The platform's own workspace: the customer companies instead of company work.
@@ -71,7 +74,15 @@ class DashboardController extends Controller
         $year = $request->integer('year', $thisYear);
         $year = $year >= self::FIRST_YEAR && $year <= $thisYear ? $year : $thisYear;
 
+        $mapAllowed = ! $platformHome && $mapPlaces->allowed($user);
+        $tab = $mapAllowed && $request->input('tab') === 'map' ? 'map' : 'overview';
+
         return Inertia::render('Dashboard', [
+            'tab' => $tab,
+            'map' => $tab === 'map' ? fn () => $mapPlaces->handle($user, [
+                'customer_id' => $request->integer('customer_id') ?: null,
+                'province' => $request->string('province')->trim()->value() ?: null,
+            ]) : null,
             'platform' => $platformHome ? [
                 ...$platformDashboard->handle(),
                 'can' => ['manage' => $user->can('platform.tenants')],
@@ -115,6 +126,7 @@ class DashboardController extends Controller
             'can' => [
                 'createTicket' => $modules->enabled('service') && $user->can('tickets.create'),
                 'reports' => $on('reporting', 'reports.view'),
+                'map' => $mapAllowed,
             ],
         ]);
     }

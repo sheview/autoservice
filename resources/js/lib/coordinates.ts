@@ -28,7 +28,12 @@ export function parseCoordinates(text: string): { lat: string; lng: string } | n
     return null;
 }
 
-/** A Google Maps link that opens the place (or directions from the phone's location). */
+/** A Google Maps link that opens the place. */
 export function mapsUrl(lat: string | number, lng: string | number): string {
     return `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+}
+
+/** Google Maps directions to the place, from where the phone (or browser) is. */
+export function directionsUrl(lat: string | number, lng: string | number): string {
+    return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
 }

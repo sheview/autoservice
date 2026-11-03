@@ -43,7 +43,7 @@ it('shows what needs attention, within what the user may see', function () {
         ->where('contracts.expiring', 0)
         ->where('parts', ['low' => 1, 'out' => 0])
         ->where('surveys.sent', 0)
-        ->where('can', ['createTicket' => true, 'reports' => true]));
+        ->where('can', ['createTicket' => true, 'reports' => true, 'map' => true]));
 
     // a technician: their own branch, their own work first, no office figures
     $this->actingAs($this->tech)->get('/dashboard')->assertInertia(fn (Assert $page) => $page
