@@ -13,5 +13,10 @@ class Branch extends Model
 {
     use BelongsToTenant, SoftDeletes;
 
-    protected $fillable = ['code', 'name', 'address', 'province'];
+    protected $fillable = ['code', 'name', 'address', 'province', 'lat', 'lng'];
+
+    protected function casts(): array
+    {
+        return ['lat' => 'decimal:7', 'lng' => 'decimal:7'];
+    }
 }

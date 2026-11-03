@@ -122,3 +122,26 @@ it('keeps an asset at the storage location its location names, picked or typed',
     $this->actingAs($this->admin)->post("/assets/{$b->ulid}/move", ['location' => 'ห้อง Store ชั้น 4'])->assertSessionHasNoErrors();
     expect($b->fresh()->storage_location_id)->toBe($store->id);
 });
+
+it('keeps an imported asset at the storage location its location names, and links assets when the location is added later', function () {
+    $floor1 = StorageLocation::create(['name' => 'ITBTD-ชั้น 1']);
+    createAssetCategory(['name' => 'Notebook', 'code_prefix' => 'NB']);
+
+    // a file with no storage location column, as most users fill in
+    $this->actingAs($this->admin)->post('/assets/imports', ['file' => xlsxUpload([
+        ['ชื่อ', 'หมวด', 'ตำแหน่งที่ตั้ง'],
+        ['Dell 3420', 'Notebook', 'itbtd-ชั้น 1'],
+        ['Acer N19Q7', 'Notebook', 'ITBTD-ชั้น 4'],
+        ['Huawei', 'Notebook', 'ห้องประชุม'],
+    ])])->assertSessionHasNoErrors();
+
+    expect(Asset::where('name', 'Dell 3420')->value('storage_location_id'))->toBe($floor1->id)
+        ->and(Asset::where('name', 'Acer N19Q7')->value('storage_location_id'))->toBeNull();
+    $this->actingAs($this->admin)->get("/assets?storage_location_id={$floor1->id}")
+        ->assertInertia(fn (Assert $page) => $page->where('assets.total', 1)->where('assets.data.0.name', 'Dell 3420'));
+
+    // "ITBTD-ชั้น 4" added afterwards: the asset already there is kept there
+    $this->actingAs($this->admin)->post('/storage-locations', ['name' => 'ITBTD-ชั้น 4'])->assertSessionHasNoErrors();
+    expect(Asset::where('name', 'Acer N19Q7')->value('storage_location_id'))->toBe(StorageLocation::where('name', 'ITBTD-ชั้น 4')->value('id'))
+        ->and(Asset::where('name', 'Huawei')->value('storage_location_id'))->toBeNull();
+});

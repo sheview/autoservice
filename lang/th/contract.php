@@ -104,6 +104,9 @@ return [
     'sites' => [
         'name' => 'ชื่อ Site',
         'address' => 'ที่อยู่',
+        'province' => 'จังหวัด',
+        'lat' => 'ละติจูด',
+        'lng' => 'ลองจิจูด',
         'created' => 'เพิ่ม Site เรียบร้อยแล้ว',
         'updated' => 'บันทึก Site เรียบร้อยแล้ว',
         'deleted' => 'ลบ Site เรียบร้อยแล้ว',

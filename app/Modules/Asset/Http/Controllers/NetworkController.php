@@ -3,6 +3,7 @@
 namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Asset\Actions\CreateSubnetForAssets;
 use App\Modules\Asset\Actions\DeleteNetwork;
 use App\Modules\Asset\Actions\DeleteSubnet;
 use App\Modules\Asset\Actions\SaveNetwork;
@@ -51,6 +52,20 @@ class NetworkController extends Controller
 
         return redirect()->route('asset.ip-check', ['customer' => $customerId ?? 'own', 'network' => $subnet->network_id, 'subnet' => $subnet->id])
             ->with('success', __('asset.ipam.subnet_saved'));
+    }
+
+    /** A suggestion of the free-IP page: a network and subnet for addresses assets already carry. */
+    public function storeFromAssets(Request $request, CreateSubnetForAssets $createSubnet): RedirectResponse
+    {
+        $this->allow($request);
+        $data = $request->validate([
+            'customer_id' => ['nullable', 'integer', Rule::exists('customers', 'id')->whereNull('deleted_at')],
+            'cidr' => ['required', 'string', 'max:18'],
+        ], attributes: __('asset.ipam.fields'));
+        $subnet = $createSubnet->handle(isset($data['customer_id']) ? (int) $data['customer_id'] : null, $data['cidr']);
+
+        return redirect()->route('asset.ip-check', ['customer' => $subnet->network?->customer_id ?? 'own', 'network' => $subnet->network_id, 'subnet' => $subnet->id])
+            ->with('success', __('asset.ipam.suggested_subnet_saved', ['cidr' => $subnet->cidr]));
     }
 
     public function updateSubnet(Request $request, Subnet $subnet, SaveSubnet $saveSubnet): RedirectResponse

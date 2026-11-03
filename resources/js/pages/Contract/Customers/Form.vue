@@ -31,7 +31,7 @@ interface CustomerForm {
 const props = defineProps<{
     customer: CustomerForm | null;
     attachments: Attachment[];
-    sites: { id: number; name: string; address: string | null }[];
+    sites: { id: number; name: string; address: string | null; province: string | null; lat: string | null; lng: string | null }[];
 }>();
 
 const title = props.customer ? t('customers.edit') : t('customers.create');

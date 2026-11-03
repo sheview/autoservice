@@ -10,7 +10,7 @@ use App\Modules\Tenancy\Models\Branch;
 class SaveBranch
 {
     /**
-     * @param  array{code: string, name: string, address?: string|null, province?: string|null}  $data
+     * @param  array{code: string, name: string, address?: string|null, province?: string|null, lat?: numeric-string|float|null, lng?: numeric-string|float|null}  $data
      */
     public function handle(?Branch $branch, array $data): Branch
     {
@@ -21,6 +21,9 @@ class SaveBranch
             'name' => trim($data['name']),
             'address' => filled($data['address'] ?? null) ? trim($data['address']) : null,
             'province' => filled($data['province'] ?? null) ? trim($data['province']) : null,
+            // Both or neither (BranchRequest).
+            'lat' => $data['lat'] ?? null,
+            'lng' => $data['lng'] ?? null,
         ])->save();
 
         return $branch;

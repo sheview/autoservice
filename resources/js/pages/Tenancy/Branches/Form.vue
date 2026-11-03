@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import CoordinatesInput from '@/components/CoordinatesInput.vue';
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,15 @@ import type { BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/vue3';
 
 const props = defineProps<{
-    branch: { id: number; code: string; name: string; address: string | null; province: string | null } | null;
+    branch: {
+        id: number;
+        code: string;
+        name: string;
+        address: string | null;
+        province: string | null;
+        lat: string | null;
+        lng: string | null;
+    } | null;
 }>();
 
 const title = props.branch ? t('branches.edit') : t('branches.create');
@@ -24,6 +33,8 @@ const form = useForm({
     name: props.branch?.name ?? '',
     address: props.branch?.address ?? '',
     province: props.branch?.province ?? '',
+    lat: props.branch?.lat ?? '',
+    lng: props.branch?.lng ?? '',
 });
 
 const submit = () => {
@@ -72,6 +83,11 @@ const submit = () => {
                     <Label for="province">{{ t('branches.province') }}</Label>
                     <Input id="province" v-model="form.province" autocomplete="off" />
                     <InputError :message="form.errors.province" />
+                </div>
+
+                <div class="grid content-start gap-2">
+                    <Label for="location">{{ t('branches.location') }}</Label>
+                    <CoordinatesInput id="location" v-model:lat="form.lat" v-model:lng="form.lng" :error="form.errors.lat || form.errors.lng" />
                 </div>
 
                 <div class="flex items-center gap-3">

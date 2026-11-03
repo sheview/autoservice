@@ -11,6 +11,7 @@ use App\Modules\Asset\Actions\IpTable;
 use App\Modules\Asset\Actions\ReleaseIp;
 use App\Modules\Asset\Actions\ReserveIps;
 use App\Modules\Asset\Actions\SetIpExcluded;
+use App\Modules\Asset\Actions\UncoveredAssetIps;
 use App\Modules\Asset\Actions\UpdateIpDetails;
 use App\Modules\Asset\Models\IpAddress;
 use App\Modules\Asset\Models\IpAssetHistory;
@@ -46,7 +47,7 @@ class IpCheckController extends Controller
 
     public function __construct(private IpTable $ipTable, private Modules $modules) {}
 
-    public function index(Request $request, ListCustomers $listCustomers, ListSites $listSites, FindFreeIps $findFreeIps): Response
+    public function index(Request $request, ListCustomers $listCustomers, ListSites $listSites, FindFreeIps $findFreeIps, UncoveredAssetIps $uncoveredIps): Response
     {
         $user = $this->allow($request, 'view');
 
@@ -121,6 +122,12 @@ class IpCheckController extends Controller
                 'ips' => $findFreeIps->handle($findSubnet, $user, $count),
                 'count' => $count,
             ] : null,
+            // Addresses on assets that no subnet shows yet, of the customer filtered on.
+            'uncovered' => collect($uncoveredIps->handle($user))
+                ->when($customerId === 0, fn ($groups) => $groups->whereNull('customer_id'))
+                ->when($customerId, fn ($groups, $id) => $groups->where('customer_id', $id))
+                ->map(fn (array $group) => $group + ['customer' => $customerNames[$group['customer_id']] ?? null])
+                ->values(),
             'statuses' => IpAddress::STATUSES,
             'can' => [
                 'run' => $user->can('ip-check.run'),

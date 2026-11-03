@@ -76,7 +76,12 @@ const props = defineProps<{
     suggestions: { subnet_id: number; cidr: string; ips: string[]; count: number } | null;
     statuses: string[];
     can: { run: boolean; manage: boolean };
+    // Addresses on assets that no subnet covers yet, by owner and /24 range.
+    uncovered: { customer_id: number | null; customer: string | null; cidr: string; count: number; samples: string[] }[];
 }>();
+
+const createFromAssets = (group: { customer_id: number | null; cidr: string }) =>
+    router.post(route('asset.ip-check.subnets.from-assets'), { customer_id: group.customer_id, cidr: group.cidr }, { preserveScroll: true });
 
 const page = usePage<SharedData>();
 const errors = computed(() => page.props.errors as Record<string, string>);
@@ -245,7 +250,30 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ page.props.flash.success }}
             </p>
-            <InputError :message="errors.network || errors.subnet" />
+            <InputError :message="errors.network || errors.subnet || errors.cidr" />
+
+            <!-- IPs typed in or imported on assets that no subnet shows yet -->
+            <div v-if="uncovered.length" class="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-800 dark:bg-amber-950">
+                <p class="font-medium text-amber-900 dark:text-amber-200">{{ t('ip_check.uncovered_title') }}</p>
+                <p class="mb-3 text-amber-800 dark:text-amber-300">{{ t('ip_check.uncovered_hint') }}</p>
+                <ul class="grid gap-2">
+                    <li
+                        v-for="group in uncovered"
+                        :key="`${group.customer_id ?? 'own'}|${group.cidr}`"
+                        class="flex flex-wrap items-center gap-x-3 gap-y-1"
+                    >
+                        <span class="font-medium">{{ t('ip_check.uncovered_row', { count: group.count, cidr: group.cidr }) }}</span>
+                        <span class="text-muted-foreground">{{ group.customer ?? t('ip_check.own') }}</span>
+                        <span class="font-mono text-xs text-muted-foreground"
+                            >{{ group.samples.join(', ') }}{{ group.count > group.samples.length ? ', …' : '' }}</span
+                        >
+                        <Button v-if="can.manage" size="sm" variant="outline" class="ml-auto" @click="createFromAssets(group)">
+                            <Plus class="h-4 w-4" />
+                            {{ t('ip_check.uncovered_create', { cidr: group.cidr }) }}
+                        </Button>
+                    </li>
+                </ul>
+            </div>
 
             <!-- Filters: customer -> site -> network -> subnet -->
             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

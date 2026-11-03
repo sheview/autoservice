@@ -317,6 +317,13 @@ class ImportAssets
                 $messages[] = __('asset.imports.unknown_location', ['value' => $values['storage_location']]);
             }
         }
+        // No storage location given: a location named as one is kept there too, as on the form.
+        if (($data['storage_location_id'] ?? null) === null && trim((string) ($values['storage_location'] ?? '')) === '') {
+            $named = $this->locations[mb_strtolower(trim((string) ($data['location'] ?? '')))] ?? null;
+            if ($named !== null) {
+                $data['storage_location_id'] = $named;
+            }
+        }
 
         // The same device as another asset (equipment number, IP, MAC): refused as on the form.
         $duplicates = $this->findDuplicates->handle([

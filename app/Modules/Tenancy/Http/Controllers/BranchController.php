@@ -46,7 +46,7 @@ class BranchController extends Controller
             ->orderBy('id')
             ->paginate(20)
             ->withQueryString()
-            ->through(fn (Branch $branch) => $branch->only(['id', 'code', 'name', 'address', 'province']));
+            ->through(fn (Branch $branch) => $branch->only(['id', 'code', 'name', 'address', 'province', 'lat', 'lng']));
 
         return Inertia::render('Tenancy/Branches/Index', [
             'branches' => $branches,
@@ -78,7 +78,7 @@ class BranchController extends Controller
     {
         Gate::authorize('update', $branch);
 
-        return Inertia::render('Tenancy/Branches/Form', ['branch' => $branch->only(['id', 'code', 'name', 'address', 'province'])]);
+        return Inertia::render('Tenancy/Branches/Form', ['branch' => $branch->only(['id', 'code', 'name', 'address', 'province', 'lat', 'lng'])]);
     }
 
     public function update(BranchRequest $request, Branch $branch, SaveBranch $saveBranch): RedirectResponse

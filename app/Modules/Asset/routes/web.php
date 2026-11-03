@@ -26,6 +26,7 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     Route::put('ip-check/networks/{network}', [NetworkController::class, 'update'])->whereNumber('network')->name('ip-check.networks.update');
     Route::delete('ip-check/networks/{network}', [NetworkController::class, 'destroy'])->whereNumber('network')->name('ip-check.networks.destroy');
     Route::post('ip-check/subnets', [NetworkController::class, 'storeSubnet'])->name('ip-check.subnets.store');
+    Route::post('ip-check/subnets/from-assets', [NetworkController::class, 'storeFromAssets'])->name('ip-check.subnets.from-assets');
     Route::put('ip-check/subnets/{subnet}', [NetworkController::class, 'updateSubnet'])->whereNumber('subnet')->name('ip-check.subnets.update');
     Route::delete('ip-check/subnets/{subnet}', [NetworkController::class, 'destroySubnet'])->whereNumber('subnet')->name('ip-check.subnets.destroy');
     Route::get('ip-check/ips/{address}', [IpCheckController::class, 'open'])->name('ip-check.ips.by-ulid');

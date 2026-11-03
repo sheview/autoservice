@@ -114,3 +114,19 @@ it('keeps branches per tenant', function () {
 
     expect(asTenant($other, fn () => Branch::sole()->name))->toBe('ของบริษัทอื่น');
 });
+
+it('places a branch on the map with both coordinates or none', function () {
+    $this->actingAs($this->admin)->post('/branches', ['code' => 'HQ', 'name' => 'สำนักงานใหญ่', 'lat' => '13.7563', 'lng' => '100.5018'])
+        ->assertSessionHasNoErrors();
+    $branch = Branch::sole();
+    expect($branch->only(['lat', 'lng']))->toBe(['lat' => '13.7563000', 'lng' => '100.5018000']);
+
+    $this->actingAs($this->admin)->get("/branches/{$branch->id}/edit")
+        ->assertInertia(fn (Assert $page) => $page->where('branch.lat', '13.7563000')->where('branch.lng', '100.5018000'));
+
+    $put = fn (array $data) => $this->actingAs($this->admin)->put("/branches/{$branch->id}", $data + ['code' => 'HQ', 'name' => 'สำนักงานใหญ่']);
+    $put(['lat' => '13.7563', 'lng' => ''])->assertSessionHasErrors('lng');
+    $put(['lat' => '95', 'lng' => '100.5'])->assertSessionHasErrors('lat');
+    $put(['lat' => '', 'lng' => ''])->assertSessionHasNoErrors();
+    expect($branch->fresh()->only(['lat', 'lng']))->toBe(['lat' => null, 'lng' => null]);
+});

@@ -16,6 +16,9 @@ class SiteRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'address' => ['nullable', 'string', 'max:2000'],
+            'province' => ['nullable', 'string', 'max:100'],
+            'lat' => ['nullable', 'numeric', 'between:-90,90', 'required_with:lng'],
+            'lng' => ['nullable', 'numeric', 'between:-180,180', 'required_with:lat'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }
@@ -25,6 +28,9 @@ class SiteRequest extends FormRequest
         return [
             'name' => __('contract.sites.name'),
             'address' => __('contract.sites.address'),
+            'province' => __('contract.sites.province'),
+            'lat' => __('contract.sites.lat'),
+            'lng' => __('contract.sites.lng'),
         ];
     }
 }

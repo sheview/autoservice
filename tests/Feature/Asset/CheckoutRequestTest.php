@@ -502,3 +502,23 @@ it('suggests what the company asks for most before anything is typed, with photo
     $other = userWithRole('admin_company', [], createTenant('other'));
     $this->actingAs($other)->getJson('/checkout-requests/items')->assertExactJson(['assets' => [], 'parts' => []]);
 });
+
+it('shows on the asset list who uses each asset and who has it out on a form until it is back', function () {
+    $this->notebook->update(['used_by' => 'Kanya', 'department' => 'IT Support']);
+    $request = ($this->approved)([($this->asset)($this->notebook, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-15'])]);
+    $line = $request->items()->sole();
+    $holders = fn () => $this->actingAs($this->admin)->get('/assets')->assertOk()->viewData('page')['props']['assets']['data'];
+    $row = fn () => collect($holders())->firstWhere('ulid', $this->notebook->ulid);
+
+    // approved, not handed out yet: nobody has it
+    expect($row())->toMatchArray(['used_by' => 'Kanya', 'department' => 'IT Support', 'holders' => []]);
+
+    $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/fulfill", ['qty' => 1])->assertSessionHasNoErrors();
+    expect($row()['holders'])->toBe([[
+        'name' => 'Somchai Office', 'type' => 'loan', 'qty' => 1, 'due_return_date' => '2026-10-15', 'request_ulid' => $request->ulid,
+    ]])
+        ->and(collect($holders())->firstWhere('ulid', $this->cables->ulid)['holders'])->toBe([]);
+
+    $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasNoErrors();
+    expect($row()['holders'])->toBe([]);
+});

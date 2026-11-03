@@ -13,7 +13,7 @@ class ListSites
     /**
      * @param  int|null  $customerId  only this customer's sites; null = every site
      * @param  bool  $withTrashed  include deleted sites (to show names on old records)
-     * @return list<array{id: int, customer_id: int, name: string, address: string|null}>
+     * @return list<array{id: int, customer_id: int, name: string, address: string|null, province: string|null, lat: string|null, lng: string|null}>
      */
     public function handle(?int $customerId = null, bool $withTrashed = false): array
     {
@@ -21,8 +21,8 @@ class ListSites
             ->when($withTrashed, fn ($q) => $q->withTrashed())
             ->when($customerId, fn ($q, $id) => $q->where('customer_id', $id))
             ->orderBy('name')
-            ->get(['id', 'customer_id', 'name', 'address'])
-            ->map(fn (CustomerSite $site) => $site->only(['id', 'customer_id', 'name', 'address']))
+            ->get(['id', 'customer_id', 'name', 'address', 'province', 'lat', 'lng'])
+            ->map(fn (CustomerSite $site) => $site->only(['id', 'customer_id', 'name', 'address', 'province', 'lat', 'lng']))
             ->all();
     }
 }

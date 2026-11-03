@@ -201,6 +201,17 @@ it('manages the sites of a customer', function () {
         ->assertInertia(fn (Assert $page) => $page->where('sites', fn ($sites) => collect($sites)->pluck('name')->sort()->values()->all() === ['ABC Head Office', 'DC Bangna']));
 });
 
+it('places a customer site on the map with its province', function () {
+    $post = fn (array $data) => $this->actingAs($this->admin)->post("/customers/{$this->acme->id}/sites", $data + ['name' => 'DC Bangna']);
+    $post(['lat' => '13.668', 'lng' => ''])->assertSessionHasErrors('lng');
+    $post(['province' => 'กรุงเทพมหานคร', 'lat' => '13.668', 'lng' => '100.634'])->assertSessionHasNoErrors();
+
+    expect(CustomerSite::where('name', 'DC Bangna')->sole()->only(['province', 'lat', 'lng']))
+        ->toBe(['province' => 'กรุงเทพมหานคร', 'lat' => '13.6680000', 'lng' => '100.6340000']);
+    $this->actingAs($this->admin)->get("/customers/{$this->acme->id}/edit")
+        ->assertInertia(fn (Assert $page) => $page->where('sites', fn ($sites) => collect($sites)->firstWhere('name', 'DC Bangna')['lat'] === '13.6680000'));
+});
+
 it('keeps every tenant to its own networks and addresses', function () {
     $other = createTenant('other');
     $theirs = asTenant($other, function () {
@@ -216,4 +227,37 @@ it('keeps every tenant to its own networks and addresses', function () {
     // Their subnet does not stop us using the same range.
     $this->actingAs($this->admin)->post('/ip-check/subnets', ['network_id' => $this->network->id, 'cidr' => '10.9.9.0/29'])->assertSessionHasNoErrors();
     expect(asTenant($other, fn () => IpAddress::count()))->toBe(0);
+});
+
+it('offers a subnet for the addresses assets carry outside every subnet of their owner, and creates it in one click', function () {
+    ($this->asset)('192.168.1.3'); // inside Acme's 192.168.1.0/29
+    ($this->asset)('192.168.1.58'); // Acme, outside the /29
+    ($this->asset)('192.168.1.113');
+    ($this->asset)('192.168.1.113'); // the same address twice counts once
+    ($this->asset)('10.0.5.7', ['customer_id' => null]); // the company's own device
+    ($this->asset)('192.168.1.3', ['customer_id' => $this->beta->id]); // Beta has no subnet: Acme's does not count
+
+    $uncovered = fn (string $query = '') => $this->actingAs($this->admin)->get("/ip-check{$query}")->assertOk()->viewData('page')['props']['uncovered'];
+
+    expect($uncovered())->toBe([
+        ['customer_id' => $this->acme->id, 'cidr' => '192.168.1.0/24', 'count' => 2, 'samples' => ['192.168.1.58', '192.168.1.113'], 'customer' => 'Acme'],
+        ['customer_id' => null, 'cidr' => '10.0.5.0/24', 'count' => 1, 'samples' => ['10.0.5.7'], 'customer' => null],
+        ['customer_id' => $this->beta->id, 'cidr' => '192.168.1.0/24', 'count' => 1, 'samples' => ['192.168.1.3'], 'customer' => 'Beta'],
+    ])
+        ->and(collect($uncovered('?customer=own'))->pluck('cidr')->all())->toBe(['10.0.5.0/24']);
+
+    // Acme's /24 overlaps its /29: refused, nothing kept
+    $this->actingAs($this->admin)->post('/ip-check/subnets/from-assets', ['customer_id' => $this->acme->id, 'cidr' => '192.168.1.0/24'])
+        ->assertSessionHasErrors('cidr');
+    expect(Network::count())->toBe(1);
+
+    $this->actingAs($this->admin)->post('/ip-check/subnets/from-assets', ['customer_id' => null, 'cidr' => '10.0.5.0/24'])
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+    $subnet = Subnet::where('cidr', '10.0.5.0/24')->sole();
+    expect($subnet->network->only(['customer_id', 'name']))->toBe(['customer_id' => null, 'name' => 'LAN 10.0.5.0/24'])
+        ->and(collect($uncovered())->pluck('cidr')->all())->toBe(['192.168.1.0/24', '192.168.1.0/24']);
+
+    // only who keeps networks may create them
+    $this->actingAs(userWithRole('technician'))->post('/ip-check/subnets/from-assets', ['cidr' => '10.0.6.0/24'])->assertForbidden();
 });

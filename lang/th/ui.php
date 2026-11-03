@@ -444,6 +444,10 @@ return [
 
     'ip_check' => [
         'title' => 'เช็ค IP ว่าง',
+        'uncovered_title' => 'พบ IP จากทรัพย์สินที่ยังไม่อยู่ใน Subnet ไหน',
+        'uncovered_hint' => 'IP เหล่านี้จะขึ้นในหน้านี้เมื่อมี Subnet ของเจ้าของเครื่อง (ลูกค้า หรือของบริษัทเอง) ที่ครอบคลุม',
+        'uncovered_row' => ':count IP ในช่วง :cidr',
+        'uncovered_create' => 'สร้าง Subnet :cidr',
         'description' => 'หา IP ว่าง จอง และผูก IP กับทรัพย์สิน แยกตามลูกค้า Site Network และ Subnet',
         'customer' => 'ลูกค้า',
         'all' => 'ทุกลูกค้าและของบริษัท',
@@ -915,6 +919,11 @@ return [
         'remove_serial' => 'ลบแถวนี้',
         'quantity' => 'จำนวน',
         'quantity_hint' => 'คงเหลือ / ทั้งหมด (ไม่นับที่ขอเบิก/ยืมไว้หรือเบิกออกไปแล้ว)',
+        'user' => 'ผู้ใช้งาน',
+        'holder_loan' => 'ยืมโดย :name',
+        'holder_issue' => 'เบิกโดย :name',
+        'holder_due' => 'คืน :date',
+        'holders_more' => '+ อีก :count คน',
         'available_of' => 'คงเหลือ :available จาก :total',
         'quantity_from_serials' => 'จำนวน :count (นับจาก Serial)',
         'unit' => 'หน่วย',
@@ -1126,6 +1135,8 @@ return [
         'no_sites' => 'ยังไม่มี Site',
         'site_name' => 'ชื่อ Site เช่น ABC Head Office',
         'site_address' => 'ที่อยู่ (ไม่บังคับ)',
+        'site_province' => 'จังหวัด (ไม่บังคับ)',
+        'site_location' => 'พิกัดบนแผนที่ (ไม่บังคับ)',
         'create' => 'เพิ่มลูกค้า',
         'edit' => 'แก้ไขลูกค้า',
         'search_placeholder' => 'ค้นหารหัส ชื่อ ชื่อย่อ ผู้ติดต่อ หรือเลขผู้เสียภาษี',
@@ -1956,6 +1967,20 @@ return [
         'name' => 'ชื่อสาขา',
         'address' => 'ที่อยู่',
         'province' => 'จังหวัด',
+        'location' => 'พิกัดบนแผนที่',
+    ],
+
+    'coordinates' => [
+        'placeholder' => 'เช่น 13.7563, 100.5018 หรือวางลิงก์ Google Maps',
+        'hint' => 'เปิด Google Maps บนคอมพิวเตอร์ กดค้างหรือคลิกขวาที่ตำแหน่ง แล้วคัดลอกพิกัดหรือลิงก์จากแถบที่อยู่มาวาง (ลิงก์แชร์แบบสั้น maps.app.goo.gl ใช้ไม่ได้)',
+        'invalid' => 'อ่านพิกัดไม่ได้ ใส่เป็น ละติจูด, ลองจิจูด เช่น 13.7563, 100.5018 หรือลิงก์ Google Maps แบบเต็ม',
+        'locate' => 'ใช้ตำแหน่งปัจจุบัน',
+        'locating' => 'กำลังหาตำแหน่ง…',
+        'locate_failed' => 'หาตำแหน่งไม่ได้ ตรวจว่าอนุญาตให้เว็บนี้เข้าถึงตำแหน่งแล้ว',
+        'locate_unsupported' => 'อุปกรณ์นี้ไม่รองรับการหาตำแหน่ง',
+        'open_map' => 'เปิดใน Google Maps',
+        'clear' => 'ล้างพิกัด',
+        'none' => 'ยังไม่ระบุพิกัด',
     ],
 
     'holidays' => [

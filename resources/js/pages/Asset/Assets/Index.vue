@@ -25,6 +25,10 @@ interface AssetRow {
     category: string | null;
     branch: string | null;
     customer: string | null;
+    used_by: string | null;
+    department: string | null;
+    // Who has it now: handed out on a loan/issue form and not back.
+    holders: { name: string; type: 'loan' | 'issue'; qty: number; due_return_date: string | null; request_ulid: string }[];
     status: string;
     warranty_expires_at: string | null;
     // Available = not held by an issue/loan form that is asked for or out.
@@ -86,6 +90,7 @@ const columns = [
     { key: 'branch', sortable: false },
     // Customers exist only when the contract module is on.
     ...(props.customers.length ? [{ key: 'customer', sortable: false }] : []),
+    { key: 'user', sortable: false },
     { key: 'quantity', sortable: false },
     { key: 'status', sortable: true },
     { key: 'warranty_expires_at', sortable: true },
@@ -238,6 +243,26 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             <td class="px-4 py-2">{{ asset.category ?? t('common.none') }}</td>
                             <td class="px-4 py-2">{{ asset.branch ?? t('assets.no_branch') }}</td>
                             <td v-if="customers.length" class="px-4 py-2">{{ asset.customer ?? t('common.none') }}</td>
+                            <td class="px-4 py-2">
+                                <div v-if="asset.used_by">{{ asset.used_by }}</div>
+                                <div v-if="asset.department" class="text-xs text-muted-foreground">{{ asset.department }}</div>
+                                <Link
+                                    v-for="holder in asset.holders.slice(0, 2)"
+                                    :key="holder.request_ulid + holder.name"
+                                    :href="route('asset.requests.show', holder.request_ulid)"
+                                    class="block text-xs text-amber-700 underline-offset-4 hover:underline dark:text-amber-400"
+                                >
+                                    {{ t(`assets.holder_${holder.type}`, { name: holder.name })
+                                    }}<template v-if="holder.qty > 1"> ({{ holder.qty }})</template>
+                                    <span v-if="holder.due_return_date" :class="{ 'text-red-700 dark:text-red-400': holder.due_return_date < today }">
+                                        · {{ t('assets.holder_due', { date: holder.due_return_date }) }}</span
+                                    >
+                                </Link>
+                                <div v-if="asset.holders.length > 2" class="text-xs text-muted-foreground">
+                                    {{ t('assets.holders_more', { count: asset.holders.length - 2 }) }}
+                                </div>
+                                <span v-if="!asset.used_by && !asset.department && asset.holders.length === 0">{{ t('common.none') }}</span>
+                            </td>
                             <td class="whitespace-nowrap px-4 py-2" :title="t('assets.quantity_hint')">
                                 <span class="font-medium" :class="{ 'text-red-700 dark:text-red-400': asset.available === 0 }">{{
                                     asset.available

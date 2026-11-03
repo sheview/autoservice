@@ -225,6 +225,8 @@ return [
         'network_saved' => 'บันทึก Network เรียบร้อยแล้ว',
         'network_deleted' => 'ลบ Network เรียบร้อยแล้ว',
         'subnet_saved' => 'บันทึก Subnet เรียบร้อยแล้ว',
+        'suggested_network_name' => 'LAN :cidr',
+        'suggested_subnet_saved' => 'สร้าง Subnet :cidr จาก IP ของทรัพย์สินเรียบร้อยแล้ว',
         'subnet_deleted' => 'ลบ Subnet เรียบร้อยแล้ว',
         'network_has_subnets' => 'ลบไม่ได้ ยังมี Subnet อยู่ใน Network นี้',
         'subnet_in_use' => 'ลบไม่ได้ ยังมี IP ที่จอง ใช้งาน หรือไม่อนุญาตอยู่ใน Subnet นี้',

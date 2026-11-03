@@ -11,7 +11,7 @@ use App\Modules\Contract\Models\CustomerSite;
 class SaveSite
 {
     /**
-     * @param  array{name: string, address?: string|null, notes?: string|null}  $data  validated
+     * @param  array{name: string, address?: string|null, province?: string|null, lat?: numeric-string|null, lng?: numeric-string|null, notes?: string|null}  $data  validated
      */
     public function handle(Customer $customer, ?CustomerSite $site, array $data): CustomerSite
     {

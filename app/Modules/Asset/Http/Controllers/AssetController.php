@@ -4,6 +4,7 @@ namespace App\Modules\Asset\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetHeldQuantities;
+use App\Modules\Asset\Actions\AssetHolders;
 use App\Modules\Asset\Actions\AssetStats;
 use App\Modules\Asset\Actions\AssetSuggestions;
 use App\Modules\Asset\Actions\CreateAsset;
@@ -61,7 +62,7 @@ class AssetController extends Controller
         private AssetSuggestions $suggestions,
     ) {}
 
-    public function index(Request $request, SearchAssets $search, AssetHeldQuantities $heldQuantities, AssetStats $stats): Response
+    public function index(Request $request, SearchAssets $search, AssetHeldQuantities $heldQuantities, AssetHolders $holders, AssetStats $stats): Response
     {
         Gate::authorize('viewAny', Asset::class);
 
@@ -76,6 +77,8 @@ class AssetController extends Controller
         $assets->getCollection()->load('media');
         // Held by request lines asked for, approved or out; the rest of each asset is available.
         $held = $heldQuantities->handle($assets->getCollection()->modelKeys());
+        // Who has it now (handed out on a loan/issue form and not back).
+        $holdersOf = $holders->handle($assets->getCollection()->modelKeys());
 
         $assets = $assets
             ->through(fn (Asset $asset) => [
@@ -91,6 +94,9 @@ class AssetController extends Controller
                 'category' => $asset->category?->name,
                 'branch' => $asset->branch?->name,
                 'customer' => $customerNames[$asset->customer_id] ?? null,
+                'used_by' => $asset->used_by,
+                'department' => $asset->department,
+                'holders' => $holdersOf[$asset->id] ?? [],
                 'status' => $asset->status,
                 'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
                 'photo' => PhotoSlots::thumbnail($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
