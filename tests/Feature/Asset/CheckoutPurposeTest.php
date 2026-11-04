@@ -99,6 +99,36 @@ it('issues each part line on its own ticket', function () {
         ->toBe([$this->first->id, $this->second->id]);
 });
 
+it('issues a part without a ticket when the old part\'s serial or photo comes with it', function () {
+    $part = fn (array $line) => ($this->line)(['item_type' => 'part', 'asset_id' => null, 'part_id' => $this->ram->id, 'qty' => 1, ...$line]);
+    ($this->send)([$part(['replaced_serial' => '  '])])->assertSessionHasErrors('items.0.ticket_id');
+
+    ($this->send)([$part(['replaced_serial' => 'RAM-OLD-1'])])->assertSessionHasNoErrors();
+    expect(CheckoutItem::sole()->only(['ticket_id', 'replaced_serial']))->toBe(['ticket_id' => null, 'replaced_serial' => 'RAM-OLD-1']);
+
+    ($this->send)([$part(['replaced_photo' => UploadedFile::fake()->image('old-ram.jpg')])])->assertSessionHasNoErrors();
+    $request = CheckoutRequest::latest('id')->first();
+    $line = $request->items()->sole();
+    expect($line->replaced_photo_id)->toBe($request->getFirstMedia(CheckoutRequest::REPLACED_PHOTOS)->id);
+
+    // The draft edited keeps its photo, so still no ticket is needed; without it, it is.
+    $this->actingAs($this->desk)->put("/checkout-requests/{$request->ulid}", [
+        'borrower_user_id' => $this->staff->id, 'items' => [$part(['replaced_photo_id' => $line->replaced_photo_id])],
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($this->desk)->put("/checkout-requests/{$request->ulid}", [
+        'borrower_user_id' => $this->staff->id, 'items' => [$part([])],
+    ])->assertSessionHasErrors('items.0.ticket_id');
+
+    // Approved and issued with no ticket: the stock goes out all the same.
+    $this->actingAs($this->desk)->put("/checkout-requests/{$request->ulid}", [
+        'borrower_user_id' => $this->staff->id, 'submit' => true, 'items' => [$part(['replaced_serial' => 'RAM-OLD-2'])],
+    ])->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
+    $item = $request->items()->sole();
+    $this->actingAs($this->desk)->post("/checkout-items/{$item->id}/fulfill", ['qty' => 1])->assertSessionHasNoErrors();
+    expect(StockMovement::where('type', StockMovement::TYPE_ISSUE)->sole()->ticket_id)->toBeNull();
+});
+
 it('does not show the photo of another company\'s request', function () {
     ($this->send)([($this->line)(['purpose' => 'replace', 'replaced_photo' => UploadedFile::fake()->image('broken.jpg')])])->assertSessionHasNoErrors();
     $request = CheckoutRequest::sole();

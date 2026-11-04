@@ -66,7 +66,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
  * The "what for" fields of one line: purpose (other = typed); for whom — inside the company, or a
  * customer (from the list or typed; follows a picked ticket) and, when that customer has any, one
  * of its projects; the ticket (searched at ticketsUrl; none = hidden) and, for a replacement, the
- * broken unit's serial (typed or scanned) or a photo — one of them is required.
+ * broken unit's serial (typed or scanned) or a photo — one of them is required. A part needs the
+ * ticket or, without one, the old part's serial or photo.
  */
 const props = defineProps<{
     id: string;
@@ -74,7 +75,8 @@ const props = defineProps<{
     customers: { id: number; name: string }[];
     contracts: ItemPurposeContract[];
     ticketsUrl: string | null;
-    ticketRequired?: boolean;
+    // A part: on a ticket, or else with the serial / a photo of the old part it replaces.
+    part?: boolean;
     // The server's messages of this line's fields, by field name.
     errors: Record<string, string | undefined>;
 }>();
@@ -82,6 +84,11 @@ const value = defineModel<ItemPurposeValue>({ required: true });
 
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 const needsEvidence = computed(() => NEEDS_EVIDENCE.includes(value.value.purpose));
+const showEvidence = computed(() => needsEvidence.value || props.part);
+const givenEvidence = computed(() => value.value.replaced_serial.trim() !== '' || value.value.replaced_photo !== null || value.value.replaced_photo_url !== null);
+const ticketMissing = computed(() => props.part && !value.value.ticket && !givenEvidence.value);
+// A part that is not a replacement speaks of "the old part".
+const partWords = computed(() => props.part && !needsEvidence.value);
 
 // --- For whom: inside the company, one of the customers, or typed -----------------------------
 const OTHER = '__other__';
@@ -239,7 +246,7 @@ const removePhoto = () => {
         <InputError v-else-if="errors.contract_id" class="sm:col-span-2" :message="errors.contract_id" />
 
         <div v-if="ticketsUrl" class="grid content-start gap-1 sm:col-span-2">
-            <Label :for="`${id}-ticket`" :required="ticketRequired">{{ t('item_purpose.ticket') }}</Label>
+            <Label :for="`${id}-ticket`" :required="ticketMissing">{{ t('item_purpose.ticket') }}</Label>
             <div v-if="value.ticket" class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                 <span class="font-mono text-xs">{{ value.ticket.ticket_no }}</span>
                 <span class="min-w-0 flex-1 truncate">{{ value.ticket.title }}</span>
@@ -268,22 +275,22 @@ const removePhoto = () => {
                     <li v-if="ticketResults.length === 0" class="px-3 py-2 text-sm text-muted-foreground">{{ t('item_purpose.no_tickets') }}</li>
                 </ul>
             </div>
-            <p v-if="ticketRequired && !value.ticket" class="text-xs text-amber-700 dark:text-amber-400">{{ t('item_purpose.ticket_part_hint') }}</p>
+            <p v-if="ticketMissing" class="text-xs text-amber-700 dark:text-amber-400">{{ t('item_purpose.ticket_part_hint') }}</p>
             <InputError :message="errors.ticket_id" />
         </div>
 
         <!-- Replacing a broken unit: its serial or a photo -->
-        <div v-if="needsEvidence" class="grid gap-3 rounded-md border border-dashed p-3 sm:col-span-2 sm:grid-cols-2">
-            <p class="text-xs font-medium sm:col-span-2">{{ t('item_purpose.evidence') }}</p>
+        <div v-if="showEvidence" class="grid gap-3 rounded-md border border-dashed p-3 sm:col-span-2 sm:grid-cols-2">
+            <p class="text-xs font-medium sm:col-span-2">{{ t(partWords ? 'item_purpose.part_evidence' : 'item_purpose.evidence') }}</p>
             <div class="grid content-start gap-1">
-                <Label :for="`${id}-serial`">{{ t('item_purpose.serial') }}</Label>
+                <Label :for="`${id}-serial`">{{ t(partWords ? 'item_purpose.part_serial' : 'item_purpose.serial') }}</Label>
                 <div class="flex gap-2">
                     <Input :id="`${id}-serial`" v-model="value.replaced_serial" maxlength="100" class="min-w-0 flex-1 font-mono" />
                     <BarcodeScanButton :hint="t('item_purpose.serial_scan_hint')" @scanned="(text) => (value.replaced_serial = text)" />
                 </div>
             </div>
             <div class="grid content-start gap-1">
-                <span class="text-sm font-medium">{{ t('item_purpose.photo') }}</span>
+                <span class="text-sm font-medium">{{ t(partWords ? 'item_purpose.part_photo' : 'item_purpose.photo') }}</span>
                 <div class="flex items-center gap-2">
                     <img v-if="shownPhoto" :src="shownPhoto" :alt="t('item_purpose.photo')" class="h-16 w-16 rounded-md border object-cover" />
                     <label class="inline-flex h-9 cursor-pointer items-center gap-1 rounded-md border px-3 text-sm font-medium hover:bg-accent">
@@ -297,7 +304,7 @@ const removePhoto = () => {
                 </div>
                 <InputError :message="photoError ?? errors.replaced_photo" />
             </div>
-            <p v-if="!hasEvidence(value)" class="text-xs text-amber-700 dark:text-amber-400 sm:col-span-2">{{ t('item_purpose.evidence_missing') }}</p>
+            <p v-if="needsEvidence && !hasEvidence(value)" class="text-xs text-amber-700 dark:text-amber-400 sm:col-span-2">{{ t('item_purpose.evidence_missing') }}</p>
             <InputError class="sm:col-span-2" :message="errors.replaced_serial" />
         </div>
     </div>

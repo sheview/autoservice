@@ -580,7 +580,7 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                         :customers="customers"
                         :contracts="contracts"
                         :tickets-url="ticketsUrl"
-                        :ticket-required="line.item_type === 'part'"
+                        :part="line.item_type === 'part'"
                         :errors="purposeErrors(index)"
                     />
                     <button

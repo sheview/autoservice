@@ -51,9 +51,16 @@ class SaveCheckoutRequest
 
         return DB::transaction(function () use ($request, $data, $actor, $outsideRequester) {
             $lines = $this->lines($data, $request);
+            // The photo of the unit a line replaces: a new one, or the one the draft had.
+            $had = $request?->getMedia(CheckoutRequest::REPLACED_PHOTOS)->pluck('id')->all() ?? [];
+            $photoOf = fn (int $index) => ($data['items'][$index]['replaced_photo'] ?? null) instanceof UploadedFile
+                || in_array($lines[$index]['replaced_photo_id'], $had, true);
             if ($outsideRequester === null) {
+                // A part goes on a ticket (its cost lands there), or else comes with the serial or a
+                // photo of the old part it replaces.
                 foreach ($lines as $index => $line) {
-                    if ($line['item_type'] === CheckoutItem::TYPE_PART && $line['ticket_id'] === null) {
+                    if ($line['item_type'] === CheckoutItem::TYPE_PART && $line['ticket_id'] === null
+                        && trim((string) $line['replaced_serial']) === '' && ! $photoOf($index)) {
                         throw ValidationException::withMessages(["items.{$index}.ticket_id" => __('asset.requests.ticket_required')]);
                     }
                 }
@@ -89,11 +96,9 @@ class SaveCheckoutRequest
                 $request->items()->delete();
             }
 
-            // The photo of the unit a line replaces: a new one, or the one the draft had.
-            $had = $request->getMedia(CheckoutRequest::REPLACED_PHOTOS)->pluck('id')->all();
             foreach ($lines as $index => $line) {
                 $photo = $data['items'][$index]['replaced_photo'] ?? null;
-                if ($photo instanceof UploadedFile && $line['purpose'] !== null && ItemPurpose::needsEvidence($line['purpose'])) {
+                if ($photo instanceof UploadedFile && ($line['item_type'] === CheckoutItem::TYPE_PART || ItemPurpose::needsEvidence($line['purpose']))) {
                     $line['replaced_photo_id'] = $request->addMedia($photo)->toMediaCollection(CheckoutRequest::REPLACED_PHOTOS)->id;
                 } elseif (! in_array($line['replaced_photo_id'], $had, true)) {
                     $line['replaced_photo_id'] = null;
@@ -134,7 +139,9 @@ class SaveCheckoutRequest
         foreach ($items as $index => $item) {
             $qty = max(1, (int) ($item['qty'] ?? 1));
             $purpose = $item['purpose'] ?? null;
-            $replaces = ItemPurpose::needsEvidence($purpose);
+            // The old unit's serial / photo: asked of a replacement, and taken for any part (it
+            // stands in for the ticket).
+            $replaces = ItemPurpose::needsEvidence($purpose) || $item['item_type'] === CheckoutItem::TYPE_PART;
             // What it is for, for whom and on which job (the request's ticket when the line has none).
             $about = [
                 'purpose' => $purpose,
