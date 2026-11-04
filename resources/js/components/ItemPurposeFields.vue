@@ -48,7 +48,10 @@ export const purposeLike = (before: ItemPurposeValue | undefined): ItemPurposeVa
 export type ItemPurposeContract = { id: number; customer_id: number | null; customer_name: string | null; label: string };
 
 export const hasEvidence = (value: ItemPurposeValue) =>
-    !NEEDS_EVIDENCE.includes(value.purpose) || value.replaced_serial.trim() !== '' || value.replaced_photo !== null || value.replaced_photo_url !== null;
+    !NEEDS_EVIDENCE.includes(value.purpose) ||
+    value.replaced_serial.trim() !== '' ||
+    value.replaced_photo !== null ||
+    value.replaced_photo_url !== null;
 </script>
 
 <script setup lang="ts">
@@ -85,7 +88,9 @@ const value = defineModel<ItemPurposeValue>({ required: true });
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 const needsEvidence = computed(() => NEEDS_EVIDENCE.includes(value.value.purpose));
 const showEvidence = computed(() => needsEvidence.value || props.part);
-const givenEvidence = computed(() => value.value.replaced_serial.trim() !== '' || value.value.replaced_photo !== null || value.value.replaced_photo_url !== null);
+const givenEvidence = computed(
+    () => value.value.replaced_serial.trim() !== '' || value.value.replaced_photo !== null || value.value.replaced_photo_url !== null,
+);
 const ticketMissing = computed(() => props.part && !value.value.ticket && !givenEvidence.value);
 // A part that is not a replacement speaks of "the old part".
 const partWords = computed(() => props.part && !needsEvidence.value);
@@ -118,7 +123,8 @@ watch(
     theirContracts,
     (list) => {
         if (list.length === 1 && value.value.contract_id === null) value.value.contract_id = list[0].id;
-        if (value.value.contract_id !== null && list.length > 0 && !list.some((c) => c.id === value.value.contract_id)) value.value.contract_id = null;
+        if (value.value.contract_id !== null && list.length > 0 && !list.some((c) => c.id === value.value.contract_id))
+            value.value.contract_id = null;
     },
     { immediate: true },
 );
@@ -146,7 +152,10 @@ const findTickets = () => {
         try {
             const url = new URL(props.ticketsUrl!, window.location.origin);
             url.searchParams.set('q', ticketSearch.value);
-            const response = await fetch(url, { headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+            const response = await fetch(url, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
             ticketResults.value = response.ok ? await response.json() : [];
             ticketOpen.value = true;
         } catch {
@@ -228,9 +237,7 @@ const removePhoto = () => {
             </select>
             <div v-else class="flex gap-2">
                 <Input :id="`${id}-customer`" v-model="value.customer_name" required maxlength="255" class="min-w-0 flex-1" />
-                <Button type="button" variant="outline" size="sm" class="h-9" @click="pickFromList">{{
-                    t('item_purpose.customer_list')
-                }}</Button>
+                <Button type="button" variant="outline" size="sm" class="h-9" @click="pickFromList">{{ t('item_purpose.customer_list') }}</Button>
             </div>
             <InputError :message="errors.customer_name" />
         </div>
@@ -250,7 +257,12 @@ const removePhoto = () => {
             <div v-if="value.ticket" class="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
                 <span class="font-mono text-xs">{{ value.ticket.ticket_no }}</span>
                 <span class="min-w-0 flex-1 truncate">{{ value.ticket.title }}</span>
-                <button type="button" class="text-muted-foreground hover:text-foreground" :aria-label="t('item_purpose.clear_ticket')" @click="value.ticket = null">
+                <button
+                    type="button"
+                    class="text-muted-foreground hover:text-foreground"
+                    :aria-label="t('item_purpose.clear_ticket')"
+                    @click="value.ticket = null"
+                >
                     <X class="h-4 w-4" />
                 </button>
             </div>
@@ -267,7 +279,11 @@ const removePhoto = () => {
                 />
                 <ul v-if="ticketOpen" class="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border bg-background shadow-md">
                     <li v-for="ticket in ticketResults" :key="ticket.id">
-                        <button type="button" class="flex w-full gap-2 px-3 py-2 text-left text-sm hover:bg-muted" @mousedown.prevent="pickTicket(ticket)">
+                        <button
+                            type="button"
+                            class="flex w-full gap-2 px-3 py-2 text-left text-sm hover:bg-muted"
+                            @mousedown.prevent="pickTicket(ticket)"
+                        >
                             <span class="font-mono text-xs">{{ ticket.ticket_no }}</span>
                             <span>{{ ticket.title }}</span>
                         </button>
@@ -298,13 +314,22 @@ const removePhoto = () => {
                         {{ shownPhoto ? t('item_purpose.photo_change') : t('item_purpose.photo_add') }}
                         <input type="file" accept="image/*" class="sr-only" @change="pickPhoto" />
                     </label>
-                    <Button v-if="shownPhoto" type="button" variant="ghost" size="sm" :aria-label="t('item_purpose.photo_remove')" @click="removePhoto">
+                    <Button
+                        v-if="shownPhoto"
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        :aria-label="t('item_purpose.photo_remove')"
+                        @click="removePhoto"
+                    >
                         <X class="h-4 w-4" />
                     </Button>
                 </div>
                 <InputError :message="photoError ?? errors.replaced_photo" />
             </div>
-            <p v-if="needsEvidence && !hasEvidence(value)" class="text-xs text-amber-700 dark:text-amber-400 sm:col-span-2">{{ t('item_purpose.evidence_missing') }}</p>
+            <p v-if="needsEvidence && !hasEvidence(value)" class="text-xs text-amber-700 dark:text-amber-400 sm:col-span-2">
+                {{ t('item_purpose.evidence_missing') }}
+            </p>
             <InputError class="sm:col-span-2" :message="errors.replaced_serial" />
         </div>
     </div>

@@ -9,6 +9,7 @@ use App\Modules\Asset\Actions\AssetStats;
 use App\Modules\Asset\Actions\AssetSuggestions;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
+use App\Modules\Asset\Actions\DeleteAssets;
 use App\Modules\Asset\Actions\FindDuplicateAssets;
 use App\Modules\Asset\Actions\FindSimilarAssets;
 use App\Modules\Asset\Actions\IpOfAsset;
@@ -119,6 +120,7 @@ class AssetController extends Controller
                 'create' => $user->can('create', Asset::class),
                 'import' => $user->can('import', Asset::class),
                 'export' => $user->can('export', Asset::class),
+                'bulkDelete' => $user->can('bulkDelete', Asset::class),
                 // Categories and storage locations (Settings), the lists of the drop-downs.
                 'lists' => $user->can('viewAny', AssetCategory::class),
             ],
@@ -316,6 +318,20 @@ class AssetController extends Controller
         $deleteAsset->handle($asset);
 
         return redirect()->route('asset.assets.index')->with('success', __('asset.assets.deleted', ['code' => $asset->asset_code]));
+    }
+
+    /** The assets ticked on the list (admin only), back to the list as it was. */
+    public function bulkDestroy(Request $request, DeleteAssets $deleteAssets): RedirectResponse
+    {
+        Gate::authorize('bulkDelete', Asset::class);
+        $data = $request->validate([
+            'assets' => ['required', 'array', 'max:500'],
+            'assets.*' => ['string', 'max:26'],
+        ]);
+
+        $deleted = $deleteAssets->handle(array_values($data['assets']), $request->user());
+
+        return back()->with('success', __('asset.assets.bulk_deleted', ['count' => count($deleted)]));
     }
 
     /**

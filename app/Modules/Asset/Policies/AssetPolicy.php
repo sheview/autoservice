@@ -5,6 +5,7 @@ namespace App\Modules\Asset\Policies;
 use App\Modules\Asset\Actions\SearchAssets;
 use App\Modules\Identity\Models\User;
 use App\Modules\Identity\Policies\TenantPolicy;
+use App\Modules\Identity\Support\PermissionCatalog;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -24,6 +25,12 @@ class AssetPolicy extends TenantPolicy
     public function move(User $user, Model $asset): bool
     {
         return $this->permits($user, 'move') && $this->inScope($user, $asset, 'move');
+    }
+
+    /** Deleting many at once from the list: the company's admin only (each still needs delete). */
+    public function bulkDelete(User $user): bool
+    {
+        return $user->hasRole(PermissionCatalog::ADMIN_ROLE) && $this->permits($user, 'delete');
     }
 
     public function export(User $user): bool

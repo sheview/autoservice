@@ -11,9 +11,9 @@ import { useListFilters } from '@/composables/useListFilters';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/vue3';
-import { ArrowDown, ArrowUp, Boxes, CircleCheck, ShieldAlert, Wrench } from 'lucide-vue-next';
-import { computed } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { ArrowDown, ArrowUp, Boxes, CircleCheck, ShieldAlert, Trash2, Wrench } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 
 interface AssetRow {
     ulid: string;
@@ -66,7 +66,7 @@ const props = defineProps<{
     statuses: string[];
     expiringDays: number;
     stats: { total: number; in_use: number; in_repair: number; warranty_expiring: number };
-    can: { create: boolean; import: boolean; export: boolean; lists: boolean };
+    can: { create: boolean; import: boolean; export: boolean; bulkDelete: boolean; lists: boolean };
 }>();
 
 const page = usePage<SharedData>();
@@ -97,6 +97,33 @@ const columns = [
     { key: 'status', sortable: true },
     { key: 'warranty_expires_at', sortable: true },
 ];
+
+// --- Ticked rows, deleted at once (admin): kept across pages and filters until cleared -------
+const selected = ref<string[]>([]);
+const pageUlids = computed(() => props.assets.data.map((a) => a.ulid));
+const allOnPage = computed(() => pageUlids.value.length > 0 && pageUlids.value.every((u) => selected.value.includes(u)));
+const toggle = (ulid: string) => {
+    selected.value = selected.value.includes(ulid) ? selected.value.filter((u) => u !== ulid) : [...selected.value, ulid];
+};
+const togglePage = () => {
+    selected.value = allOnPage.value
+        ? selected.value.filter((u) => !pageUlids.value.includes(u))
+        : [...new Set([...selected.value, ...pageUlids.value])];
+};
+const deleting = ref(false);
+const deleteSelected = () => {
+    if (!confirm(t('assets.bulk_delete_confirm', { count: selected.value.length }))) return;
+    router.post(
+        route('asset.assets.bulk-destroy'),
+        { assets: selected.value },
+        {
+            preserveScroll: true,
+            onStart: () => (deleting.value = true),
+            onSuccess: () => (selected.value = []),
+            onFinish: () => (deleting.value = false),
+        },
+    );
+};
 
 // Local date as YYYY-MM-DD (toISOString would give the UTC date).
 const today = new Date().toLocaleDateString('sv-SE');
@@ -205,10 +232,31 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 </select>
             </div>
 
+            <div
+                v-if="can.bulkDelete && selected.length"
+                class="flex flex-wrap items-center gap-2 rounded-md border border-red-200 bg-red-50 px-4 py-2 dark:border-red-900 dark:bg-red-950"
+            >
+                <span class="text-sm font-medium">{{ t('assets.selected', { count: selected.length }) }}</span>
+                <Button variant="ghost" size="sm" @click="selected = []">{{ t('assets.clear_selection') }}</Button>
+                <Button variant="destructive" size="sm" class="ml-auto" :disabled="deleting" @click="deleteSelected">
+                    <Trash2 class="h-4 w-4" />
+                    {{ t('assets.bulk_delete') }}
+                </Button>
+            </div>
+
             <div class="overflow-x-auto rounded-md border">
                 <table class="w-full text-sm">
                     <thead class="bg-muted/50 text-left">
                         <tr>
+                            <th v-if="can.bulkDelete" class="w-10 px-4 py-2">
+                                <input
+                                    type="checkbox"
+                                    class="size-4"
+                                    :checked="allOnPage"
+                                    :aria-label="t('assets.select_page')"
+                                    @change="togglePage"
+                                />
+                            </th>
                             <th v-for="column in columns" :key="column.key" class="whitespace-nowrap px-4 py-2 font-medium">
                                 <button v-if="column.sortable" type="button" class="flex items-center gap-1" @click="sortBy(column.key)">
                                     {{ t(`assets.${column.key}`) }}
@@ -222,7 +270,21 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="asset in assets.data" :key="asset.ulid" class="border-t">
+                        <tr
+                            v-for="asset in assets.data"
+                            :key="asset.ulid"
+                            class="border-t"
+                            :class="{ 'bg-red-50/60 dark:bg-red-950/40': selected.includes(asset.ulid) }"
+                        >
+                            <td v-if="can.bulkDelete" class="px-4 py-2">
+                                <input
+                                    type="checkbox"
+                                    class="size-4"
+                                    :checked="selected.includes(asset.ulid)"
+                                    :aria-label="t('assets.select_row', { code: asset.asset_code })"
+                                    @change="toggle(asset.ulid)"
+                                />
+                            </td>
                             <td class="whitespace-nowrap px-4 py-2 font-mono text-xs">
                                 <div class="flex items-center gap-3">
                                     <ListThumb :src="asset.photo" :alt="asset.name" />
@@ -295,7 +357,9 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                             </td>
                         </tr>
                         <tr v-if="assets.data.length === 0">
-                            <td :colspan="columns.length" class="px-4 py-8 text-center text-muted-foreground">{{ t('common.no_results') }}</td>
+                            <td :colspan="columns.length + (can.bulkDelete ? 1 : 0)" class="px-4 py-8 text-center text-muted-foreground">
+                                {{ t('common.no_results') }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>

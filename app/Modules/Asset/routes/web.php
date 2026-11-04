@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(function () {
     // Before the resource, so "export" / "imports" are not taken as an asset ulid.
     Route::get('assets/export', [AssetController::class, 'export'])->name('assets.export');
+    Route::post('assets/bulk-delete', [AssetController::class, 'bulkDestroy'])->name('assets.bulk-destroy');
     Route::get('assets/duplicates', [AssetController::class, 'duplicates'])->name('assets.duplicates');
     Route::get('assets/imports', [AssetImportController::class, 'index'])->name('imports.index');
     Route::post('assets/imports', [AssetImportController::class, 'store'])->name('imports.store');
