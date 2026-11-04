@@ -31,6 +31,9 @@ export interface PmItem {
     checked_at: string | null;
     photos: { id: number; name: string; url: string; question: string | null }[];
     removable: boolean;
+    // its form, and whether another may still be picked (nothing recorded on it yet)
+    template?: { code: string; name: string } | null;
+    template_changeable?: boolean;
     // what was typed and not saved yet (autosave), the instrument used, why it was not inspected
     draft?: (PmItemDraft & { saved_at?: string }) | null;
     instrument_id?: number | null;
@@ -54,10 +57,12 @@ const props = withDefaults(
         priorities: string[];
         instruments?: PmInstrumentOption[];
         notInspectedReasons?: string[];
+        // the forms another may be picked from (the work order page, for who may change its equipment)
+        templateOptions?: { code: string; name: string }[];
         // the field page: big controls, and "save and go to the next one" when there is a next one
         nextUrl?: string | null;
     }>(),
-    { instruments: () => [], notInspectedReasons: () => [], nextUrl: null },
+    { instruments: () => [], notInspectedReasons: () => [], templateOptions: () => [], nextUrl: null },
 );
 
 const results = ['passed', 'failed', 'not_inspected'];
@@ -101,6 +106,19 @@ const saveAsset = () =>
 
 const ticket = useForm({ priority: 'medium' });
 const openTicket = () => ticket.post(route('maintenance.visits.items.ticket', [props.visitUlid, props.item.id]), { preserveScroll: true });
+
+// Another form for this piece of equipment, while nothing is recorded on it; what was only autosaved goes (asked first).
+const templateEditing = ref(false);
+const templateForm = useForm({ template_code: props.item.template?.code ?? '', remember: true });
+const changeTemplate = () => {
+    if (props.item.draft && !confirm(t('pm_visits.confirm_change_template'))) {
+        return;
+    }
+    templateForm.put(route('maintenance.visits.items.template', [props.visitUlid, props.item.id]), {
+        preserveScroll: true,
+        onSuccess: () => (templateEditing.value = false),
+    });
+};
 
 const remove = () =>
     confirm(t('pm_visits.confirm_remove_item')) &&
@@ -173,6 +191,30 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
                     <span class="ml-2 font-medium">{{ item.asset.name }}</span>
                 </template>
                 <span v-else class="text-muted-foreground">{{ t('pm_visits.asset_missing') }}</span>
+                <p v-if="item.template || item.template_changeable" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{{ t('pm_visits.template') }}: {{ item.template?.name ?? t('pm_visits.no_template') }}</span>
+                    <button
+                        v-if="item.template_changeable && templateOptions.length && !templateEditing"
+                        type="button"
+                        class="text-primary underline-offset-4 hover:underline"
+                        :title="t('pm_visits.change_template_hint')"
+                        @click="templateEditing = true"
+                    >
+                        {{ t('pm_visits.change_template') }}
+                    </button>
+                </p>
+                <form v-if="templateEditing" class="mt-2 flex flex-wrap items-center gap-2 text-xs" @submit.prevent="changeTemplate">
+                    <select v-model="templateForm.template_code" :class="selectClass" :aria-label="t('pm_visits.template')">
+                        <option v-for="option in templateOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
+                    </select>
+                    <label class="inline-flex items-center gap-2">
+                        <input v-model="templateForm.remember" type="checkbox" class="size-4 rounded border-input" />
+                        {{ t('pm_visits.remember_template') }}
+                    </label>
+                    <Button size="sm" :disabled="templateForm.processing || !templateForm.template_code">{{ t('common.save') }}</Button>
+                    <Button type="button" size="sm" variant="ghost" @click="templateEditing = false">{{ t('common.cancel') }}</Button>
+                    <InputError class="w-full" :message="templateForm.errors.template_code" />
+                </form>
                 <p v-if="item.checked_at" class="text-xs text-muted-foreground">
                     {{ t('pm_visits.checked_by', { name: item.checked_by ?? t('common.system'), at: dateTime(item.checked_at) }) }}
                 </p>

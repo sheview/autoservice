@@ -9,12 +9,14 @@ use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Maintenance\Actions\AddPmVisitItems;
+use App\Modules\Maintenance\Actions\ChangePmVisitItemTemplate;
 use App\Modules\Maintenance\Actions\CreatePmWorkOrder;
 use App\Modules\Maintenance\Actions\PmTemplatesForAssets;
 use App\Modules\Maintenance\Actions\RemovePmVisitItem;
 use App\Modules\Maintenance\Http\Requests\PmPlanRequest;
 use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
+use App\Modules\Maintenance\Support\PmTemplateResolver;
 use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -57,6 +59,8 @@ class PmWorkOrderController extends Controller
             'contracts' => $customerId ? $this->contracts($customerId) : [],
             'assets' => $assets,
             'templates' => $templatesFor->handle(array_column($assets, 'id')),
+            // every form that may be picked by hand instead
+            'templateOptions' => PmTemplateResolver::load()->options(),
             'assignees' => $this->usersWithPermission->handle(PmPlanRequest::ASSIGNABLE_PERMISSION)
                 ->map(fn (User $user) => $user->only(['id', 'name']))->values(),
         ]);
@@ -80,6 +84,9 @@ class PmWorkOrderController extends Controller
             'assignee_id' => ['nullable', 'integer', Rule::in($this->usersWithPermission->handle(PmPlanRequest::ASSIGNABLE_PERMISSION)->pluck('id')->all())],
             'asset_ids' => ['array', 'max:500'],
             'asset_ids.*' => ['integer', 'distinct'],
+            'templates' => ['array'],
+            'templates.*' => ['nullable', 'string', 'max:40'],
+            'remember_templates' => ['boolean'],
             'draft' => ['boolean'],
         ], [], __('maintenance.fields'));
 
@@ -114,6 +121,24 @@ class PmWorkOrderController extends Controller
         $removeItem->handle($visit, $item, $request->user());
 
         return back()->with('success', __('maintenance.visits.item_removed'));
+    }
+
+    /**
+     * Another form for a piece of equipment the form picked for it was wrong for (ChangePmVisitItemTemplate);
+     * remember = the asset keeps it for later work orders.
+     */
+    public function changeTemplate(Request $request, PmVisit $visit, PmVisitItem $item, ChangePmVisitItemTemplate $change): RedirectResponse
+    {
+        Gate::authorize('update', $visit);
+
+        $data = $request->validate([
+            'template_code' => ['required', 'string', 'max:40'],
+            'remember' => ['boolean'],
+        ], [], __('maintenance.fields'));
+
+        $change->handle($visit, $item, $data['template_code'], (bool) ($data['remember'] ?? false), $request->user());
+
+        return back()->with('success', __('maintenance.visits.template_changed'));
     }
 
     /**

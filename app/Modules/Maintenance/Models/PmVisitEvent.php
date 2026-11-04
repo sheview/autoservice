@@ -25,6 +25,9 @@ class PmVisitEvent extends Model
 
     public const TYPE_ITEM_REMOVED = 'item_removed';
 
+    /** The form of a piece of equipment was changed by hand (ChangePmVisitItemTemplate). */
+    public const TYPE_TEMPLATE_CHANGED = 'template_changed';
+
     public const TYPE_SIGNED = 'signed';
 
     public const TYPE_VERSION = 'version_created';

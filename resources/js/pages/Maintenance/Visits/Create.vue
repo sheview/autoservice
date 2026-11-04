@@ -25,8 +25,10 @@ const props = defineProps<{
     contractId: number | null;
     contracts: Record<string, { id: number; contract_no: string; title: string; asset_ids: number[] }>;
     assets: AssetRow[];
-    // The template each asset would get (by asset id); null = none checks it.
-    templates: Record<string, { code: string; name: string } | null>;
+    // The template each asset would get (by asset id) and why (source); null = none checks it.
+    templates: Record<string, { code: string; name: string; source: string } | null>;
+    // every form that may be picked by hand instead
+    templateOptions: { code: string; name: string }[];
     assignees: { id: number; name: string }[];
 }>();
 
@@ -43,6 +45,9 @@ const form = useForm({
     scheduled_on: '',
     assignee_id: null as number | null,
     asset_ids: [] as number[],
+    // a form picked by hand, by asset id ('' = the one the system picks)
+    templates: {} as Record<number, string>,
+    remember_templates: true as boolean,
     draft: false as boolean,
 });
 
@@ -62,6 +67,7 @@ watch(
     (id) => {
         form.contract_id = null;
         form.asset_ids = [];
+        form.templates = {};
         showOthers.value = false;
         router.reload({ only: ['contracts', 'assets', 'templates', 'customerId', 'contractId'], data: { customer_id: id ?? undefined } });
     },
@@ -78,7 +84,13 @@ const shown = computed(() => {
         : listed;
 });
 const templateOf = (asset: AssetRow) => props.templates[asset.id] ?? null;
-const withoutTemplate = computed(() => props.assets.filter((a) => form.asset_ids.includes(a.id) && !templateOf(a)));
+const pickedTemplate = (asset: AssetRow) => form.templates[asset.id] || '';
+const withoutTemplate = computed(() => props.assets.filter((a) => form.asset_ids.includes(a.id) && !templateOf(a) && !pickedTemplate(a)));
+const pickedCount = computed(() => form.asset_ids.filter((id) => form.templates[id]).length);
+const templateTitle = (asset: AssetRow) => {
+    const auto = templateOf(asset);
+    return auto ? t('pm_visits.template_source', { source: t(`pm_visits.template_sources.${auto.source}`) }) : '';
+};
 const allShownPicked = computed(() => shown.value.length > 0 && shown.value.every((a) => form.asset_ids.includes(a.id)));
 const toggleAll = () => {
     const ids = shown.value.map((a) => a.id);
@@ -176,16 +188,35 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <span v-if="!inContract(asset)" class="rounded bg-amber-100 px-1.5 text-xs text-amber-800">{{
                             t('pm_visits.outside_contract')
                         }}</span>
-                        <span class="ml-auto shrink-0 text-xs" :class="templateOf(asset) ? 'text-muted-foreground' : 'text-red-600'">
-                            {{ templateOf(asset)?.name ?? t('pm_visits.no_template') }}
-                        </span>
+                        <select
+                            v-model="form.templates[asset.id]"
+                            class="ml-auto h-8 max-w-56 shrink-0 rounded-md border bg-transparent px-2 text-xs"
+                            :class="
+                                pickedTemplate(asset)
+                                    ? 'border-primary font-medium text-primary'
+                                    : templateOf(asset)
+                                      ? 'border-input text-muted-foreground'
+                                      : 'border-red-300 text-red-600'
+                            "
+                            :title="templateTitle(asset)"
+                            :aria-label="t('pm_visits.template')"
+                        >
+                            <option :value="undefined">
+                                {{ templateOf(asset) ? t('pm_visits.template_auto', { name: templateOf(asset)!.name }) : t('pm_visits.no_template') }}
+                            </option>
+                            <option v-for="option in templateOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
+                        </select>
                     </label>
                 </div>
                 <p v-else class="text-sm text-muted-foreground">{{ t('pm_visits.no_assets') }}</p>
                 <p v-if="withoutTemplate.length" class="text-xs text-red-600">
                     {{ t('pm_visits.assets_without_template', { count: withoutTemplate.length }) }}
                 </p>
-                <InputError :message="form.errors.asset_ids" />
+                <label v-if="pickedCount" class="flex items-center gap-2 text-xs">
+                    <input v-model="form.remember_templates" type="checkbox" class="size-4 rounded border-input" />
+                    {{ t('pm_visits.remember_templates') }} ({{ pickedCount }})
+                </label>
+                <InputError :message="form.errors.asset_ids ?? (form.errors as Record<string, string>).templates" />
             </section>
 
             <div class="flex flex-wrap gap-2">

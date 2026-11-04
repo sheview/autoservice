@@ -183,7 +183,7 @@ it('opens a work order for a contract with its equipment from the register and t
             ->where('customerId', $this->customer->id)
             ->where('contractId', $contract->id)
             ->where("contracts.{$contract->id}.asset_ids", [$this->upsA->id])
-            ->where("templates.{$this->upsA->id}", ['code' => $template->code, 'name' => 'UPS PM'])
+            ->where("templates.{$this->upsA->id}", ['code' => $template->code, 'name' => 'UPS PM', 'source' => 'category'])
             ->where("templates.{$router->id}", null));
 
     // a contract of another customer, or one that ended, picks nothing

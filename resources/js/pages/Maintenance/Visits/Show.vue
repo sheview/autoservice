@@ -74,6 +74,7 @@ const props = defineProps<{
     assignees: { id: number; name: string }[] | null;
     priorities: string[];
     instruments: PmInstrumentOption[];
+    templateOptions: { code: string; name: string }[];
     notInspectedReasons: string[];
     moves: string[];
     needsNote: string[];
@@ -447,6 +448,7 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     :can-open-ticket="can.openTicket"
                     :priorities="priorities"
                     :instruments="instruments"
+                    :template-options="templateOptions"
                     :not-inspected-reasons="notInspectedReasons"
                 />
             </section>

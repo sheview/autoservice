@@ -7,7 +7,8 @@ use App\Modules\Maintenance\Support\PmTemplateResolver;
 
 /**
  * The template each asset would get on a work order made by hand (PmTemplateResolver, no plan), so the
- * page can show it before the work order is opened and point out equipment no template checks.
+ * page can show it before the work order is opened, say why it was picked (source: asset, model, brand,
+ * category, default) and point out equipment no template checks.
  */
 class PmTemplatesForAssets
 {
@@ -15,7 +16,7 @@ class PmTemplatesForAssets
 
     /**
      * @param  list<int>  $assetIds
-     * @return array<int, array{code: string, name: string}|null> keyed by asset id; null = no template
+     * @return array<int, array{code: string, name: string, source: string}|null> keyed by asset id; null = no template
      */
     public function handle(array $assetIds): array
     {
@@ -26,9 +27,9 @@ class PmTemplatesForAssets
         $templates = PmTemplateResolver::load();
 
         return array_map(function (array $asset) use ($templates) {
-            $template = $templates->for($asset);
+            $match = $templates->match($asset);
 
-            return $template ? ['code' => $template->code, 'name' => $template->name] : null;
+            return $match ? ['code' => $match['template']->code, 'name' => $match['template']->name, 'source' => $match['source']] : null;
         }, $this->assetDetails->handle($assetIds));
     }
 }

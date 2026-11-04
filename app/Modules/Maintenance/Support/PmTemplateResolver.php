@@ -18,6 +18,9 @@ use Illuminate\Support\Collection;
  *   5. an assignment to its category
  *   6. the default assignment (nothing filled in)
  *
+ * (match() also says which: plan, asset, model, brand, category, default.) A template picked by hand on
+ * a work order is given directly and does not go through here.
+ *
  * A code with no published version is passed over. Ties go to the oldest assignment. Everything is
  * loaded once, so a work order of hundreds of assets costs three queries.
  */
@@ -62,9 +65,20 @@ final class PmTemplateResolver
      */
     public function for(array $asset): ?PmChecklist
     {
+        return $this->match($asset)['template'] ?? null;
+    }
+
+    /**
+     * The template of an asset and the level that picked it (SOURCES), so a page can say why.
+     *
+     * @param  array{id: int, category_id?: int|null, asset_brand_id?: int|null, asset_model_id?: int|null}  $asset
+     * @return array{template: PmChecklist, source: string}|null
+     */
+    public function match(array $asset): ?array
+    {
         $override = $this->overrides[$asset['id']] ?? null;
         if ($override !== null && $this->templates->has($override)) {
-            return $this->templates[$override];
+            return ['template' => $this->templates[$override], 'source' => 'plan'];
         }
 
         $categoryId = $asset['category_id'] ?? null;
@@ -72,23 +86,43 @@ final class PmTemplateResolver
         $modelId = $asset['asset_model_id'] ?? null;
 
         $levels = [
-            fn (PmTemplateAssignment $a) => (int) $a->asset_id === (int) $asset['id'],
-            fn (PmTemplateAssignment $a) => $modelId !== null && $a->asset_id === null && (int) $a->asset_model_id === (int) $modelId,
-            fn (PmTemplateAssignment $a) => $brandId !== null && $categoryId !== null && $a->asset_id === null && $a->asset_model_id === null
+            'asset' => fn (PmTemplateAssignment $a) => (int) $a->asset_id === (int) $asset['id'],
+            'model' => fn (PmTemplateAssignment $a) => $modelId !== null && $a->asset_id === null && (int) $a->asset_model_id === (int) $modelId,
+            'brand' => fn (PmTemplateAssignment $a) => $brandId !== null && $categoryId !== null && $a->asset_id === null && $a->asset_model_id === null
                 && (int) $a->asset_brand_id === (int) $brandId && (int) $a->asset_category_id === (int) $categoryId,
-            fn (PmTemplateAssignment $a) => $categoryId !== null && $a->asset_id === null && $a->asset_model_id === null && $a->asset_brand_id === null
+            'category' => fn (PmTemplateAssignment $a) => $categoryId !== null && $a->asset_id === null && $a->asset_model_id === null && $a->asset_brand_id === null
                 && (int) $a->asset_category_id === (int) $categoryId,
-            fn (PmTemplateAssignment $a) => $a->asset_id === null && $a->asset_model_id === null && $a->asset_brand_id === null && $a->asset_category_id === null,
+            'default' => fn (PmTemplateAssignment $a) => $a->asset_id === null && $a->asset_model_id === null && $a->asset_brand_id === null && $a->asset_category_id === null,
         ];
 
-        foreach ($levels as $matches) {
+        foreach ($levels as $source => $matches) {
             $assignment = $this->assignments->first($matches);
             if ($assignment !== null) {
-                return $this->templates[$assignment->template_code];
+                return ['template' => $this->templates[$assignment->template_code], 'source' => $source];
             }
         }
 
         return null;
+    }
+
+    /**
+     * The newest published version of a code; null when it has none.
+     */
+    public function template(string $code): ?PmChecklist
+    {
+        return $this->templates->get($code);
+    }
+
+    /**
+     * Every template that may be picked by hand: newest published version, by name.
+     *
+     * @return list<array{code: string, name: string}>
+     */
+    public function options(): array
+    {
+        return $this->templates->sortBy('name', SORT_NATURAL)
+            ->map(fn (PmChecklist $template) => ['code' => $template->code, 'name' => $template->name])
+            ->values()->all();
     }
 
     /**

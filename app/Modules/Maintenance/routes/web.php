@@ -99,6 +99,7 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::post('pm-visits', [PmWorkOrderController::class, 'store'])->name('visits.store');
     Route::post('pm-visits/{visit}/items', [PmWorkOrderController::class, 'addItems'])->name('visits.items.store');
     Route::delete('pm-visits/{visit}/items/{item}', [PmWorkOrderController::class, 'removeItem'])->scopeBindings()->name('visits.items.destroy');
+    Route::put('pm-visits/{visit}/items/{item}/template', [PmWorkOrderController::class, 'changeTemplate'])->scopeBindings()->name('visits.items.template');
     Route::resource('pm-visits', PmVisitController::class)->only(['index', 'show', 'update'])
         ->names('visits')->parameters(['pm-visits' => 'visit']);
     Route::get('pm-visits/{visit}/pdf', [PmVisitPdfController::class, 'consolidated'])->name('visits.pdf');

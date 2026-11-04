@@ -11,6 +11,7 @@ use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Actions\UsersWithPermission;
 use App\Modules\Identity\Models\User;
 use App\Modules\Labeling\Actions\QrSvg;
+use App\Modules\Maintenance\Actions\ChangePmVisitItemTemplate;
 use App\Modules\Maintenance\Actions\CorrectPmItemAsset;
 use App\Modules\Maintenance\Actions\CreatePmRevision;
 use App\Modules\Maintenance\Actions\CreatePmSignLink;
@@ -26,6 +27,7 @@ use App\Modules\Maintenance\Actions\SubmitPmVisit;
 use App\Modules\Maintenance\Actions\UpdatePmVisit;
 use App\Modules\Maintenance\Http\Requests\PmPlanRequest;
 use App\Modules\Maintenance\Http\Requests\RecordPmItemRequest;
+use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmReportShare;
 use App\Modules\Maintenance\Models\PmSignature;
 use App\Modules\Maintenance\Models\PmVisit;
@@ -33,6 +35,7 @@ use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Maintenance\Support\ChecklistItems;
 use App\Modules\Maintenance\Support\PmSettings;
+use App\Modules\Maintenance\Support\PmTemplateResolver;
 use App\Modules\Maintenance\Support\PmWorkflow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketLabels;
@@ -100,6 +103,8 @@ class PmVisitController extends Controller
         $canUpdate = $user->can('update', $visit);
         $canEditItems = $canUpdate && $visit->isOpen();
         $canShare = $user->customer_id === null && $user->can('share', $visit);
+        // The name of each item's form (its copy keeps only the code and the questions).
+        $templateNames = PmChecklist::withTrashed()->whereIn('id', $items->pluck('pm_checklist_id')->filter()->unique()->values())->pluck('name', 'id');
 
         $staff = $user->customer_id === null;
         $settings = PmSettings::of();
@@ -166,9 +171,13 @@ class PmVisitController extends Controller
                 ])->values(),
                 'checked_by' => $names[$item->checked_by] ?? null,
                 'checked_at' => $item->checked_at?->toIso8601String(),
+                'template' => $item->template_code ? ['code' => $item->template_code, 'name' => $templateNames[$item->pm_checklist_id] ?? $item->template_code] : null,
+                // Its form may be changed while nothing is recorded on it (ChangePmVisitItemTemplate).
+                'template_changeable' => $canEditItems && ChangePmVisitItemTemplate::changeable($item),
                 // Equipment with nothing recorded may still be taken off a work order that is still to do.
                 'removable' => $canEditItems && $item->result === PmVisitItem::RESULT_PENDING && $item->ticket_id === null && ! $item->hasMedia(PmVisitItem::PHOTOS),
             ]),
+            'templateOptions' => fn () => $canEditItems ? PmTemplateResolver::load()->options() : [],
             'instruments' => fn () => $canPerform ? app(PmInstrumentOptions::class)->handle() : [],
             'notInspectedReasons' => PmVisitItem::NOT_INSPECTED_REASONS,
             // ?asset_search= : equipment of the customer that may still be put on the work order.
