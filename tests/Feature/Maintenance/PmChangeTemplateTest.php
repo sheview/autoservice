@@ -170,6 +170,44 @@ it('never changes the form of recorded work, nor on a work order handed in', fun
     $this->actingAs($this->helpdesk)->put("{$url}/items/{$desktop->id}/template", ['template_code' => 'NB'])->assertSessionHasErrors('template_code');
 });
 
+it('gives the remembered form to the other work orders still to do, never to recorded or drafted work', function () {
+    foreach (range(1, 5) as $n) {
+        ($this->create)(['title' => "PM {$n}"])->assertSessionHasNoErrors();
+    }
+    [$here, $todo, $recorded, $drafted, $closed] = PmVisit::orderBy('id')->get()->all();
+    $item = fn (PmVisit $visit) => ($this->itemOf)($visit, $this->notebook);
+    // work recorded on the notebook, work drafted on it, and a work order already done
+    $this->actingAs($this->tech)->post("/pm-visits/{$recorded->ulid}/start")->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->put("/pm-visits/{$recorded->ulid}/items/{$item($recorded)->id}", ['result' => 'passed', 'answers' => ['fan' => 'pass']])
+        ->assertSessionHasNoErrors();
+    $item($drafted)->update(['draft' => ['answers' => ['fan' => 'pass']]]);
+    $closed->update(['status' => PmVisit::STATUS_CLOSED]);
+
+    // not remembered: only this work order
+    $this->actingAs($this->tech)->put("/pm-visits/{$here->ulid}/items/{$item($here)->id}/template", ['template_code' => 'NB', 'remember' => false])
+        ->assertSessionHasNoErrors();
+    expect($item($todo)->template_code)->toBe('PC');
+
+    $item($here)->update(['template_code' => 'PC']);
+    $this->actingAs($this->tech)->put("/pm-visits/{$here->ulid}/items/{$item($here)->id}/template", ['template_code' => 'NB', 'remember' => true])
+        ->assertSessionHasNoErrors();
+
+    expect($item($todo)->only(['template_code', 'pm_checklist_id']))->toBe(['template_code' => 'NB', 'pm_checklist_id' => $this->nbForm->id])
+        ->and($item($todo)->checklist)->toHaveCount(2)
+        // recorded, drafted and done keep the form they were done with
+        ->and($item($recorded)->template_code)->toBe('PC')
+        ->and($item($recorded)->answers)->toBe(['fan' => 'pass'])
+        ->and($item($drafted)->template_code)->toBe('PC')
+        ->and($item($drafted)->draft)->not->toBeEmpty()
+        ->and($item($closed)->template_code)->toBe('PC')
+        // the desktop is not touched
+        ->and(($this->itemOf)($todo, $this->desktop)->template_code)->toBe('PC');
+
+    // each work order changed says so in its history
+    expect(PmVisitEvent::where('pm_visit_id', $todo->id)->where('type', PmVisitEvent::TYPE_TEMPLATE_CHANGED)->sole()->data['because_of'])->toBe($here->visit_no)
+        ->and(PmVisitEvent::where('pm_visit_id', $recorded->id)->where('type', PmVisitEvent::TYPE_TEMPLATE_CHANGED)->exists())->toBeFalse();
+});
+
 it('does not reach a form or a work order of another tenant', function () {
     $other = createTenant('other');
     asTenant($other, fn () => PmChecklist::create(['code' => 'THEIRS', 'name' => 'ของบริษัทอื่น', 'items' => []]));
