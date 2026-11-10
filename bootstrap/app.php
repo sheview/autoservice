@@ -6,6 +6,7 @@ use App\Modules\Platform\Http\Middleware\EnsureModuleEnabled;
 use App\Modules\Platform\Http\Middleware\LogImpersonatedRequests;
 use App\Modules\Tenancy\Http\Middleware\EnforceSubscription;
 use App\Modules\Tenancy\Http\Middleware\ResolveTenant;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -41,6 +42,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        // Signed out while a page loads a file (a photo, the logo — an <img> asks for images, not a
+        // page): 401, not the login page, and not kept as where to go after signing in.
+        $exceptions->render(function (AuthenticationException $e, Request $request) {
+            $accept = (string) $request->header('Accept', '');
+            if ($accept !== '' && ! $request->expectsJson() && ! $request->header('X-Inertia') && ! str_contains($accept, 'text/html')) {
+                return response('', 401);
+            }
+
+            return null;
+        });
+
         // A body larger than post_max_size arrives empty: say so in Thai instead of an error page
         // (the session has not started yet, so no redirect with errors). The pages show this
         // message from the 413 (resources/js/lib/uploadNotice.ts).

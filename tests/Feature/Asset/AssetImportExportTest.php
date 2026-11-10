@@ -15,8 +15,6 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Maatwebsite\Excel\Facades\Excel;
-use PhpOffice\PhpSpreadsheet\Spreadsheet;
-use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
 beforeEach(function () {
     Storage::fake('local');
@@ -32,19 +30,6 @@ beforeEach(function () {
         ],
     ]);
 });
-
-/**
- * An uploaded .xlsx file with these rows (first row = headings).
- */
-function xlsxUpload(array $rows): UploadedFile
-{
-    $spreadsheet = new Spreadsheet;
-    $spreadsheet->getActiveSheet()->fromArray($rows, null, 'A1', true);
-    $path = tempnam(sys_get_temp_dir(), 'assets').'.xlsx';
-    (new Xlsx($spreadsheet))->save($path);
-
-    return new UploadedFile($path, 'assets.xlsx', null, null, true);
-}
 
 function sheetRows(string $path): array
 {

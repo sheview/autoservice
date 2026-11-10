@@ -15,6 +15,14 @@ use Illuminate\Validation\ValidationException;
 class LoginRequest extends FormRequest
 {
     /**
+     * A wrong or missing entry goes back to the login page, never "back": the last URL the session
+     * saw may be a file an old tab loaded (a photo, the logo) after it ran out.
+     *
+     * @var string
+     */
+    protected $redirectRoute = 'login';
+
+    /**
      * Determine if the user is authorized to make this request.
      */
     public function authorize(): bool
@@ -56,7 +64,7 @@ class LoginRequest extends FormRequest
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
-            ]);
+            ])->redirectTo(route('login'));
         }
 
         RateLimiter::clear($this->throttleKey());
@@ -82,7 +90,7 @@ class LoginRequest extends FormRequest
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
-        ]);
+        ])->redirectTo(route('login'));
     }
 
     /**

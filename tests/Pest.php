@@ -29,7 +29,10 @@ use App\Modules\Service\Models\Ticket;
 use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Tests\TestCase;
 
 /*
@@ -339,4 +342,18 @@ function issueToTicket(Ticket $ticket, Part $part, int $qty, User $actor, string
 function signaturePng(): string
 {
     return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+}
+
+/**
+ * An uploaded .xlsx file with these rows (first row = headings). Here, where every test file sees
+ * it: a parallel run does not load the other test files.
+ */
+function xlsxUpload(array $rows): UploadedFile
+{
+    $spreadsheet = new Spreadsheet;
+    $spreadsheet->getActiveSheet()->fromArray($rows, null, 'A1', true);
+    $path = tempnam(sys_get_temp_dir(), 'assets').'.xlsx';
+    (new Xlsx($spreadsheet))->save($path);
+
+    return new UploadedFile($path, 'assets.xlsx', null, null, true);
 }
