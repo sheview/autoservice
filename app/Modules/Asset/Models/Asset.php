@@ -72,12 +72,16 @@ class Asset extends Model implements HasMedia
         'warranty_expires_at',
         'specs',
         'notes',
+        // Registered on site, waiting for the office to confirm it (AddAssetFromSite / ConfirmAssetReview).
+        'needs_review',
+        'added_note',
     ];
 
     protected $attributes = [
         'status' => self::STATUS_IN_USE,
         'quantity' => 1,
         'specs' => '{}',
+        'needs_review' => false,
     ];
 
     protected function casts(): array
@@ -88,6 +92,7 @@ class Asset extends Model implements HasMedia
             'purchase_price' => 'integer',
             'quantity' => 'integer',
             'specs' => 'array',
+            'needs_review' => 'boolean',
         ];
     }
 

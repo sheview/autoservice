@@ -125,11 +125,12 @@ class PmWorkOrderController extends Controller
 
     /**
      * Another form for a piece of equipment the form picked for it was wrong for (ChangePmVisitItemTemplate);
-     * remember = the asset keeps it for later work orders.
+     * remember = the asset keeps it for later work orders. Who arranges the work order, or who does the
+     * work: the technician finds the wrong form on site.
      */
     public function changeTemplate(Request $request, PmVisit $visit, PmVisitItem $item, ChangePmVisitItemTemplate $change): RedirectResponse
     {
-        Gate::authorize('update', $visit);
+        abort_unless(Gate::any(['update', 'perform'], $visit), 403);
 
         $data = $request->validate([
             'template_code' => ['required', 'string', 'max:40'],

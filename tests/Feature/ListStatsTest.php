@@ -16,7 +16,7 @@ it('counts assets as the list filters them, only those the user may see', functi
     createAsset($category, ['status' => Asset::STATUS_RETIRED, 'warranty_expires_at' => now()->addYears(2)->toDateString()]);
 
     $this->actingAs($admin)->get('/assets')->assertInertia(fn (Assert $page) => $page
-        ->where('stats', ['total' => 3, 'in_use' => 1, 'in_repair' => 1, 'warranty_expiring' => 1]));
+        ->where('stats', ['total' => 3, 'in_use' => 1, 'in_repair' => 1, 'warranty_expiring' => 1, 'needs_review' => 0]));
 
     // Another company's assets are not counted.
     asTenant(createTenant('other'), fn () => createAsset(createAssetCategory()));

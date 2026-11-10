@@ -41,6 +41,7 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     });
 
     Route::post('assets/{asset}/move', [AssetController::class, 'move'])->name('assets.move');
+    Route::put('assets/{asset}/review', [AssetController::class, 'confirmReview'])->name('assets.review');
     Route::resource('assets', AssetController::class);
 
     // Slot 0 is the main photo, 1-3 the extras.

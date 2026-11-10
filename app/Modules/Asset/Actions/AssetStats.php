@@ -27,6 +27,8 @@ class AssetStats
             'warranty_expiring' => $visible()
                 ->whereBetween('warranty_expires_at', [$today, now()->addDays(SearchAssets::EXPIRING_DAYS)->toDateString()])
                 ->count(),
+            // registered on site and not confirmed by the office yet
+            'needs_review' => $visible()->where('needs_review', true)->count(),
         ];
     }
 }

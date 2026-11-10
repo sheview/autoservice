@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Identity\Actions\UserNames;
+use App\Modules\Maintenance\Actions\ChangePmVisitItemTemplate;
 use App\Modules\Maintenance\Actions\CreatePmSignLink;
 use App\Modules\Maintenance\Actions\MarkPmVisitArrival;
 use App\Modules\Maintenance\Actions\MarkPmVisitDeparture;
@@ -22,6 +23,7 @@ use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use App\Modules\Maintenance\Support\ChecklistItems;
 use App\Modules\Maintenance\Support\PmSettings;
+use App\Modules\Maintenance\Support\PmTemplateResolver;
 use App\Modules\Maintenance\Support\PmWorkflow;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\TicketLabels;
@@ -84,6 +86,9 @@ class PmFieldController extends Controller
         $at = array_search($item->id, $ids, true);
         $asset = $this->assetDetails->handle([$item->asset_id])[$item->asset_id] ?? null;
         $ticket = $item->ticket_id && $this->modules->enabled('service') ? ($ticketLabels->handle([$item->ticket_id])[$item->ticket_id] ?? null) : null;
+        // A wrong form is changed right here, while nothing is recorded on the equipment.
+        $templates = $visit->isOpen() ? PmTemplateResolver::load($visit->pm_plan_id) : null;
+        $templateName = $item->pm_checklist_id ? PmChecklist::withTrashed()->whereKey($item->pm_checklist_id)->value('name') : null;
 
         return Inertia::render('Maintenance/Field/Item', [
             'visit' => $this->visitSummary($visit),
@@ -101,7 +106,11 @@ class PmFieldController extends Controller
                 'checked_by' => $item->checked_by ? ($userNames->handle([$item->checked_by])[$item->checked_by] ?? null) : null,
                 'checked_at' => $item->checked_at?->toIso8601String(),
                 'removable' => false,
+                'template' => $item->template_code ? ['code' => $item->template_code, 'name' => $templateName ?? $item->template_code] : null,
+                'template_changeable' => $templates !== null && ChangePmVisitItemTemplate::changeable($item),
+                'template_suggested' => $templates && $asset ? $templates->suggested($asset) : [],
             ],
+            'templateOptions' => $templates?->options() ?? [],
             'position' => ['index' => $at + 1, 'total' => count($ids)],
             'previous' => $at > 0 ? $ids[$at - 1] : null,
             'next' => $at < count($ids) - 1 ? $ids[$at + 1] : null,
@@ -224,6 +233,7 @@ class PmFieldController extends Controller
             'onsite_at' => $visit->onsite_at?->toIso8601String(),
             'departed_at' => $visit->departed_at?->toIso8601String(),
             'working' => $visit->isWorking(),
+            'open' => $visit->isOpen(),
             'can_start' => $visit->status === PmVisit::STATUS_SCHEDULED,
             'locked_at' => $visit->locked_at?->toIso8601String(),
         ];

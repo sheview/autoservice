@@ -102,6 +102,13 @@ class PmVisitController extends Controller
         $canPerform = $user->can('perform', $visit);
         $canUpdate = $user->can('update', $visit);
         $canEditItems = $canUpdate && $visit->isOpen();
+        // Its form may be changed by who arranges the work order, or by who does the work (on site).
+        $canChangeTemplates = $visit->isOpen() && ($canUpdate || $canPerform);
+        // Every published form with its questions: loaded only when a prop asks for it (not on partial reloads).
+        $resolver = null;
+        $templates = function () use (&$resolver, $visit): PmTemplateResolver {
+            return $resolver ??= PmTemplateResolver::load($visit->pm_plan_id);
+        };
         $canShare = $user->customer_id === null && $user->can('share', $visit);
         // The name of each item's form (its copy keeps only the code and the questions).
         $templateNames = PmChecklist::withTrashed()->whereIn('id', $items->pluck('pm_checklist_id')->filter()->unique()->values())->pluck('name', 'id');
@@ -173,11 +180,16 @@ class PmVisitController extends Controller
                 'checked_at' => $item->checked_at?->toIso8601String(),
                 'template' => $item->template_code ? ['code' => $item->template_code, 'name' => $templateNames[$item->pm_checklist_id] ?? $item->template_code] : null,
                 // Its form may be changed while nothing is recorded on it (ChangePmVisitItemTemplate).
-                'template_changeable' => $canEditItems && ChangePmVisitItemTemplate::changeable($item),
+                'template_changeable' => $canChangeTemplates && ChangePmVisitItemTemplate::changeable($item),
                 // Equipment with nothing recorded may still be taken off a work order that is still to do.
                 'removable' => $canEditItems && $item->result === PmVisitItem::RESULT_PENDING && $item->ticket_id === null && ! $item->hasMedia(PmVisitItem::PHOTOS),
             ]),
-            'templateOptions' => fn () => $canEditItems ? PmTemplateResolver::load()->options() : [],
+            'templateOptions' => fn () => $canChangeTemplates ? $templates()->options() : [],
+            // the forms that fit each item best (by item id), offered first when another is picked
+            'templateSuggested' => fn () => $canChangeTemplates
+                ? (object) $items->filter(fn (PmVisitItem $item) => ! $hideWork && isset($assets[$item->asset_id]) && ChangePmVisitItemTemplate::changeable($item))
+                    ->mapWithKeys(fn (PmVisitItem $item) => [$item->id => $templates()->suggested($assets[$item->asset_id])])->all()
+                : (object) [],
             'instruments' => fn () => $canPerform ? app(PmInstrumentOptions::class)->handle() : [],
             'notInspectedReasons' => PmVisitItem::NOT_INSPECTED_REASONS,
             // ?asset_search= : equipment of the customer that may still be put on the work order.

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import BarcodeScanButton from '@/components/BarcodeScanButton.vue';
 import InputError from '@/components/InputError.vue';
+import PmAddEquipmentDialog from '@/components/pm/PmAddEquipmentDialog.vue';
 import type { TableRow } from '@/components/pm/PmGroupedRow.vue';
 import PmGroupedTable, { type TablePlace } from '@/components/pm/PmGroupedTable.vue';
 import PmResultBadge from '@/components/PmResultBadge.vue';
@@ -14,7 +15,7 @@ import { passRows, type RowItem } from '@/lib/pmRows';
 import type { Answer, TemplateField } from '@/lib/pmTemplate';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { ChevronRight, CircleCheck, LogIn, LogOut, MapPin, Printer } from 'lucide-vue-next';
+import { ChevronRight, CircleCheck, LogIn, LogOut, MapPin, Plus, Printer } from 'lucide-vue-next';
 import { computed, nextTick, ref, watch } from 'vue';
 
 interface FieldVisit {
@@ -29,6 +30,8 @@ interface FieldVisit {
     departed_at: string | null;
     working: boolean;
     can_start: boolean;
+    // equipment may still be put on it (draft, scheduled, in progress, sent back)
+    open: boolean;
 }
 
 interface FieldItem {
@@ -172,18 +175,29 @@ const pass = async (ids: number[]) => {
     }
 };
 
+// Equipment found on site that is not on the work order: looked up in the register, or registered.
+const adding = ref(false);
+const addTerm = ref('');
+const addEquipment = (term = '') => {
+    addTerm.value = term;
+    adding.value = true;
+};
+
 // Scanning a sticker (or typing a code): to the row in the table, or to the equipment's form.
 const highlighted = ref<number | null>(null);
 const scanMessage = ref('');
+const notHere = ref('');
 let unmark: ReturnType<typeof setTimeout> | undefined;
 const goTo = async (text: string) => {
     scanMessage.value = '';
+    notHere.value = '';
     const key = assetKeyFromScan(text);
     const item = key
         ? live.value.find((i) => (key.ulid ? i.asset?.ulid === key.ulid : i.asset?.asset_code.toLowerCase() === key.code?.toLowerCase()))
         : undefined;
     if (!item) {
         scanMessage.value = t('pm_field.scan_not_here', { code: key?.code ?? text });
+        notHere.value = key?.code ?? text;
         return;
     }
     await openItem(item);
@@ -282,7 +296,11 @@ const errors = computed(() => page.props.errors as Record<string, string>);
             <form class="flex gap-2" @submit.prevent="openSearched">
                 <Input v-model="search" type="search" enterkeyhint="search" class="h-11 min-w-0 flex-1" :placeholder="t('pm_field.search')" />
                 <BarcodeScanButton class="h-11" @scanned="goTo" />
+                <Button v-if="visit.open" type="button" variant="outline" class="h-11" :title="t('pm_field.add_equipment')" @click="addEquipment()">
+                    <Plus class="h-4 w-4 sm:mr-1" /><span class="hidden sm:inline">{{ t('pm_field.add_equipment') }}</span>
+                </Button>
             </form>
+            <PmAddEquipmentDialog v-if="visit.open" v-model:open="adding" :visit-ulid="visit.ulid" :initial-term="addTerm" />
             <div class="flex flex-wrap gap-2" role="group" :aria-label="t('pm_field.show')">
                 <Button
                     v-for="option in SHOWS"
@@ -297,11 +315,20 @@ const errors = computed(() => page.props.errors as Record<string, string>);
                     {{ t(`pm_field.shows.${option}`) }} ({{ counts[option] }})
                 </Button>
             </div>
-            <p v-if="(search.trim() || show !== 'all') && !groups.length && !tableSections.some((s) => s.places.length)" class="text-sm text-muted-foreground">
+            <p
+                v-if="(search.trim() || show !== 'all') && !groups.length && !tableSections.some((s) => s.places.length)"
+                class="text-sm text-muted-foreground"
+            >
                 {{ t('pm_field.search_none') }}
             </p>
-            <p v-if="scanMessage" class="rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+            <p
+                v-if="scanMessage"
+                class="flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+            >
                 {{ scanMessage }}
+                <button v-if="notHere && visit.open" type="button" class="font-medium underline underline-offset-4" @click="addEquipment(notHere)">
+                    {{ t('pm_field.add_this') }}
+                </button>
             </p>
             <p v-if="passMessage" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">
                 {{ passMessage }}

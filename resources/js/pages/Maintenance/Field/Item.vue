@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import type { PmTemplateOption } from '@/components/pm/PmTemplatePicker.vue';
 import PmVisitItemCard, { type PmInstrumentOption, type PmItem } from '@/components/PmVisitItemCard.vue';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/AppLayout.vue';
@@ -24,6 +25,8 @@ const props = defineProps<{
     notInspectedReasons: string[];
     priorities: string[];
     canOpenTicket: boolean;
+    // the forms another may be picked from, while nothing is recorded on the equipment
+    templateOptions: PmTemplateOption[];
 }>();
 
 const page = usePage<SharedData>();
@@ -74,6 +77,7 @@ const errors = computed(() => page.props.errors as Record<string, string>);
                 :priorities="priorities"
                 :instruments="instruments"
                 :not-inspected-reasons="notInspectedReasons"
+                :template-options="templateOptions"
                 :next-url="nextUrl"
             />
         </div>

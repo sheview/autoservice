@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
+import PmAddEquipmentDialog from '@/components/pm/PmAddEquipmentDialog.vue';
+import type { PmTemplateOption } from '@/components/pm/PmTemplatePicker.vue';
 import PmSharePanel, { type PmShare } from '@/components/PmSharePanel.vue';
 import PmVisitItemCard, { type PmInstrumentOption, type PmItem } from '@/components/PmVisitItemCard.vue';
 import PmVisitStatusBadge from '@/components/PmVisitStatusBadge.vue';
@@ -74,7 +76,8 @@ const props = defineProps<{
     assignees: { id: number; name: string }[] | null;
     priorities: string[];
     instruments: PmInstrumentOption[];
-    templateOptions: { code: string; name: string }[];
+    templateOptions: PmTemplateOption[];
+    templateSuggested: Record<number, string[]>;
     notInspectedReasons: string[];
     moves: string[];
     needsNote: string[];
@@ -184,6 +187,8 @@ const heading = computed(() =>
 
 // --- equipment: search the customer's assets and put the ticked ones on the work order ---
 const search = ref(props.assetSearch);
+// New equipment registered from here (PmAddEquipmentDialog), as the technician does on site.
+const registering = ref(false);
 const picked = ref<number[]>([]);
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 watch(search, (value) => {
@@ -428,8 +433,12 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     </ul>
                     <p v-else class="text-sm text-muted-foreground">{{ t('pm_visits.no_candidates') }}</p>
                 </template>
-                <Button v-if="picked.length" size="sm" @click="addPicked">{{ t('pm_visits.add_selected', { count: picked.length }) }}</Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button v-if="picked.length" size="sm" @click="addPicked">{{ t('pm_visits.add_selected', { count: picked.length }) }}</Button>
+                    <Button size="sm" variant="outline" @click="registering = true">{{ t('pm_field.register_new') }}</Button>
+                </div>
                 <InputError :message="errors.asset_ids ?? errors.item" />
+                <PmAddEquipmentDialog v-model:open="registering" :visit-ulid="visit.ulid" />
             </section>
 
             <!-- Results per piece of equipment -->
@@ -442,7 +451,7 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                 <PmVisitItemCard
                     v-for="item in items"
                     :key="item.id"
-                    :item="item"
+                    :item="{ ...item, template_suggested: templateSuggested[item.id] ?? [] }"
                     :visit-ulid="visit.ulid"
                     :editable="can.perform"
                     :can-open-ticket="can.openTicket"

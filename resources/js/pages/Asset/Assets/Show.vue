@@ -41,6 +41,9 @@ interface AssetDetail {
     used_by: string | null;
     department: string | null;
     notes: string | null;
+    // registered on site (a PM work order), waiting for the office to confirm it
+    needs_review: boolean;
+    added_note: string | null;
     category: string | null;
     storage_location: string | null;
     branch: string | null;
@@ -210,6 +213,20 @@ const details: [string, (a: AssetDetail) => string | null][] = [
             <p v-if="page.props.flash.error" class="rounded-md bg-red-50 px-4 py-2 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
                 {{ page.props.flash.error }}
             </p>
+
+            <div
+                v-if="asset.needs_review"
+                class="flex flex-wrap items-center gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
+            >
+                <div class="min-w-0 flex-1">
+                    <p class="font-medium">{{ t('assets.needs_review') }}</p>
+                    <p>{{ t('assets.needs_review_notice') }}</p>
+                    <p v-if="asset.added_note" class="text-xs opacity-80">{{ asset.added_note }}</p>
+                </div>
+                <Button v-if="can.update" size="sm" @click="router.put(route('asset.assets.review', asset.ulid), {}, { preserveScroll: true })">
+                    {{ t('assets.confirm_review') }}
+                </Button>
+            </div>
 
             <PhotoSlots :photos="photos" :editable="can.update" :pending-key="`asset:${asset.id}`" />
 

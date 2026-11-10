@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Actions\AssetHolders;
 use App\Modules\Asset\Actions\AssetStats;
 use App\Modules\Asset\Actions\AssetSuggestions;
+use App\Modules\Asset\Actions\ConfirmAssetReview;
 use App\Modules\Asset\Actions\CreateAsset;
 use App\Modules\Asset\Actions\DeleteAsset;
 use App\Modules\Asset\Actions\DeleteAssets;
@@ -102,6 +103,7 @@ class AssetController extends Controller
                 'holders' => $holdersOf[$asset->id] ?? [],
                 'status' => $asset->status,
                 'warranty_expires_at' => $asset->warranty_expires_at?->toDateString(),
+                'needs_review' => $asset->needs_review,
                 'photo' => PhotoSlots::thumbnail($asset, fn (int $slot) => route('asset.assets.photos.show', [$asset, $slot])),
             ]);
 
@@ -230,7 +232,7 @@ class AssetController extends Controller
             'asset' => [
                 ...$asset->only([
                     'id', 'ulid', 'asset_code', 'name', 'brand', 'model', 'subtype', 'serial_number', 'quantity', 'unit', 'property_no', 'status',
-                    'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes',
+                    'location', 'ip_address', 'mac_address', 'used_by', 'department', 'notes', 'needs_review', 'added_note',
                 ]),
                 'serials' => $asset->serials->pluck('serial_number'),
                 'available' => $available,
@@ -441,6 +443,16 @@ class AssetController extends Controller
         $moveAsset->handle($asset, $data);
 
         return back()->with('success', __('asset.assets.moved'));
+    }
+
+    /** An asset registered on site, checked by the office (ConfirmAssetReview): who may change it. */
+    public function confirmReview(Asset $asset, ConfirmAssetReview $confirm): RedirectResponse
+    {
+        Gate::authorize('update', $asset);
+
+        $confirm->handle($asset);
+
+        return back()->with('success', __('asset.assets.review_confirmed'));
     }
 
     private function checkouts(User $user, Asset $asset, ItemRequestLines $requestLines, int $available): ?array

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
 import PmField from '@/components/pm/PmField.vue';
+import PmTemplatePicker, { type PmTemplateOption } from '@/components/pm/PmTemplatePicker.vue';
 import PmResultBadge from '@/components/PmResultBadge.vue';
 import TicketStatusBadge from '@/components/TicketStatusBadge.vue';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { t } from '@/lib/i18n';
 import type { PmItemDraft } from '@/lib/pmDraftStore';
 import { sectionsOf, type Answer, type TemplateField } from '@/lib/pmTemplate';
 import { Link, router, useForm } from '@inertiajs/vue3';
-import { Camera, CheckCheck, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-vue-next';
+import { Camera, CheckCheck, ChevronDown, ClipboardList, MessageSquarePlus, Pencil, Trash2, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /** A field of the item's copy of its template (see resources/js/lib/pmTemplate.ts). */
@@ -34,6 +35,8 @@ export interface PmItem {
     // its form, and whether another may still be picked (nothing recorded on it yet)
     template?: { code: string; name: string } | null;
     template_changeable?: boolean;
+    // codes of the forms that fit it best, offered first
+    template_suggested?: string[];
     // what was typed and not saved yet (autosave), the instrument used, why it was not inspected
     draft?: (PmItemDraft & { saved_at?: string }) | null;
     instrument_id?: number | null;
@@ -58,7 +61,7 @@ const props = withDefaults(
         instruments?: PmInstrumentOption[];
         notInspectedReasons?: string[];
         // the forms another may be picked from (the work order page, for who may change its equipment)
-        templateOptions?: { code: string; name: string }[];
+        templateOptions?: PmTemplateOption[];
         // the field page: big controls, and "save and go to the next one" when there is a next one
         nextUrl?: string | null;
     }>(),
@@ -109,11 +112,13 @@ const openTicket = () => ticket.post(route('maintenance.visits.items.ticket', [p
 
 // Another form for this piece of equipment, while nothing is recorded on it; what was only autosaved goes (asked first).
 const templateEditing = ref(false);
-const templateForm = useForm({ template_code: props.item.template?.code ?? '', remember: true });
-const changeTemplate = () => {
+const templateForm = useForm({ template_code: props.item.template?.code ?? '', remember: true as boolean });
+const changeTemplate = (code: string, remember: boolean) => {
     if (props.item.draft && !confirm(t('pm_visits.confirm_change_template'))) {
         return;
     }
+    templateForm.template_code = code;
+    templateForm.remember = remember;
     templateForm.put(route('maintenance.visits.items.template', [props.visitUlid, props.item.id]), {
         preserveScroll: true,
         onSuccess: () => (templateEditing.value = false),
@@ -191,30 +196,33 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
                     <span class="ml-2 font-medium">{{ item.asset.name }}</span>
                 </template>
                 <span v-else class="text-muted-foreground">{{ t('pm_visits.asset_missing') }}</span>
-                <p v-if="item.template || item.template_changeable" class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span>{{ t('pm_visits.template') }}: {{ item.template?.name ?? t('pm_visits.no_template') }}</span>
+                <!-- Its form: a chip that opens the picker while another may still be picked -->
+                <p v-if="item.template || item.template_changeable" class="mt-1">
                     <button
-                        v-if="item.template_changeable && templateOptions.length && !templateEditing"
+                        v-if="item.template_changeable && templateOptions.length"
                         type="button"
-                        class="text-primary underline-offset-4 hover:underline"
+                        class="inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition hover:bg-muted"
                         :title="t('pm_visits.change_template_hint')"
                         @click="templateEditing = true"
                     >
-                        {{ t('pm_visits.change_template') }}
+                        <ClipboardList class="h-3.5 w-3.5 shrink-0" />
+                        <span class="truncate">{{ t('pm_visits.template') }}: {{ item.template?.name ?? t('pm_visits.no_template') }}</span>
+                        <ChevronDown class="h-3.5 w-3.5 shrink-0" />
                     </button>
+                    <span v-else class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <ClipboardList class="h-3.5 w-3.5" />{{ t('pm_visits.template') }}: {{ item.template?.name ?? t('pm_visits.no_template') }}
+                    </span>
                 </p>
-                <form v-if="templateEditing" class="mt-2 flex flex-wrap items-center gap-2 text-xs" @submit.prevent="changeTemplate">
-                    <select v-model="templateForm.template_code" :class="selectClass" :aria-label="t('pm_visits.template')">
-                        <option v-for="option in templateOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
-                    </select>
-                    <label class="inline-flex items-center gap-2">
-                        <input v-model="templateForm.remember" type="checkbox" class="size-4 rounded border-input" />
-                        {{ t('pm_visits.remember_template') }}
-                    </label>
-                    <Button size="sm" :disabled="templateForm.processing || !templateForm.template_code">{{ t('common.save') }}</Button>
-                    <Button type="button" size="sm" variant="ghost" @click="templateEditing = false">{{ t('common.cancel') }}</Button>
-                    <InputError class="w-full" :message="templateForm.errors.template_code" />
-                </form>
+                <PmTemplatePicker
+                    v-if="item.template_changeable && templateOptions.length"
+                    v-model:open="templateEditing"
+                    :options="templateOptions"
+                    :suggested="item.template_suggested"
+                    :current="item.template?.code ?? null"
+                    :processing="templateForm.processing"
+                    :error="templateForm.errors.template_code"
+                    @pick="changeTemplate"
+                />
                 <p v-if="item.checked_at" class="text-xs text-muted-foreground">
                     {{ t('pm_visits.checked_by', { name: item.checked_by ?? t('common.system'), at: dateTime(item.checked_at) }) }}
                 </p>

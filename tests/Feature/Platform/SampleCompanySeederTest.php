@@ -39,6 +39,27 @@ it('creates the sample company with every status of every workflow', function ()
     });
 });
 
+it('has a work order to practise changing a form and adding equipment found on site', function () {
+    $this->seed(SampleCompanySeeder::class);
+
+    asTenant(sampleCompany(), function () {
+        $visit = PmVisit::query()->where('title', SampleCompanySeeder::PM_TRAINING_TITLE)->sole();
+        $assets = Asset::query()->whereIn('id', $visit->items()->pluck('asset_id'))->get()->keyBy('serial_number');
+        $formOf = fn (string $serial) => $visit->items()->where('asset_id', $assets[$serial]->id)->value('template_code');
+
+        expect($visit->status)->toBe(PmVisit::STATUS_IN_PROGRESS)
+            ->and($assets->keys()->sort()->values()->all())->toBe(['TRAIN-SN-NEW', 'TRAIN-SN-UPS', 'TRAIN-SN-WRONG'])
+            // the UPS under the battery category got another form than the real UPS
+            ->and($formOf('TRAIN-SN-WRONG'))->not->toBe($formOf('TRAIN-SN-UPS'))
+            ->and($assets['TRAIN-SN-NEW']->needs_review)->toBeTrue()
+            ->and(Asset::query()->where('serial_number', SampleCompanySeeder::PM_TRAINING_SERIAL)->where('customer_id', $visit->customer_id)->exists())->toBeTrue();
+    });
+
+    // seeding again adds it no second time
+    $this->seed(SampleCompanySeeder::class);
+    expect(asTenant(sampleCompany(), fn () => PmVisit::query()->where('title', SampleCompanySeeder::PM_TRAINING_TITLE)->count()))->toBe(1);
+});
+
 it('adds nothing when the sample company already exists', function () {
     $this->seed(SampleCompanySeeder::class);
     $tickets = asTenant(sampleCompany(), fn () => Ticket::query()->count());

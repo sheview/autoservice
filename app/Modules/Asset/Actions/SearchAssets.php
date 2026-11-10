@@ -28,7 +28,7 @@ class SearchAssets
 
     /**
      * @return array{search: string, branch_id: int|null, customer_id: int|null, category_id: int|null, storage_location_id: int|null, asset_type: string|null, status: string|null,
-     *     warranty: string|null, sort: string, direction: string}
+     *     warranty: string|null, needs_review: true|null, sort: string, direction: string}
      */
     public static function filtersFrom(Request $request): array
     {
@@ -42,6 +42,8 @@ class SearchAssets
             'asset_type' => in_array($request->input('asset_type'), AssetCategory::ASSET_TYPES, true) ? $request->input('asset_type') : null,
             'status' => in_array($request->input('status'), Asset::STATUSES, true) ? $request->input('status') : null,
             'warranty' => in_array($request->input('warranty'), self::WARRANTY_FILTERS, true) ? $request->input('warranty') : null,
+            // Registered on site, waiting for the office to confirm it.
+            'needs_review' => $request->boolean('needs_review') ?: null,
             'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'asset_code',
             'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
         ];
@@ -78,6 +80,7 @@ class SearchAssets
                     ->whereIn('location', StorageLocation::query()->select('name')->whereKey($id)))))
             ->when($filters['asset_type'] ?? null, fn (Builder $q, $type) => $q->whereHas('category', fn (Builder $q) => $q->where('asset_type', $type)))
             ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
+            ->when($filters['needs_review'] ?? null, fn (Builder $q) => $q->where('needs_review', true))
             ->when(($filters['warranty'] ?? null) === 'active', fn (Builder $q) => $q->where('warranty_expires_at', '>=', $today))
             ->when(($filters['warranty'] ?? null) === 'expiring', fn (Builder $q) => $q
                 ->whereBetween('warranty_expires_at', [$today, now()->addDays(self::EXPIRING_DAYS)->toDateString()]))

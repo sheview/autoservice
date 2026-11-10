@@ -39,6 +39,8 @@ interface AssetRow {
     unit: string | null;
     // The main photo, small (null: none).
     photo: string | null;
+    // registered on site, not confirmed by the office yet
+    needs_review: boolean;
 }
 
 interface Filters {
@@ -50,6 +52,7 @@ interface Filters {
     asset_type: string | null;
     status: string | null;
     warranty: string | null;
+    needs_review: boolean | null;
     sort: string;
     direction: 'asc' | 'desc';
     [key: string]: unknown;
@@ -65,7 +68,7 @@ const props = defineProps<{
     assetTypes: string[];
     statuses: string[];
     expiringDays: number;
-    stats: { total: number; in_use: number; in_repair: number; warranty_expiring: number };
+    stats: { total: number; in_use: number; in_repair: number; warranty_expiring: number; needs_review: number };
     can: { create: boolean; import: boolean; export: boolean; bulkDelete: boolean; lists: boolean };
 }>();
 
@@ -188,6 +191,17 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                 {{ page.props.flash.success }}
             </p>
 
+            <!-- Equipment technicians registered on site, waiting for the office -->
+            <p
+                v-if="stats.needs_review && !filters.needs_review"
+                class="flex flex-wrap items-center gap-2 rounded-md bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+            >
+                {{ t('assets.needs_review_banner', { count: stats.needs_review }) }}
+                <button type="button" class="font-medium underline underline-offset-4" @click="filters.needs_review = true">
+                    {{ t('assets.needs_review_show') }}
+                </button>
+            </p>
+
             <div class="flex flex-wrap gap-3">
                 <div class="flex w-full max-w-sm gap-2">
                     <Input v-model="filters.search" type="search" class="min-w-0 flex-1" :placeholder="t('assets.search_placeholder')" />
@@ -230,6 +244,15 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                         {{ t(`assets.warranty_filters.${key}`, { days: expiringDays }) }}
                     </option>
                 </select>
+                <label class="inline-flex h-9 items-center gap-2 text-sm">
+                    <input
+                        type="checkbox"
+                        class="size-4 rounded border-input"
+                        :checked="!!filters.needs_review"
+                        @change="filters.needs_review = ($event.target as HTMLInputElement).checked || null"
+                    />
+                    {{ t('assets.needs_review_filter') }}
+                </label>
             </div>
 
             <div
@@ -299,7 +322,14 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                                 </div>
                             </td>
                             <td class="px-4 py-2">
-                                <div class="font-medium">{{ asset.name }}</div>
+                                <div class="font-medium">
+                                    {{ asset.name }}
+                                    <span
+                                        v-if="asset.needs_review"
+                                        class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-normal text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                                        >{{ t('assets.needs_review') }}</span
+                                    >
+                                </div>
                                 <div v-if="asset.brand_model || asset.serial_number" class="text-xs text-muted-foreground">
                                     {{ [asset.brand_model, asset.serial_number && `S/N ${asset.serial_number}`].filter(Boolean).join(' · ') }}
                                 </div>

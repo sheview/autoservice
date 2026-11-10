@@ -26,6 +26,9 @@ use Illuminate\Support\Collection;
  */
 final class PmTemplateResolver
 {
+    /** How many questions an option shows before it is picked. */
+    public const PREVIEW = 5;
+
     /**
      * @param  Collection<string, PmChecklist>  $templates  newest published version by code
      * @param  Collection<int, PmTemplateAssignment>  $assignments
@@ -81,11 +84,61 @@ final class PmTemplateResolver
             return ['template' => $this->templates[$override], 'source' => 'plan'];
         }
 
+        foreach ($this->levels($asset) as $source => $matches) {
+            $assignment = $this->assignments->first($matches);
+            if ($assignment !== null) {
+                return ['template' => $this->templates[$assignment->template_code], 'source' => $source];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The forms that fit an asset best, to offer first when one is picked by hand: the plan's choice,
+     * every assignment that matches it (asset, model, brand, category, default), then the forms
+     * assigned to anything else of its category. Most specific first, each code once.
+     *
+     * @param  array{id: int, category_id?: int|null, asset_brand_id?: int|null, asset_model_id?: int|null}  $asset
+     * @return list<string>
+     */
+    public function suggested(array $asset): array
+    {
+        $codes = [];
+        $override = $this->overrides[$asset['id']] ?? null;
+        if ($override !== null && $this->templates->has($override)) {
+            $codes[] = $override;
+        }
+
+        $categoryId = $asset['category_id'] ?? null;
+        $levels = $this->levels($asset);
+        $default = $levels['default'];
+        unset($levels['default']);
+        $levels['same_category'] = fn (PmTemplateAssignment $a) => $categoryId !== null && (int) $a->asset_category_id === (int) $categoryId;
+        $levels['default'] = $default;
+
+        foreach ($levels as $matches) {
+            foreach ($this->assignments->filter($matches) as $assignment) {
+                $codes[] = $assignment->template_code;
+            }
+        }
+
+        return array_values(array_unique($codes));
+    }
+
+    /**
+     * Who an assignment is for, most specific first: whether it matches the asset, by level.
+     *
+     * @param  array{id: int, category_id?: int|null, asset_brand_id?: int|null, asset_model_id?: int|null}  $asset
+     * @return array<string, \Closure(PmTemplateAssignment): bool>
+     */
+    private function levels(array $asset): array
+    {
         $categoryId = $asset['category_id'] ?? null;
         $brandId = $asset['asset_brand_id'] ?? null;
         $modelId = $asset['asset_model_id'] ?? null;
 
-        $levels = [
+        return [
             'asset' => fn (PmTemplateAssignment $a) => (int) $a->asset_id === (int) $asset['id'],
             'model' => fn (PmTemplateAssignment $a) => $modelId !== null && $a->asset_id === null && (int) $a->asset_model_id === (int) $modelId,
             'brand' => fn (PmTemplateAssignment $a) => $brandId !== null && $categoryId !== null && $a->asset_id === null && $a->asset_model_id === null
@@ -94,15 +147,6 @@ final class PmTemplateResolver
                 && (int) $a->asset_category_id === (int) $categoryId,
             'default' => fn (PmTemplateAssignment $a) => $a->asset_id === null && $a->asset_model_id === null && $a->asset_brand_id === null && $a->asset_category_id === null,
         ];
-
-        foreach ($levels as $source => $matches) {
-            $assignment = $this->assignments->first($matches);
-            if ($assignment !== null) {
-                return ['template' => $this->templates[$assignment->template_code], 'source' => $source];
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -114,14 +158,20 @@ final class PmTemplateResolver
     }
 
     /**
-     * Every template that may be picked by hand: newest published version, by name.
+     * Every template that may be picked by hand: newest published version, by name, with how many
+     * questions it has and the first of them, so the right one is told apart before it is picked.
      *
-     * @return list<array{code: string, name: string}>
+     * @return list<array{code: string, name: string, questions: int, preview: list<string>}>
      */
     public function options(): array
     {
         return $this->templates->sortBy('name', SORT_NATURAL)
-            ->map(fn (PmChecklist $template) => ['code' => $template->code, 'name' => $template->name])
+            ->map(fn (PmChecklist $template) => [
+                'code' => $template->code,
+                'name' => $template->name,
+                'questions' => count($template->items ?? []),
+                'preview' => collect($template->items ?? [])->pluck('label')->filter()->take(self::PREVIEW)->values()->all(),
+            ])
             ->values()->all();
     }
 

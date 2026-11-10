@@ -18,6 +18,7 @@ use App\Modules\Maintenance\Http\Controllers\PmRoundShareController;
 use App\Modules\Maintenance\Http\Controllers\PmSettingsController;
 use App\Modules\Maintenance\Http\Controllers\PmSharedReportController;
 use App\Modules\Maintenance\Http\Controllers\PmSharedRoundController;
+use App\Modules\Maintenance\Http\Controllers\PmSiteEquipmentController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitController;
 use App\Modules\Maintenance\Http\Controllers\PmVisitPdfController;
 use App\Modules\Maintenance\Http\Controllers\PmWorkOrderController;
@@ -98,6 +99,11 @@ Route::middleware(['auth', 'verified', 'module:maintenance'])->name('maintenance
     Route::get('pm-visits/create', [PmWorkOrderController::class, 'create'])->name('visits.create');
     Route::post('pm-visits', [PmWorkOrderController::class, 'store'])->name('visits.store');
     Route::post('pm-visits/{visit}/items', [PmWorkOrderController::class, 'addItems'])->name('visits.items.store');
+    // Equipment found on site: looked up in the register, or registered right here (PmSiteEquipmentController).
+    Route::get('pm-visits/{visit}/site-equipment/options', [PmSiteEquipmentController::class, 'options'])->name('visits.site-equipment.options');
+    Route::get('pm-visits/{visit}/site-equipment/search', [PmSiteEquipmentController::class, 'search'])->name('visits.site-equipment.search');
+    Route::post('pm-visits/{visit}/site-equipment/existing', [PmSiteEquipmentController::class, 'existing'])->name('visits.site-equipment.existing');
+    Route::post('pm-visits/{visit}/site-equipment', [PmSiteEquipmentController::class, 'store'])->name('visits.site-equipment.store');
     Route::delete('pm-visits/{visit}/items/{item}', [PmWorkOrderController::class, 'removeItem'])->scopeBindings()->name('visits.items.destroy');
     Route::put('pm-visits/{visit}/items/{item}/template', [PmWorkOrderController::class, 'changeTemplate'])->scopeBindings()->name('visits.items.template');
     Route::resource('pm-visits', PmVisitController::class)->only(['index', 'show', 'update'])

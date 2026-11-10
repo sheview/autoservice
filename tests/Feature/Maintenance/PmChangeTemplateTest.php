@@ -1,5 +1,6 @@
 <?php
 
+use App\Modules\Asset\Models\AssetBrand;
 use App\Modules\Maintenance\Actions\SavePmPlan;
 use App\Modules\Maintenance\Models\PmChecklist;
 use App\Modules\Maintenance\Models\PmPlanAsset;
@@ -8,6 +9,7 @@ use App\Modules\Maintenance\Models\PmVisit;
 use App\Modules\Maintenance\Models\PmVisitEvent;
 use App\Modules\Maintenance\Models\PmVisitItem;
 use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -41,7 +43,10 @@ it('shows why each form was picked and every form that may be picked instead, by
     $this->actingAs($this->helpdesk)->get("/pm-visits/create?customer_id={$this->customer->id}")
         ->assertInertia(fn (Assert $page) => $page
             ->where("templates.{$this->notebook->id}", ['code' => 'PC', 'name' => 'ฟอร์ม PC', 'source' => 'category'])
-            ->where('templateOptions', [['code' => 'NB', 'name' => 'ฟอร์ม Notebook'], ['code' => 'PC', 'name' => 'ฟอร์ม PC']]));
+            ->where('templateOptions', [
+                ['code' => 'NB', 'name' => 'ฟอร์ม Notebook', 'questions' => 2, 'preview' => ['แบตเตอรี่', 'จอ']],
+                ['code' => 'PC', 'name' => 'ฟอร์ม PC', 'questions' => 1, 'preview' => ['พัดลม']],
+            ]));
 });
 
 it('opens a work order with a form picked by hand, and remembers it for the asset when asked', function () {
@@ -102,6 +107,40 @@ it('changes the form of equipment on a work order while nothing is recorded on i
     $this->actingAs($this->helpdesk)->put("{$url}/items/{$item->id}/template", ['template_code' => 'NB', 'remember' => true])->assertSessionHasNoErrors();
     expect(PmTemplateAssignment::where('asset_id', $this->notebook->id)->pluck('template_code')->all())->toBe(['NB'])
         ->and(PmPlanAsset::where('asset_id', $this->notebook->id)->value('template_code'))->toBe('NB');
+});
+
+it('lets the technician doing the work change a wrong form on site, offering the fitting ones first', function () {
+    // another form assigned to a brand of the same category: fits a PC, offered after the category's own
+    $brand = AssetBrand::create(['name' => 'Dell']);
+    PmTemplateAssignment::create(['template_code' => 'NB', 'asset_category_id' => $this->pc->id, 'asset_brand_id' => $brand->id]);
+    ($this->create)();
+    $visit = PmVisit::sole();
+    $item = ($this->itemOf)($visit, $this->notebook);
+
+    $this->actingAs($this->tech)->get("/pm-work/{$visit->ulid}/items/{$item->id}")->assertInertia(fn (Assert $page) => $page
+        ->component('Maintenance/Field/Item')
+        ->where('item.template', ['code' => 'PC', 'name' => 'ฟอร์ม PC'])
+        ->where('item.template_changeable', true)
+        ->where('item.template_suggested', ['PC', 'NB'])
+        ->where('templateOptions', fn ($options) => collect($options)->pluck('code')->all() === ['NB', 'PC']));
+    $this->actingAs($this->tech)->get("/pm-visits/{$visit->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('items.0.template_changeable', true)
+        ->where("templateSuggested.{$item->id}", ['PC', 'NB']));
+    // a partial reload of something else does not load the forms
+    $this->actingAs($this->tech)->get("/pm-visits/{$visit->ulid}", [
+        'X-Inertia' => 'true', 'X-Inertia-Version' => Inertia::getVersion(),
+        'X-Inertia-Partial-Component' => 'Maintenance/Visits/Show', 'X-Inertia-Partial-Data' => 'events',
+    ])->assertOk()->assertJsonMissingPath('props.templateSuggested')->assertJsonMissingPath('props.templateOptions');
+
+    $this->actingAs($this->tech)->put("/pm-visits/{$visit->ulid}/items/{$item->id}/template", ['template_code' => 'NB', 'remember' => true])
+        ->assertSessionHasNoErrors();
+    expect($item->fresh()->template_code)->toBe('NB')
+        ->and(PmTemplateAssignment::where('asset_id', $this->notebook->id)->pluck('template_code')->all())->toBe(['NB']);
+
+    // recorded: no longer offered
+    $this->actingAs($this->tech)->post("/pm-visits/{$visit->ulid}/start")->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->put("/pm-visits/{$visit->ulid}/items/{$item->id}", ['result' => 'passed', 'answers' => ['battery' => 'pass', 'screen' => 'pass']])->assertSessionHasNoErrors();
+    $this->actingAs($this->tech)->get("/pm-work/{$visit->ulid}/items/{$item->id}")->assertInertia(fn (Assert $page) => $page->where('item.template_changeable', false));
 });
 
 it('never changes the form of recorded work, nor on a work order handed in', function () {

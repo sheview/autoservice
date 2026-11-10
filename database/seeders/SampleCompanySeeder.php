@@ -23,6 +23,7 @@ use App\Modules\Asset\Actions\SetIpExcluded;
 use App\Modules\Asset\Actions\SubmitCheckoutRequest;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\AssetCategory;
+use App\Modules\Asset\Models\AssetSerial;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
 use App\Modules\Contract\Actions\AddContractAssets;
@@ -52,6 +53,7 @@ use App\Modules\Inventory\Models\Part;
 use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Labeling\Actions\RecordLabelPrint;
+use App\Modules\Maintenance\Actions\AddSiteEquipment;
 use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Maintenance\Actions\CreatePmReportShare;
 use App\Modules\Maintenance\Actions\CreatePmWorkOrder;
@@ -144,6 +146,12 @@ class SampleCompanySeeder extends Seeder
     public const SUBDOMAIN = 'sample';
 
     public const NAME = 'บริษัท ตัวอย่าง จำกัด';
+
+    /** The work order to practise on: a wrong form to change, and equipment found on site (pmFieldTraining). */
+    public const PM_TRAINING_TITLE = 'ใบงานฝึก: เปลี่ยนแบบฟอร์ม และเพิ่มเครื่องหน้างาน';
+
+    /** The serial number of the customer's device that is in the register but not on the training work order. */
+    public const PM_TRAINING_SERIAL = 'TRAIN-SN-001';
 
     private const DOMAIN = 'sample.test';
 
@@ -262,16 +270,38 @@ class SampleCompanySeeder extends Seeder
             $existing->forceFill(['is_sample' => true])->save();
             // Made before branches and sites had places: put them on the map (only what is missing).
             $this->context->run($existing, fn () => $this->places());
+            // Made before forms could be changed and equipment added on site: the work order to practise on.
+            // Nothing is sent from it, and nothing of it is half made: all or none (one transaction).
+            $this->quietly(fn () => $this->context->run($existing, fn () => DB::transaction(fn () => $this->pmFieldTraining())));
             $this->command?->info(self::NAME.' มีอยู่แล้ว: ไม่ได้เพิ่มข้อมูล');
 
             return;
         }
 
-        // Sample data must not e-mail or message anyone, now or when the queue worker starts.
+        $this->quietly(fn () => $this->seedCompany());
+    }
+
+    /**
+     * Sample data must not e-mail or message anyone, now or when the queue worker starts. The real
+     * mailer, bus and notifications come back afterwards, for whatever runs next in the same process.
+     */
+    private function quietly(callable $seed): void
+    {
+        $real = [Bus::getFacadeRoot(), Mail::getFacadeRoot(), Notification::getFacadeRoot()];
         Bus::fake([SendTicketNotification::class, SendCustomerTicketMail::class, SendSurveyInvitation::class, DeliverAlert::class, SendGuardLinkMail::class]);
         Mail::fake();
         Notification::fake();
+        try {
+            $seed();
+        } finally {
+            Bus::swap($real[0]);
+            Mail::swap($real[1]);
+            Notification::swap($real[2]);
+        }
+    }
 
+    private function seedCompany(): void
+    {
         $this->password = (string) (config('app.sample_company_password') ?: (app()->isProduction() ? Str::password(12, symbols: false) : 'password'));
         $this->realNow = now()->toImmutable();
         mt_srand(2569);
@@ -331,6 +361,7 @@ class SampleCompanySeeder extends Seeder
         $this->ipam();
         $this->labelsAndDocuments();
         $this->maintenance();
+        $this->pmFieldTraining();
         $this->roomAccess();
         $this->surveys();
     }
@@ -1186,6 +1217,63 @@ class SampleCompanySeeder extends Seeder
         }
 
         Carbon::setTestNow($this->realNow);
+    }
+
+    /**
+     * A work order in progress to practise the technician's page on (customer 3, วิชัย):
+     *   - "เครื่องสำรองไฟ APC Back-UPS" was registered under the battery bank category, so it got the
+     *     battery form: change it to the UPS form (the chip "แบบฟอร์มตรวจ ▾");
+     *   - the customer's printer TRAIN-SN-001 is in the register but not on the work order: "+ เพิ่มเครื่อง",
+     *     search the serial number, add it;
+     *   - a small UPS was already registered from this work order: it waits in the asset register
+     *     ("รอตรวจทาน") for the office to confirm.
+     * Added once (by its title), so it also reaches a sample company made before it.
+     */
+    private function pmFieldTraining(): void
+    {
+        // Once: not again when its work order or its equipment is already there (or was deleted since).
+        if (PmVisit::withTrashed()->where('title', self::PM_TRAINING_TITLE)->exists()
+            || AssetSerial::withTrashed()->whereIn('serial_number', ['TRAIN-SN-WRONG', 'TRAIN-SN-UPS', self::PM_TRAINING_SERIAL, 'TRAIN-SN-NEW'])->exists()) {
+            return;
+        }
+        $customer = Customer::query()->where('code', 'CUST003')->first();
+        $technician = User::query()->where('email', 'tech1@'.self::DOMAIN)->first();
+        $office = User::query()->where('email', 'helpdesk@'.self::DOMAIN)->first();
+        $categories = AssetCategory::query()->pluck('id', 'code_prefix');
+        if (! $customer || ! $technician || ! $office || ! isset($categories['BAT'], $categories['UPS'], $categories['PR'])) {
+            return;
+        }
+        $contract = Contract::query()->where('customer_id', $customer->id)->where('status', Contract::STATUS_ACTIVE)
+            ->where('starts_on', '<=', now()->toDateString())->where('ends_on', '>=', now()->toDateString())->first();
+        $branchId = Branch::query()->where('code', self::BRANCHES[self::CUSTOMERS[2][6]]['code'])->value('id');
+        $save = fn (string $prefix, string $name, string $brand, string $model, string $serial, string $room) => app(SaveAsset::class)->handle(null, [
+            'category_id' => $categories[$prefix], 'branch_id' => $branchId, 'customer_id' => $customer->id,
+            'name' => $name, 'brand' => $brand, 'model' => $model, 'serial_number' => $serial,
+            'status' => Asset::STATUS_IN_USE, 'location' => 'คลังสินค้า 1', 'floor' => '1', 'room' => $room,
+        ]);
+
+        // A UPS put under the wrong category, and one whose form is right.
+        $wrong = $save('BAT', 'เครื่องสำรองไฟ APC Back-UPS', 'APC', 'Back-UPS 1100', 'TRAIN-SN-WRONG', 'ห้องแพ็กสินค้า');
+        $right = $save('UPS', 'เครื่องสำรองไฟ APC Smart-UPS', 'APC', 'Smart-UPS 1500', 'TRAIN-SN-UPS', 'ห้อง Server');
+        // In the register, not on the work order: found by its serial number on site.
+        $printer = $save('PR', 'เครื่องพิมพ์ใบส่งของ', 'Brother', 'HL-L2370DN', self::PM_TRAINING_SERIAL, 'จุดรับส่งสินค้า');
+        if ($contract) {
+            app(AddContractAssets::class)->handle($contract, [$wrong->id, $right->id, $printer->id]);
+        }
+
+        $visit = app(CreatePmWorkOrder::class)->handle([
+            'customer_id' => $customer->id, 'contract_id' => $contract?->id, 'title' => self::PM_TRAINING_TITLE,
+            'due_on' => now()->addDays(7)->toDateString(), 'scheduled_on' => now()->toDateString(),
+            'assignee_id' => $technician->id, 'asset_ids' => [$wrong->id, $right->id],
+        ], $office);
+        $visit = app(StartPmVisit::class)->handle($visit, $technician);
+        app(MarkPmVisitArrival::class)->handle($visit->fresh(), $technician);
+
+        // Registered on site already (as the technician would), waiting for the office.
+        app(AddSiteEquipment::class)->handle($visit->fresh(), [
+            'category_id' => $categories['UPS'], 'brand' => 'CyberPower', 'model' => 'UT1000E', 'serial_number' => 'TRAIN-SN-NEW',
+            'location' => 'คลังสินค้า 1', 'floor' => '1', 'room' => 'ห้องหัวหน้าคลัง', 'add_to_plan' => false,
+        ], $technician);
     }
 
     /**
