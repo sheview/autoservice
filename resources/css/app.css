@@ -97,6 +97,20 @@ html {
     body {
         @apply bg-background text-foreground;
     }
+
+    /* Native controls (the list of a <select>, the date picker, scrollbars) follow the theme: without
+       this the open list of every dropdown stays white with the light text of dark mode on it. */
+    :root {
+        color-scheme: light;
+    }
+    .dark {
+        color-scheme: dark;
+    }
+    select option,
+    select optgroup {
+        background-color: hsl(var(--popover));
+        color: hsl(var(--popover-foreground));
+    }
 }
 
 /*
@@ -126,6 +140,14 @@ html {
     [data-sidebar='content'] {
         scrollbar-width: thin;
         scrollbar-color: hsl(0 0% 100% / 0.3) transparent;
+    }
+
+    /* Shrunk to icons the menu still scrolls (wheel / touch), without a scrollbar eating its narrow width. */
+    [data-collapsible='icon'] [data-sidebar='content'] {
+        scrollbar-width: none;
+    }
+    [data-collapsible='icon'] [data-sidebar='content']::-webkit-scrollbar {
+        display: none;
     }
 
     /* Secondary text (group labels, the company under the logo, the e-mail) on the gradient. */

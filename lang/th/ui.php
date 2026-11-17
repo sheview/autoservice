@@ -72,7 +72,7 @@ return [
         'branches' => 'สาขา',
         'tenants' => 'บริษัทลูกค้า',
         'linked_staff' => 'ช่างหลายบริษัท',
-        'platform_settings' => 'ตั้งค่าระบบ',
+        'platform_settings' => 'ตั้งค่าแพลตฟอร์ม',
         'company' => 'ข้อมูลบริษัท',
         'checkouts' => 'เบิก / ยืม',
         'part_checkouts' => 'เบิก / ยืมอะไหล่',
@@ -579,7 +579,7 @@ return [
 
     // The sidebar entry of a tab set, when it is not named after its first page.
     'nav_sets' => [
-        'settings' => 'ตั้งค่าระบบ',
+        'settings' => 'ตั้งค่าบริษัท',
     ],
 
     'nav_groups' => [
@@ -3934,7 +3934,7 @@ return [
     ],
 
     'platform_settings' => [
-        'title' => 'ตั้งค่าระบบ',
+        'title' => 'ตั้งค่าแพลตฟอร์ม',
         'description' => 'ค่าที่มีผลกับทุกบริษัทและทีมงานแพลตฟอร์ม',
         'session' => 'การเข้าสู่ระบบ',
         'session_timeout' => 'ออกจากระบบอัตโนมัติเมื่อไม่ได้ใช้งาน (นาที)',

@@ -104,7 +104,8 @@ const icons: Record<string, LucideIcon> = {
 // Items of a tab set ("pm.overview", "pm.plans", ...) are one entry here, the first the user may open,
 // plus the pages pinned in config (used every day); the others are tabs on top of the pages
 // (ModuleTabs). Each page of a set marks one entry current: its pinned page, else a pinned page of
-// its tab, else the set's entry. A set named in nav_sets (settings) shows that name and a gear.
+// its tab, else the set's entry. A set named in nav_sets (settings) shows that name and a gear —
+// unless the user may open only one page of it (a technician: the branches), which keeps its own name.
 const mainNavItems = computed<NavItem[]>(() => {
     const navigation = page.props.navigation;
     const setOf = (item: { tab: string | null }) => item.tab?.split('.')[0] ?? null;
@@ -125,7 +126,8 @@ const mainNavItems = computed<NavItem[]>(() => {
     return shown.map((item) => {
         const set = setOf(item);
         const also = set ? navigation.filter((other) => setOf(other) === set && owner(other) === item).map((other) => other.href) : [];
-        const named = set && !item.pinned ? t(`nav_sets.${set}`) : '';
+        const pages = set ? navigation.filter((other) => setOf(other) === set).length : 0;
+        const named = set && !item.pinned && pages > 1 ? t(`nav_sets.${set}`) : '';
         return named && named !== `nav_sets.${set}`
             ? { title: named, href: item.href, icon: Settings, group: item.group, also }
             : { title: item.title, href: item.href, icon: icons[item.icon] ?? Circle, group: item.group, also };

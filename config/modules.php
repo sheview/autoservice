@@ -85,7 +85,7 @@ return [
         ['group' => 'reports', 'title' => 'nav.surveys', 'route' => 'survey.surveys.index', 'icon' => 'star', 'permission' => 'surveys.view', 'module' => 'survey'],
 
         ['group' => 'help', 'title' => 'nav.manuals', 'route' => 'document.manuals.index', 'icon' => 'book-open', 'permission' => 'manuals.view'],
-        // Settings: one sidebar entry ("ตั้งค่าระบบ", nav_sets.settings), the pages as tabs
+        // Settings: one sidebar entry ("ตั้งค่าบริษัท", nav_sets.settings), the pages as tabs
         // (ผู้ใช้และสิทธิ์ / บริษัท / งานบริการ / ระบบ) and sub-tabs.
         ['group' => 'settings', 'tab' => 'settings.users', 'title' => 'nav.users', 'route' => 'identity.users.index', 'icon' => 'users', 'permission' => 'users.view'],
         ['group' => 'settings', 'tab' => 'settings.users', 'title' => 'nav.roles', 'route' => 'identity.roles.index', 'icon' => 'shield-check', 'permission' => 'roles.manage'],
