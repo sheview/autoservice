@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Validation\Validator;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Validator as ValidatorFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -27,6 +29,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Every new or changed password: at least 8 characters, upper and lower case, and a special character.
         Password::defaults(fn () => Password::min(8)->mixedCase()->symbols());
+
+        // Dates with a four-digit year only (App\Validation\Validator).
+        ValidatorFacade::resolver(fn ($translator, $data, $rules, $messages, $attributes) => new Validator($translator, $data, $rules, $messages, $attributes));
     }
 
     /**

@@ -271,6 +271,8 @@ const isMac = (value: string) => /^[0-9a-f]{12}$/i.test(value.replace(/[^0-9a-f]
  * The same rules as AssetRequest, checked before sending so the user is told at once.
  * Keys are the server's error keys, so both kinds of error show in the same place.
  */
+const formEl = ref<HTMLFormElement | null>(null);
+
 function validate(): Record<string, string> {
     const errors: Record<string, string> = {};
     const required = (field: string) => t('assets.validation.required', { field: t(`assets.${field}`) });
@@ -316,6 +318,14 @@ function validate(): Record<string, string> {
     else if (form.purchased_at && form.warranty_expires_at < form.purchased_at) {
         errors.warranty_expires_at = t('assets.validation.warranty_before_purchase');
     }
+
+    // A date field typed half-way or past year 9999 sends nothing (or nothing valid): the form has
+    // novalidate, so the browser does not stop it — say so at the field instead of saving it empty.
+    formEl.value?.querySelectorAll<HTMLInputElement>('input[type="date"]').forEach((input) => {
+        if (input.id && (input.validity.badInput || input.validity.rangeOverflow)) {
+            errors[input.id.startsWith('spec_') ? `specs.${input.id.slice(5)}` : input.id] = t('assets.validation.date_invalid');
+        }
+    });
 
     category.value?.spec_fields.forEach((field) => {
         const value = form.specs[field.key];
@@ -444,7 +454,7 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                 {{ t('assets.fix_errors') }}
             </p>
 
-            <form class="space-y-8" novalidate @submit.prevent="submit">
+            <form ref="formEl" class="space-y-8" novalidate @submit.prevent="submit">
                 <section class="space-y-4">
                     <h3 class="text-sm font-semibold">{{ t('assets.general') }}</h3>
                     <div class="grid gap-6 sm:grid-cols-2">

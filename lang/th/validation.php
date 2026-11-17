@@ -7,7 +7,8 @@ return [
     'boolean' => ':attribute ต้องเป็นใช่หรือไม่ใช่',
     'confirmed' => ':attribute ที่ยืนยันไม่ตรงกัน',
     'current_password' => 'รหัสผ่านไม่ถูกต้อง',
-    'date' => ':attribute ต้องเป็นวันที่',
+    'date' => ':attribute ต้องเป็นวันที่ที่ถูกต้อง (ปี ค.ศ. 4 หลัก)',
+    'date_format' => ':attribute ต้องอยู่ในรูปแบบ :format',
     'decimal' => ':attribute ต้องมีทศนิยม :decimal ตำแหน่ง',
     'distinct' => ':attribute ซ้ำกัน',
     'email' => ':attribute ต้องเป็นอีเมลที่ถูกต้อง',
@@ -44,6 +45,12 @@ return [
     'unique' => ':attribute นี้ถูกใช้แล้ว',
     // The file did not arrive whole: usually larger than the server's upload_max_filesize.
     'uploaded' => 'อัปโหลด:attributeไม่สำเร็จ ไฟล์อาจใหญ่เกินกว่าที่ server รับได้',
+
+    // date_format, said in words (App\Validation\Validator::replaceDateFormat).
+    'formats' => [
+        'Y-m-d' => 'วัน/เดือน/ปี ค.ศ. 4 หลัก',
+        'H:i' => 'ชั่วโมง:นาที เช่น 09:30',
+    ],
 
     'attributes' => [
         'name' => 'ชื่อ',
