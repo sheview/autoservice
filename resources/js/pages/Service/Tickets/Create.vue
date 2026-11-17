@@ -108,6 +108,7 @@ watch(
 // Is the device a registered asset, or one described by hand?
 const deviceMode = ref<'registered' | 'unregistered'>('registered');
 watch(deviceMode, (mode) => {
+    form.clearErrors('asset_id');
     if (mode === 'unregistered' && selectedAsset.value) clearAsset();
 });
 
@@ -150,6 +151,7 @@ watch(
 const pickAsset = (asset: AssetOption) => {
     selectedAsset.value = asset;
     form.asset_id = asset.id;
+    form.clearErrors('asset_id');
     if (asset.customer_id) form.customer_id = asset.customer_id;
     offerContact(asset);
     assetSearch.value = '';
@@ -174,7 +176,17 @@ const contract = computed(() => props.contracts.find((c) => c.id === form.contra
 const sla = computed(() => contract.value?.slas[form.priority] ?? null);
 const hours = (minutes: number) => t('contracts.hours', { hours: minutes / 60 });
 
-const submit = () => form.post(route('service.tickets.store'), { preserveScroll: true });
+// "In the system" with nothing picked from the list (a code or serial that matched nothing): say so
+// at the asset field instead of sending — the server would only ask for the hand-typed device fields,
+// which are hidden in this mode.
+const submit = () => {
+    if (deviceMode.value === 'registered' && !form.asset_id) {
+        form.setError('asset_id', t('tickets.asset_not_picked'));
+        document.getElementById('asset_search')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+    form.post(route('service.tickets.store'), { preserveScroll: true });
+};
 
 const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs';
 </script>

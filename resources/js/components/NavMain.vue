@@ -13,7 +13,14 @@ const page = usePage<SharedData>();
 const { state } = useSidebar();
 
 const isAt = (href: string) => page.url === href || page.url.startsWith(`${href}/`) || page.url.startsWith(`${href}?`);
-const isActive = (item: NavItem) => [item.href, ...(item.also ?? [])].some(isAt);
+// How closely an item matches the page open now: the length of its longest address that does (0: none),
+// its own address a little ahead of the pages it stands for ("also").
+const matchOf = (item: NavItem) =>
+    Math.max(0, isAt(item.href) ? item.href.length + 0.5 : 0, ...(item.also ?? []).filter(isAt).map((href) => href.length));
+// Only the closest match is current: on /reports/parts-issued that is "parts issued", not "reports"
+// (/reports) as well; on /pm-dashboard the PM overview, not also "PM report" whose tab it shares.
+const bestMatch = computed(() => Math.max(0, ...props.items.map(matchOf)));
+const isActive = (item: NavItem) => bestMatch.value > 0 && matchOf(item) === bestMatch.value;
 
 // Items in their sections, in the order the server sent them (a section with nothing the user may open is not there).
 const sections = computed(() =>

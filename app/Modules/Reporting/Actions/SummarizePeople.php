@@ -58,6 +58,18 @@ class SummarizePeople
     }
 
     /**
+     * The name of a user of the company the viewer's summary has rows of: their current name, else
+     * the name kept on those rows — someone whose account is not of this company (a platform admin
+     * viewing as the company, a technician linked from another company) is listed under it too, so
+     * their page must open the same way. Null when the viewer sees nothing of them.
+     */
+    public function nameOf(User $viewer, int $userId): ?string
+    {
+        return $this->userNames->handle([$userId])[$userId]
+            ?? DB::query()->fromSub($this->rows->handle($viewer), 'rows')->where('user_id', $userId)->max('name');
+    }
+
+    /**
      * @param  array<string, mixed>  $filters  from filtersFrom()
      */
     public function handle(User $viewer, array $filters): LengthAwarePaginator

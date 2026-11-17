@@ -2,6 +2,7 @@
 
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Identity\Support\PermissionCatalog;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Platform\Support\Modules;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -138,6 +139,27 @@ it('shows one person with their forms and purchases', function () {
 
     $this->actingAs($this->admin)->get('/summary/people/view')->assertNotFound();
     $this->actingAs($this->admin)->get('/summary/people/view?user=999999')->assertNotFound();
+});
+
+it('opens the page of someone listed whose account is not of this company', function () {
+    // a platform admin viewing as the company asks to buy: listed under their name, page opens too
+    $superadmin = createSuperadmin(['name' => 'Platform Intern']);
+    $this->actingAs($superadmin)->post("/platform/impersonation/{$this->admin->tenant->ulid}");
+    ($this->buy)($superadmin);
+
+    $this->actingAs($superadmin)->get('/summary/people')->assertInertia(fn (Assert $page) => $page
+        ->where('people.data.0.user_id', $superadmin->id)
+        ->where('people.data.0.name', 'Platform Intern'));
+    $this->actingAs($superadmin)->get("/summary/people/view?user={$superadmin->id}")->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('person.name', 'Platform Intern')
+        ->where('totals.purchases', 1)
+        ->has('purchases.data', 1));
+
+    // the company's own admin sees the same; another platform account with nothing here is still not found
+    $this->actingAs($this->admin)->get("/summary/people/view?user={$superadmin->id}")->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->where('person.name', 'Platform Intern'));
+    $stranger = userWithRole(PermissionCatalog::SUPERADMIN, ['email' => 'other@platform.test'], $superadmin->tenant);
+    $this->actingAs($this->admin)->get("/summary/people/view?user={$stranger->id}")->assertNotFound();
 });
 
 it('sums up what went out and was bought for each project', function () {

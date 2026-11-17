@@ -33,6 +33,14 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        // A platform admin whose session ran out while viewing as a company is no longer viewing as
+        // it: that company's page would be "not found", so they start from the home page instead.
+        $intended = $request->session()->get('url.intended');
+        if ($intended !== null && $request->user()->tenant?->is_platform
+            && ! str_starts_with((string) parse_url($intended, PHP_URL_PATH), '/platform')) {
+            $request->session()->forget('url.intended');
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

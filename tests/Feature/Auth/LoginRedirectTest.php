@@ -37,6 +37,26 @@ it('goes to the home page after signing in, not to a file loaded while signed ou
     $this->assertAuthenticatedAs(User::where('email', 'somchai@example.com')->first());
 });
 
+it('sends a platform admin whose session ran out while viewing as a company to the home page', function () {
+    $superadmin = createSuperadmin(['email' => 'root@platform.test']);
+    $this->actingAs($superadmin)->post("/platform/impersonation/{$this->user->tenant->ulid}");
+    $this->get('/tickets')->assertOk();
+
+    // the session runs out: viewing as the company ends with it
+    auth()->logout();
+    session()->invalidate();
+    $this->get('/tickets', $this->page)->assertRedirect(route('login'));
+
+    $this->post('/login', ['email' => 'root@platform.test', 'password' => 'password'])
+        ->assertRedirect(route('dashboard', absolute: false));
+    $this->get(route('dashboard', absolute: false))->assertOk();
+
+    // a platform page is still come back to
+    auth()->logout();
+    $this->get('/platform/settings', $this->page)->assertRedirect(route('login'));
+    $this->post('/login', ['email' => 'root@platform.test', 'password' => 'password'])->assertRedirect('/platform/settings');
+});
+
 it('still comes back to the page the user was sent away from', function () {
     $this->get('/assets?search=PC', $this->page)->assertRedirect(route('login'));
 

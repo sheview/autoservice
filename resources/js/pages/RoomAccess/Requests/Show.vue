@@ -204,7 +204,8 @@ const decide = (value: 'approve' | 'reject' | 'ask') => {
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <template v-if="can.edit">
-                        <Button @click="dialog = true">{{ t('room_requests.submit') }}</Button>
+                        <!-- Only a draft is sent; once sent it waits for approval (edit/cancel still apply). -->
+                        <Button v-if="request.status === 'draft'" @click="dialog = true">{{ t('room_requests.submit') }}</Button>
                         <Button variant="outline" as-child>
                             <Link :href="route('room-access.requests.edit', request.ulid)">{{ t('common.edit') }}</Link>
                         </Button>

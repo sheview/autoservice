@@ -23,7 +23,7 @@ import {
     Server,
     UserRound,
 } from 'lucide-vue-next';
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 
 interface WorkItem {
     key: string;
@@ -176,6 +176,13 @@ const dotClass = (item: WorkItem) => (item.overdue ? 'bg-red-500' : toneDot[tone
 // --- own appointments ---
 const editing = ref<WorkItem | 'new' | null>(null);
 const form = useForm({ title: '', date: '', all_day: false as boolean, start_time: '09:00', end_time: '10:00', notes: '' });
+// Own appointments belong to the "mine" view: switching to the team's PM or the rooms closes the form.
+watch(
+    () => props.view,
+    (view) => {
+        if (view !== 'mine') editing.value = null;
+    },
+);
 const openNew = (date: string) => {
     selected.value = date;
     editing.value = 'new';
@@ -482,7 +489,7 @@ const timeText = (item: WorkItem) =>
                         </ul>
 
                         <!-- Add / change an own appointment -->
-                        <form v-if="editing" class="grid gap-3 border-t pt-4 sm:grid-cols-2" @submit.prevent="save">
+                        <form v-if="editing && view === 'mine'" class="grid gap-3 border-t pt-4 sm:grid-cols-2" @submit.prevent="save">
                             <div class="flex items-center gap-2 text-xs text-muted-foreground sm:col-span-2">
                                 <Lock class="h-3.5 w-3.5" />{{ t('my_work.private_hint') }}
                             </div>

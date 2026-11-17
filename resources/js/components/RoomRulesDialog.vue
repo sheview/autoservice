@@ -7,7 +7,7 @@ import { ref, watch } from 'vue';
 /**
  * The accept popup shown when a request is sent: the rules of the chosen room only (the
  * customer's lines, then the company's own terms), with a link to the full document. "Accept and
- * send" works once the text is read to the end or the box is ticked; "Decline" closes it and the
+ * send" works only once the box is ticked (reading to the end alone is not consent); "Decline" closes it and the
  * form keeps everything typed. A room without rules either blocks or shows the company's terms
  * with a warning, as the room says; a version accepted before (once per version) needs no new tick.
  */
@@ -32,15 +32,12 @@ const emit = defineEmits<{ accept: [versionId: number | null]; close: [] }>();
 
 const rules = ref<Rules | null>(null);
 const loading = ref(false);
-const readToEnd = ref(false);
 const ticked = ref(false);
-const body = ref<HTMLElement | null>(null);
 
 const load = async () => {
     if (!props.roomUlid) return;
     loading.value = true;
     rules.value = null;
-    readToEnd.value = false;
     ticked.value = false;
     try {
         const url = route('room-access.requests.rules', props.requestUlid ? { room: props.roomUlid, request: props.requestUlid } : props.roomUlid);
@@ -51,8 +48,6 @@ const load = async () => {
         rules.value = response.ok ? await response.json() : null;
     } finally {
         loading.value = false;
-        // Short text that needs no scrolling counts as read.
-        requestAnimationFrame(onScroll);
     }
 };
 watch(
@@ -60,11 +55,6 @@ watch(
     () => props.open && load(),
     { immediate: true },
 );
-
-const onScroll = () => {
-    const el = body.value;
-    if (el && el.scrollTop + el.clientHeight >= el.scrollHeight - 8) readToEnd.value = true;
-};
 </script>
 
 <template>
@@ -86,7 +76,7 @@ const onScroll = () => {
                     </p>
                 </header>
 
-                <div ref="body" class="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm" @scroll="onScroll">
+                <div class="flex-1 space-y-4 overflow-y-auto px-5 py-4 text-sm">
                     <p v-if="loading" class="text-muted-foreground">{{ t('room_requests.rules_loading') }}</p>
                     <template v-else-if="rules">
                         <p v-if="rules.blocked" class="rounded-md bg-red-50 px-3 py-2 text-red-800 dark:bg-red-950 dark:text-red-200">
@@ -125,7 +115,7 @@ const onScroll = () => {
                         {{ t('room_requests.rules_accepted_before', { at: dateTime(rules.accepted_before) }) }}
                     </p>
                     <template v-else>
-                        <p v-if="!readToEnd" class="text-xs text-muted-foreground">{{ t('room_requests.rules_scroll') }}</p>
+                        <p v-if="!ticked" class="text-xs text-muted-foreground">{{ t('room_requests.rules_scroll') }}</p>
                         <label class="flex items-start gap-2 text-sm font-medium">
                             <input v-model="ticked" type="checkbox" class="mt-0.5 size-5 rounded border-input" />
                             {{ t('room_requests.rules_accept_check') }}
@@ -133,11 +123,7 @@ const onScroll = () => {
                     </template>
                     <div class="flex flex-wrap justify-end gap-2">
                         <Button type="button" variant="outline" @click="emit('close')">{{ t('room_requests.rules_decline') }}</Button>
-                        <Button
-                            type="button"
-                            :disabled="processing || (!rules.accepted_before && !ticked && !readToEnd)"
-                            @click="emit('accept', rules.version_id)"
-                        >
+                        <Button type="button" :disabled="processing || (!rules.accepted_before && !ticked)" @click="emit('accept', rules.version_id)">
                             {{ rules.accepted_before ? t('room_requests.rules_send') : t('room_requests.rules_accept') }}
                         </Button>
                     </div>

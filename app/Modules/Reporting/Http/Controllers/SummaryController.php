@@ -10,7 +10,6 @@ use App\Modules\Contract\Actions\ContractDetails;
 use App\Modules\Contract\Actions\ContractLabels;
 use App\Modules\Contract\Actions\ListCustomers;
 use App\Modules\Contract\Support\ContractPhase;
-use App\Modules\Identity\Actions\UserNames;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\SearchPurchaseRequests;
 use App\Modules\Inventory\Models\PurchaseRequest;
@@ -71,7 +70,7 @@ class SummaryController extends Controller
     /**
      * One person: ?user= a user of the company, or ?name= someone from outside (loans and issues only).
      */
-    public function person(Request $request, UserNames $userNames, TicketKpi $ticketKpi): Response
+    public function person(Request $request, SummarizePeople $people, TicketKpi $ticketKpi): Response
     {
         $viewer = $request->user();
         abort_unless($viewer->can(SummarizePeople::PERMISSION), 403);
@@ -79,7 +78,7 @@ class SummaryController extends Controller
         $userId = $request->integer('user') ?: null;
         abort_unless(SummarizePeople::reaches($viewer, $userId), 403);
         $outsideName = $userId ? null : $request->string('name')->trim()->limit(255, '')->value();
-        $name = $userId ? ($userNames->handle([$userId])[$userId] ?? null) : $outsideName;
+        $name = $userId ? $people->nameOf($viewer, $userId) : $outsideName;
         abort_if(blank($name), 404);
 
         $filters = $this->listFilters($request);

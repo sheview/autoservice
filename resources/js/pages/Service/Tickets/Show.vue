@@ -729,6 +729,7 @@ const stepBar = computed(() => {
                                     id="warranty_expires_on"
                                     v-model="warranty.warranty_expires_on"
                                     type="date"
+                                    max="9999-12-31"
                                     class="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                                 />
                             </div>
