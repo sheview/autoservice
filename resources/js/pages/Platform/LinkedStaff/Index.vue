@@ -241,7 +241,8 @@ const selectClass = 'h-9 rounded-md border border-input bg-transparent px-3 text
                     </label>
                     <fieldset class="grid gap-1 text-sm">
                         <legend class="mb-1">{{ t('linked_staff.pool_roles') }}</legend>
-                        <div class="flex h-9 flex-wrap items-center gap-3">
+                        <!-- min-h, not h: the roles wrap to more lines on a phone and must push the button down. -->
+                        <div class="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1">
                             <label v-for="role in roleOptions" :key="role.name" class="flex items-center gap-1.5">
                                 <input v-model="poolForm.roles" type="checkbox" :value="role.name" class="size-4 rounded border-input" />
                                 {{ role.label }}

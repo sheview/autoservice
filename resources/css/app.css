@@ -111,6 +111,23 @@ html {
         background-color: hsl(var(--popover));
         color: hsl(var(--popover-foreground));
     }
+
+    /* A <select> is as wide as its longest option: one long customer / contract name pushed the
+       filter past the edge of a phone and the whole page (and the menu) scrolled sideways.
+       It never gets wider than the box it sits in; the chosen text ends in "…" instead. */
+    select {
+        max-width: 100%;
+        min-width: 0;
+        text-overflow: ellipsis;
+    }
+
+    /* A .grid with no column count yet (phones, before sm:/md:/lg:grid-cols-*) has one "auto" column,
+       which is as wide as its widest content: a long plan / device name with `truncate` never
+       shrank and the card ran off the screen. One column that fits the box instead — :where() has no
+       weight, so any grid-cols-* on the element still wins. */
+    :where(.grid) {
+        grid-template-columns: minmax(0, 1fr);
+    }
 }
 
 /*

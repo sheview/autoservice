@@ -23,7 +23,9 @@ const dotClass = (index: number) => {
     <ol class="flex items-center" :aria-label="t('steps.label')">
         <li v-for="(step, index) in steps" :key="step.key" class="flex items-center" :title="step.at ? `${step.label} · ${step.at}` : step.label">
             <span v-if="index > 0" class="h-0.5 w-4" :class="index <= current ? 'bg-green-600' : 'bg-muted'" aria-hidden="true" />
-            <span class="flex size-5 items-center justify-center rounded-full text-[10px] font-semibold" :class="dotClass(index)">
+            <!-- relative: holds the sr-only name in place; without it the name escaped the table's
+                 scroll box and widened the whole page on a phone. -->
+            <span class="relative flex size-5 items-center justify-center rounded-full text-[10px] font-semibold" :class="dotClass(index)">
                 <Check v-if="done(index)" class="size-3" />
                 <X v-else-if="index === current && state === 'cancelled'" class="size-3" />
                 <template v-else>{{ index + 1 }}</template>

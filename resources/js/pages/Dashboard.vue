@@ -236,7 +236,7 @@ const charts = computed(() => {
                 <section v-if="trends && charts" class="space-y-3">
                     <div class="flex flex-wrap items-center justify-between gap-3">
                         <h2 class="text-sm font-semibold">{{ t('dashboard.charts.title') }}</h2>
-                        <div class="flex flex-wrap items-center gap-2">
+                        <div class="flex max-w-full flex-wrap items-center gap-2">
                             <div class="inline-flex rounded-md border p-0.5" role="group">
                                 <button
                                     v-for="option in ['monthly', 'yearly'] as const"

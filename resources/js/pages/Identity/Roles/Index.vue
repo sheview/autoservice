@@ -191,20 +191,20 @@ const reset = () => {
                     </thead>
                     <tbody>
                         <template v-for="(resource, i) in visible" :key="resource.key">
+                            <!-- Rows across the whole table: the cell itself cannot stick (it is as wide as the
+                                 table, so it has nowhere to move), the name inside it does — it stays at the
+                                 left like the first column while the roles scroll sideways. -->
                             <tr v-if="resource.group && resource.group !== visible[i - 1]?.group">
                                 <td
                                     :colspan="roles.length + 1"
-                                    class="sticky left-0 border-b bg-primary/10 px-4 py-2 text-sm font-bold uppercase tracking-wide text-primary"
+                                    class="border-b bg-primary/10 py-2 text-sm font-bold uppercase tracking-wide text-primary"
                                 >
-                                    {{ t(`nav_groups.${resource.group}`) }}
+                                    <span class="sticky left-0 inline-block px-4">{{ t(`nav_groups.${resource.group}`) }}</span>
                                 </td>
                             </tr>
                             <tr>
-                                <td
-                                    :colspan="roles.length + 1"
-                                    class="sticky left-0 border-b border-t-2 border-t-border bg-muted/60 px-4 py-2 font-semibold"
-                                >
-                                    {{ t(`permissions.resources.${resource.key}`) }}
+                                <td :colspan="roles.length + 1" class="border-b border-t-2 border-t-border bg-muted/60 py-2 font-semibold">
+                                    <span class="sticky left-0 inline-block px-4">{{ t(`permissions.resources.${resource.key}`) }}</span>
                                 </td>
                             </tr>
                             <tr v-for="action in resource.actions" :key="`${resource.key}.${action}`" class="group">
