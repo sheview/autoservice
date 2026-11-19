@@ -14,6 +14,7 @@ use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -62,5 +63,19 @@ return Application::configure(basePath: dirname(__DIR__))
             return $request->expectsJson()
                 ? response()->json(['message' => $message], 413)
                 : response($message, 413)->header('Content-Type', 'text/plain; charset=UTF-8');
+        });
+
+        // A form sent from a page opened before its session ended (left open past SESSION_LIFETIME,
+        // or loaded before a deploy) fails the CSRF check: instead of Laravel's bare "419 PAGE EXPIRED"
+        // (shown by Inertia as a blank popup), back to the same page — it loads with a new token —
+        // with a message to send it again. `status` is what the sign-in pages show, `error` the others.
+        $exceptions->respond(function (Response $response, Throwable $e, Request $request) {
+            if ($response->getStatusCode() !== 419 || $request->expectsJson()) {
+                return $response;
+            }
+
+            $message = __('ui.page_expired');
+
+            return back()->with(['status' => $message, 'error' => $message]);
         });
     })->create();
