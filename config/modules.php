@@ -104,5 +104,7 @@ return [
         ['group' => 'platform', 'title' => 'nav.tenants', 'route' => 'platform.impersonation.index', 'icon' => 'building-2', 'permission' => 'platform.impersonate'],
         ['group' => 'platform', 'title' => 'nav.linked_staff', 'route' => 'platform.linked-staff.index', 'icon' => 'users', 'permission' => 'platform.tenants'],
         ['group' => 'platform', 'title' => 'nav.platform_settings', 'route' => 'platform.settings.edit', 'icon' => 'settings', 'permission' => 'platform.tenants'],
+        // A backup holds every company's data: the superadmin only.
+        ['group' => 'platform', 'title' => 'nav.backups', 'route' => 'platform.backups.index', 'icon' => 'database-backup', 'permission' => 'platform.full_access'],
     ],
 ];

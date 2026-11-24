@@ -2,6 +2,7 @@
 
 use App\Modules\Platform\Http\Controllers\ActivityLogController;
 use App\Modules\Platform\Http\Controllers\AlertSettingsController;
+use App\Modules\Platform\Http\Controllers\BackupController;
 use App\Modules\Platform\Http\Controllers\CompanyShareController;
 use App\Modules\Platform\Http\Controllers\DashboardController;
 use App\Modules\Platform\Http\Controllers\ImpersonationController;
@@ -62,4 +63,10 @@ Route::middleware(['auth'])->prefix('platform')->name('platform.')->group(functi
 
     Route::get('settings', [PlatformSettingsController::class, 'edit'])->name('settings.edit');
     Route::put('settings', [PlatformSettingsController::class, 'update'])->name('settings.update');
+
+    // The platform's backups (superadmin only, BackupController).
+    Route::get('backups', [BackupController::class, 'index'])->name('backups.index');
+    Route::put('backups', [BackupController::class, 'update'])->name('backups.update');
+    Route::post('backups/run', [BackupController::class, 'run'])->name('backups.run');
+    Route::get('backups/{file}', [BackupController::class, 'download'])->where('file', '[A-Za-z0-9._-]+\.zip')->name('backups.download');
 });

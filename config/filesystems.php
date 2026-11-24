@@ -38,6 +38,15 @@ return [
             'report' => false,
         ],
 
+        // The platform's backups (spatie/laravel-backup). Best on another disk or mount than the
+        // system's, so a full or broken system disk does not take the backups with it.
+        'backups' => [
+            'driver' => 'local',
+            'root' => env('BACKUP_PATH', storage_path('backups')),
+            'throw' => true,
+            'report' => false,
+        ],
+
         'public' => [
             'driver' => 'local',
             'root' => storage_path('app/public'),

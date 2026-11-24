@@ -83,6 +83,13 @@ return [
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            // The backup's dump (mariadb-dump): one consistent snapshot without locking tables, and
+            // not the tables that are only working state (signed-in sessions, cache, queued jobs).
+            'dump' => [
+                'dump_binary_path' => env('DB_DUMP_BINARY_PATH', ''),
+                'use_single_transaction' => true,
+                'exclude_tables' => ['sessions', 'cache', 'cache_locks', 'jobs', 'job_batches'],
+            ],
         ],
 
         'pgsql' => [
