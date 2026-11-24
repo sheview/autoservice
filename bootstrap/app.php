@@ -14,6 +14,7 @@ use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Middleware\SubstituteBindings;
+use Inertia\Middleware\EncryptHistory;
 use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -30,6 +31,9 @@ return Application::configure(basePath: dirname(__DIR__))
             ResolveTenant::class,
             EnforceSubscription::class,
             LogImpersonatedRequests::class,
+            // Pages kept in the browser history are encrypted with a key that logout throws away
+            // (AuthenticatedSessionController::destroy), so Back cannot show them after signing out.
+            EncryptHistory::class,
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
         ]);

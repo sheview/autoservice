@@ -49,6 +49,16 @@ class AuthenticationTest extends TestCase
         $response = $this->actingAs($user)->post('/logout');
 
         $this->assertGuest();
-        $response->assertRedirect('/');
+        $response->assertRedirect(route('login'));
+        $response->assertSessionHas('status', __('ui.logged_out'));
+        $response->assertSessionHas('inertia.clear_history', true);
+
+        // The login page says so.
+        $this->get(route('login'))->assertInertia(fn ($page) => $page->where('status', __('ui.logged_out')));
+    }
+
+    public function test_pages_are_kept_encrypted_in_browser_history()
+    {
+        $this->assertTrue($this->get(route('login'))->viewData('page')['encryptHistory']);
     }
 }

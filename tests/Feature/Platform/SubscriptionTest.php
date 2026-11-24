@@ -66,7 +66,7 @@ it('lets the company look but not change anything for 30 days after the end', fu
 
     ($this->createCustomer)()->assertRedirect()->assertSessionHas('error', fn ($message) => str_contains($message, '2026-07-10'));
     $this->actingAs($this->admin)->delete("/customers/{$this->customer->id}")->assertSessionHas('error');
-    $this->actingAs($this->admin)->post('/logout')->assertRedirect('/');
+    $this->actingAs($this->admin)->post('/logout')->assertRedirect(route('login'));
 
     expect(Customer::count())->toBe(1);
 });
@@ -86,7 +86,7 @@ it('locks the company out once the read-only period is over', function () {
         ->assertInertia(fn (Assert $page) => $page->component('Subscription/Locked')->where('subscription.state', 'locked'));
     ($this->createCustomer)()->assertStatus(403);
     // signing out still works
-    $this->actingAs($this->admin)->post('/logout')->assertRedirect('/');
+    $this->actingAs($this->admin)->post('/logout')->assertRedirect(route('login'));
 });
 
 it('lets the superadmin in to fix things, and central staff look only', function () {

@@ -54,6 +54,12 @@ class AuthenticatedSessionController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/');
+        // The browser keeps every page seen in its history (encrypted: EncryptHistory). Clearing it
+        // means Back after signing out asks the server again — the login page — instead of showing
+        // the company's pages from memory. Set after invalidate(), which would drop it.
+        Inertia::clearHistory();
+
+        // Straight to the login page: by way of "/" the message would be used up on that redirect.
+        return redirect()->route('login')->with('status', __('ui.logged_out'));
     }
 }

@@ -6,6 +6,7 @@ import type { DefineComponent } from 'vue';
 import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import { initializeTheme } from './composables/useAppearance';
+import { installNativeValidity } from './lib/nativeValidity';
 import { installUploadNotice } from './lib/uploadNotice';
 
 // Extra env variables for Vite (import.meta.glob etc. come from vite/client).
@@ -33,6 +34,9 @@ createInertiaApp({
 
 // A request over the server's size limit: a Thai message instead of an error window.
 installUploadNotice();
+
+// The browser's "Please fill out this field." popups in Thai.
+installNativeValidity();
 
 // This will set light / dark mode on page load...
 initializeTheme();
