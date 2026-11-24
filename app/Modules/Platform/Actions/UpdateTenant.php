@@ -16,11 +16,12 @@ class UpdateTenant
 {
     /**
      * @param  array{name: string, subdomain: string, status: string, subscription_starts_on?: string|null,
-     *     subscription_ends_on?: string|null, auth_mode?: string}  $data
+     *     subscription_ends_on?: string|null, auth_mode?: string, sso_source?: string, keycloak_org?: string|null}  $data
      */
     public function handle(Tenant $tenant, array $data, User $actor): Tenant
     {
-        $fields = ['name', 'subdomain', 'status', 'subscription_starts_on', 'subscription_ends_on', 'auth_mode'];
+        $fields = ['name', 'subdomain', 'status', 'subscription_starts_on', 'subscription_ends_on', 'auth_mode', 'sso_source', 'keycloak_org'];
+        $ssoSource = $data['sso_source'] ?? $tenant->sso_source;
         $old = collect($fields)->mapWithKeys(fn (string $field) => [$field => $this->plain($tenant->{$field})])->all();
 
         $tenant->fill([
@@ -30,6 +31,9 @@ class UpdateTenant
             'subscription_starts_on' => $data['subscription_starts_on'] ?? null,
             'subscription_ends_on' => $data['subscription_ends_on'] ?? null,
             'auth_mode' => $data['auth_mode'] ?? $tenant->auth_mode,
+            'sso_source' => $ssoSource,
+            // An Organization only for a company on its own system: any other sign-in must come with none.
+            'keycloak_org' => $ssoSource === Tenant::SSO_IDP ? ($data['keycloak_org'] ?? $tenant->keycloak_org) : null,
         ])->save();
 
         $new = collect($fields)->mapWithKeys(fn (string $field) => [$field => $this->plain($tenant->{$field})])->all();

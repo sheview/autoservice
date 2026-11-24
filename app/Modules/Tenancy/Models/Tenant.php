@@ -27,10 +27,18 @@ class Tenant extends Model implements HasMedia
 
     public const AUTH_MODES = [self::AUTH_PASSWORD, self::AUTH_BOTH, self::AUTH_SSO_ONLY];
 
-    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings', 'subscription_starts_on', 'subscription_ends_on', 'auth_mode'];
+    /** Where its SSO accounts live: in Keycloak (made by Governix), or the company's own system via a Keycloak Organization. */
+    public const SSO_KEYCLOAK = 'keycloak';
+
+    public const SSO_IDP = 'idp';
+
+    public const SSO_SOURCES = [self::SSO_KEYCLOAK, self::SSO_IDP];
+
+    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings', 'subscription_starts_on', 'subscription_ends_on', 'auth_mode', 'sso_source', 'keycloak_org'];
 
     protected $attributes = [
         'auth_mode' => self::AUTH_PASSWORD,
+        'sso_source' => self::SSO_KEYCLOAK,
         'status' => self::STATUS_ACTIVE,
         'plan' => 'standard',
         'is_platform' => false,

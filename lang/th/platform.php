@@ -46,6 +46,8 @@ return [
         'subdomain' => 'Subdomain',
         'status' => 'สถานะ',
         'auth_mode' => 'วิธีเข้าสู่ระบบของพนักงาน',
+        'sso_source' => 'บัญชี SSO ของพนักงาน',
+        'keycloak_org' => 'Organization ใน Keycloak',
         'subscription_starts_on' => 'วันเริ่มใช้งาน',
         'subscription_ends_on' => 'วันสิ้นสุดการใช้งาน',
         'admin_name' => 'ชื่อผู้ดูแล',

@@ -28,7 +28,13 @@ class SyncKeycloakAccount
             return;
         }
 
-        $profile = ['email' => $user->email, 'firstName' => $user->name, 'enabled' => $user->is_active];
+        // A company on its own system (AD/Entra): name and e-mail come from there, and its people
+        // set no password with us; their account here is linked on their first sign-in. Turning
+        // one off in Governix still turns it off in Keycloak, whatever their own system says.
+        $ownSystem = $user->tenant->sso_source === Tenant::SSO_IDP;
+        $profile = $ownSystem
+            ? ['enabled' => $user->is_active]
+            : ['email' => $user->email, 'firstName' => $user->name, 'enabled' => $user->is_active];
 
         if ($user->keycloak_sub !== null) {
             $this->keycloak->update($user->keycloak_sub, $profile);
@@ -39,7 +45,7 @@ class SyncKeycloakAccount
             return;
         }
 
-        if (! $user->is_active) {
+        if (! $user->is_active || $ownSystem) {
             return;
         }
 

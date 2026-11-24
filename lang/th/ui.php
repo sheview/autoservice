@@ -3901,6 +3901,18 @@ return [
         ],
         'auth_mode_hint' => 'เมื่อเปิด SSO ระบบจะสร้างบัญชี SSO ให้พนักงานทุกคน และส่งอีเมลให้ตั้งรหัสผ่าน · บัญชีลูกค้าใช้รหัสผ่านเสมอ',
         'sso_not_ready' => 'ยังไม่ได้ตั้งค่า Keycloak บน server พนักงานจะยังเข้าด้วย SSO ไม่ได้',
+        'sso_source' => 'บัญชี SSO ของพนักงาน',
+        'sso_sources' => [
+            'keycloak' => 'บัญชีใน Keycloak (ระบบสร้างให้)',
+            'idp' => 'ระบบของบริษัทเอง (AD / Entra ID / Google)',
+        ],
+        'sso_source_hints' => [
+            'keycloak' => 'ระบบสร้างบัญชี SSO ให้พนักงาน และส่งอีเมลให้ตั้งรหัสผ่าน',
+            'idp' => 'พนักงานเข้าด้วยบัญชีของบริษัทตัวเอง ไม่ต้องตั้งรหัสผ่านใหม่ · ต้องเชื่อมระบบของบริษัทเข้ากับ Organization ใน Keycloak ก่อน',
+        ],
+        'keycloak_org' => 'Organization ใน Keycloak (alias)',
+        'keycloak_org_hint' => 'ชื่อ alias ของ Organization ของบริษัทนี้ใน Keycloak · รับเฉพาะการเข้าสู่ระบบที่ผ่าน Organization นี้',
+        'organizations_not_ready' => 'ยังไม่ได้เปิด Organizations ของ Keycloak บน server (KEYCLOAK_ORGANIZATIONS) พนักงานจะยังเข้าด้วย SSO ไม่ได้',
         'subscription' => 'อายุการใช้งาน',
         'starts_on' => 'วันเริ่มใช้งาน',
         'ends_on' => 'วันสิ้นสุดการใช้งาน',

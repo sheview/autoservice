@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Modules\Identity\Actions\EndSsoSessions;
 use App\Modules\Identity\Actions\SignInWithSso;
 use App\Modules\Identity\Support\Sso;
+use App\Modules\Tenancy\Models\Tenant;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,7 +35,11 @@ class SsoController extends Controller
         $request->session()->put(self::FROM_TENANT, $tenants->id());
         $request->session()->put(self::FROM_HOME, route('dashboard'));
 
-        return Sso::driver()->redirect();
+        // On the subdomain of a company on its own system: straight to that system's sign-in.
+        $tenant = $tenants->tenant();
+        $organization = $tenant?->sso_source === Tenant::SSO_IDP ? $tenant->keycloak_org : null;
+
+        return Sso::driver($organization)->redirect();
     }
 
     public function callback(Request $request, SignInWithSso $signIn): RedirectResponse

@@ -57,7 +57,7 @@ class TenantController extends Controller
     {
         return Inertia::render('Platform/Tenants/Form', [
             'tenant' => $tenant ? [
-                ...$tenant->only(['ulid', 'name', 'subdomain', 'company_code', 'status', 'auth_mode']),
+                ...$tenant->only(['ulid', 'name', 'subdomain', 'company_code', 'status', 'auth_mode', 'sso_source', 'keycloak_org']),
                 'subscription_starts_on' => $tenant->subscription_starts_on?->toDateString(),
                 'subscription_ends_on' => $tenant->subscription_ends_on?->toDateString(),
                 'subscription' => Subscription::of($tenant),
@@ -65,6 +65,8 @@ class TenantController extends Controller
             'statuses' => [Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED],
             'authModes' => Tenant::AUTH_MODES,
             'ssoReady' => Sso::enabled(),
+            'ssoSources' => Tenant::SSO_SOURCES,
+            'organizationsReady' => Sso::enabled() && Sso::organizationsEnabled(),
             'warnDays' => Subscription::WARN_DAYS,
             'graceDays' => Subscription::GRACE_DAYS,
         ]);

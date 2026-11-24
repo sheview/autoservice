@@ -32,7 +32,16 @@ class Sso
         return filled(config('services.keycloak.client_id')) && filled(config('services.keycloak.base_url'));
     }
 
-    public static function driver(): KeycloakProvider
+    public static function organizationsEnabled(): bool
+    {
+        return (bool) config('services.keycloak.organizations');
+    }
+
+    /**
+     * @param  string|null  $organization  the company's Keycloak Organization: Keycloak then signs the
+     *                                     person in through that company's own system (AD/Entra) straight away.
+     */
+    public static function driver(?string $organization = null): KeycloakProvider
     {
         $config = config('services.keycloak');
 
@@ -48,7 +57,7 @@ class Sso
                 'base_url' => $config['base_url'],
                 'realms' => $config['realms'],
             ]))
-            ->scopes(['profile', 'email'])
+            ->scopes(self::scopes($organization))
             ->enablePKCE();
     }
 
@@ -56,6 +65,23 @@ class Sso
     public static function logoutUrl(?string $idToken): string
     {
         return self::driver()->getLogoutUrl(route('login'), config('services.keycloak.client_id'), $idToken);
+    }
+
+    /**
+     * With Organizations on, always the "organization" scope: without it Keycloak leaves the
+     * organization claim out, and SignInWithSso could not tell which company's system vouched
+     * for the person.
+     *
+     * @return list<string>
+     */
+    public static function scopes(?string $organization): array
+    {
+        $scopes = ['profile', 'email'];
+        if (self::organizationsEnabled()) {
+            $scopes[] = $organization !== null ? 'organization:'.$organization : 'organization';
+        }
+
+        return $scopes;
     }
 
     private static function callbackUrl(): string

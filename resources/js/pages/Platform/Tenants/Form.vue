@@ -16,6 +16,8 @@ interface TenantForm {
     company_code?: string | null;
     status: string;
     auth_mode: string;
+    sso_source: string;
+    keycloak_org: string | null;
     subscription_starts_on: string | null;
     subscription_ends_on: string | null;
     subscription: NonNullable<SharedData['subscription']>;
@@ -27,6 +29,9 @@ const props = defineProps<{
     authModes: string[];
     /** Keycloak is set up on the server (without it, SSO cannot be used whatever is chosen). */
     ssoReady: boolean;
+    ssoSources: string[];
+    /** Keycloak Organizations are turned on (needed for a company's own AD/Entra). */
+    organizationsReady: boolean;
     warnDays: number;
     graceDays: number;
 }>();
@@ -42,6 +47,8 @@ const form = useForm({
     subdomain: props.tenant?.subdomain ?? '',
     status: props.tenant?.status ?? 'active',
     auth_mode: props.tenant?.auth_mode ?? 'password',
+    sso_source: props.tenant?.sso_source ?? 'keycloak',
+    keycloak_org: props.tenant?.keycloak_org ?? '',
     subscription_starts_on: props.tenant?.subscription_starts_on ?? '',
     subscription_ends_on: props.tenant?.subscription_ends_on ?? '',
     admin_name: '',
@@ -58,13 +65,15 @@ const submit = () => {
             subdomain: data.subdomain,
             status: data.status,
             auth_mode: data.auth_mode,
+            sso_source: data.sso_source,
+            keycloak_org: data.sso_source === 'idp' ? data.keycloak_org || null : null,
             subscription_starts_on: data.subscription_starts_on || null,
             subscription_ends_on: data.subscription_ends_on || null,
         })).put(route('platform.tenants.update', props.tenant.ulid));
     } else {
         // A new company starts with passwords (the server refuses auth_mode here).
         form.transform((data) => ({
-            ...Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'auth_mode')),
+            ...Object.fromEntries(Object.entries(data).filter(([key]) => !['auth_mode', 'sso_source', 'keycloak_org'].includes(key))),
             subscription_starts_on: data.subscription_starts_on || null,
             subscription_ends_on: data.subscription_ends_on || null,
         })).post(route('platform.tenants.store'));
@@ -115,6 +124,23 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                         <p v-if="!ssoReady && form.auth_mode !== 'password'" class="text-xs text-amber-600">{{ t('tenants.sso_not_ready') }}</p>
                         <InputError :message="form.errors.auth_mode" />
                     </div>
+                    <template v-if="tenant && form.auth_mode !== 'password'">
+                        <div class="grid content-start gap-2">
+                            <Label for="sso_source">{{ t('tenants.sso_source') }}</Label>
+                            <select id="sso_source" v-model="form.sso_source" :class="selectClass">
+                                <option v-for="source in ssoSources" :key="source" :value="source">{{ t(`tenants.sso_sources.${source}`) }}</option>
+                            </select>
+                            <p class="text-xs text-muted-foreground">{{ t(`tenants.sso_source_hints.${form.sso_source}`) }}</p>
+                            <InputError :message="form.errors.sso_source" />
+                        </div>
+                        <div v-if="form.sso_source === 'idp'" class="grid content-start gap-2">
+                            <Label for="keycloak_org">{{ t('tenants.keycloak_org') }}</Label>
+                            <Input id="keycloak_org" v-model="form.keycloak_org" required maxlength="64" class="font-mono" autocomplete="off" />
+                            <p class="text-xs text-muted-foreground">{{ t('tenants.keycloak_org_hint') }}</p>
+                            <p v-if="!organizationsReady" class="text-xs text-amber-600">{{ t('tenants.organizations_not_ready') }}</p>
+                            <InputError :message="form.errors.keycloak_org" />
+                        </div>
+                    </template>
                 </div>
 
                 <fieldset class="space-y-4 rounded-md border p-4">

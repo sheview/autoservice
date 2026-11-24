@@ -18,11 +18,29 @@ class KeycloakProvider extends Provider
     protected function userInstance(array $response, array $user)
     {
         $idToken = Arr::get($response, 'id_token');
+        $claims = is_string($idToken) ? $this->claims($idToken) : [];
 
         return parent::userInstance($response, $user)->map([
             'idToken' => $idToken,
-            'sid' => is_string($idToken) ? $this->claims($idToken)['sid'] ?? null : null,
+            'sid' => $claims['sid'] ?? null,
+            'organizations' => $this->organizations($claims['organization'] ?? null),
         ]);
+    }
+
+    /**
+     * The Keycloak Organizations the sign-in came through, by alias. The claim is a list of
+     * aliases, or an object keyed by alias when the mapper adds the organizations' ids.
+     *
+     * @return list<string>
+     */
+    private function organizations(mixed $claim): array
+    {
+        if (! is_array($claim)) {
+            return [];
+        }
+        $aliases = array_is_list($claim) ? $claim : array_keys($claim);
+
+        return array_values(array_filter($aliases, fn ($alias) => is_string($alias) && $alias !== ''));
     }
 
     /** @return array<string, mixed> */

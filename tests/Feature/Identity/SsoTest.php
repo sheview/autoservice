@@ -23,22 +23,40 @@ beforeEach(function () {
     auth()->logout();
 
     // Who Keycloak says signed in (null: the sign-in failed at Keycloak).
-    $this->keycloak = function (?array $person) {
-        $provider = Mockery::mock(KeycloakProvider::class);
-        $provider->shouldReceive('setConfig', 'scopes', 'enablePKCE')->andReturnSelf();
+    // One stub for the whole test, answering with whoever was set last (Mockery would keep
+    // answering with the first of several stubs).
+    $provider = Mockery::mock(KeycloakProvider::class);
+    Socialite::shouldReceive('buildProvider')->andReturn($provider);
+    $this->keycloak = function (?array $person) use ($provider) {
+        $this->person = $person;
+        if ($this->stubbed ?? false) {
+            return;
+        }
+        $this->stubbed = true;
+        $provider->shouldReceive('setConfig', 'enablePKCE')->andReturnSelf();
+        $provider->shouldReceive('scopes')->andReturnUsing(function (array $scopes) use ($provider) {
+            $this->scopes = $scopes;
+
+            return $provider;
+        });
         $provider->shouldReceive('redirect')->andReturn(redirect('https://sso.test/auth'));
         $provider->shouldReceive('getLogoutUrl')->andReturnUsing(
             fn ($back, $client, $token) => 'https://sso.test/logout?id_token_hint='.$token.'&post_logout_redirect_uri='.urlencode($back)
         );
-        $person === null
-            ? $provider->shouldReceive('user')->andThrow(new RuntimeException('access_denied'))
-            : $provider->shouldReceive('user')->andReturn((new SocialiteUser)->setRaw($person)->map([
+        $provider->shouldReceive('user')->andReturnUsing(function () {
+            $person = $this->person;
+            if ($person === null) {
+                throw new RuntimeException('access_denied');
+            }
+
+            return (new SocialiteUser)->setRaw($person)->map([
                 'id' => $person['sub'] ?? null,
                 'email' => $person['email'] ?? null,
                 'name' => $person['name'] ?? null,
                 'idToken' => 'the-id-token',
-            ]));
-        Socialite::shouldReceive('buildProvider')->andReturn($provider);
+                'organizations' => $person['organizations'] ?? [],
+            ]);
+        });
     };
 
     // Through Keycloak and back, starting on $host.
@@ -170,4 +188,87 @@ it('signs out of Keycloak as well, back to the login page', function () {
     // signed in with a password: straight to the login page
     $this->post('/login', ['email' => 'somchai@example.com', 'password' => 'password']);
     $this->post('/logout')->assertRedirect(route('login'));
+});
+
+/*
+ * Companies on their own system (AD/Entra) behind Keycloak, each through its own Keycloak
+ * Organization: a company's system vouches for its own people only.
+ */
+
+it('lets in a person of a company on its own system only through that company\'s Organization', function () {
+    config(['services.keycloak.organizations' => true]);
+    $this->user->tenant->update(['sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'default-co']);
+
+    // not through any Organization (an account in Keycloak itself), or through another company's
+    ($this->signIn)($this->verified)->assertSessionHasErrors(['email' => __('auth.sso_refused')]);
+    ($this->signIn)([...$this->verified, 'organizations' => ['acme']])->assertSessionHasErrors(['email' => __('auth.sso_refused')]);
+    $this->assertGuest();
+    expect($this->user->fresh()->keycloak_sub)->toBeNull();
+
+    ($this->signIn)([...$this->verified, 'organizations' => ['default-co']])->assertRedirect(route('dashboard'));
+    $this->assertAuthenticatedAs($this->user);
+    expect($this->user->fresh()->keycloak_sub)->toBe('kc-1');
+});
+
+it('never lets one company\'s system take over another company\'s account with its e-mail', function () {
+    config(['services.keycloak.organizations' => true]);
+    $acme = createTenant('acme');
+    $acme->update(['auth_mode' => Tenant::AUTH_BOTH, 'sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'acme']);
+    $beta = createTenant('beta');
+    $beta->update(['auth_mode' => Tenant::AUTH_BOTH, 'sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'beta']);
+    $victim = userWithRole('admin_company', ['email' => 'boss@beta.test'], $beta);
+
+    // Acme's AD says "this is boss@beta.test, e-mail verified" — on Beta's subdomain too
+    foreach (['http://localhost', 'http://beta.localhost'] as $host) {
+        ($this->signIn)(['sub' => 'kc-evil', 'email' => 'boss@beta.test', 'email_verified' => true, 'organizations' => ['acme']], $host)
+            ->assertSessionHasErrors(['email' => __('auth.sso_refused')]);
+    }
+
+    // nor an account in Keycloak itself (no Organization) for a company on its own system, nor
+    // a company account by way of a company's Organization
+    ($this->signIn)(['sub' => 'kc-evil', 'email' => 'boss@beta.test', 'email_verified' => true]);
+    ($this->signIn)([...$this->verified, 'sub' => 'kc-evil', 'organizations' => ['acme']]);
+
+    $this->assertGuest();
+    expect(asTenant($beta, fn () => $victim->fresh()->keycloak_sub))->toBeNull()
+        ->and($this->user->fresh()->keycloak_sub)->toBeNull();
+});
+
+it('sends people straight to their company\'s own system from its subdomain, and always asks which Organization', function () {
+    config(['services.keycloak.organizations' => true]);
+    $this->user->tenant->update(['sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'default-co']);
+
+    ($this->keycloak)(null);
+    $this->get('http://default.localhost/auth/sso');
+    expect($this->scopes)->toBe(['profile', 'email', 'organization:default-co']);
+
+    $this->get('http://localhost/auth/sso');
+    expect($this->scopes)->toBe(['profile', 'email', 'organization']);
+
+    // Organizations off in Keycloak: not asked for (Keycloak would refuse an unknown scope)
+    config(['services.keycloak.organizations' => false]);
+    $this->get('http://default.localhost/auth/sso');
+    expect($this->scopes)->toBe(['profile', 'email']);
+});
+
+it('keeps the company form\'s Organization to companies on their own system', function () {
+    $superadmin = createSuperadmin();
+    $update = fn (array $data) => $this->actingAs($superadmin)->put(route('platform.tenants.update', $this->tenant->ulid), [
+        'name' => 'Default', 'subdomain' => 'default', 'status' => 'active', 'auth_mode' => Tenant::AUTH_BOTH, ...$data,
+    ]);
+
+    $update(['sso_source' => Tenant::SSO_IDP])->assertSessionHasErrors('keycloak_org');
+    $update(['sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'bad alias!'])->assertSessionHasErrors('keycloak_org');
+
+    $update(['sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'default-co'])->assertSessionHasNoErrors();
+    expect($this->tenant->fresh()->only('sso_source', 'keycloak_org'))->toBe(['sso_source' => 'idp', 'keycloak_org' => 'default-co']);
+
+    $other = createTenant('other');
+    $this->actingAs($superadmin)->put(route('platform.tenants.update', $other->ulid), [
+        'name' => 'Other', 'subdomain' => 'other', 'status' => 'active', 'sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'default-co',
+    ])->assertSessionHasErrors('keycloak_org');
+
+    // back to accounts in Keycloak: the Organization goes, or its sign-ins would still count
+    $update(['sso_source' => Tenant::SSO_KEYCLOAK, 'keycloak_org' => 'default-co'])->assertSessionHasNoErrors();
+    expect($this->tenant->fresh()->keycloak_org)->toBeNull();
 });

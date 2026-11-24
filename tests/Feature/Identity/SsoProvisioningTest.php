@@ -150,3 +150,18 @@ it('gives every staff member of a company that turns SSO on an account, and nobo
         'name' => 'Default', 'subdomain' => 'default', 'status' => 'active', 'auth_mode' => 'magic',
     ])->assertSessionHasErrors('auth_mode');
 });
+
+it('sets no password for people of a company on its own system, but still turns them off', function () {
+    $this->tenant->update(['sso_source' => Tenant::SSO_IDP, 'keycloak_org' => 'default-co']);
+
+    $user = ($this->save)(null, ['name' => 'Somsri', 'email' => 'somsri@example.com']);
+    expect($this->accounts)->toBe([])->and($this->emails)->toBe([])
+        ->and($user->fresh()->keycloak_sub)->toBeNull();
+
+    // signed in through their AD once (linked then), then turned off in Governix
+    $this->accounts['kc-ad'] = ['id' => 'kc-ad', 'email' => 'somsri@example.com', 'enabled' => true];
+    $user->forceFill(['keycloak_sub' => 'kc-ad'])->save();
+    ($this->save)($user->fresh(), ['name' => 'Somsri', 'email' => 'somsri@example.com', 'is_active' => false]);
+
+    expect($this->accounts['kc-ad'])->toBe(['id' => 'kc-ad', 'email' => 'somsri@example.com', 'enabled' => false, 'signed_out' => true]);
+});

@@ -58,5 +58,8 @@ return [
         'realms' => env('KEYCLOAK_REALM', 'governix'),
         // Make / turn off staff accounts in Keycloak when they are in Governix (KeycloakAdmin).
         'provision' => (bool) env('KEYCLOAK_PROVISION', false),
+        // The realm has Organizations turned on (Keycloak 26+): every sign-in asks for the
+        // "organization" scope, and companies on their own system (AD/Entra) can sign in.
+        'organizations' => (bool) env('KEYCLOAK_ORGANIZATIONS', false),
     ],
 ];
