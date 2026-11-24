@@ -4,12 +4,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import AuthBrandLayout from '@/layouts/auth/AuthBrandLayout.vue';
 import { t } from '@/lib/i18n';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { CircleCheck, Eye, EyeOff, LoaderCircle, Lock, LogIn, Mail, Search, ShieldCheck } from 'lucide-vue-next';
+import { CircleCheck, Eye, EyeOff, KeyRound, LoaderCircle, Lock, LogIn, Mail, Search, ShieldCheck } from 'lucide-vue-next';
 import { ref } from 'vue';
 
 defineProps<{
     status?: string;
     canResetPassword: boolean;
+    /** Sign in with Keycloak is set up (Identity\Support\Sso). */
+    sso?: boolean;
 }>();
 
 const form = useForm({
@@ -46,7 +48,23 @@ const submit = () => {
                 {{ status }}
             </div>
 
-            <form @submit.prevent="submit" class="mt-8 space-y-5">
+            <!-- A full page visit (not Inertia): the server sends the browser on to Keycloak. -->
+            <template v-if="sso">
+                <a
+                    :href="route('sso.redirect')"
+                    class="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-violet-200 bg-violet-50 text-sm font-semibold text-violet-700 transition hover:bg-violet-100"
+                >
+                    <KeyRound class="h-4 w-4" />
+                    {{ t('auth.sso_button') }}
+                </a>
+                <div class="mt-6 flex items-center gap-3 text-xs text-slate-400">
+                    <span class="h-px flex-1 bg-slate-200" />
+                    {{ t('auth.or') }}
+                    <span class="h-px flex-1 bg-slate-200" />
+                </div>
+            </template>
+
+            <form @submit.prevent="submit" :class="sso ? 'mt-6 space-y-5' : 'mt-8 space-y-5'">
                 <div>
                     <label for="email" class="mb-1.5 block text-sm font-medium text-slate-700">{{ t('auth.email') }}</label>
                     <div class="relative">

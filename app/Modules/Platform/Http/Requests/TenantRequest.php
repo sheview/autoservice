@@ -44,6 +44,8 @@ class TenantRequest extends FormRequest
                 },
             ],
             'status' => ['required', Rule::in([Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED])],
+            // How its staff sign in: set on an existing company (a new one starts with passwords).
+            'auth_mode' => [$creating ? 'prohibited' : 'sometimes', Rule::in(Tenant::AUTH_MODES)],
             'subscription_starts_on' => ['nullable', 'date'],
             'subscription_ends_on' => ['nullable', 'date', 'after_or_equal:subscription_starts_on'],
             'admin_name' => [$creating ? 'required' : 'prohibited', 'string', 'max:255'],

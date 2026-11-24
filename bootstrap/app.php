@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Modules\Identity\Http\Middleware\EndSsoSession;
 use App\Modules\Platform\Http\Middleware\ApplySessionTimeout;
 use App\Modules\Platform\Http\Middleware\EnsureModuleEnabled;
 use App\Modules\Platform\Http\Middleware\LogImpersonatedRequests;
@@ -27,7 +28,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Before StartSession, which reads session.lifetime.
         $middleware->web(prepend: [ApplySessionTimeout::class]);
 
+        // Keycloak's back-channel logout is a server-to-server POST, proven by its signed token.
+        $middleware->validateCsrfTokens(except: ['auth/sso/backchannel-logout']);
+
         $middleware->web(append: [
+            // A Keycloak session ended there ends here too (before anything runs as the user).
+            EndSsoSession::class,
             ResolveTenant::class,
             EnforceSubscription::class,
             LogImpersonatedRequests::class,

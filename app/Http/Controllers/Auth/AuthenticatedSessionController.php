@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Modules\Identity\Support\Sso;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -20,6 +22,7 @@ class AuthenticatedSessionController extends Controller
     {
         return Inertia::render('auth/Login', [
             'canResetPassword' => Route::has('password.request'),
+            'sso' => Sso::enabled(),
             'status' => $request->session()->get('status'),
         ]);
     }
@@ -47,8 +50,11 @@ class AuthenticatedSessionController extends Controller
     /**
      * Destroy an authenticated session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): SymfonyResponse
     {
+        // Signed in with Keycloak: sign out there too, or "Sign in with SSO" would let them straight back in.
+        $idToken = $request->session()->get(Sso::ID_TOKEN);
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();
@@ -60,6 +66,13 @@ class AuthenticatedSessionController extends Controller
         Inertia::clearHistory();
 
         // Straight to the login page: by way of "/" the message would be used up on that redirect.
-        return redirect()->route('login')->with('status', __('ui.logged_out'));
+        $request->session()->flash('status', __('ui.logged_out'));
+
+        if ($idToken !== null && Sso::enabled()) {
+            // Keycloak sends them back to the login page; Inertia::location leaves the app for it.
+            return Inertia::location(Sso::logoutUrl($idToken));
+        }
+
+        return redirect()->route('login');
     }
 }

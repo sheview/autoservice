@@ -2,6 +2,8 @@
 
 namespace App\Modules\Identity;
 
+use App\Modules\Identity\Events\UserSaved;
+use App\Modules\Identity\Listeners\QueueKeycloakSync;
 use App\Modules\Identity\Listeners\SeedRolesForNewTenant;
 use App\Modules\Platform\CrossTenant\TenantAwareUserProvider;
 use App\Modules\Platform\Support\Impersonation;
@@ -18,6 +20,7 @@ class IdentityServiceProvider extends ServiceProvider
         Auth::provider('tenant-eloquent', fn ($app, array $config) => new TenantAwareUserProvider($app['hash'], $config['model']));
 
         Event::listen(TenantCreated::class, SeedRolesForNewTenant::class);
+        Event::listen(UserSaved::class, QueueKeycloakSync::class);
 
         // A superadmin working inside a customer tenant may do everything there. Central staff
         // (who also enter tenants) are not let through here: the policies decide, with the

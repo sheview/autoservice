@@ -15,6 +15,7 @@ interface TenantForm {
     subdomain: string;
     company_code?: string | null;
     status: string;
+    auth_mode: string;
     subscription_starts_on: string | null;
     subscription_ends_on: string | null;
     subscription: NonNullable<SharedData['subscription']>;
@@ -23,6 +24,9 @@ interface TenantForm {
 const props = defineProps<{
     tenant: TenantForm | null;
     statuses: string[];
+    authModes: string[];
+    /** Keycloak is set up on the server (without it, SSO cannot be used whatever is chosen). */
+    ssoReady: boolean;
     warnDays: number;
     graceDays: number;
 }>();
@@ -37,6 +41,7 @@ const form = useForm({
     name: props.tenant?.name ?? '',
     subdomain: props.tenant?.subdomain ?? '',
     status: props.tenant?.status ?? 'active',
+    auth_mode: props.tenant?.auth_mode ?? 'password',
     subscription_starts_on: props.tenant?.subscription_starts_on ?? '',
     subscription_ends_on: props.tenant?.subscription_ends_on ?? '',
     admin_name: '',
@@ -52,12 +57,14 @@ const submit = () => {
             name: data.name,
             subdomain: data.subdomain,
             status: data.status,
+            auth_mode: data.auth_mode,
             subscription_starts_on: data.subscription_starts_on || null,
             subscription_ends_on: data.subscription_ends_on || null,
         })).put(route('platform.tenants.update', props.tenant.ulid));
     } else {
+        // A new company starts with passwords (the server refuses auth_mode here).
         form.transform((data) => ({
-            ...data,
+            ...Object.fromEntries(Object.entries(data).filter(([key]) => key !== 'auth_mode')),
             subscription_starts_on: data.subscription_starts_on || null,
             subscription_ends_on: data.subscription_ends_on || null,
         })).post(route('platform.tenants.store'));
@@ -98,6 +105,15 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                             <option v-for="status in statuses" :key="status" :value="status">{{ t(`impersonation.status.${status}`) }}</option>
                         </select>
                         <InputError :message="form.errors.status" />
+                    </div>
+                    <div v-if="tenant" class="grid content-start gap-2">
+                        <Label for="auth_mode">{{ t('tenants.auth_mode') }}</Label>
+                        <select id="auth_mode" v-model="form.auth_mode" :class="selectClass">
+                            <option v-for="mode in authModes" :key="mode" :value="mode">{{ t(`tenants.auth_modes.${mode}`) }}</option>
+                        </select>
+                        <p class="text-xs text-muted-foreground">{{ t('tenants.auth_mode_hint') }}</p>
+                        <p v-if="!ssoReady && form.auth_mode !== 'password'" class="text-xs text-amber-600">{{ t('tenants.sso_not_ready') }}</p>
+                        <InputError :message="form.errors.auth_mode" />
                     </div>
                 </div>
 

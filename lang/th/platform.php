@@ -45,6 +45,7 @@ return [
         'name' => 'ชื่อบริษัท',
         'subdomain' => 'Subdomain',
         'status' => 'สถานะ',
+        'auth_mode' => 'วิธีเข้าสู่ระบบของพนักงาน',
         'subscription_starts_on' => 'วันเริ่มใช้งาน',
         'subscription_ends_on' => 'วันสิ้นสุดการใช้งาน',
         'admin_name' => 'ชื่อผู้ดูแล',

@@ -18,9 +18,19 @@ class Tenant extends Model implements HasMedia
 
     public const STATUS_SUSPENDED = 'suspended';
 
-    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings', 'subscription_starts_on', 'subscription_ends_on'];
+    /** How the company's staff sign in (customers' accounts always use a password). */
+    public const AUTH_PASSWORD = 'password';
+
+    public const AUTH_BOTH = 'both';
+
+    public const AUTH_SSO_ONLY = 'sso_only';
+
+    public const AUTH_MODES = [self::AUTH_PASSWORD, self::AUTH_BOTH, self::AUTH_SSO_ONLY];
+
+    protected $fillable = ['name', 'slug', 'subdomain', 'status', 'plan', 'is_platform', 'settings', 'subscription_starts_on', 'subscription_ends_on', 'auth_mode'];
 
     protected $attributes = [
+        'auth_mode' => self::AUTH_PASSWORD,
         'status' => self::STATUS_ACTIVE,
         'plan' => 'standard',
         'is_platform' => false,

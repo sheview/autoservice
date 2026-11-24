@@ -3,6 +3,7 @@
 namespace App\Modules\Platform\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Identity\Support\Sso;
 use App\Modules\Platform\Actions\CreateTenant;
 use App\Modules\Platform\Actions\UpdateTenant;
 use App\Modules\Platform\Http\Requests\TenantRequest;
@@ -56,12 +57,14 @@ class TenantController extends Controller
     {
         return Inertia::render('Platform/Tenants/Form', [
             'tenant' => $tenant ? [
-                ...$tenant->only(['ulid', 'name', 'subdomain', 'company_code', 'status']),
+                ...$tenant->only(['ulid', 'name', 'subdomain', 'company_code', 'status', 'auth_mode']),
                 'subscription_starts_on' => $tenant->subscription_starts_on?->toDateString(),
                 'subscription_ends_on' => $tenant->subscription_ends_on?->toDateString(),
                 'subscription' => Subscription::of($tenant),
             ] : null,
             'statuses' => [Tenant::STATUS_ACTIVE, Tenant::STATUS_SUSPENDED],
+            'authModes' => Tenant::AUTH_MODES,
+            'ssoReady' => Sso::enabled(),
             'warnDays' => Subscription::WARN_DAYS,
             'graceDays' => Subscription::GRACE_DAYS,
         ]);

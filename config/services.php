@@ -46,4 +46,17 @@ return [
         'site_key' => env('TURNSTILE_SITE_KEY'),
         'secret_key' => env('TURNSTILE_SECRET_KEY'),
     ],
+
+    // Single sign-on with Keycloak (OpenID Connect). Empty client id or base url = no SSO button.
+    // redirect: one callback on the central domain (with SESSION_DOMAIN shared by the company
+    // subdomains), so Keycloak needs a single Valid Redirect URI; empty = the host the login started on.
+    'keycloak' => [
+        'client_id' => env('KEYCLOAK_CLIENT_ID'),
+        'client_secret' => env('KEYCLOAK_CLIENT_SECRET'),
+        'redirect' => env('KEYCLOAK_REDIRECT_URI'),
+        'base_url' => env('KEYCLOAK_BASE_URL'),
+        'realms' => env('KEYCLOAK_REALM', 'governix'),
+        // Make / turn off staff accounts in Keycloak when they are in Governix (KeycloakAdmin).
+        'provision' => (bool) env('KEYCLOAK_PROVISION', false),
+    ],
 ];

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Modules\Platform\CrossTenant\LinkedAccounts;
+use App\Modules\Identity\Actions\CanSignIn;
 use App\Modules\Tenancy\Support\TenantContext;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -52,18 +52,23 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        // Inactive users cannot log in, and on a tenant subdomain only that tenant's users can (or a
-        // person whose own row there is linked to this account). A linked row never logs in itself:
-        // its person logs in with their main account and switches company.
+        // Who may sign in here, and with a password (CanSignIn: the same rule as SSO).
         $tenantId = app(TenantContext::class)->id();
-        $allowed = fn ($user) => $user->is_active && $user->login_user_id === null
-            && ($tenantId === null || $user->tenant_id === $tenantId || app(LinkedAccounts::class)->accountIn($user, $tenantId) !== null);
+        $rule = app(CanSignIn::class);
+        $credentials = $this->only('email', 'password');
 
-        if (! Auth::attemptWhen($this->only('email', 'password'), $allowed, $this->boolean('remember'))) {
+        if (! Auth::attemptWhen($credentials, fn ($user) => $rule->handle($user, CanSignIn::PASSWORD, $tenantId), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            // The right password of a company that signs in with SSO only: say so (only once the
+            // password is right, so it tells nothing to someone guessing).
+            $users = Auth::guard('web')->getProvider();
+            $user = $users->retrieveByCredentials($credentials);
+            $ssoOnly = $user !== null && $users->validateCredentials($user, $credentials)
+                && $rule->handle($user, CanSignIn::SSO, $tenantId);
+
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => trans($ssoOnly ? 'auth.use_sso' : 'auth.failed'),
             ])->redirectTo(route('login'));
         }
 
