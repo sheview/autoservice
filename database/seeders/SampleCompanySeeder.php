@@ -283,8 +283,12 @@ class SampleCompanySeeder extends Seeder
             // Nothing is sent from it, and nothing of it is half made: all or none (one transaction).
             $this->quietly(fn () => $this->context->run($existing, fn () => DB::transaction(fn () => $this->pmFieldTraining())));
             // Made before the MOTS forms: the project's example (equipment, forms, a finished PM).
-            $this->quietly(fn () => $this->context->run($existing, fn () => DB::transaction(fn () => $this->pmMots())));
-            $this->command?->info(self::NAME.' มีอยู่แล้ว: ไม่ได้เพิ่มข้อมูล');
+            $mots = '';
+            $this->quietly(function () use ($existing, &$mots) {
+                $mots = $this->context->run($existing, fn () => DB::transaction(fn () => $this->pmMots()));
+            });
+            $this->command?->info(self::NAME.' มีอยู่แล้ว: เพิ่มเฉพาะส่วนที่ยังไม่มี');
+            $this->command?->info($mots);
 
             return;
         }
@@ -1354,18 +1358,33 @@ class SampleCompanySeeder extends Seeder
      * hostname is not in the register: the technician typed it on site.
      * Added once (by the customer code), so it also reaches a sample company made before it.
      */
-    private function pmMots(): void
+    /**
+     * @return string what was done, or why not (shown by db:seed / platform:deploy)
+     */
+    private function pmMots(): string
     {
         if (Customer::withTrashed()->where('code', self::MOTS_CODE)->exists()) {
-            return;
+            return 'ตัวอย่าง MOTS: มีอยู่แล้ว';
+        }
+        // A sample company made with fewer standard categories: the missing ones first.
+        $needed = ['FW', 'STO', 'SV', 'UPS'];
+        if (collect($needed)->diff(AssetCategory::query()->pluck('code_prefix'))->isNotEmpty()) {
+            app(AddStandardCategories::class)->handle();
         }
         $categories = AssetCategory::query()->get()->keyBy('code_prefix');
         $technician = User::query()->where('email', 'tech1@'.self::DOMAIN)->first();
         $office = User::query()->where('email', 'helpdesk@'.self::DOMAIN)->first();
         $admin = User::query()->where('email', 'admin@'.self::DOMAIN)->first();
         $branch = Branch::query()->orderBy('id')->first();
-        if (! $technician || ! $office || ! $admin || ! $branch || collect(['FW', 'STO', 'SV', 'UPS'])->contains(fn ($p) => ! isset($categories[$p]))) {
-            return;
+        $missing = [
+            ...array_map(fn ($p) => 'หมวด '.$p, collect($needed)->reject(fn ($p) => isset($categories[$p]))->values()->all()),
+            ...(! $technician ? ['tech1@'.self::DOMAIN] : []),
+            ...(! $office ? ['helpdesk@'.self::DOMAIN] : []),
+            ...(! $admin ? ['admin@'.self::DOMAIN] : []),
+            ...(! $branch ? ['สาขา'] : []),
+        ];
+        if ($missing !== []) {
+            return 'ตัวอย่าง MOTS: ไม่ได้เพิ่ม เพราะไม่มี '.implode(', ', $missing);
         }
         $this->realNow ??= now()->toImmutable();
 
@@ -1511,6 +1530,8 @@ class SampleCompanySeeder extends Seeder
         } finally {
             Carbon::setTestNow($this->realNow);
         }
+
+        return 'ตัวอย่าง MOTS: เพิ่มแล้ว ใบงาน '.$visit->visit_no.' "'.self::MOTS_TITLE.'" (สถานะอนุมัติแล้ว)';
     }
 
     /**

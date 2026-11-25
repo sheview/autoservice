@@ -192,7 +192,8 @@ const errors = computed(() => Object.values(page.props.errors as Record<string, 
                                 >
                                     {{ visit.visit_no }}
                                 </Link>
-                                <div class="text-xs text-muted-foreground">{{ t('pm_visits.round', { round: visit.round }) }}</div>
+                                <!-- A work order opened on its own (not from a plan) has no round -->
+                                <div v-if="visit.round" class="text-xs text-muted-foreground">{{ t('pm_visits.round', { round: visit.round }) }}</div>
                             </td>
                             <td class="px-4 py-2">
                                 <div class="font-medium">{{ visit.plan ?? t('common.none') }}</div>
