@@ -32,7 +32,7 @@ beforeEach(function () {
 
     $this->line = fn (Asset $asset, array $line = []) => $line + ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => 1, 'checkout_type' => 'issue'];
     $this->send = function (array $items, array $data = [], $user = null): CheckoutRequest {
-        $this->actingAs($user ?? $this->desk)->post('/checkout-requests', $data + [
+        $this->actingAs($user ?? $this->desk)->post('/checkout-requests', $data + ['work_orders' => [workOrderFile()],
             'borrower_user_id' => $this->staff->id, 'submit' => true, 'items' => $items,
         ])->assertSessionHasNoErrors();
 
@@ -72,7 +72,7 @@ it('makes whoever may only ask for themself the receiver, whatever the form says
 
     // a user of another company is no one to choose
     $outsider = userWithRole('admin_company', [], createTenant('other'));
-    $this->actingAs($this->desk)->post('/checkout-requests', [
+    $this->actingAs($this->desk)->post('/checkout-requests', ['work_orders' => [workOrderFile()],
         'borrower_user_id' => $outsider->id, 'items' => [($this->line)($this->cables)],
     ])->assertSessionHasErrors('borrower_user_id');
 });

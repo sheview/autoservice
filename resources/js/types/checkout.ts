@@ -101,6 +101,8 @@ export interface CheckoutRequestRow {
     approved_at: string | null;
     closed_at: string | null;
     items: CheckoutLineRow[];
+    // The paper job sheets attached (PDF or photo), when there is no ticket in the system (request and draft pages).
+    work_orders?: { id: number; name: string; mime: string; size: number; url: string }[];
     // The request page.
     ticket?: CheckoutTicketOption | null;
     contract?: { id: number; contract_no: string; title: string } | null;

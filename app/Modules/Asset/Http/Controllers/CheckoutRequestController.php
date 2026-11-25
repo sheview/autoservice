@@ -48,9 +48,11 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -153,6 +155,7 @@ class CheckoutRequestController extends Controller
             'contract' => $checkout->contract_id && $this->modules->enabled('contract')
                 ? (app(ContractLabels::class)->handle([$checkout->contract_id])[$checkout->contract_id] ?? null) : null,
         ], $purchases, $onHand, $tickets, $this->contractsOf($checkout));
+        $row['work_orders'] = $this->workOrders($checkout);
         $row['items'] = collect($row['items'])->map(fn (array $item) => [
             ...$item,
             'fulfillments' => $checkout->items->firstWhere('id', $item['id'])->fulfillments
@@ -194,6 +197,7 @@ class CheckoutRequestController extends Controller
         $parts = $partIds === [] || ! $this->modules->enabled('inventory') ? [] : app(PartsForCheckout::class)->handle($partIds);
         $tickets = $this->ticketsOf($checkout, $request->user());
         $row = RequestRow::of($checkout, tickets: $tickets);
+        $row['work_orders'] = $this->workOrders($checkout);
         $row['items'] = collect($row['items'])->map(function (array $item) use ($checkout, $held, $parts) {
             $line = $checkout->items->firstWhere('id', $item['id']);
             $asset = $line->item_type === CheckoutItem::TYPE_ASSET ? $line->asset : null;
@@ -381,6 +385,37 @@ class CheckoutRequestController extends Controller
         return response()->stream(fn () => fpassthru($photo->stream()), 200, [
             'Content-Type' => $photo->mime_type, 'X-Content-Type-Options' => 'nosniff', 'Cache-Control' => 'private, max-age=86400',
         ]);
+    }
+
+    /** A paper job sheet the request refers to (PDF or photo), opened in the browser. */
+    public function workOrder(CheckoutRequest $checkout, int $media): StreamedResponse
+    {
+        Gate::authorize('view', $checkout);
+        $file = $checkout->getMedia(CheckoutRequest::WORK_ORDERS)->firstWhere('id', $media);
+        abort_if($file === null, 404);
+
+        return response()->stream(fn () => fpassthru($file->stream()), 200, [
+            'Content-Type' => $file->mime_type,
+            'Content-Disposition' => HeaderUtils::makeDisposition(HeaderUtils::DISPOSITION_INLINE, $file->file_name, Str::ascii($file->file_name) ?: 'work-order'),
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, max-age=86400',
+        ]);
+    }
+
+    /**
+     * The paper job sheets of a request, for its pages.
+     *
+     * @return list<array{id: int, name: string, mime: string, size: int, url: string}>
+     */
+    private function workOrders(CheckoutRequest $checkout): array
+    {
+        return $checkout->getMedia(CheckoutRequest::WORK_ORDERS)->map(fn ($media) => [
+            'id' => $media->id,
+            'name' => $media->file_name,
+            'mime' => $media->mime_type,
+            'size' => (int) $media->size,
+            'url' => route('asset.requests.work-order', [$checkout, $media->id]),
+        ])->values()->all();
     }
 
     /** The form as an A4 page for the browser to print (works without the PDF service). */

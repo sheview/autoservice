@@ -34,7 +34,7 @@ beforeEach(function () {
     $this->asset = fn (Asset $asset, array $line = []) => $line + ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $asset->id, 'qty' => 1, 'checkout_type' => 'issue'];
     $this->part = fn (int $qty, array $line = []) => $line + ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => $qty];
     // Sends a request as helpdesk for the staff member (submit = false keeps it a draft).
-    $this->send = fn (array $items, array $data = [], $user = null) => $this->actingAs($user ?? $this->desk)->post('/checkout-requests', $data + [
+    $this->send = fn (array $items, array $data = [], $user = null) => $this->actingAs($user ?? $this->desk)->post('/checkout-requests', $data + ['work_orders' => [workOrderFile()],
         'borrower_user_id' => $this->staff->id, 'purpose' => 'New staff', 'needed_by' => '2026-10-10', 'submit' => true, 'items' => $items,
     ]);
     $this->approved = function (array $items, array $data = []) {
@@ -101,7 +101,8 @@ it('offers a purchase request on the form to those who may open one', function (
 });
 
 it('checks the lines: parts need the ticket, loans a due date, assets enough left', function () {
-    ($this->send)([($this->part)(2)])->assertSessionHasErrors('items.0.ticket_id');
+    // no ticket and no paper job sheet either
+    ($this->send)([($this->part)(2)], ['work_orders' => []])->assertSessionHasErrors('items.0.ticket_id');
     ($this->send)([($this->asset)($this->notebook, ['checkout_type' => 'loan'])])->assertSessionHasErrors('items.0');
     ($this->send)([])->assertSessionHasErrors('items');
     ($this->send)([($this->part)(2)], ['ticket_id' => 999999])->assertSessionHasErrors('ticket_id');
@@ -538,4 +539,58 @@ it('shows on the asset list who uses each asset and who has it out on a form unt
 
     $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasNoErrors();
     expect($row()['holders'])->toBe([]);
+});
+
+it('sends a request only with a ticket on a line or its paper job sheet (PDF or photo), a draft either way', function () {
+    $loan = fn () => ($this->asset)($this->notebook, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-15']);
+
+    // neither: kept as a draft, not sent
+    ($this->send)([$loan()], ['work_orders' => []])->assertSessionHasErrors('work_orders');
+    $draft = CheckoutRequest::latest('id')->first();
+    expect($draft->status)->toBe('draft');
+
+    // the paper job sheet attached to the draft, then sent
+    $this->actingAs($this->desk)->put("/checkout-requests/{$draft->ulid}", [
+        'borrower_user_id' => $this->staff->id, 'submit' => true, 'items' => [$loan()],
+        'work_orders' => [workOrderFile(), UploadedFile::fake()->image('sheet-page-2.jpg')],
+    ])->assertSessionHasNoErrors();
+    expect($draft->fresh()->status)->toBe('pending');
+    $files = $draft->fresh()->getMedia(CheckoutRequest::WORK_ORDERS);
+    expect($files->pluck('mime_type')->sort()->values()->all())->toBe(['application/pdf', 'image/jpeg']);
+
+    // on the request's page, to open (who may see the request only)
+    $this->actingAs($this->desk)->get("/checkout-requests/{$draft->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->has('request.work_orders', 2)->where('request.work_orders.0.name', 'job-sheet.pdf'));
+    $this->actingAs($this->desk)->get("/checkout-requests/{$draft->ulid}/work-orders/{$files->first()->id}")
+        ->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+    $other = userWithRole('user');
+    $this->actingAs($other)->get("/checkout-requests/{$draft->ulid}/work-orders/{$files->first()->id}")->assertForbidden();
+
+    // a ticket on a line is enough
+    // (the notebook is taken now: a cable from the lot)
+    $cable = fn () => ($this->asset)($this->cables, ['qty' => 1, 'checkout_type' => 'loan', 'due_return_date' => '2026-10-15']);
+    ($this->send)([$cable() + ['ticket_id' => $this->ticket->id]], ['work_orders' => []])->assertSessionHasNoErrors();
+    expect(CheckoutRequest::latest('id')->first()->status)->not->toBe('draft');
+
+    // a draft that drops its only sheet cannot be sent
+    ($this->send)([$cable()], ['submit' => false])->assertSessionHasNoErrors();
+    $second = CheckoutRequest::latest('id')->first();
+    $sheet = $second->getFirstMedia(CheckoutRequest::WORK_ORDERS);
+    $this->actingAs($this->desk)->put("/checkout-requests/{$second->ulid}", [
+        'borrower_user_id' => $this->staff->id, 'submit' => true, 'items' => [$cable()], 'remove_work_orders' => [$sheet->id],
+    ])->assertSessionHasErrors('work_orders');
+    expect($second->fresh()->getMedia(CheckoutRequest::WORK_ORDERS))->toHaveCount(0);
+});
+
+it('takes only a PDF or a photo as the job sheet, five at most', function () {
+    $loan = ($this->asset)($this->notebook, ['checkout_type' => 'loan', 'due_return_date' => '2026-10-15']);
+
+    ($this->send)([$loan], ['work_orders' => [UploadedFile::fake()->create('sheet.docx', 10)]])->assertSessionHasErrors('work_orders.0');
+    // named .pdf, but a script inside (a real file: its type is read from what is in it)
+    $script = tempnam(sys_get_temp_dir(), 'wo');
+    file_put_contents($script, "<?php echo 'x'; ?>
+");
+    ($this->send)([$loan], ['work_orders' => [new UploadedFile($script, 'sheet.pdf', null, null, true)]])->assertSessionHasErrors('work_orders.0');
+    ($this->send)([$loan], ['work_orders' => array_map(fn () => workOrderFile(), range(1, 6))])->assertSessionHasErrors('work_orders');
+    expect(CheckoutRequest::count())->toBe(0);
 });

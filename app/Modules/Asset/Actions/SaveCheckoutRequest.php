@@ -39,7 +39,8 @@ class SaveCheckoutRequest
      *     items: list<array{item_type: string, asset_id?: int|null, part_id?: int|null, checkout_type?: string|null,
      *     qty?: int|null, due_return_date?: string|null, note?: string|null, purchase_request_id?: int|null,
      *     purpose?: string|null, purpose_other?: string|null, customer_name?: string|null, ticket_id?: int|null,
-     *     replaced_serial?: string|null, replaced_photo?: UploadedFile|null, replaced_photo_id?: int|null}>}  $data  validated
+     *     replaced_serial?: string|null, replaced_photo?: UploadedFile|null, replaced_photo_id?: int|null}>,
+     *     work_orders?: list<UploadedFile>, remove_work_orders?: list<int>}  $data  validated
      * @param  string|null  $outsideRequester  a person of another company asking through a share (no $actor here,
      *                                         and no ticket of this company: the job is theirs)
      */
@@ -55,11 +56,16 @@ class SaveCheckoutRequest
             $had = $request?->getMedia(CheckoutRequest::REPLACED_PHOTOS)->pluck('id')->all() ?? [];
             $photoOf = fn (int $index) => ($data['items'][$index]['replaced_photo'] ?? null) instanceof UploadedFile
                 || in_array($lines[$index]['replaced_photo_id'], $had, true);
+            // The paper job sheet(s): those the draft keeps, and those sent now.
+            $removed = array_map('intval', $data['remove_work_orders'] ?? []);
+            $newSheets = array_values(array_filter($data['work_orders'] ?? [], fn ($file) => $file instanceof UploadedFile));
+            $keptSheets = $request?->getMedia(CheckoutRequest::WORK_ORDERS)->reject(fn ($media) => in_array($media->id, $removed, true)) ?? collect();
+            $hasWorkOrder = $newSheets !== [] || $keptSheets->isNotEmpty();
             if ($outsideRequester === null) {
-                // A part goes on a ticket (its cost lands there), or else comes with the serial or a
-                // photo of the old part it replaces.
+                // A part goes on a ticket (its cost lands there), or else comes with the paper job
+                // sheet, or the serial or a photo of the old part it replaces.
                 foreach ($lines as $index => $line) {
-                    if ($line['item_type'] === CheckoutItem::TYPE_PART && $line['ticket_id'] === null
+                    if ($line['item_type'] === CheckoutItem::TYPE_PART && $line['ticket_id'] === null && ! $hasWorkOrder
                         && trim((string) $line['replaced_serial']) === '' && ! $photoOf($index)) {
                         throw ValidationException::withMessages(["items.{$index}.ticket_id" => __('asset.requests.ticket_required')]);
                     }
@@ -107,6 +113,12 @@ class SaveCheckoutRequest
             }
             $used = $request->items()->pluck('replaced_photo_id')->filter()->all();
             $request->getMedia(CheckoutRequest::REPLACED_PHOTOS)->reject(fn ($media) => in_array($media->id, $used))->each->delete();
+
+            $request->getMedia(CheckoutRequest::WORK_ORDERS)->filter(fn ($media) => in_array($media->id, $removed, true))->each->delete();
+            foreach ($newSheets as $sheet) {
+                $request->addMedia($sheet)->usingName(pathinfo($sheet->getClientOriginalName(), PATHINFO_FILENAME))
+                    ->toMediaCollection(CheckoutRequest::WORK_ORDERS);
+            }
 
             return $request->load('items');
         });

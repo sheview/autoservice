@@ -243,6 +243,17 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
 
             <RequestSteps :request="request" />
 
+            <!-- The paper job sheets the request refers to (no ticket in the system) -->
+            <section v-if="request.work_orders?.length" class="space-y-1 rounded-md border p-3">
+                <h3 class="text-sm font-semibold">{{ t('requests.work_orders') }}</h3>
+                <ul class="space-y-1 text-sm">
+                    <li v-for="file in request.work_orders" :key="file.id">
+                        <a :href="file.url" target="_blank" class="text-violet-600 hover:underline">{{ file.name }}</a>
+                    </li>
+                </ul>
+            </section>
+            <InputError :message="errors.work_orders" />
+
             <!-- The receiver: confirm what was handed out, or report what was wrong -->
             <section
                 v-if="can.confirm_receipt && unconfirmed.length"

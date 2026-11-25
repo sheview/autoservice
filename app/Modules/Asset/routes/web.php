@@ -63,6 +63,8 @@ Route::middleware(['auth', 'verified', 'module:asset'])->name('asset.')->group(f
     }
     Route::get('checkout-requests/{checkout}/replaced-photos/{media}', [CheckoutRequestController::class, 'replacedPhoto'])
         ->whereNumber('media')->name('requests.replaced-photo');
+    Route::get('checkout-requests/{checkout}/work-orders/{media}', [CheckoutRequestController::class, 'workOrder'])
+        ->whereNumber('media')->name('requests.work-order');
     Route::get('checkout-requests/{checkout}/print', [CheckoutRequestController::class, 'print'])->name('requests.print');
     Route::get('checkout-requests/{checkout}/pdf', [CheckoutRequestController::class, 'pdf'])->name('requests.pdf');
     // What was handed out, as a delivery note.

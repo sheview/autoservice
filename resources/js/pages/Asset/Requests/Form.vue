@@ -8,10 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
+import { shrinkImage } from '@/lib/image';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import type { CheckoutItemOption, CheckoutRequestRow, CheckoutTicketOption } from '@/types/checkout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { CopyCheck, Plus, ShoppingCart, Trash2, X } from 'lucide-vue-next';
+import { Check, CopyCheck, FileText, Paperclip, Plus, ShoppingCart, Trash2, X } from 'lucide-vue-next';
 import { computed, onMounted, ref, watch } from 'vue';
 
 /**
@@ -372,6 +373,38 @@ const purposeErrors = (index: number): Record<string, string | undefined> =>
     Object.fromEntries(PURPOSE_FIELDS.map((field) => [field, (form.errors as Record<string, string>)[`items.${index}.${field}`]]));
 
 // --- Save -----------------------------------------------------------------------------------
+// --- The job sheet: a ticket on a line, else its paper (PDF or photo) attached; one is needed to send ---
+const MAX_SHEETS = 5;
+const SHEET_MB = 10;
+const keptSheets = ref((props.request?.work_orders ?? []).map((file) => ({ ...file })));
+const removedSheets = ref<number[]>([]);
+const newSheets = ref<File[]>([]);
+const sheetError = ref('');
+const hasTicket = computed(() => lines.value.some((line) => line.about.ticket?.id));
+const sheetCount = computed(() => keptSheets.value.length + newSheets.value.length);
+const hasReference = computed(() => hasTicket.value || sheetCount.value > 0);
+const addSheets = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const chosen = Array.from(input.files ?? []);
+    input.value = '';
+    sheetError.value = '';
+    for (const original of chosen) {
+        if (sheetCount.value >= MAX_SHEETS) break;
+        const isPdf = original.type === 'application/pdf' || /\.pdf$/i.test(original.name);
+        // A photo is made small first (a phone photo of several MB fits afterwards).
+        const file = isPdf ? original : await shrinkImage(original);
+        if (file.size > SHEET_MB * 1024 * 1024) {
+            sheetError.value = t('requests.work_order_too_big', { name: original.name, mb: SHEET_MB });
+            continue;
+        }
+        newSheets.value.push(file);
+    }
+};
+const removeKept = (id: number) => {
+    removedSheets.value.push(id);
+    keptSheets.value = keptSheets.value.filter((file) => file.id !== id);
+};
+
 const save = (submit: boolean, thenPurchase: string | null = null) => {
     form.transform((data) => ({
         borrower_user_id: !props.can.forOthers ? me.id : borrowerKind.value === 'staff' ? data.borrower_user_id : null,
@@ -380,6 +413,8 @@ const save = (submit: boolean, thenPurchase: string | null = null) => {
         needed_by: data.needed_by || null,
         submit,
         then_purchase: thenPurchase,
+        work_orders: newSheets.value,
+        remove_work_orders: removedSheets.value,
         // Files go as a form: a change is a POST that says PUT.
         ...(props.request ? { _method: 'put' } : {}),
         items: lines.value.map((line) => ({
@@ -694,6 +729,45 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                     </p>
                     <InputError v-for="message in lineErrors(index)" :key="message" :message="message" />
                 </div>
+            </section>
+
+            <!-- The job sheet: a ticket on a line, or its paper attached (PDF or photo) -->
+            <section class="space-y-2 rounded-md border p-4" :class="hasReference ? '' : 'border-amber-300 dark:border-amber-800'">
+                <h3 class="text-sm font-semibold">{{ t('requests.work_order_title') }} <span class="text-red-600">*</span></h3>
+                <p v-if="hasTicket" class="flex items-center gap-1 text-sm text-green-700 dark:text-green-400">
+                    <Check class="h-4 w-4" />{{ t('requests.work_order_has_ticket') }}
+                </p>
+                <p class="text-xs text-muted-foreground">{{ t('requests.work_order_hint') }}</p>
+                <ul v-if="sheetCount" class="space-y-1 text-sm">
+                    <li v-for="file in keptSheets" :key="`kept-${file.id}`" class="flex items-center gap-2">
+                        <FileText class="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <a :href="file.url" target="_blank" class="min-w-0 truncate text-violet-600 hover:underline">{{ file.name }}</a>
+                        <button type="button" class="text-muted-foreground hover:text-red-600" :aria-label="t('common.delete')" @click="removeKept(file.id)">
+                            <X class="h-4 w-4" />
+                        </button>
+                    </li>
+                    <li v-for="(file, i) in newSheets" :key="`new-${i}`" class="flex items-center gap-2">
+                        <FileText class="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <span class="min-w-0 truncate">{{ file.name }}</span>
+                        <button type="button" class="text-muted-foreground hover:text-red-600" :aria-label="t('common.delete')" @click="newSheets.splice(i, 1)">
+                            <X class="h-4 w-4" />
+                        </button>
+                    </li>
+                </ul>
+                <label
+                    v-if="sheetCount < MAX_SHEETS"
+                    class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 text-sm"
+                >
+                    <Paperclip class="h-4 w-4" />{{ t('requests.work_order_add') }}
+                    <input type="file" accept="application/pdf,.pdf,image/*" multiple class="hidden" @change="addSheets" />
+                </label>
+                <InputError :message="sheetError" />
+                <InputError
+                    :message="
+                        (form.errors as Record<string, string>).work_orders ||
+                        Object.entries(form.errors as Record<string, string>).find(([key]) => key.startsWith('work_orders.'))?.[1]
+                    "
+                />
             </section>
 
             <div class="flex flex-wrap gap-2">

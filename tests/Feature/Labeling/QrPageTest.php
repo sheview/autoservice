@@ -58,7 +58,7 @@ it('shows signed-in staff the whole device, its jobs and what they may do next',
 
 it('counts free devices from the same source as the asset list', function () {
     // One device lent out: it reads 0 of 1, the model 3 of 4 free.
-    $request = app(SaveCheckoutRequest::class)->handle(null, [
+    $request = app(SaveCheckoutRequest::class)->handle(null, ['work_orders' => [workOrderFile()],
         'borrower_user_id' => $this->helpdesk->id,
         'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $this->asset->id, 'checkout_type' => 'loan', 'qty' => 1, 'due_return_date' => now()->addWeek()->toDateString()]],
     ], $this->helpdesk);

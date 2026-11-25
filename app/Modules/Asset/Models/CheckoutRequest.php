@@ -25,6 +25,13 @@ class CheckoutRequest extends Model implements HasMedia
 
     public const REPLACED_PHOTOS = 'replaced_photos';
 
+    /** The paper job sheet (PDF or photo) a request refers to when it has no ticket in the system. */
+    public const WORK_ORDERS = 'work_orders';
+
+    public const WORK_ORDER_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+
+    public const MAX_WORK_ORDERS = 5;
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_PENDING = 'pending';
@@ -93,5 +100,6 @@ class CheckoutRequest extends Model implements HasMedia
     {
         $this->addMediaCollection(self::REPLACED_PHOTOS)
             ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
+        $this->addMediaCollection(self::WORK_ORDERS)->acceptsMimeTypes(self::WORK_ORDER_TYPES);
     }
 }

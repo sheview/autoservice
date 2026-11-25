@@ -176,7 +176,7 @@ it('ties the purchase to the issue/loan draft it was asked from, and hands it ou
     $spare = createAsset(createAssetCategory(['name' => 'Mouse']), ['name' => 'Mouse', 'status' => Asset::STATUS_SPARE]);
 
     // nothing to hand out was found: the draft is kept and the purchase request opens for it
-    $this->actingAs($this->staff)->post('/checkout-requests', [
+    $this->actingAs($this->staff)->post('/checkout-requests', ['work_orders' => [workOrderFile()],
         'purpose' => 'New staff', 'submit' => true, 'then_purchase' => 'Notebook Lenovo E14',
         'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $spare->id, 'qty' => 1, 'checkout_type' => 'issue']],
     ])->assertRedirect();
@@ -224,7 +224,7 @@ it('approves at once a request of only what an approved purchase bought', functi
     $pr = ($this->approved)(['quantity' => 1]);
     ($this->receive)($pr, ['quantity' => 1, 'serials' => 'SN1']);
     $notebook = Asset::where('name', 'Notebook Lenovo E14')->sole();
-    $send = fn (int $qty) => $this->actingAs($this->buyer)->post('/checkout-requests', [
+    $send = fn (int $qty) => $this->actingAs($this->buyer)->post('/checkout-requests', ['work_orders' => [workOrderFile()],
         'borrower_user_id' => $this->staff->id, 'purpose' => 'x', 'submit' => true,
         'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $notebook->id, 'qty' => $qty, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id]],
     ]);
@@ -284,7 +284,7 @@ it('offers to hand out only the devices still free, whichever went out first', f
     [$first, $second] = Asset::where('name', 'Notebook Lenovo E14')->orderBy('id')->get()->all();
 
     // the second device goes out on a request of its own
-    $this->actingAs($this->buyer)->post('/checkout-requests', [
+    $this->actingAs($this->buyer)->post('/checkout-requests', ['work_orders' => [workOrderFile()],
         'borrower_user_id' => $this->staff->id, 'purpose' => 'x', 'submit' => true,
         'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'asset', 'asset_id' => $second->id, 'qty' => 1, 'checkout_type' => 'issue', 'purchase_request_id' => $pr->id]],
     ])->assertSessionHasNoErrors();

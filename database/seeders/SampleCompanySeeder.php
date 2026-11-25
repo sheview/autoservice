@@ -389,6 +389,22 @@ class SampleCompanySeeder extends Seeder
         Carbon::setTestNow(now()->addMinutes($minutes));
     }
 
+    /** A photo of a paper job sheet (a PNG with a few lines on it), as a technician would attach it. */
+    private function workOrderScan(): UploadedFile
+    {
+        $image = imagecreatetruecolor(600, 400);
+        imagefill($image, 0, 0, imagecolorallocate($image, 250, 250, 245));
+        $ink = imagecolorallocate($image, 40, 40, 60);
+        imagerectangle($image, 20, 20, 579, 379, $ink);
+        for ($y = 70; $y < 360; $y += 30) {
+            imageline($image, 40, $y, 40 + mt_rand(250, 520), $y, $ink);
+        }
+        $path = tempnam(sys_get_temp_dir(), 'job').'.png';
+        imagepng($image, $path);
+
+        return new UploadedFile($path, 'ใบงาน.png', 'image/png', null, true);
+    }
+
     /** A signature drawn on a screen, as the link page sends it (a PNG data URL): a few strokes. */
     private function scribble(int $seed): string
     {
@@ -955,7 +971,18 @@ class SampleCompanySeeder extends Seeder
      */
     private function checkouts(): void
     {
-        $save = app(SaveCheckoutRequest::class);
+        // A request with no ticket comes with its paper job sheet (a photo), as the form asks.
+        $save = new class($this->workOrderScan(...))
+        {
+            public function __construct(private \Closure $scan) {}
+
+            public function handle(?CheckoutRequest $request, array $data, User $actor): CheckoutRequest
+            {
+                $ticket = ($data['ticket_id'] ?? null) ?? collect($data['items'] ?? [])->pluck('ticket_id')->filter()->first();
+
+                return app(SaveCheckoutRequest::class)->handle($request, $ticket === null ? $data + ['work_orders' => [($this->scan)()]] : $data, $actor);
+            }
+        };
         $submit = app(SubmitCheckoutRequest::class);
         $approve = fn (CheckoutRequest $request) => $request->fresh()->status === CheckoutRequest::STATUS_PENDING
             ? app(ApproveCheckoutRequest::class)->handle($request->fresh(), $this->admin())

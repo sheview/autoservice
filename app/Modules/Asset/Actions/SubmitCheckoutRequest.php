@@ -34,6 +34,9 @@ class SubmitCheckoutRequest
         if ($request->status !== CheckoutRequest::STATUS_DRAFT) {
             throw ValidationException::withMessages(['request' => __('asset.requests.not_draft')]);
         }
+        if (! $this->hasReference($request)) {
+            throw ValidationException::withMessages(['work_orders' => __('asset.requests.reference_required')]);
+        }
 
         return DB::transaction(function () use ($request, $actor) {
             $request->update(['status' => CheckoutRequest::STATUS_PENDING, 'submitted_at' => now()]);
@@ -87,5 +90,22 @@ class SubmitCheckoutRequest
 
             return $limit !== null && $cost !== null && $cost * $item->qty_requested <= $limit;
         });
+    }
+
+    /**
+     * What the request is for, on file: a ticket (of the request or a line), else the paper job
+     * sheet attached (PDF or photo). Not asked of a hand-over of what a purchase request bought (that
+     * request is the reference) nor of a request from another company through a share (the job is theirs).
+     */
+    private function hasReference(CheckoutRequest $request): bool
+    {
+        $items = $request->items()->get(['ticket_id', 'purchase_request_id']);
+
+        return $request->requester_id === null
+            || $request->ticket_id !== null
+            || $items->contains(fn ($item) => $item->ticket_id !== null)
+            || ($items->isNotEmpty() && $items->every(fn ($item) => $item->purchase_request_id !== null))
+            // Asked of the database: the request may still hold its media from before a file was added.
+            || $request->media()->where('collection_name', CheckoutRequest::WORK_ORDERS)->exists();
     }
 }

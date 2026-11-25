@@ -596,6 +596,8 @@ class DemoExtrasSeeder extends Seeder
             'purpose' => 'ยืมไปนำเสนอลูกค้านอกสถานที่',
             'needed_by' => $realNow->addDays(2)->toDateString(),
             'items' => [$loan($assets[0], $realNow->addDays(9)->toDateString())],
+            // No ticket: its paper job sheet (a request is sent with one or the other).
+            'work_orders' => [$this->jobSheetPhoto()],
         ], $helpdesk);
         $submit->handle($request, $helpdesk);
 
@@ -611,7 +613,7 @@ class DemoExtrasSeeder extends Seeder
             'purpose' => 'ใช้ในงานซ่อมตามใบแจ้งซ่อม',
             'needed_by' => $realNow->subDays(5)->toDateString(),
             'items' => $items,
-        ], $technician);
+        ] + ($part && $ticket ? [] : ['work_orders' => [$this->jobSheetPhoto()]]), $technician);
         $submit->handle($request, $technician);
         Carbon::setTestNow(now()->addHours(2));
         $approve->handle($request, $admin);
@@ -1011,5 +1013,21 @@ class DemoExtrasSeeder extends Seeder
     private function staff(string $email): User
     {
         return User::where('email', $email)->firstOrFail();
+    }
+
+    /** A photo of a paper job sheet (a PNG with a few lines on it). */
+    private function jobSheetPhoto(): UploadedFile
+    {
+        $image = imagecreatetruecolor(600, 400);
+        imagefill($image, 0, 0, imagecolorallocate($image, 250, 250, 245));
+        $ink = imagecolorallocate($image, 40, 40, 60);
+        imagerectangle($image, 20, 20, 579, 379, $ink);
+        for ($y = 70; $y < 360; $y += 30) {
+            imageline($image, 40, $y, 40 + mt_rand(250, 520), $y, $ink);
+        }
+        $path = tempnam(sys_get_temp_dir(), 'job').'.png';
+        imagepng($image, $path);
+
+        return new UploadedFile($path, 'job-sheet.png', 'image/png', null, true);
     }
 }

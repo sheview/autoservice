@@ -90,6 +90,19 @@ function asTenant(Tenant $tenant, callable $callback): mixed
 }
 
 /**
+ * A paper job sheet (PDF) for an issue/loan request with no ticket: a request is sent with one or
+ * the other (SubmitCheckoutRequest).
+ */
+function workOrderFile(): UploadedFile
+{
+    return UploadedFile::fake()->createWithContent('job-sheet.pdf', '%PDF-1.4
+1 0 obj << /Type /Catalog >> endobj
+trailer << /Root 1 0 R >>
+%%EOF
+');
+}
+
+/**
  * A user with one role, created in $tenant (default: the current tenant).
  */
 function userWithRole(string $role, array $attributes = [], ?Tenant $tenant = null): User

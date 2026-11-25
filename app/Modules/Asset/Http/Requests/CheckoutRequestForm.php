@@ -40,6 +40,9 @@ class CheckoutRequestForm extends FormRequest
         }
     }
 
+    /** A scanned job sheet may be a few pages of PDF. */
+    public const WORK_ORDER_KB = 10240;
+
     public function rules(): array
     {
         return [
@@ -78,6 +81,11 @@ class CheckoutRequestForm extends FormRequest
             }],
             // Save the draft, then open a purchase request for this (nothing to hand out was found).
             'then_purchase' => ['nullable', 'string', 'max:255'],
+            // The paper job sheet when there is no ticket (PDF or photo), and those of the draft to drop.
+            'work_orders' => ['nullable', 'array', 'max:'.CheckoutRequest::MAX_WORK_ORDERS],
+            'work_orders.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:'.self::WORK_ORDER_KB],
+            'remove_work_orders' => ['nullable', 'array'],
+            'remove_work_orders.*' => ['integer'],
         ];
     }
 

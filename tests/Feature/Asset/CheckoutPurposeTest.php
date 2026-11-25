@@ -122,6 +122,8 @@ it('issues a part without a ticket when the old part\'s serial or photo comes wi
     // Approved and issued with no ticket: the stock goes out all the same.
     $this->actingAs($this->desk)->put("/checkout-requests/{$request->ulid}", [
         'borrower_user_id' => $this->staff->id, 'submit' => true, 'items' => [$part(['replaced_serial' => 'RAM-OLD-2'])],
+        // sent with its paper job sheet (no ticket in the system)
+        'work_orders' => [workOrderFile()],
     ])->assertSessionHasNoErrors();
     $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
     $item = $request->items()->sole();

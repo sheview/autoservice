@@ -24,7 +24,7 @@ beforeEach(function () {
 
     // The office sends the requests (asset-checkouts.create: for anyone, or someone from outside), one line each.
     $this->checkout = function (Asset $asset, array $data): CheckoutRequest {
-        $this->actingAs($this->admin)->post('/checkout-requests', [
+        $this->actingAs($this->admin)->post('/checkout-requests', ['work_orders' => [workOrderFile()],
             'borrower_user_id' => $data['borrower_user_id'] ?? null,
             'borrower_name' => $data['borrower_name'] ?? null,
             'contract_id' => $data['contract_id'] ?? null,
