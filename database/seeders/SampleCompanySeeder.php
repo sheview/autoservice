@@ -378,6 +378,27 @@ class SampleCompanySeeder extends Seeder
         Carbon::setTestNow(now()->addMinutes($minutes));
     }
 
+    /** A signature drawn on a screen, as the link page sends it (a PNG data URL): a few strokes. */
+    private function scribble(int $seed): string
+    {
+        $image = imagecreatetruecolor(300, 100);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        imagesetthickness($image, 3);
+        $ink = imagecolorallocate($image, 20, 30, 90);
+        mt_srand($seed);
+        [$x, $y] = [20, 60];
+        for ($i = 0; $i < 12; $i++) {
+            [$nx, $ny] = [$x + mt_rand(12, 26), mt_rand(25, 80)];
+            imageline($image, $x, $y, $nx, $ny, $ink);
+            [$x, $y] = [$nx, $ny];
+        }
+        mt_srand();
+        ob_start();
+        imagepng($image);
+
+        return 'data:image/png;base64,'.base64_encode((string) ob_get_clean());
+    }
+
     // ---------------------------------------------------------------- People, customers, assets, contracts
 
     /**
@@ -777,7 +798,8 @@ class SampleCompanySeeder extends Seeder
                 app(SubmitFieldReport::class)->handle($link, [
                     'symptoms' => ['เชื่อมต่อเครือข่ายไม่ได้'], 'solutions' => ['เปลี่ยนสายสัญญาณ'],
                     'parts' => 'สาย UTP Cat6 3 เมตร 1 เส้น', 'note' => 'ทดสอบแล้วใช้งานได้ปกติ',
-                    'signer_name' => null, 'signature' => null,
+                    // Signed on the screen: the technician, then the customer.
+                    'signer_name' => 'คุณวิภา ผู้ใช้งาน', 'tech_signature' => $this->scribble(1), 'signature' => $this->scribble(2),
                 ]);
             }
             if ($i === 3) {

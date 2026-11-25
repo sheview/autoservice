@@ -122,6 +122,12 @@ class TicketSheet
                 'signer' => $sig->getCustomProperty('signer'),
                 'signed_at' => $sig->getCustomProperty('signed_at'),
             ] : null,
+            // The technician's, signed on the screen before the customer (through the ticket's link).
+            'techSignature' => ($tech = $ticket->getFirstMedia(Ticket::TECH_SIGNATURE)) ? [
+                'image' => 'data:image/png;base64,'.base64_encode(stream_get_contents($tech->stream())),
+                'signer' => $tech->getCustomProperty('signer'),
+                'signed_at' => $tech->getCustomProperty('signed_at'),
+            ] : null,
             // The score boxes for the customer to tick; already ticked when the survey was answered.
             'rating' => $this->modules->enabled('survey') ? [
                 'score' => $survey !== null && $survey['answered'] ? $survey['score'] : null,

@@ -14,8 +14,10 @@ use Illuminate\Validation\ValidationException;
  * What comes back through a ticket's link, without an account:
  *
  *   work  the outside technician's report (what was wrong, what was done, parts they used, a
- *         note), photos before / after, and the customer's sign-off: signed on the screen, or a
- *         photo of the printed job sheet signed on paper
+ *         note), photos before / after, and always a sign-off, one of:
+ *           - on paper: the printed job sheet the customer filled in and signed, as a photo;
+ *           - on the screen: what was done (a solution at least), the technician's signature,
+ *             then the customer's.
  *   sign  the customer's signature on the screen only
  *
  * It fills the ticket's repair report and signature (the customer who signed is who approved the
@@ -28,7 +30,7 @@ class SubmitFieldReport
 
     /**
      * @param  array{symptoms?: list<string>, solutions?: list<string>, parts?: string|null, note?: string|null,
-     *     signer_name?: string|null, signature?: string|null}  $data  validated
+     *     signer_name?: string|null, signature?: string|null, tech_signature?: string|null}  $data  validated
      * @param  array{before?: list<UploadedFile>, after?: list<UploadedFile>, signed_sheet?: UploadedFile|null}  $files
      */
     public function handle(TicketFieldLink $link, array $data, array $files = []): Ticket
@@ -43,6 +45,18 @@ class SubmitFieldReport
         if (! $work && ! $signature) {
             throw ValidationException::withMessages(['signature' => __('service.field_links.signature_required')]);
         }
+        // The work is sent with its sign-off only: the paper sheet, or both signatures on the screen.
+        $techSignature = $work && $sheet === null && filled($data['tech_signature'] ?? null);
+        if ($work && $sheet === null) {
+            $missing = array_filter([
+                'solutions' => ($data['solutions'] ?? []) === [] ? __('service.field_links.solution_required') : null,
+                'tech_signature' => ! $techSignature ? __('service.field_links.tech_signature_required') : null,
+                'signature' => ! $signature ? __('service.field_links.customer_signature_required') : null,
+            ]);
+            if ($missing !== []) {
+                throw ValidationException::withMessages($missing);
+            }
+        }
         if (($signature || $sheet) && blank($data['signer_name'] ?? null)) {
             throw ValidationException::withMessages(['signer_name' => __('service.field_links.signer_required')]);
         }
@@ -52,13 +66,14 @@ class SubmitFieldReport
             filled($data['parts'] ?? null) ? __('service.field_links.parts_line', ['parts' => $data['parts']]) : null,
             $data['note'] ?? null,
         ])->filter()->implode("\n") : null;
-        if ($work && $cause === '' && ! $signature && $sheet === null) {
-            throw ValidationException::withMessages(['symptoms' => __('service.field_links.nothing')]);
+        // Signed off on paper with nothing typed: what was done is written on the sheet.
+        if ($work && $cause === '' && $sheet !== null) {
+            $cause = __('service.field_links.on_paper');
         }
 
         $by = __('service.field_links.by', ['name' => $link->holder_name, 'company' => $link->holder_company ?? '-']);
 
-        $ticket = DB::transaction(function () use ($link, $data, $files, $work, $signature, $sheet, $cause, $by) {
+        $ticket = DB::transaction(function () use ($link, $data, $files, $work, $signature, $techSignature, $sheet, $cause, $by) {
             $ticket = Ticket::query()->lockForUpdate()->findOrFail($link->ticket_id);
 
             if ($work && $cause !== '') {
@@ -78,6 +93,12 @@ class SubmitFieldReport
             if ($sheet !== null) {
                 $ticket->addMedia($sheet)->withCustomProperties(['stage' => 'signed_sheet', 'by' => $by, 'signer' => $data['signer_name']])
                     ->toMediaCollection(Ticket::PHOTOS);
+            }
+            if ($techSignature) {
+                $png = base64_decode(substr($data['tech_signature'], strlen('data:image/png;base64,')), true);
+                $ticket->addMediaFromString($png)->usingFileName('tech-signature.png')
+                    ->withCustomProperties(['signer' => $link->holder_name, 'signed_at' => now()->toIso8601String(), 'by' => $by])
+                    ->toMediaCollection(Ticket::TECH_SIGNATURE);
             }
             if ($signature) {
                 $png = base64_decode(substr($data['signature'], strlen('data:image/png;base64,')), true);

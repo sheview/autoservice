@@ -5,6 +5,7 @@ use App\Modules\Inventory\Models\PartUnit;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketRemovedPart;
+use Illuminate\Http\UploadedFile;
 use Inertia\Testing\AssertableInertia as Assert;
 
 /*
@@ -17,6 +18,7 @@ beforeEach(function () {
     $this->helpdesk = userWithRole('helpdesk');
     $this->admin = userWithRole('admin_company');
     $this->tech = userWithRole('technician', ['name' => 'Tech One']);
+    $this->signature = 'data:image/png;base64,'.base64_encode(UploadedFile::fake()->image('s.png', 10, 10)->getContent());
     $this->asset = createAsset(createAssetCategory(['name' => 'Server']), ['name' => 'DB server']);
     $this->ssd = createTrackedPart(['code' => 'SSD', 'name' => 'SSD 1TB'], ['S-1', 'S-2', 'S-3']);
     $this->fan = createPart(['code' => 'FAN', 'name' => 'Fan'], 5);
@@ -25,7 +27,11 @@ beforeEach(function () {
     app(AssignTicket::class)->handle($this->ticket, $this->tech->id, $this->helpdesk);
     $this->unit = fn (string $serial) => PartUnit::where('serial_number', $serial)->value('id');
     $this->close = fn (array $data) => $this->actingAs($this->tech)
-        ->post("/tickets/{$this->ticket->ulid}/close", $data + ['symptoms' => ['ดิสก์เสีย'], 'solutions' => ['เปลี่ยนอะไหล่'], 'approver_name' => 'Khun A']);
+        ->post("/tickets/{$this->ticket->ulid}/close", $data + [
+            'symptoms' => ['ดิสก์เสีย'], 'solutions' => ['เปลี่ยนอะไหล่'], 'signer_name' => 'Khun A',
+            // signed off on the screen: the technician, then the customer
+            'tech_signature' => $this->signature, 'signature' => $this->signature,
+        ]);
     // The request the close sent: approved, then each line handed out (pieces chosen for a tracked part).
     $this->handOut = function (array $pieces = []): void {
         $request = CheckoutRequest::with('items')->latest('id')->first();

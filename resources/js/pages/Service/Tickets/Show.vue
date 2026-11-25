@@ -156,6 +156,7 @@ const props = defineProps<{
     } | null;
     photos: { url: string; stage: string | null }[];
     signature: { url: string; signer: string | null } | null;
+    techSignature: { url: string; signer: string | null } | null;
     askOthersUrl: string | null;
     ipChoices?: { key: string; ip: string; cidr: string; status: string; hostname: string | null }[];
     can: {
@@ -477,7 +478,7 @@ const stepBar = computed(() => {
 
                     <TicketReviewPanel v-if="review" :ticket-ulid="ticket.ulid" :review="review" />
                     <TicketFieldLinks v-if="fieldLinks" :ticket-ulid="ticket.ulid" :links="fieldLinks" />
-                    <TicketPhotos :photos="photos" :signature="signature" />
+                    <TicketPhotos :photos="photos" :signature="signature" :tech-signature="techSignature" />
                     <TicketTrackingLink v-if="tracking" :ticket-ulid="ticket.ulid" :url="tracking.url" :can-renew="tracking.can_renew" />
                     <TicketAppointment :ticket-ulid="ticket.ulid" :appointment-at="ticket.appointment_at" :can-change="can.update" />
 

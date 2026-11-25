@@ -252,6 +252,10 @@ class TicketController extends Controller
                 'url' => route('service.tickets.media', [$ticket, $sig->id]),
                 'signer' => $sig->getCustomProperty('signer'),
             ] : null,
+            'techSignature' => ($tech = $ticket->getFirstMedia(Ticket::TECH_SIGNATURE)) ? [
+                'url' => route('service.tickets.media', [$ticket, $tech->id]),
+                'signer' => $tech->getCustomProperty('signer'),
+            ] : null,
             // The customer's tracking link (no sign-in), for staff to send; customer accounts see their tickets signed in.
             'tracking' => $user->customer_id === null && $ticket->tracking_token ? [
                 'url' => PublicUrl::forTenant($ticket->tenant, '/track/'.$ticket->tracking_token),

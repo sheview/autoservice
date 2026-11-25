@@ -67,7 +67,7 @@ it('lets the outside technician send the work back without an account, leaving t
 
     $this->post("/t/001/job/{$link->token}", [
         'symptoms' => ['กระดาษติด'], 'solutions' => ['ทำความสะอาด'], 'parts' => 'ลูกยางดึงกระดาษ 1 ชุด', 'note' => 'ลูกยางสึก',
-        'signer_name' => 'Khun Customer', 'signature' => $this->signature,
+        'signer_name' => 'Khun Customer', 'tech_signature' => $this->signature, 'signature' => $this->signature,
         'before' => [UploadedFile::fake()->image('b.jpg')], 'after' => [UploadedFile::fake()->image('a.jpg')],
     ])->assertSessionHasNoErrors();
 
@@ -76,6 +76,8 @@ it('lets the outside technician send the work back without an account, leaving t
         ->and($ticket->cause)->toContain('กระดาษติด')->toContain('ทำความสะอาด')->toContain('ลูกยางดึงกระดาษ')->toContain('ลูกยางสึก')
         ->and($ticket->approver_name)->toBe('Khun Customer')
         ->and($ticket->getFirstMedia(Ticket::SIGNATURE)->getCustomProperty('signer'))->toBe('Khun Customer')
+        // the technician signed too, under the name the link was made for
+        ->and($ticket->getFirstMedia(Ticket::TECH_SIGNATURE)->getCustomProperty('signer'))->toBe('ช่างสมชาย')
         ->and($ticket->getMedia(Ticket::PHOTOS)->map->getCustomProperty('stage')->sort()->values()->all())->toBe(['after', 'before'])
         ->and($ticket->events()->latest('id')->first()->only(['user_id', 'user_name', 'is_internal']))
         ->toBe(['user_id' => null, 'user_name' => 'ช่างสมชาย (ร้านคอมเชียงใหม่ · ผ่านลิงก์)', 'is_internal' => true])
@@ -89,7 +91,37 @@ it('lets the outside technician send the work back without an account, leaving t
     app(MoveTicket::class)->handle($ticket->fresh(), 'resolve', $this->helpdesk);
     expect($link->fresh()->reviewed_by_name)->toBe('Desk One');
     $this->actingAs($this->helpdesk)->get("/tickets/{$this->ticket->ulid}/print")->assertInertia(fn (Assert $page) => $page
-        ->where('signature.signer', 'Khun Customer')->where('signature.image', fn ($img) => str_starts_with($img, 'data:image/png;base64,')));
+        ->where('signature.signer', 'Khun Customer')->where('signature.image', fn ($img) => str_starts_with($img, 'data:image/png;base64,'))
+        ->where('techSignature.signer', 'ช่างสมชาย')->where('techSignature.image', fn ($img) => str_starts_with($img, 'data:image/png;base64,')));
+    $this->actingAs($this->helpdesk)->get("/tickets/{$this->ticket->ulid}")->assertInertia(fn (Assert $page) => $page
+        ->where('techSignature.signer', 'ช่างสมชาย'));
+});
+
+it('takes the work on the screen only with a solution, the technician\'s signature, then the customer\'s', function () {
+    $link = ($this->link)();
+    $work = ['symptoms' => ['กระดาษติด'], 'solutions' => ['ทำความสะอาดลูกยาง'], 'signer_name' => 'Khun Customer'];
+
+    // nothing signed at all: not sent
+    $this->post("/t/001/job/{$link->token}", ['symptoms' => ['กระดาษติด'], 'note' => 'ยังไม่เสร็จ'])
+        ->assertSessionHasErrors(['solutions', 'tech_signature', 'signature']);
+    // the customer signed, the technician not
+    $this->post("/t/001/job/{$link->token}", [...$work, 'signature' => $this->signature])
+        ->assertSessionHasErrors('tech_signature')->assertSessionDoesntHaveErrors('signature');
+    // the technician signed, the customer not
+    $this->post("/t/001/job/{$link->token}", [...$work, 'tech_signature' => $this->signature])
+        ->assertSessionHasErrors('signature')->assertSessionDoesntHaveErrors('tech_signature');
+    // both signed, but what was done is not said
+    $this->post("/t/001/job/{$link->token}", [...$work, 'solutions' => [], 'tech_signature' => $this->signature, 'signature' => $this->signature])
+        ->assertSessionHasErrors('solutions');
+    // a solution typed in (not in the list) counts
+    $this->post("/t/001/job/{$link->token}", [...$work, 'solutions' => ['เปลี่ยนเฟืองขับกระดาษ'], 'tech_signature' => $this->signature, 'signature' => $this->signature])
+        ->assertSessionHasNoErrors();
+
+    $ticket = $this->ticket->fresh();
+    expect($ticket->cause)->toContain('เปลี่ยนเฟืองขับกระดาษ')
+        ->and($ticket->getFirstMedia(Ticket::TECH_SIGNATURE))->not->toBeNull()
+        ->and($ticket->getFirstMedia(Ticket::SIGNATURE))->not->toBeNull()
+        ->and($link->fresh()->submitted_at)->not->toBeNull();
 });
 
 it('takes the sign-off on paper: the printed sheet, then a photo of it', function () {
@@ -99,12 +131,16 @@ it('takes the sign-off on paper: the printed sheet, then a photo of it', functio
         ->component('Service/Tickets/Print')->where('publicView', true)->where('ticket.title', 'Printer jam'));
 
     $this->post("/t/001/job/{$link->token}", ['signed_sheet' => UploadedFile::fake()->image('sheet.jpg')])->assertSessionHasErrors('signer_name');
+    // without the photo of the signed sheet (nor signatures on the screen) the work is not sent
+    $this->post("/t/001/job/{$link->token}", ['note' => 'ซ่อมเสร็จ', 'signer_name' => 'Khun Customer'])->assertSessionHasErrors('signature');
+    // on paper: what was done is written on the sheet, no solution or signatures needed here
     $this->post("/t/001/job/{$link->token}", ['note' => 'ซ่อมเสร็จ', 'signer_name' => 'Khun Customer', 'signed_sheet' => UploadedFile::fake()->image('sheet.jpg')])
         ->assertSessionHasNoErrors();
 
     $ticket = $this->ticket->fresh();
     expect($ticket->getMedia(Ticket::PHOTOS)->sole()->getCustomProperty('stage'))->toBe('signed_sheet')
-        ->and($ticket->approver_name)->toBe('Khun Customer');
+        ->and($ticket->approver_name)->toBe('Khun Customer')
+        ->and($ticket->getFirstMedia(Ticket::TECH_SIGNATURE))->toBeNull();
 });
 
 it('lets the customer only sign off through a sign link', function () {

@@ -11,9 +11,11 @@ import { computed, ref } from 'vue';
 
 /**
  * A ticket's link, without an account, on a phone or an iPad. An outside technician ("work") sees
- * the job and sends back what was found and done, parts used, photos, and the customer's sign-off:
- * signed right here on the screen, or on the printed job sheet (then a photo of it). The customer
- * ("sign") only signs it off. Sending again replaces the report. The helpdesk closes the job.
+ * the job (with the job sheet to print, at the top) and sends back what was found and done, parts
+ * used, photos, and always the sign-off: on the printed sheet the customer filled in and signed
+ * (then a photo of it), or here on the screen — a solution at least, the technician's signature,
+ * then the customer's. The customer ("sign") only signs it off. Sending again replaces the report.
+ * The helpdesk closes the job.
  */
 const props = defineProps<{
     page: {
@@ -48,6 +50,7 @@ const form = useForm({
     note: '',
     signer_name: props.page?.ticket.contact_name ?? '',
     signature: null as string | null,
+    tech_signature: null as string | null,
     before: [] as File[],
     after: [] as File[],
     signed_sheet: null as File | null,
@@ -55,6 +58,35 @@ const form = useForm({
 
 // How the customer signs off: on the screen here, or on paper (printed sheet, then a photo).
 const how = ref<'screen' | 'paper'>('screen');
+
+// A symptom or solution not in the list, typed in (added as one more chip, ticked).
+type Kind = 'symptom' | 'solution';
+const picked = (kind: Kind) => (kind === 'symptom' ? form.symptoms : form.solutions);
+const typed = ref<Record<Kind, string>>({ symptom: '', solution: '' });
+const addTyped = (kind: Kind) => {
+    const label = typed.value[kind].trim();
+    if (label && !picked(kind).includes(label)) picked(kind).push(label);
+    typed.value[kind] = '';
+};
+const chipsOf = (kind: Kind) => {
+    const presets = props.page?.presets?.[kind] ?? [];
+    return [...presets, ...picked(kind).filter((label) => !presets.includes(label))];
+};
+
+// What is still missing before the work can be sent (the server checks the same).
+const missing = computed(() => {
+    if (!work.value) return [];
+    const items: string[] = [];
+    if (how.value === 'paper') {
+        if (!form.signed_sheet) items.push('sheet');
+    } else {
+        if (form.solutions.length === 0) items.push('solution');
+        if (!form.tech_signature) items.push('tech_signature');
+        if (!form.signature) items.push('signature');
+    }
+    if (!form.signer_name.trim()) items.push('signer');
+    return items;
+});
 
 const toggle = (list: string[], label: string) => {
     const i = list.indexOf(label);
@@ -91,6 +123,7 @@ const submit = () =>
         .transform((data) => ({
             ...data,
             signature: how.value === 'screen' ? data.signature : null,
+            tech_signature: how.value === 'screen' ? data.tech_signature : null,
             signed_sheet: how.value === 'paper' ? data.signed_sheet : null,
         }))
         .post(window.location.pathname, { forceFormData: true, preserveScroll: true });
@@ -157,6 +190,18 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                     </dl>
                 </section>
 
+                <!-- The job sheet to print: up here, where it is found at once -->
+                <template v-if="work && page.link.usable">
+                    <a
+                        :href="printUrl"
+                        target="_blank"
+                        class="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-500 text-base font-semibold text-white shadow-lg"
+                    >
+                        <Printer class="size-6" />{{ t('field_link.print_top') }}
+                    </a>
+                    <p class="-mt-3 text-center text-xs text-muted-foreground">{{ t('field_link.print_top_hint') }}</p>
+                </template>
+
                 <p v-if="!page.link.usable" class="flex items-center gap-2 rounded-2xl bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
                     <CircleX class="size-5" />{{ t('field_link.unusable') }}
                 </p>
@@ -167,10 +212,14 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                     <!-- What was wrong and what was done (outside technician) -->
                     <template v-if="work && page.presets">
                         <section v-for="kind in ['symptom', 'solution'] as const" :key="kind" class="space-y-2 rounded-2xl border bg-background p-5">
-                            <h2 class="font-semibold">{{ kind === 'symptom' ? t('close.symptoms') : t('close.solutions') }}</h2>
+                            <h2 class="font-semibold">
+                                {{ kind === 'symptom' ? t('close.symptoms') : t('close.solutions') }}
+                                <span v-if="kind === 'solution' && how === 'screen'" class="text-red-600">*</span>
+                            </h2>
+                            <p v-if="kind === 'solution'" class="text-xs text-muted-foreground">{{ t('field_link.solution_required') }}</p>
                             <div class="flex flex-wrap gap-2">
                                 <button
-                                    v-for="label in page.presets[kind]"
+                                    v-for="label in chipsOf(kind)"
                                     :key="label"
                                     type="button"
                                     class="min-h-11 rounded-full border px-4 text-sm"
@@ -180,6 +229,19 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                                     {{ label }}
                                 </button>
                             </div>
+                            <div class="flex gap-2">
+                                <input
+                                    v-model="typed[kind]"
+                                    maxlength="100"
+                                    :placeholder="t(kind === 'symptom' ? 'field_link.other_symptom' : 'field_link.other_solution')"
+                                    :class="input"
+                                    @keydown.enter.prevent="addTyped(kind)"
+                                />
+                                <button type="button" class="min-h-12 shrink-0 rounded-xl border px-4 text-sm" @click="addTyped(kind)">
+                                    {{ t('field_link.other_solution_add') }}
+                                </button>
+                            </div>
+                            <InputError v-if="kind === 'solution'" :message="errors.solutions" />
                         </section>
                         <section class="space-y-3 rounded-2xl border bg-background p-5">
                             <label class="block space-y-1.5 text-sm">
@@ -213,7 +275,8 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
 
                     <!-- The customer's sign-off -->
                     <section class="space-y-3 rounded-2xl border bg-background p-5">
-                        <h2 class="font-semibold">{{ t('field_link.sign_off') }}</h2>
+                        <h2 class="font-semibold">{{ t('field_link.sign_off') }} <span v-if="work" class="text-red-600">*</span></h2>
+                        <p v-if="work" class="text-xs text-muted-foreground">{{ t('field_link.sign_off_hint') }}</p>
                         <div v-if="work" class="flex flex-wrap gap-2">
                             <button type="button" class="min-h-11 rounded-full border px-4 text-sm" :class="chip(how === 'screen')" @click="how = 'screen'">
                                 {{ t('field_link.sign_screen') }}
@@ -230,15 +293,30 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                             <input v-model="form.signer_name" maxlength="255" :class="input" />
                         </label>
                         <InputError :message="errors.signer_name" />
-                        <template v-if="how === 'screen' || !work">
+                        <!-- On the screen: the technician first, then the customer -->
+                        <template v-if="work && how === 'screen'">
+                            <div class="space-y-1.5">
+                                <p class="text-sm font-semibold">{{ t('field_link.tech_sign', { name: page.link.holder_name }) }}</p>
+                                <p class="text-xs text-muted-foreground">{{ t('field_link.tech_sign_here') }}</p>
+                                <SignaturePad v-model="form.tech_signature" />
+                                <InputError :message="errors.tech_signature" />
+                            </div>
+                            <div class="space-y-1.5">
+                                <p class="text-sm font-semibold">{{ t('field_link.customer_sign') }}</p>
+                                <template v-if="form.tech_signature">
+                                    <p class="text-xs text-muted-foreground">{{ t('field_link.sign_here') }}</p>
+                                    <SignaturePad v-model="form.signature" />
+                                </template>
+                                <p v-else class="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground">{{ t('field_link.customer_after_tech') }}</p>
+                                <InputError :message="errors.signature" />
+                            </div>
+                        </template>
+                        <template v-else-if="!work">
                             <p class="text-sm text-muted-foreground">{{ t('field_link.sign_here') }}</p>
                             <SignaturePad v-model="form.signature" />
                             <InputError :message="errors.signature" />
                         </template>
                         <template v-else>
-                            <a :href="printUrl" target="_blank" class="flex min-h-12 items-center justify-center gap-2 rounded-xl border text-sm font-medium">
-                                <Printer class="size-5" />{{ t('field_link.print') }}
-                            </a>
                             <p class="text-xs text-muted-foreground">{{ t('field_link.paper_hint') }}</p>
                             <label class="flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm">
                                 <Camera class="size-5" />{{ t('field_link.sheet_photo') }}
@@ -250,10 +328,13 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                     </section>
 
                     <div class="fixed inset-x-0 bottom-0 border-t bg-background/95 p-3 backdrop-blur">
-                        <div class="mx-auto max-w-3xl">
+                        <div class="mx-auto max-w-3xl space-y-1">
+                            <p v-if="missing.length" class="text-center text-xs text-amber-700 dark:text-amber-400">
+                                {{ t('field_link.missing', { items: missing.map((m) => t(`field_link.missing_items.${m}`)).join(', ') }) }}
+                            </p>
                             <button
                                 type="submit"
-                                :disabled="form.processing || (!work && !form.signature)"
+                                :disabled="form.processing || (!work && !form.signature) || missing.length > 0"
                                 class="flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-base font-semibold text-primary-foreground shadow-lg disabled:opacity-50"
                             >
                                 <Check class="size-6" />{{ work ? t('field_link.send') : t('field_link.send_sign') }}

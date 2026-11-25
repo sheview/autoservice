@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import InputError from '@/components/InputError.vue';
+import SignaturePad from '@/components/SignaturePad.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { t } from '@/lib/i18n';
 import type { SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
-import { Camera, Check, Eraser, MapPin, Minus, Plus, Search, Trash2 } from 'lucide-vue-next';
-import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import { Camera, Check, MapPin, Minus, Plus, Printer, Search, Trash2 } from 'lucide-vue-next';
+import { computed, onMounted, ref, watch } from 'vue';
 
 interface PartOption {
     id: number;
@@ -41,7 +42,6 @@ const props = defineProps<{
         closable: boolean;
     };
     presets: { symptom: string[]; solution: string[] };
-    signatureRequired: boolean;
     // Parts go on an issue request sent for approval (stock moves when it is handed out).
     canRequestParts: boolean;
     partOptions?: PartOption[];
@@ -61,8 +61,9 @@ const form = useForm({
     parts: [] as PartLine[],
     removed: [] as RemovedPiece[],
     signer_name: props.ticket.contact_name ?? '',
-    approver_name: props.ticket.contact_name ?? '',
+    tech_signature: null as string | null,
     signature: null as string | null,
+    signed_sheet: null as File | null,
     lat: null as number | null,
     lng: null as number | null,
     before: [] as File[],
@@ -144,44 +145,31 @@ const short = (line: PartLine) => line.qty > (chosen.value[line.part_id]?.qty_on
 // --- 3b. pieces taken out of the device (a note only, not stock) ---
 const addRemoved = () => form.removed.push({ item_name: '', serial_number: '', problem: '', disposition: props.dispositions[0] });
 
-// --- 4. signature on the screen ---
-const pad = ref<HTMLCanvasElement | null>(null);
-let drawing = false;
-const point = (e: PointerEvent) => {
-    const r = pad.value!.getBoundingClientRect();
-    return [((e.clientX - r.left) * pad.value!.width) / r.width, ((e.clientY - r.top) * pad.value!.height) / r.height];
+// --- 4. sign-off, always: on the screen (the technician, then the customer) or on the printed sheet ---
+const how = ref<'screen' | 'paper'>('screen');
+const sheetPreview = ref<string | null>(null);
+const addSheet = async (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    form.signed_sheet = await shrink(file, 2200);
+    sheetPreview.value = URL.createObjectURL(form.signed_sheet);
 };
-const down = (e: PointerEvent) => {
-    drawing = true;
-    const ctx = pad.value!.getContext('2d')!;
-    ctx.beginPath();
-    ctx.moveTo(...(point(e) as [number, number]));
-    pad.value!.setPointerCapture(e.pointerId);
-};
-const moveTo = (e: PointerEvent) => {
-    if (!drawing) return;
-    const ctx = pad.value!.getContext('2d')!;
-    ctx.lineTo(...(point(e) as [number, number]));
-    ctx.stroke();
-};
-const up = () => {
-    if (!drawing) return;
-    drawing = false;
-    form.signature = pad.value!.toDataURL('image/png');
-};
-const clearPad = () => {
-    const ctx = pad.value!.getContext('2d')!;
-    ctx.clearRect(0, 0, pad.value!.width, pad.value!.height);
-    form.signature = null;
-};
-onMounted(async () => {
-    await nextTick();
-    const ctx = pad.value?.getContext('2d');
-    if (ctx) {
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = '#111827';
+// What is still missing before the job can be closed (the server checks the same).
+const missing = computed(() => {
+    const items: string[] = [];
+    if (how.value === 'paper') {
+        if (!form.signed_sheet) items.push('sheet');
+    } else {
+        if (form.solutions.length === 0) items.push('solution');
+        if (!form.tech_signature) items.push('tech_signature');
+        if (!form.signature) items.push('signature');
     }
+    if (!form.signer_name.trim()) items.push('signer');
+    return items;
+});
+const techName = computed(() => (page.props.auth.user as { name?: string } | null)?.name ?? '');
+
+onMounted(() => {
     // Where the technician is, if the phone allows it (optional).
     navigator.geolocation?.getCurrentPosition(
         (pos) => {
@@ -193,7 +181,15 @@ onMounted(async () => {
     );
 });
 
-const submit = () => form.post(route('service.tickets.close.store', props.ticket.ulid), { forceFormData: true, preserveScroll: true });
+const submit = () =>
+    form
+        .transform((data) => ({
+            ...data,
+            tech_signature: how.value === 'screen' ? data.tech_signature : null,
+            signature: how.value === 'screen' ? data.signature : null,
+            signed_sheet: how.value === 'paper' ? data.signed_sheet : null,
+        }))
+        .post(route('service.tickets.close.store', props.ticket.ulid), { forceFormData: true, preserveScroll: true });
 
 const chipClass = (on: boolean) => (on ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background');
 const big = 'flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl px-4 text-base font-semibold transition active:scale-[0.98]';
@@ -211,6 +207,16 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                 <div v-if="ticket.asset" class="text-sm text-muted-foreground">{{ ticket.asset }}</div>
             </div>
 
+            <!-- The job sheet to print, for a sign-off on paper: up here, where it is found at once -->
+            <a
+                :href="route('service.tickets.print', ticket.ulid)"
+                target="_blank"
+                :class="[big, 'bg-gradient-to-r from-violet-600 to-indigo-500 text-white shadow-lg']"
+            >
+                <Printer class="size-6" />{{ t('field_link.print_top') }}
+            </a>
+            <p class="-mt-4 text-center text-xs text-muted-foreground">{{ t('field_link.print_top_hint') }}</p>
+
             <p v-if="!ticket.closable" class="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                 {{ t('close.not_closable') }}
                 <Link :href="route('service.tickets.show', ticket.ulid)" class="font-semibold underline">{{ t('close.back') }}</Link>
@@ -221,7 +227,11 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
             <section class="space-y-4">
                 <h2 class="text-lg font-semibold">{{ t('close.step_what') }}</h2>
                 <div v-for="kind in ['symptom', 'solution'] as const" :key="kind" class="space-y-2">
-                    <div class="text-sm font-semibold">{{ t(kind === 'symptom' ? 'close.symptoms' : 'close.solutions') }}</div>
+                    <div class="text-sm font-semibold">
+                        {{ t(kind === 'symptom' ? 'close.symptoms' : 'close.solutions') }}
+                        <span v-if="kind === 'solution' && how === 'screen'" class="text-red-600">*</span>
+                    </div>
+                    <p v-if="kind === 'solution'" class="text-xs text-muted-foreground">{{ t('field_link.solution_required') }}</p>
                     <div class="flex flex-wrap gap-2">
                         <button
                             v-for="label in chips[kind]"
@@ -241,7 +251,7 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                         </button>
                     </div>
                 </div>
-                <InputError :message="errors.symptoms" />
+                <InputError :message="errors.symptoms || errors.solutions" />
                 <textarea
                     v-model="form.note"
                     rows="2"
@@ -381,33 +391,49 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                 <InputError :message="errors['removed.0.item_name'] || errors['removed.0.disposition']" />
             </section>
 
-            <!-- 4. Signature / who took the job back -->
+            <!-- 4. Sign-off: on the screen (the technician first, then the customer) or on paper -->
             <section class="space-y-3">
-                <h2 class="text-lg font-semibold">{{ signatureRequired ? t('close.step_sign') : t('close.step_sign_optional') }}</h2>
-                <label class="block space-y-1.5 text-sm">
-                    <span class="font-semibold"
-                        >{{ signatureRequired ? t('close.signer') : t('close.approver') }} <span class="text-red-600">*</span></span
-                    >
-                    <input v-if="signatureRequired" v-model="form.signer_name" :class="input" required />
-                    <input v-else v-model="form.approver_name" :class="input" required />
-                </label>
-                <template v-if="signatureRequired">
-                    <div class="text-sm text-muted-foreground">{{ t('close.sign_here') }}</div>
-                    <canvas
-                        ref="pad"
-                        width="800"
-                        height="300"
-                        class="h-40 w-full touch-none rounded-xl border-2 border-dashed bg-white"
-                        @pointerdown="down"
-                        @pointermove="moveTo"
-                        @pointerup="up"
-                        @pointerleave="up"
-                    />
-                    <button type="button" class="flex min-h-12 items-center gap-2 text-sm text-muted-foreground" @click="clearPad">
-                        <Eraser class="size-4" />{{ t('close.clear') }}
+                <h2 class="text-lg font-semibold">{{ t('field_link.sign_off') }} <span class="text-red-600">*</span></h2>
+                <p class="text-xs text-muted-foreground">{{ t('field_link.sign_off_hint') }}</p>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" class="min-h-12 rounded-full border px-4 text-sm" :class="chipClass(how === 'screen')" @click="how = 'screen'">
+                        {{ t('field_link.sign_screen') }}
                     </button>
+                    <button type="button" class="min-h-12 rounded-full border px-4 text-sm" :class="chipClass(how === 'paper')" @click="how = 'paper'">
+                        {{ t('field_link.sign_paper') }}
+                    </button>
+                </div>
+                <label class="block space-y-1.5 text-sm">
+                    <span class="font-semibold">{{ t('field_link.signer') }} <span class="text-red-600">*</span></span>
+                    <input v-model="form.signer_name" :class="input" maxlength="255" />
+                </label>
+                <InputError :message="errors.signer_name" />
+                <template v-if="how === 'screen'">
+                    <div class="space-y-1.5">
+                        <p class="text-sm font-semibold">{{ t('field_link.tech_sign', { name: techName }) }}</p>
+                        <p class="text-xs text-muted-foreground">{{ t('field_link.tech_sign_here') }}</p>
+                        <SignaturePad v-model="form.tech_signature" />
+                        <InputError :message="errors.tech_signature" />
+                    </div>
+                    <div class="space-y-1.5">
+                        <p class="text-sm font-semibold">{{ t('field_link.customer_sign') }}</p>
+                        <template v-if="form.tech_signature">
+                            <p class="text-xs text-muted-foreground">{{ t('field_link.sign_here') }}</p>
+                            <SignaturePad v-model="form.signature" />
+                        </template>
+                        <p v-else class="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground">{{ t('field_link.customer_after_tech') }}</p>
+                        <InputError :message="errors.signature" />
+                    </div>
                 </template>
-                <InputError :message="errors.signature || errors.approver_name" />
+                <template v-else>
+                    <p class="text-xs text-muted-foreground">{{ t('field_link.paper_hint') }}</p>
+                    <label :class="[big, 'cursor-pointer border-2 border-dashed text-sm']">
+                        <Camera class="size-5" />{{ t('field_link.sheet_photo') }}
+                        <input type="file" accept="image/*" capture="environment" class="hidden" @change="addSheet" />
+                    </label>
+                    <img v-if="sheetPreview" :src="sheetPreview" class="max-h-64 rounded-lg border" alt="" />
+                    <InputError :message="errors.signed_sheet" />
+                </template>
                 <p class="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <MapPin class="size-3.5" />{{ form.lat ? t('close.location') : t('close.location_hint') }}
                 </p>
@@ -415,10 +441,13 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
 
             <!-- Close: always within thumb reach -->
             <div class="fixed inset-x-0 bottom-0 border-t bg-background/95 p-3 backdrop-blur">
-                <div class="mx-auto max-w-xl">
+                <div class="mx-auto max-w-xl space-y-1">
+                    <p v-if="missing.length" class="text-center text-xs text-amber-700 dark:text-amber-400">
+                        {{ t('field_link.missing', { items: missing.map((m) => t(`field_link.missing_items.${m}`)).join(', ') }) }}
+                    </p>
                     <button
                         type="submit"
-                        :disabled="form.processing || !ticket.closable || (signatureRequired && !form.signature)"
+                        :disabled="form.processing || !ticket.closable || missing.length > 0"
                         :class="[big, 'bg-primary text-primary-foreground shadow-lg disabled:opacity-50']"
                     >
                         <Check class="size-6" />{{ t('close.submit') }}

@@ -4,7 +4,6 @@ namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\AssetDetails;
-use App\Modules\Contract\Actions\SignatureRequirement;
 use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\PartsForCheckout;
 use App\Modules\Platform\Support\Modules;
@@ -33,7 +32,7 @@ class TicketCloseController extends Controller
 
     public function __construct(private Modules $modules) {}
 
-    public function show(Request $request, Ticket $ticket, RepairPresetList $presets, SignatureRequirement $signature, AssetDetails $assetDetails, PartsForCheckout $parts, AssetWarranty $assetWarranty): Response
+    public function show(Request $request, Ticket $ticket, RepairPresetList $presets, AssetDetails $assetDetails, PartsForCheckout $parts, AssetWarranty $assetWarranty): Response
     {
         Gate::authorize('resolve', $ticket);
         $user = $request->user();
@@ -49,7 +48,6 @@ class TicketCloseController extends Controller
                 'closable' => in_array($ticket->status, QuickCloseTicket::CLOSABLE, true),
             ],
             'presets' => $presets->handle(),
-            'signatureRequired' => $signature->handle($ticket->customer_id, $ticket->contract_id),
             'canRequestParts' => $this->canRequestParts($user),
             'partOptions' => fn () => $search === '' || ! $this->modules->enabled('inventory') ? [] : array_values($parts->handle(null, $search)),
             'warrantyStatuses' => Ticket::WARRANTY_STATUSES,
@@ -80,9 +78,11 @@ class TicketCloseController extends Controller
             'removed.*.problem' => ['nullable', 'string', 'max:1000'],
             'removed.*.disposition' => ['required', Rule::in(TicketRemovedPart::DISPOSITIONS)],
             'signer_name' => ['nullable', 'string', 'max:255'],
-            'approver_name' => ['nullable', 'string', 'max:255'],
-            // A PNG drawn on the screen, as a data URL, at most about 300 KB.
+            // PNGs drawn on the screen, as data URLs, at most about 300 KB: the technician's, then the customer's.
+            'tech_signature' => ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:400000'],
             'signature' => ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:400000'],
+            // Or a photo of the printed job sheet the customer filled in and signed.
+            'signed_sheet' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PHOTO_KB],
             'lat' => ['nullable', 'numeric', 'between:-90,90'],
             'lng' => ['nullable', 'numeric', 'between:-180,180'],
             'before' => ['array', 'max:'.self::MAX_PHOTOS],
@@ -94,15 +94,11 @@ class TicketCloseController extends Controller
         if (! empty($data['parts']) && ! $this->canRequestParts($user)) {
             abort(403);
         }
-        if (blank($data['symptoms'] ?? []) && blank($data['solutions'] ?? []) && blank($data['note'] ?? null)) {
-            return back()->withErrors(['symptoms' => __('service.quick_close.what_required')]);
-        }
-
         $close->handle($ticket, $user, [
             ...$data,
             'symptoms' => $data['symptoms'] ?? [],
             'solutions' => $data['solutions'] ?? [],
-        ], ['before' => $request->file('before', []), 'after' => $request->file('after', [])]);
+        ], ['before' => $request->file('before', []), 'after' => $request->file('after', []), 'signed_sheet' => $request->file('signed_sheet')]);
 
         return redirect()->route('service.tickets.show', $ticket)->with('success', __('service.quick_close.done', ['no' => $ticket->ticket_no])
             .(empty($data['parts']) ? '' : ' '.__('service.quick_close.parts_requested')));

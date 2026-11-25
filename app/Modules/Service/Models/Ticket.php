@@ -149,10 +149,14 @@ class Ticket extends Model implements HasMedia
 
     public const SIGNATURE = 'signature';
 
+    /** The technician's signature on the screen (through a ticket's link), signed before the customer. */
+    public const TECH_SIGNATURE = 'tech_signature';
+
     public function registerMediaCollections(): void
     {
         $this->registerAttachmentCollection();
         $this->addMediaCollection(self::PHOTOS)->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp']);
         $this->addMediaCollection(self::SIGNATURE)->singleFile()->acceptsMimeTypes(['image/png']);
+        $this->addMediaCollection(self::TECH_SIGNATURE)->singleFile()->acceptsMimeTypes(['image/png']);
     }
 }

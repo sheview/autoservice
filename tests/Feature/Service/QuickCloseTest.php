@@ -23,16 +23,19 @@ beforeEach(function () {
     $this->ticket = openTicket($this->helpdesk, ['customer_id' => $this->customer->id], warrantyChecked: false, reportFilled: false);
     app(AssignTicket::class)->handle($this->ticket, $this->tech->id, $this->helpdesk);
 
-    $this->close = fn (array $data, $user = null) => $this->actingAs($user ?? $this->tech)
-        ->post("/tickets/{$this->ticket->ulid}/close", $data + ['symptoms' => ['ร้อนผิดปกติ'], 'solutions' => ['เปลี่ยนอะไหล่'], 'approver_name' => 'Khun A', 'warranty_status' => 'out_of_warranty']);
     $this->signature = 'data:image/png;base64,'.base64_encode(UploadedFile::fake()->image('s.png', 10, 10)->getContent());
+    // Signed off on the screen: the technician, then the customer (Khun A).
+    $this->close = fn (array $data, $user = null) => $this->actingAs($user ?? $this->tech)
+        ->post("/tickets/{$this->ticket->ulid}/close", $data + [
+            'symptoms' => ['ร้อนผิดปกติ'], 'solutions' => ['เปลี่ยนอะไหล่'], 'warranty_status' => 'out_of_warranty',
+            'signer_name' => 'Khun A', 'tech_signature' => $this->signature, 'signature' => $this->signature,
+        ]);
 });
 
 it('closes a job in one go: report, photos, parts asked for, place, then resolved', function () {
     $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}/close")->assertOk()->assertInertia(fn (Assert $page) => $page
         ->component('Service/Tickets/Close')
         ->where('presets.symptom', fn ($list) => in_array('เปิดไม่ติด', collect($list)->all(), true))
-        ->where('signatureRequired', false)
         ->where('canRequestParts', true)
         ->where('ticket.warranty_checked', false));
 
@@ -85,27 +88,39 @@ it('takes parts only from whoever may ask for them', function () {
     expect(CheckoutRequest::count())->toBe(0);
 });
 
-it('needs the customer to sign when their customer or contract asks for it', function () {
-    $this->customer->update(['require_signature' => true]);
-    $this->actingAs($this->tech)->get("/tickets/{$this->ticket->ulid}/close")->assertInertia(fn (Assert $page) => $page->where('signatureRequired', true));
-
-    ($this->close)([])->assertSessionHasErrors('signature');
+it('closes only with a sign-off on the screen: a solution, the technician\'s signature, then the customer\'s', function () {
+    ($this->close)(['solutions' => [], 'tech_signature' => null, 'signature' => null, 'signer_name' => ''])
+        ->assertSessionHasErrors(['solutions', 'tech_signature', 'signature', 'signer_name']);
+    ($this->close)(['tech_signature' => null])->assertSessionHasErrors('tech_signature')->assertSessionDoesntHaveErrors('signature');
+    ($this->close)(['signature' => null])->assertSessionHasErrors('signature');
     expect($this->ticket->fresh()->status)->toBe(Ticket::STATUS_ASSIGNED);
 
-    ($this->close)(['signature' => $this->signature, 'signer_name' => 'Khun Signer'])->assertSessionHasNoErrors();
+    // a solution typed in (not one of the chips) counts
+    ($this->close)(['solutions' => ['ล้างพัดลม CPU'], 'signer_name' => 'Khun Signer'])->assertSessionHasNoErrors();
     $ticket = $this->ticket->fresh();
     expect($ticket->status)->toBe(Ticket::STATUS_RESOLVED)
+        ->and($ticket->cause)->toContain('ล้างพัดลม CPU')
         ->and($ticket->approver_name)->toBe('Khun Signer')
-        ->and($ticket->getFirstMedia(Ticket::SIGNATURE)?->getCustomProperty('signer'))->toBe('Khun Signer');
+        ->and($ticket->getFirstMedia(Ticket::SIGNATURE)?->getCustomProperty('signer'))->toBe('Khun Signer')
+        // the technician's under their own name
+        ->and($ticket->getFirstMedia(Ticket::TECH_SIGNATURE)?->getCustomProperty('signer'))->toBe('Tech One');
+    $this->actingAs($this->tech)->get("/tickets/{$ticket->ulid}/print")->assertInertia(fn (Assert $page) => $page
+        ->where('techSignature.signer', 'Tech One')->where('signature.signer', 'Khun Signer'));
 });
 
-it('lets a contract say otherwise than its customer', function () {
-    $this->customer->update(['require_signature' => true]);
-    $contract = createContract($this->customer, ['require_signature' => false]);
-    $this->ticket->forceFill(['contract_id' => $contract->id])->save();
+it('closes with the job sheet signed on paper instead: its photo, no signatures on the screen', function () {
+    $paper = ['symptoms' => [], 'solutions' => [], 'tech_signature' => null, 'signature' => null, 'signer_name' => 'Khun Paper'];
 
-    ($this->close)([])->assertSessionHasNoErrors();
-    expect($this->ticket->fresh()->status)->toBe(Ticket::STATUS_RESOLVED);
+    ($this->close)($paper)->assertSessionHasErrors('signature');
+    ($this->close)([...$paper, 'signer_name' => '', 'signed_sheet' => UploadedFile::fake()->image('sheet.jpg')])->assertSessionHasErrors('signer_name');
+    ($this->close)([...$paper, 'signed_sheet' => UploadedFile::fake()->image('sheet.jpg')])->assertSessionHasNoErrors();
+
+    $ticket = $this->ticket->fresh();
+    expect($ticket->status)->toBe(Ticket::STATUS_RESOLVED)
+        ->and($ticket->approver_name)->toBe('Khun Paper')
+        ->and($ticket->getMedia(Ticket::PHOTOS)->sole()->getCustomProperty('stage'))->toBe('signed_sheet')
+        ->and($ticket->getFirstMedia(Ticket::TECH_SIGNATURE))->toBeNull()
+        ->and($ticket->getFirstMedia(Ticket::SIGNATURE))->toBeNull();
 });
 
 it('lets only who may finish the job close it', function () {

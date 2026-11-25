@@ -108,7 +108,7 @@ class TicketActionController extends Controller
     public function media(Ticket $ticket, int $media): BinaryFileResponse
     {
         Gate::authorize('view', $ticket);
-        $file = $ticket->media()->whereKey($media)->whereIn('collection_name', [Ticket::PHOTOS, Ticket::SIGNATURE])->firstOrFail();
+        $file = $ticket->media()->whereKey($media)->whereIn('collection_name', [Ticket::PHOTOS, Ticket::SIGNATURE, Ticket::TECH_SIGNATURE])->firstOrFail();
 
         return response()->file($file->getPath(), ['Content-Type' => $file->mime_type, 'Cache-Control' => 'private, max-age=3600']);
     }

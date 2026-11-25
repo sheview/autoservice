@@ -4,7 +4,6 @@ namespace App\Modules\Service\Actions;
 
 use App\Modules\Asset\Actions\RequestPartsForTicket;
 use App\Modules\Contract\Actions\ListCustomers;
-use App\Modules\Contract\Actions\SignatureRequirement;
 use App\Modules\Identity\Models\User;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketRemovedPart;
@@ -16,8 +15,10 @@ use Illuminate\Validation\ValidationException;
  * Finishing a job on a phone in one go: what was wrong and what fixed it, photos before and
  * after, the parts used (asked for on an issue request for the ticket, sent for approval: stock
  * moves when it is handed out, like any request), the pieces taken out of the device (a note),
- * the customer's signature when their contract or customer asks for it, and where the technician
- * was — then the job is done (resolved), which tells whoever confirms it (and the company's alert
+ * where the technician was, and always the sign-off — as through a ticket's link (SubmitFieldReport):
+ *   - on paper: the printed job sheet the customer filled in and signed, as a photo;
+ *   - on the screen: a solution at least, the technician's signature, then the customer's.
+ * Then the job is done (resolved), which tells whoever confirms it (and the company's alert
  * channels) as usual. All or nothing.
  */
 class QuickCloseTicket
@@ -30,16 +31,15 @@ class QuickCloseTicket
         private SaveRepairReport $saveReport,
         private RequestPartsForTicket $requestParts,
         private ListCustomers $customers,
-        private SignatureRequirement $signatureRequirement,
         private AssetWarranty $assetWarranty,
     ) {}
 
     /**
      * @param  array{symptoms: list<string>, solutions: list<string>, note?: string|null, warranty_status?: string|null,
      *     parts?: list<array{part_id: int, qty: int}>, signer_name?: string|null, signature?: string|null,
-     *     approver_name?: string|null, lat?: float|null, lng?: float|null,
+     *     tech_signature?: string|null, lat?: float|null, lng?: float|null,
      *     removed?: list<array{item_name: string, serial_number?: string|null, problem?: string|null, disposition: string}>}  $data  validated
-     * @param  array{before?: list<UploadedFile>, after?: list<UploadedFile>}  $photos
+     * @param  array{before?: list<UploadedFile>, after?: list<UploadedFile>, signed_sheet?: UploadedFile|null}  $photos
      */
     public function handle(Ticket $ticket, User $actor, array $data, array $photos = []): Ticket
     {
@@ -47,14 +47,21 @@ class QuickCloseTicket
             throw ValidationException::withMessages(['ticket' => __('service.quick_close.not_closable')]);
         }
 
-        $signatureNeeded = $this->signatureRequirement->handle($ticket->customer_id, $ticket->contract_id);
-        if ($signatureNeeded && (blank($data['signature'] ?? null) || blank($data['signer_name'] ?? null))) {
-            throw ValidationException::withMessages(['signature' => __('service.quick_close.signature_required')]);
+        // The sign-off: the signed paper sheet, or on the screen what was done and both signatures.
+        $sheet = $photos['signed_sheet'] ?? null;
+        $missing = array_filter([
+            'signer_name' => blank($data['signer_name'] ?? null) ? __('service.field_links.signer_required') : null,
+            ...($sheet !== null ? [] : [
+                'solutions' => ($data['solutions'] ?? []) === [] ? __('service.field_links.solution_required') : null,
+                'tech_signature' => blank($data['tech_signature'] ?? null) ? __('service.field_links.tech_signature_required') : null,
+                'signature' => blank($data['signature'] ?? null) ? __('service.field_links.customer_signature_required') : null,
+            ]),
+        ]);
+        if ($missing !== []) {
+            throw ValidationException::withMessages($missing);
         }
-        $approver = $signatureNeeded ? $data['signer_name'] : ($data['signer_name'] ?? $data['approver_name'] ?? null);
-        if (blank($approver)) {
-            throw ValidationException::withMessages(['approver_name' => __('service.quick_close.approver_required')]);
-        }
+        // The customer who signed off is who approved the repair.
+        $approver = trim($data['signer_name']);
         // Not checked yet: what the technician picked, else the asset register's warranty date.
         $fromAsset = $ticket->warranty_checked_at === null && blank($data['warranty_status'] ?? null)
             ? $this->assetWarranty->handle($ticket)
@@ -63,7 +70,7 @@ class QuickCloseTicket
             throw ValidationException::withMessages(['warranty_status' => __('service.tickets.warranty_first')]);
         }
 
-        return DB::transaction(function () use ($ticket, $actor, $data, $photos, $approver, $fromAsset) {
+        return DB::transaction(function () use ($ticket, $actor, $data, $photos, $approver, $fromAsset, $sheet) {
             if ($fromAsset !== null) {
                 $this->checkWarranty->handle($ticket, $actor, $fromAsset['status'], $fromAsset['expires_on'], fromAsset: true);
             } elseif ($ticket->warranty_checked_at === null) {
@@ -98,6 +105,10 @@ class QuickCloseTicket
                 $data['solutions'] ? __('service.quick_close.solutions').': '.implode(', ', $data['solutions']) : null,
                 $data['note'] ?? null,
             ])->filter()->implode("\n");
+            // Signed off on paper with nothing typed: what was done is written on the sheet.
+            if ($cause === '' && $sheet !== null) {
+                $cause = __('service.field_links.on_paper');
+            }
             $this->saveReport->handle($ticket, $actor, ['cause' => $cause, 'extra_cost' => $ticket->extra_cost, 'approver_name' => $approver]);
 
             foreach (['before', 'after'] as $stage) {
@@ -107,10 +118,17 @@ class QuickCloseTicket
                 }
             }
 
-            if (filled($data['signature'] ?? null)) {
+            if ($sheet !== null) {
+                $ticket->addMedia($sheet)->withCustomProperties(['stage' => 'signed_sheet', 'by' => $actor->name, 'signer' => $approver])
+                    ->toMediaCollection(Ticket::PHOTOS);
+            } else {
+                $png = base64_decode(substr($data['tech_signature'], strlen('data:image/png;base64,')), true);
+                $ticket->addMediaFromString($png)->usingFileName('tech-signature.png')
+                    ->withCustomProperties(['signer' => $actor->name, 'signed_at' => now()->toIso8601String(), 'by' => $actor->name])
+                    ->toMediaCollection(Ticket::TECH_SIGNATURE);
                 $png = base64_decode(substr($data['signature'], strlen('data:image/png;base64,')), true);
                 $ticket->addMediaFromString($png)->usingFileName('signature.png')
-                    ->withCustomProperties(['signer' => $data['signer_name'], 'signed_at' => now()->toIso8601String()])
+                    ->withCustomProperties(['signer' => $approver, 'signed_at' => now()->toIso8601String()])
                     ->toMediaCollection(Ticket::SIGNATURE);
             }
 

@@ -112,6 +112,8 @@ class FieldLinkController extends Controller
             'signer_name' => ['nullable', 'string', 'max:255'],
             // A PNG drawn on the screen, as a data URL, at most about 300 KB.
             'signature' => ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:400000'],
+            // The technician's, signed before the customer's.
+            'tech_signature' => ['nullable', 'string', 'starts_with:data:image/png;base64,', 'max:400000'],
             'before' => ['array', 'max:'.self::MAX_PHOTOS],
             'before.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:'.self::PHOTO_KB],
             'after' => ['array', 'max:'.self::MAX_PHOTOS],

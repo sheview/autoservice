@@ -17,6 +17,8 @@ const props = defineProps<{
     tracking: { qr: string; search: string } | null;
     // The customer's signature on the screen (through the ticket's link or the close form).
     signature?: { image: string; signer: string | null; signed_at: string | null } | null;
+    // The technician's, signed on the screen before the customer (through the ticket's link).
+    techSignature?: { image: string; signer: string | null; signed_at: string | null } | null;
     // Opened through a ticket link, without an account: no way into the system from here.
     publicView?: boolean;
     ticket: {
@@ -151,7 +153,12 @@ const requestSigns = [
 const goBack = () => window.history.back();
 
 const doneSigns = [
-    { caption: t('ticket_print.done_caption'), role: t('ticket_print.technician'), name: ticket.assignee },
+    {
+        caption: t('ticket_print.done_caption'),
+        role: t('ticket_print.technician'),
+        name: props.techSignature?.signer ?? ticket.assignee,
+        image: props.techSignature?.image,
+    },
     {
         caption: t('ticket_print.checked_caption'),
         role: t('ticket_print.customer_sign'),
