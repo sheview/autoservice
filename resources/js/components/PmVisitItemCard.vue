@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { usePmItemForm } from '@/composables/usePmItemForm';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { shrinkImage } from '@/lib/image';
 import type { PmItemDraft } from '@/lib/pmDraftStore';
 import { sectionsOf, type Answer, type TemplateField } from '@/lib/pmTemplate';
 import { Link, router, useForm } from '@inertiajs/vue3';
@@ -153,8 +154,11 @@ const setPhotoTarget = (target: PhotoTarget) => {
 const photo = useForm<{ photo: File | null; question: string | null; target: PhotoTarget }>({ photo: null, question: null, target: 'report' });
 const uploadPhotos = async (event: Event, question: string | null = null) => {
     const input = event.target as HTMLInputElement;
-    for (const file of Array.from(input.files ?? [])) {
-        photo.photo = file;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    for (const file of files) {
+        // Made small on the phone first: quicker to send, less room on the server.
+        photo.photo = await shrinkImage(file);
         photo.question = question;
         photo.target = photoTarget.value;
         await new Promise<void>((resolve) =>
@@ -165,7 +169,6 @@ const uploadPhotos = async (event: Event, question: string | null = null) => {
             }),
         );
     }
-    input.value = '';
 };
 const deletePhoto = (id: number) => {
     if (confirm(t('pm_visits.confirm_delete_photo'))) {

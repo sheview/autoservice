@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { assetKeyFromScan } from '@/lib/assetQr';
 import { t } from '@/lib/i18n';
+import { shrinkImage } from '@/lib/image';
 import { router, useForm } from '@inertiajs/vue3';
 import { ChevronLeft, LoaderCircle, Plus, Search } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
@@ -185,8 +186,10 @@ const autoTemplate = computed(() => {
     return code ? (options.value?.templates.find((o) => o.code === code)?.name ?? code) : null;
 });
 
-const pickPhoto = (event: Event) => {
-    form.photo = (event.target as HTMLInputElement).files?.[0] ?? null;
+// Made small on the phone first: quicker to send, less room on the server.
+const pickPhoto = async (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0] ?? null;
+    form.photo = file ? await shrinkImage(file) : null;
 };
 
 const save = (another: boolean) =>

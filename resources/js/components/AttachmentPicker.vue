@@ -3,6 +3,7 @@ import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { formatBytes } from '@/lib/format';
 import { t } from '@/lib/i18n';
+import { prepareImage } from '@/lib/image';
 import { Paperclip, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
@@ -29,27 +30,43 @@ const accept = computed(() => extensions.value.map((ext) => `.${ext}`).join(',')
 const refused = ref<string[]>([]);
 const input = ref<HTMLInputElement | null>(null);
 
-const pick = (event: Event) => {
+// A photo is made small first (a phone photo of several MB fits the limit afterwards, and takes
+// little room on the server); other files go as they are.
+const IMAGE_EXT = ['jpg', 'jpeg', 'png'];
+const shrunk = async (file: File): Promise<File> => {
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    if (!IMAGE_EXT.includes(ext)) return file;
+    try {
+        return await prepareImage(file);
+    } catch {
+        return file; // not readable here: the size check below and the server decide
+    }
+};
+
+const pick = async (event: Event) => {
     const target = event.target as HTMLInputElement;
     refused.value = [];
-    const picked = [...(target.files ?? [])].filter((file) => {
-        const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const chosen = [...(target.files ?? [])];
+    target.value = ''; // the same file can be picked again after removing it
+    const picked: File[] = [];
+    for (const original of chosen) {
+        const ext = original.name.split('.').pop()?.toLowerCase() ?? '';
         if (!extensions.value.includes(ext)) {
-            refused.value.push(t('attachments.wrong_type', { name: file.name }));
-            return false;
+            refused.value.push(t('attachments.wrong_type', { name: original.name }));
+            continue;
         }
+        const file = await shrunk(original);
         if (file.size > MAX_MB.value * 1024 * 1024) {
-            refused.value.push(t('attachments.too_big', { name: file.name, mb: MAX_MB.value }));
-            return false;
+            refused.value.push(t('attachments.too_big', { name: original.name, mb: MAX_MB.value }));
+            continue;
         }
-        return true;
-    });
+        picked.push(file);
+    }
     const all = [...files.value, ...picked];
     if (all.length > MAX_FILES) {
         refused.value.push(t('attachments.too_many', { max: MAX_FILES }));
     }
     files.value = all.slice(0, MAX_FILES);
-    target.value = ''; // the same file can be picked again after removing it
 };
 
 const remove = (index: number) => (files.value = files.value.filter((_, i) => i !== index));
