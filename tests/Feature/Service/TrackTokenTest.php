@@ -22,7 +22,8 @@ it('gives every ticket a long random tracking link the staff can send', function
         ->assertInertia(fn (Assert $page) => $page->where('tracking.url', "http://localhost/t/001/track/{$this->token}"));
 
     config(['tenancy.public_links' => 'subdomain', 'tenancy.central_domains' => ['example.test']]);
-    $this->actingAs($this->helpdesk)->get("/tickets/{$this->ticket->ulid}")
+    // on the host of app.url (only the system's own hosts are answered: AllowKnownHosts)
+    $this->actingAs($this->helpdesk)->get("http://localhost/tickets/{$this->ticket->ulid}")
         ->assertInertia(fn (Assert $page) => $page->where('tracking.url', "http://default.example.test/track/{$this->token}"));
 });
 

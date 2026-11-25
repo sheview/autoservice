@@ -5,6 +5,8 @@ use App\Modules\Identity\Http\Middleware\EndSsoSession;
 use App\Modules\Platform\Http\Middleware\ApplySessionTimeout;
 use App\Modules\Platform\Http\Middleware\EnsureModuleEnabled;
 use App\Modules\Platform\Http\Middleware\LogImpersonatedRequests;
+use App\Modules\Platform\Http\Middleware\SecurityHeaders;
+use App\Modules\Tenancy\Http\Middleware\AllowKnownHosts;
 use App\Modules\Tenancy\Http\Middleware\EnforceSubscription;
 use App\Modules\Tenancy\Http\Middleware\ResolveTenant;
 use Illuminate\Auth\AuthenticationException;
@@ -25,6 +27,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Only the system's own hosts (links in e-mails are built from the request's host), and the
+        // browser's safety headers on every answer.
+        $middleware->prepend(AllowKnownHosts::class);
+        $middleware->append(SecurityHeaders::class);
+
         // Before StartSession, which reads session.lifetime.
         $middleware->web(prepend: [ApplySessionTimeout::class]);
 
