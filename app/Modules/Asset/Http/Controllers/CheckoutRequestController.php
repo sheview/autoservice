@@ -157,7 +157,7 @@ class CheckoutRequestController extends Controller
             ...$item,
             'fulfillments' => $checkout->items->firstWhere('id', $item['id'])->fulfillments
                 ->map(fn (CheckoutFulfillment $f) => [
-                    'qty' => $f->qty, 'by' => $f->fulfilled_by_name, 'at' => $f->fulfilled_at?->toIso8601String(),
+                    'id' => $f->id, 'qty' => $f->qty, 'by' => $f->fulfilled_by_name, 'at' => $f->fulfilled_at?->toIso8601String(),
                     'received_at' => $f->received_at?->toIso8601String(), 'received_by' => $f->received_by_name, 'receipt_issue' => $f->receipt_issue,
                 ])->values(),
             'track_serial' => $item['part_id'] ? (bool) ($partRows[$item['part_id']]['track_serial'] ?? false) : false,
@@ -308,10 +308,13 @@ class CheckoutRequestController extends Controller
         $data = $request->validate([
             'report' => ['boolean'],
             'receipt_issue' => ['required_if_accepted:report', 'nullable', 'string', 'max:1000'],
+            // The hand-outs ticked (none sent: all of them).
+            'fulfillment_ids' => ['sometimes', 'array', 'min:1'],
+            'fulfillment_ids.*' => ['integer'],
         ], attributes: ['receipt_issue' => __('asset.requests.fields.receipt_issue')]);
         $issue = $request->boolean('report') ? $data['receipt_issue'] : null;
 
-        $confirm->handle($checkout, $request->user(), $issue);
+        $confirm->handle($checkout, $request->user(), $issue, isset($data['fulfillment_ids']) ? array_map('intval', $data['fulfillment_ids']) : null);
 
         return back()->with('success', __($issue === null ? 'asset.requests.receipt_confirmed' : 'asset.requests.receipt_reported', ['no' => $checkout->request_no]));
     }

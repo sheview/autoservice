@@ -128,8 +128,9 @@ it('receives and hands over to whoever asked in one go, with the papers to print
     ($this->receive)($pr, ['quantity' => 2, 'serials' => "SN-A\nSN-B", 'hand_out' => true])->assertSessionHasNoErrors();
 
     $checkout = CheckoutRequest::sole();
+    // all handed out; done once whoever asked says it came
     expect($checkout->only(['status', 'borrower_user_id', 'contract_id', 'auto_approved']))->toBe([
-        'status' => 'closed', 'borrower_user_id' => $this->staff->id, 'contract_id' => $pr->contract_id, 'auto_approved' => true,
+        'status' => 'fulfilled', 'borrower_user_id' => $this->staff->id, 'contract_id' => $pr->contract_id, 'auto_approved' => true,
     ])
         // one line per device, each handed out
         ->and($checkout->items()->get(['qty_fulfilled', 'purchase_request_id'])->toArray())->toBe([
@@ -153,6 +154,10 @@ it('receives and hands over to whoever asked in one go, with the papers to print
         ->where('checkouts.0.delivered', true));
     // someone who may not see the request gets no paper
     $this->actingAs(userWithRole('user'))->get("/checkout-requests/{$checkout->ulid}/delivery-note")->assertForbidden();
+
+    // whoever asked says both came: done
+    $this->actingAs($this->staff)->post("/checkout-requests/{$checkout->ulid}/confirm-receipt")->assertSessionHasNoErrors();
+    expect($checkout->fresh()->status)->toBe('closed');
 });
 
 it('hands over later what was received without it, and only by whoever hands things out', function () {

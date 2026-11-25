@@ -46,8 +46,8 @@ it('lets the receiver confirm what was handed out, and no one else', function ()
     $request = ($this->handedOut)();
     $fulfillment = CheckoutFulfillment::sole();
     expect($fulfillment->awaitsReceipt())->toBeTrue()
-        // handed out in full: closed as before, still waiting for the receiver
-        ->and($request->status)->toBe('closed');
+        // handed out in full, but not done until the receiver says it came
+        ->and($request->status)->toBe('fulfilled');
 
     $this->actingAs($this->desk)->get("/checkout-requests/{$request->ulid}")->assertInertia(fn (Assert $page) => $page
         ->where('can.confirm_receipt', false)
@@ -60,7 +60,9 @@ it('lets the receiver confirm what was handed out, and no one else', function ()
 
     expect($fulfillment->fresh()->only(['received_by', 'received_by_name', 'receipt_issue']))
         ->toBe(['received_by' => $this->staff->id, 'received_by_name' => 'Somchai Office', 'receipt_issue' => null])
-        ->and($fulfillment->fresh()->received_at->toDateTimeString())->toBe('2026-10-01 10:00:00');
+        ->and($fulfillment->fresh()->received_at->toDateTimeString())->toBe('2026-10-01 10:00:00')
+        // all handed out and all received: done
+        ->and($request->fresh()->status)->toBe('closed');
     $this->actingAs($this->desk)->get("/checkout-requests/{$request->ulid}")->assertInertia(fn (Assert $page) => $page
         ->where('request.items.0.fulfillments.0.received_by', 'Somchai Office'));
 
@@ -147,4 +149,63 @@ it('keeps each company to its own hand-outs', function () {
 
     $this->actingAs($this->staff)->post("/checkout-requests/{$theirs->ulid}/confirm-receipt")->assertNotFound();
     $this->actingAs($this->desk)->get('/checkout-requests?receipt=pending')->assertInertia(fn (Assert $p) => $p->where('requests.total', 0));
+});
+
+it('lets the receiver tick which hand-outs came, and closes the request only when all did', function () {
+    $request = ($this->handedOut)(2);
+    // a second hand-out on another line of another request, and a second line here
+    $other = ($this->handedOut)(1);
+    $theirs = CheckoutFulfillment::whereIn('item_id', $other->items()->select('id'))->sole();
+
+    $cable = createPart(['code' => 'CBL', 'name' => 'LAN cable', 'unit' => 'เส้น'], stock: 5);
+    $this->actingAs($this->desk)->post('/checkout-requests', [
+        'borrower_user_id' => $this->staff->id, 'ticket_id' => $this->ticket->id, 'submit' => true,
+        'items' => [
+            ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => 1],
+            ['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $cable->id, 'qty' => 3],
+        ],
+    ])->assertSessionHasNoErrors();
+    $two = CheckoutRequest::latest('id')->first();
+    $this->actingAs($this->admin)->post("/checkout-requests/{$two->ulid}/approve");
+    $this->actingAs($this->desk)->post("/checkout-requests/{$two->ulid}/fulfill-all")->assertSessionHasNoErrors();
+    [$ramOut, $cableOut] = CheckoutFulfillment::whereIn('item_id', $two->items()->select('id'))->orderBy('id')->get()->all();
+
+    // the RAM came; the cables did not: the RAM only, and an id of another request is not touched
+    $this->actingAs($this->staff)->post("/checkout-requests/{$two->ulid}/confirm-receipt", ['fulfillment_ids' => [$ramOut->id, $theirs->id]])
+        ->assertSessionHasNoErrors();
+    expect($ramOut->fresh()->received_at)->not->toBeNull()
+        ->and($cableOut->fresh()->received_at)->toBeNull()
+        ->and($theirs->fresh()->received_at)->toBeNull()
+        ->and($two->fresh()->status)->toBe('fulfilled');
+
+    // the cables: reported short, still open
+    $this->actingAs($this->staff)->post("/checkout-requests/{$two->ulid}/confirm-receipt", [
+        'report' => true, 'receipt_issue' => 'ได้ 2 จาก 3 เส้น', 'fulfillment_ids' => [$cableOut->id],
+    ])->assertSessionHasNoErrors();
+    expect($cableOut->fresh()->receipt_issue)->toBe('ได้ 2 จาก 3 เส้น')
+        ->and($two->fresh()->status)->toBe('fulfilled');
+    // nobody closes it by hand meanwhile
+    $this->actingAs($this->admin)->post("/checkout-requests/{$two->ulid}/close")->assertSessionHasErrors('request');
+
+    // sorted out, then confirmed: everything came, done
+    $this->actingAs($this->staff)->post("/checkout-requests/{$two->ulid}/confirm-receipt", ['fulfillment_ids' => [$cableOut->id]])->assertSessionHasNoErrors();
+    expect($two->fresh()->status)->toBe('closed')
+        ->and($other->fresh()->status)->toBe('fulfilled');
+
+    // ticking nothing of this request: nothing to confirm
+    $this->actingAs($this->staff)->post("/checkout-requests/{$other->ulid}/confirm-receipt", ['fulfillment_ids' => [$ramOut->id]])
+        ->assertSessionHasErrors('request');
+});
+
+it('keeps a request partly handed out open, whatever the receiver confirms', function () {
+    $this->actingAs($this->desk)->post('/checkout-requests', [
+        'borrower_user_id' => $this->staff->id, 'ticket_id' => $this->ticket->id, 'submit' => true,
+        'items' => [['purpose' => 'delivery', 'for_internal' => true, 'item_type' => 'part', 'part_id' => $this->ram->id, 'qty' => 4]],
+    ]);
+    $request = CheckoutRequest::latest('id')->first();
+    $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve");
+    $this->actingAs($this->desk)->post('/checkout-items/'.$request->items()->sole()->id.'/fulfill', ['qty' => 1])->assertSessionHasNoErrors();
+
+    $this->actingAs($this->staff)->post("/checkout-requests/{$request->ulid}/confirm-receipt")->assertSessionHasNoErrors();
+    expect($request->fresh()->status)->toBe('partial');
 });

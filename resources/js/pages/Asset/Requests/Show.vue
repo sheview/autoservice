@@ -151,13 +151,24 @@ const unconfirmed = computed(() => fulfillments.value.filter((f) => f.received_a
 const reportedCount = computed(() => unconfirmed.value.filter((f) => f.receipt_issue !== null).length);
 const reporting = ref(false);
 const receiptForm = useForm({ receipt_issue: '' });
+// The hand-outs the receiver ticks (all of them to start with): confirmed, or reported, together.
+const picked = ref<number[]>([]);
+watch(
+    () => unconfirmed.value.map((f) => f.id),
+    (ids) => (picked.value = [...ids]),
+    { immediate: true },
+);
+const allPicked = computed(() => picked.value.length === unconfirmed.value.length);
+const togglePick = (id: number) =>
+    (picked.value = picked.value.includes(id) ? picked.value.filter((p) => p !== id) : [...picked.value, id]);
 const confirmReceipt = () => {
-    if (!confirm(t('requests.receipt.confirm_prompt'))) return;
-    receiptForm.transform(() => ({})).post(route('asset.requests.confirm-receipt', props.request.ulid), options);
+    if (picked.value.length === 0) return;
+    if (!confirm(t(allPicked.value ? 'requests.receipt.confirm_prompt' : 'requests.receipt.confirm_some_prompt', { count: picked.value.length }))) return;
+    receiptForm.transform(() => ({ fulfillment_ids: picked.value })).post(route('asset.requests.confirm-receipt', props.request.ulid), options);
 };
 const reportIssue = () =>
     receiptForm
-        .transform((d) => ({ report: true, receipt_issue: d.receipt_issue }))
+        .transform((d) => ({ report: true, receipt_issue: d.receipt_issue, fulfillment_ids: picked.value }))
         .post(route('asset.requests.confirm-receipt', props.request.ulid), { ...options, onSuccess: () => (reporting.value = false) });
 
 const lineError = (field: string) => (lineForm.errors as Record<string, string>)[field];
@@ -244,20 +255,42 @@ const textareaClass = 'shadow-xs w-full rounded-md border border-input bg-transp
                     <p class="text-xs text-muted-foreground">{{ t('requests.receipt.hint') }}</p>
                 </div>
                 <ul class="space-y-1 text-sm">
-                    <li v-for="(f, index) in unconfirmed" :key="index">
-                        {{ f.line.item_name }} × {{ f.qty }} {{ f.line.unit ?? '' }}
-                        <span class="text-xs text-muted-foreground">· {{ f.by ?? '-' }} · {{ dateTime(f.at) }}</span>
-                        <span v-if="f.receipt_issue" class="block text-xs text-red-700 dark:text-red-400">
-                            {{ t('requests.receipt.issue') }}: {{ f.receipt_issue }}
-                        </span>
+                    <li v-if="unconfirmed.length > 1">
+                        <label class="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-medium sm:min-h-0">
+                            <input
+                                type="checkbox"
+                                class="h-4 w-4"
+                                :checked="allPicked"
+                                @change="picked = allPicked ? [] : unconfirmed.map((f) => f.id)"
+                            />
+                            {{ t('requests.receipt.pick_all') }}
+                        </label>
+                    </li>
+                    <li v-for="f in unconfirmed" :key="f.id">
+                        <label class="flex min-h-11 cursor-pointer items-start gap-2 sm:min-h-0">
+                            <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" :checked="picked.includes(f.id)" @change="togglePick(f.id)" />
+                            <span>
+                                {{ f.line.item_name }} × {{ f.qty }} {{ f.line.unit ?? '' }}
+                                <span class="text-xs text-muted-foreground">· {{ f.by ?? '-' }} · {{ dateTime(f.at) }}</span>
+                                <span v-if="f.receipt_issue" class="block text-xs text-red-700 dark:text-red-400">
+                                    {{ t('requests.receipt.issue') }}: {{ f.receipt_issue }}
+                                </span>
+                            </span>
+                        </label>
                     </li>
                 </ul>
                 <p v-if="reportedCount" class="text-xs text-muted-foreground">{{ t('requests.receipt.reported') }}</p>
                 <div class="flex flex-wrap gap-2">
-                    <Button class="min-h-11 sm:min-h-9" :disabled="receiptForm.processing" @click="confirmReceipt">
-                        {{ t('requests.receipt.confirm') }}
+                    <Button class="min-h-11 sm:min-h-9" :disabled="receiptForm.processing || picked.length === 0" @click="confirmReceipt">
+                        {{ allPicked ? t('requests.receipt.confirm') : t('requests.receipt.confirm_some', { count: picked.length }) }}
                     </Button>
-                    <Button v-if="reportedCount < unconfirmed.length" variant="outline" class="min-h-11 sm:min-h-9" @click="reporting = !reporting">
+                    <Button
+                        v-if="reportedCount < unconfirmed.length"
+                        variant="outline"
+                        class="min-h-11 sm:min-h-9"
+                        :disabled="picked.length === 0"
+                        @click="reporting = !reporting"
+                    >
                         {{ t('requests.receipt.report') }}
                     </Button>
                 </div>

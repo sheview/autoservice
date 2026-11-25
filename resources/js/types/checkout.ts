@@ -59,6 +59,7 @@ export interface CheckoutLineRow {
     // The request page: each hand-out of this line.
     // received_at: the receiver confirmed it; receipt_issue: they said it was short / never came.
     fulfillments?: {
+        id: number;
         qty: number;
         by: string | null;
         at: string | null;

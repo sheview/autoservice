@@ -7,6 +7,7 @@ use App\Modules\Asset\Actions\ApproveCheckoutRequest;
 use App\Modules\Asset\Actions\AssignIp;
 use App\Modules\Asset\Actions\BackorderCheckoutItem;
 use App\Modules\Asset\Actions\CancelCheckoutRequest;
+use App\Modules\Asset\Actions\ConfirmCheckoutReceipt;
 use App\Modules\Asset\Actions\FulfillCheckoutItem;
 use App\Modules\Asset\Actions\HandOutPurchase;
 use App\Modules\Asset\Actions\IpRecord;
@@ -984,8 +985,11 @@ class SampleCompanySeeder extends Seeder
         $request = $approve($request);
         $this->later(30);
         $fulfill->handle($request->items()->first(), 1, $this->helpdesk());
+        // Closed once the receiver says it came.
+        $this->later(45);
+        app(ConfirmCheckoutReceipt::class)->handle($request->fresh(), $this->tech2());
 
-        // Closed: a PC lent and returned.
+        // Closed: a PC lent, received and returned.
         $this->at(12, 13, 30);
         $request = $save->handle(null, ['borrower_user_id' => $staff->id, 'borrower_department' => 'ฝ่ายบัญชี',
             'purpose' => 'ยืมใช้งานระหว่างย้ายสำนักงาน', 'items' => [$loan($own[4], $this->realNow->subDays(5))]], $this->helpdesk());
@@ -994,6 +998,8 @@ class SampleCompanySeeder extends Seeder
         $request = $approve($request);
         $this->later(60);
         $item = $fulfill->handle($request->items()->first(), 1, $this->helpdesk());
+        $this->later(30);
+        app(ConfirmCheckoutReceipt::class)->handle($request->fresh(), $staff);
         $this->at(7, 16);
         app(ReturnCheckoutItem::class)->handle($item->fresh(), $this->helpdesk(), 1, 'สภาพปกติ อุปกรณ์ครบ');
 

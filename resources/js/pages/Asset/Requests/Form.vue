@@ -275,6 +275,61 @@ const addLine = (option: CheckoutItemOption) => {
 };
 const removeLine = (index: number) => lines.value.splice(index, 1);
 
+// Several at once: ticked in the list — across searches — then added together.
+const optionKey = (option: CheckoutItemOption) => `${option.item_type}-${option.asset_id ?? option.part_id}`;
+const ticked = ref<CheckoutItemOption[]>([]);
+const isTicked = (option: CheckoutItemOption) => ticked.value.some((o) => optionKey(o) === optionKey(option));
+const toggleTick = (option: CheckoutItemOption) => {
+    ticked.value = isTicked(option) ? ticked.value.filter((o) => optionKey(o) !== optionKey(option)) : [...ticked.value, option];
+};
+const tooMany = computed(() => lines.value.length + ticked.value.length > props.maxItems);
+const addTicked = () => {
+    ticked.value.forEach(addLine);
+    ticked.value = [];
+    itemSearch.value = '';
+};
+
+// Enter in the box: the codes in it (a barcode scanner types one and Enter; several can be pasted)
+// are added straight away. What was not found stays in the box; a plain word is just a search.
+const codesNote = ref('');
+const codeOf = (token: string) => (token.includes('/') ? (token.split('/').filter(Boolean).pop() ?? token) : token);
+const addByCodes = async () => {
+    const codes = itemSearch.value.split(/[\s,;]+/).map(codeOf).filter(Boolean);
+    if (codes.length === 0) return;
+    codesNote.value = '';
+    const missing: string[] = [];
+    let count = 0;
+    for (const code of codes) {
+        let found = { assets: [] as CheckoutItemOption[], parts: [] as CheckoutItemOption[] };
+        try {
+            found = await getJson(route('asset.requests.items', { q: code }));
+        } catch {
+            // left as not found
+        }
+        const option = [...found.assets, ...found.parts].find((o) => (o.code ?? '').toLowerCase() === code.toLowerCase());
+        if (!option || (full.value && !added(option))) {
+            missing.push(code);
+        } else if (!added(option)) {
+            addLine(option);
+            count++;
+        }
+    }
+    // No code at all: words typed to search, the results stay as they are.
+    if (missing.length === codes.length) return;
+    itemSearch.value = missing.join(' ');
+    codesNote.value = [t('requests.codes_added', { count }), missing.length ? t('requests.codes_not_found', { codes: missing.join(', ') }) : '']
+        .filter(Boolean)
+        .join(' · ');
+};
+// Pasted lines (a column copied from Excel): one code a line, added at once.
+const pasteCodes = (event: ClipboardEvent) => {
+    const text = event.clipboardData?.getData('text') ?? '';
+    if (!/[\r\n]/.test(text.trim())) return;
+    event.preventDefault();
+    itemSearch.value = text.replace(/\s+/g, ' ').trim();
+    addByCodes();
+};
+
 // The purchase request form, started with the item's name. With lines already written, the
 // request is saved as a draft first and the purchase is tied to it (nothing is lost).
 const purchaseUrl = (item: string) => route('inventory.purchase-requests.create', { item });
@@ -439,8 +494,22 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                         :placeholder="partsEnabled ? t('requests.item_placeholder') : t('requests.item_placeholder_assets')"
                         @focus="openFrequent"
                         @click="openFrequent"
+                        @keydown.enter.prevent="addByCodes"
+                        @paste="pasteCodes"
                     />
+                    <p class="text-xs text-muted-foreground">{{ t('requests.codes_hint') }}</p>
+                    <p v-if="codesNote" class="text-xs text-green-700 dark:text-green-400">{{ codesNote }}</p>
                     <p v-if="full" class="text-xs text-amber-700 dark:text-amber-400">{{ t('requests.lines_full', { max: maxItems }) }}</p>
+                    <!-- Ticked so far (kept across searches): added together -->
+                    <div v-if="ticked.length" class="flex flex-wrap items-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-sm">
+                        <span class="font-medium">{{ t('requests.ticked', { count: ticked.length }) }}</span>
+                        <Button type="button" size="sm" :disabled="tooMany" @click="addTicked">
+                            <Plus class="h-4 w-4" />
+                            {{ t('requests.add_ticked') }}
+                        </Button>
+                        <Button type="button" size="sm" variant="ghost" @click="ticked = []">{{ t('requests.untick') }}</Button>
+                        <span v-if="tooMany" class="text-xs text-amber-700 dark:text-amber-400">{{ t('requests.lines_full', { max: maxItems }) }}</span>
+                    </div>
                     <p v-if="searching" class="text-xs text-muted-foreground">{{ t('requests.searching') }}</p>
                     <div v-else-if="shownItems" class="max-h-96 overflow-y-auto rounded-md border">
                         <div v-if="suggesting" class="flex items-center justify-between gap-2 px-3 py-2 text-xs font-semibold">
@@ -462,6 +531,14 @@ const title = props.request ? t('requests.edit_title', { no: props.request.reque
                                     :key="`${option.item_type}-${option.asset_id ?? option.part_id}`"
                                     class="flex items-center gap-3 border-t px-3 py-2 text-sm"
                                 >
+                                    <input
+                                        type="checkbox"
+                                        class="h-5 w-5 shrink-0"
+                                        :aria-label="t('requests.tick', { item: option.name })"
+                                        :checked="added(option) || isTicked(option)"
+                                        :disabled="added(option)"
+                                        @change="toggleTick(option)"
+                                    />
                                     <ListThumb :src="option.photo" :alt="option.name" />
                                     <div class="min-w-0 flex-1">
                                         <span class="font-mono text-xs">{{ option.code }}</span>

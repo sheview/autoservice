@@ -2,6 +2,7 @@
 
 namespace App\Modules\Asset\Support;
 
+use App\Modules\Asset\Models\CheckoutFulfillment;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
 
@@ -41,10 +42,31 @@ class CheckoutStatus
             ->doesntContain(fn (CheckoutItem $item) => $item->checkout_type === CheckoutItem::LOAN && $item->outstanding() > 0);
     }
 
-    /** Whether the request may be closed: no line still waits for a decision or a hand-out. */
+    /**
+     * Whether the request may be closed: no line still waits for a decision or a hand-out, and the
+     * receiver has confirmed every hand-out (a job is done once the things have arrived, not when
+     * they left the store). A request with nobody here to confirm (asked by another company
+     * through a share) is done once it is all handed out.
+     */
     public static function closable(CheckoutRequest $request): bool
     {
         return $request->status === CheckoutRequest::STATUS_FULFILLED
-            && $request->items()->whereNotIn('status', CheckoutItem::FINISHED)->doesntExist();
+            && $request->items()->whereNotIn('status', CheckoutItem::FINISHED)->doesntExist()
+            && (! self::hasReceiver($request) || ! self::awaitingReceipt($request));
+    }
+
+    /** Someone of this company confirms receipt (CheckoutRequestPolicy::confirmReceipt): the borrower, else who asked. */
+    public static function hasReceiver(CheckoutRequest $request): bool
+    {
+        return ($request->borrower_user_id ?? $request->requester_id) !== null;
+    }
+
+    /** Something handed out the receiver has not confirmed yet (reported as wrong or not). */
+    public static function awaitingReceipt(CheckoutRequest $request): bool
+    {
+        return CheckoutFulfillment::query()
+            ->whereIn('item_id', $request->items()->select('id'))
+            ->whereNull('received_at')
+            ->exists();
     }
 }

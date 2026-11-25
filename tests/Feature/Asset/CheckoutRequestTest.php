@@ -4,6 +4,7 @@ use App\Modules\Asset\Actions\AssetHeldQuantities;
 use App\Modules\Asset\Models\Asset;
 use App\Modules\Asset\Models\CheckoutItem;
 use App\Modules\Asset\Models\CheckoutRequest;
+use App\Modules\Identity\Models\User;
 use App\Modules\Inventory\Actions\RecordStockMovement;
 use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Inventory\Models\StockMovement;
@@ -42,6 +43,11 @@ beforeEach(function () {
         $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/approve")->assertSessionHasNoErrors();
 
         return $request->fresh();
+    };
+    // The receiver (the borrower, else whoever asked) confirms everything handed out to them.
+    $this->received = function (CheckoutRequest $request) {
+        $receiver = User::find($request->borrower_user_id ?? $request->requester_id);
+        $this->actingAs($receiver)->post("/checkout-requests/{$request->ulid}/confirm-receipt")->assertSessionHasNoErrors();
     };
 });
 
@@ -220,7 +226,11 @@ it('hands out an asset to the borrower and takes it back with its condition', fu
 
     $this->actingAs($this->desk)->post("/checkout-items/{$line->id}/return", ['qty' => 1])->assertSessionHasErrors('qty');
 
-    // the loan back, every line finished: closed on its own
+    // the loan back, every line finished, but the borrower has not said it came: still open
+    expect($request->fresh()->status)->toBe('fulfilled');
+
+    // received: closed on its own
+    ($this->received)($request);
     expect($request->fresh()->status)->toBe('closed')
         ->and($request->fresh()->closed_at)->not->toBeNull();
 });
@@ -250,7 +260,10 @@ it('hands out a lot in parts, then gives up the rest with a reason and closes', 
 
     // the staff member (neither approve nor fulfill) does not close it
     $this->actingAs($this->staff)->post("/checkout-requests/{$request->ulid}/close")->assertForbidden();
-    $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/close")->assertSessionHasNoErrors();
+    // nor anyone, before the receiver says the cable came
+    $this->actingAs($this->admin)->post("/checkout-requests/{$request->ulid}/close")->assertSessionHasErrors('request');
+    ($this->received)($request);
+    expect($request->fresh()->status)->toBe('closed');
     expect($request->fresh()->status)->toBe('closed');
 
     // a line given up before anything went out is cancelled
@@ -426,8 +439,10 @@ it('hands out every line still to hand out in one go, and closes when all is out
     $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasNoErrors();
 
     expect($request->items()->orderBy('id')->get()->map(fn ($line) => [$line->status, $line->qty_fulfilled])->all())->toBe([['fulfilled', 1], ['fulfilled', 2]])
-        // nothing lent: done with, so closed
-        ->and($request->fresh()->status)->toBe('closed');
+        // all out, nothing lent, but not received yet: open until the receiver says it all came
+        ->and($request->fresh()->status)->toBe('fulfilled');
+    ($this->received)($request);
+    expect($request->fresh()->status)->toBe('closed');
 
     // nothing left to hand out
     $this->actingAs($this->desk)->post("/checkout-requests/{$request->ulid}/fulfill-all")->assertSessionHasErrors('request');
@@ -448,7 +463,9 @@ it('takes every lent asset back in one go, and closes the request', function () 
     expect($request->items()->get()->every(fn ($line) => $line->outstanding() === 0 && $line->return_condition === 'สภาพปกติ'))->toBeTrue()
         ->and($this->notebook->fresh()->status)->toBe(Asset::STATUS_SPARE)
         ->and($laptop->fresh()->status)->toBe(Asset::STATUS_SPARE)
-        ->and($request->fresh()->status)->toBe('closed');
+        ->and($request->fresh()->status)->toBe('fulfilled');
+    ($this->received)($request);
+    expect($request->fresh()->status)->toBe('closed');
 });
 
 it('narrows the list to parts issued or assets lent', function () {
