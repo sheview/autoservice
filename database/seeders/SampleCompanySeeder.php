@@ -56,6 +56,7 @@ use App\Modules\Inventory\Models\PurchaseRequest;
 use App\Modules\Labeling\Actions\RecordLabelPrint;
 use App\Modules\Maintenance\Actions\AddSiteEquipment;
 use App\Modules\Maintenance\Actions\AddStandardChecklists;
+use App\Modules\Maintenance\Actions\AssignPmTemplateToAsset;
 use App\Modules\Maintenance\Actions\CreatePmReportShare;
 use App\Modules\Maintenance\Actions\CreatePmWorkOrder;
 use App\Modules\Maintenance\Actions\CreateTemplateVersion;
@@ -149,6 +150,13 @@ class SampleCompanySeeder extends Seeder
     public const NAME = 'บริษัท ตัวอย่าง จำกัด';
 
     /** The work order to practise on: a wrong form to change, and equipment found on site (pmFieldTraining). */
+    /** The MOTS project example (its customer code): added once, to a sample company made before it too. */
+    public const MOTS_CODE = 'MOTS';
+
+    public const MOTS_TITLE = 'PM รอบที่ 1 โครงการ MOTS (ตัวอย่าง)';
+
+    private const MOTS_PLACE = ['lat' => '13.8836', 'lng' => '100.5651'];
+
     public const PM_TRAINING_TITLE = 'ใบงานฝึก: เปลี่ยนแบบฟอร์ม และเพิ่มเครื่องหน้างาน';
 
     /** The serial number of the customer's device that is in the register but not on the training work order. */
@@ -274,6 +282,8 @@ class SampleCompanySeeder extends Seeder
             // Made before forms could be changed and equipment added on site: the work order to practise on.
             // Nothing is sent from it, and nothing of it is half made: all or none (one transaction).
             $this->quietly(fn () => $this->context->run($existing, fn () => DB::transaction(fn () => $this->pmFieldTraining())));
+            // Made before the MOTS forms: the project's example (equipment, forms, a finished PM).
+            $this->quietly(fn () => $this->context->run($existing, fn () => DB::transaction(fn () => $this->pmMots())));
             $this->command?->info(self::NAME.' มีอยู่แล้ว: ไม่ได้เพิ่มข้อมูล');
 
             return;
@@ -363,6 +373,7 @@ class SampleCompanySeeder extends Seeder
         $this->labelsAndDocuments();
         $this->maintenance();
         $this->pmFieldTraining();
+        $this->pmMots();
         $this->roomAccess();
         $this->surveys();
     }
@@ -409,6 +420,10 @@ class SampleCompanySeeder extends Seeder
     {
         foreach (self::BRANCH_PLACES as $code => [$lat, $lng]) {
             Branch::query()->where('code', $code)->whereNull('lat')->update(['lat' => $lat, 'lng' => $lng]);
+        }
+        // The MOTS project's data center (pmMots).
+        if ($mots = Customer::query()->where('code', self::MOTS_CODE)->first()) {
+            CustomerSite::query()->where('customer_id', $mots->id)->whereNull('lat')->update(self::MOTS_PLACE);
         }
 
         foreach (self::SITE_PLACES as $i => $sites) {
@@ -1302,6 +1317,173 @@ class SampleCompanySeeder extends Seeder
             'category_id' => $categories['UPS'], 'brand' => 'CyberPower', 'model' => 'UT1000E', 'serial_number' => 'TRAIN-SN-NEW',
             'location' => 'คลังสินค้า 1', 'floor' => '1', 'room' => 'ห้องหัวหน้าคลัง', 'add_to_plan' => false,
         ], $technician);
+    }
+
+    /**
+     * The MOTS project (its PM forms: docs/pm-forms): a customer and its contract, its equipment
+     * with the details the forms show (hostname, CPU, controller ... in the register's spec fields),
+     * each tied to its MOTS form (Precision Air keeps the standard one, from the same project), and
+     * the first round done: recorded, signed by both sides and approved, to print. One server's
+     * hostname is not in the register: the technician typed it on site.
+     * Added once (by the customer code), so it also reaches a sample company made before it.
+     */
+    private function pmMots(): void
+    {
+        if (Customer::withTrashed()->where('code', self::MOTS_CODE)->exists()) {
+            return;
+        }
+        $categories = AssetCategory::query()->get()->keyBy('code_prefix');
+        $technician = User::query()->where('email', 'tech1@'.self::DOMAIN)->first();
+        $office = User::query()->where('email', 'helpdesk@'.self::DOMAIN)->first();
+        $admin = User::query()->where('email', 'admin@'.self::DOMAIN)->first();
+        $branch = Branch::query()->orderBy('id')->first();
+        if (! $technician || ! $office || ! $admin || ! $branch || collect(['FW', 'STO', 'SV', 'UPS'])->contains(fn ($p) => ! isset($categories[$p]))) {
+            return;
+        }
+        $this->realNow ??= now()->toImmutable();
+
+        try {
+            // The details the MOTS forms show, as spec fields of the categories.
+            $specs = [
+                'FW' => [['hostname', 'Hostname']],
+                'STO' => [['hostname', 'Hostname'], ['controller', 'Controller'], ['disks', 'Disk']],
+                'SV' => [['hostname', 'Hostname'], ['raid_controller', 'Raid Controller'], ['nic', 'Network Interface'], ['os', 'Operating System']],
+            ];
+            foreach ($specs as $prefix => $fields) {
+                $category = $categories[$prefix];
+                $current = $category->spec_fields ?? [];
+                foreach ($fields as [$key, $label]) {
+                    if (! in_array($key, array_column($current, 'key'), true)) {
+                        $current[] = ['key' => $key, 'label' => $label, 'type' => 'text', 'options' => [], 'required' => false];
+                    }
+                }
+                app(SaveAssetCategory::class)->handle($category, [
+                    ...$category->only(['name', 'code_prefix', 'service_line', 'asset_type', 'requires_serial']),
+                    'spec_fields' => $current,
+                ]);
+            }
+            // The MOTS forms (and any standard one the company does not have yet).
+            app(AddStandardChecklists::class)->handle();
+
+            $this->at(70, 9);
+            $customer = app(SaveCustomer::class)->handle(null, [
+                'code' => self::MOTS_CODE, 'name' => 'ลูกค้าโครงการ MOTS (ตัวอย่าง)',
+                'contact_name' => 'ปฏิภาณ อินหว่าง', 'phone' => '02-000-0000', 'email' => 'mots@customer.'.self::DOMAIN,
+                'address' => 'อาคาร C ศูนย์ราชการ (ข้อมูลสมมติ)',
+            ]);
+            app(SaveSite::class)->handle($customer, null, [
+                'name' => 'Data Center อาคาร C', 'notes' => 'ติดต่อเจ้าหน้าที่ก่อนเข้าห้อง', 'address' => 'อาคาร C ชั้น 2',
+                'province' => 'กรุงเทพมหานคร', ...self::MOTS_PLACE,
+            ]);
+            $contract = app(SaveContract::class)->handle(null, [
+                'customer_id' => $customer->id,
+                'contract_no' => 'จข.2/2568',
+                'title' => 'โครงการค่าใช้จ่ายการพัฒนาและจัดหาโครงสร้างพื้นฐานด้านเทคโนโลยีดิจิทัลอย่างมีประสิทธิภาพ',
+                'status' => Contract::STATUS_ACTIVE,
+                'starts_on' => $this->realNow->subMonths(3)->toDateString(),
+                'ends_on' => $this->realNow->addMonths(9)->toDateString(),
+                'value' => 1_850_000 * 100, // satang
+                'service_window' => '24x7',
+                'pm_interval_months' => 3,
+                'notify_days_before' => 60,
+                'slas' => collect(['critical' => [30, 240], 'high' => [60, 480], 'medium' => [240, 1440], 'low' => [480, 2880]])
+                    ->map(fn (array $minutes) => ['response_minutes' => $minutes[0], 'resolve_minutes' => $minutes[1]])->all(),
+            ]);
+            app(SyncContractMembers::class)->handle($contract, [$technician->id, $office->id]);
+
+            // [category, name, brand, model, serial, specs, MOTS form (null: the category's own)]
+            $equipment = [
+                ['FW', 'Firewall MOTS-FW-01', 'Fortinet', 'FortiGate-400F', 'FG4H0FT924906370', ['hostname' => 'MOTS-FW-01'], 'MOTS-FW'],
+                ['FW', 'Firewall MOTS-FW-02', 'Fortinet', 'FortiGate-400F', 'FG4H0FT924906374', ['hostname' => 'MOTS-FW-02'], 'MOTS-FW'],
+                ['STO', 'Storage MOTS-MSA1060-01', 'HPE', 'MSA1060', 'ACV442W033',
+                    ['hostname' => 'MOTS-MSA1060-01', 'controller' => '2 Controllers (A,B)', 'disks' => '1.2 TB SAS x 24'], 'MOTS-STORAGE'],
+                ['SV', 'Server MOTS-SRV03', 'HPE', 'ProLiant DL360', 'SGHD2FLXGW', [
+                    'hostname' => 'MOTS-SRV03', 'cpu' => 'Intel(R) Xeon(R) GOLD 6544Y 0 x 2', 'ram_gb' => 128, 'storage' => '960GB SSD x 4',
+                    'raid_controller' => 'HPE MR408i-o Gen11', 'nic' => 'HPE Ethernet 10Gb Base-T BCM574164', 'os' => 'Windows Server',
+                ], 'MOTS-SERVER'],
+                // Its hostname is not in the register yet: typed on site.
+                ['SV', 'Server MOTS-SRV04', 'HPE', 'ProLiant DL360', 'SGHD2FLXGX', [
+                    'cpu' => 'Intel(R) Xeon(R) GOLD 6544Y 0 x 2', 'ram_gb' => 128, 'storage' => '960GB SSD x 4', 'os' => 'Windows Server',
+                ], 'MOTS-SERVER'],
+                ['UPS', 'UPS 3C3 PRO 40kVA', '3C3', '3C3-PRO-40KS', '250445403990001', ['capacity_va' => 40000], 'MOTS-UPS'],
+            ];
+            if (isset($categories['PAC'])) {
+                $equipment[] = ['PAC', 'Precision Air CRAC-01', 'STULZ', 'ASD430CW', '276160000152756', [], null];
+            }
+            $assets = [];
+            foreach ($equipment as [$prefix, $name, $brand, $model, $serial, $spec, $form]) {
+                $asset = app(SaveAsset::class)->handle(null, [
+                    'category_id' => $categories[$prefix]->id, 'branch_id' => $branch->id, 'customer_id' => $customer->id,
+                    'name' => $name, 'brand' => $brand, 'model' => $model, 'serial_number' => $serial,
+                    'status' => Asset::STATUS_IN_USE, 'location' => 'Data Center อาคาร C', 'floor' => '2', 'room' => 'Facility Room',
+                    'specs' => $spec,
+                ]);
+                if ($form !== null) {
+                    app(AssignPmTemplateToAsset::class)->handle($asset->id, $form);
+                }
+                $assets[] = $asset;
+            }
+            app(AddContractAssets::class)->handle($contract, array_map(fn (Asset $asset) => $asset->id, $assets));
+
+            // The first round, done and approved (to print, with its forms and signatures).
+            $this->at(12, 9);
+            $visit = app(CreatePmWorkOrder::class)->handle([
+                'customer_id' => $customer->id, 'contract_id' => $contract->id, 'title' => self::MOTS_TITLE,
+                'due_on' => $this->realNow->subDays(5)->toDateString(), 'scheduled_on' => $this->realNow->subDays(10)->toDateString(),
+                'assignee_id' => $technician->id, 'asset_ids' => array_map(fn (Asset $asset) => $asset->id, $assets),
+            ], $office);
+            $this->at(10, 9, 30);
+            $visit = app(StartPmVisit::class)->handle($visit, $technician);
+            app(MarkPmVisitArrival::class)->handle($visit->fresh(), $technician);
+
+            foreach ($visit->fresh()->items()->orderBy('id')->get() as $item) {
+                $this->later(20);
+                $asset = Asset::query()->findOrFail($item->asset_id);
+                $checklist = $item->checklist ?? [];
+                $answers = $this->answers($checklist, $asset);
+                foreach ($checklist as $field) {
+                    // Not in the register: the technician types it (MOTS-SRV04's hostname).
+                    if ($field['type'] === 'readonly_from_asset' && ($field['source'] ?? '') === 'spec.hostname' && blank($asset->specs['hostname'] ?? null)) {
+                        $answers[$field['key']] = 'MOTS-SRV04';
+                    }
+                    if ($field['type'] === 'textarea' && $field['key'] === 'suggestion') {
+                        $answers[$field['key']] = 'อุปกรณ์ทำงานปกติ แนะนำสำรองค่าการติดตั้งทุกครั้งที่มีการเปลี่ยนแปลง';
+                    }
+                    // A battery block reads about 13.5 V (not a mains voltage).
+                    if ($field['key'] === 'battery_blocks') {
+                        $answers[$field['key']] = array_map(fn () => ['volt' => mt_rand(1340, 1365) / 100], range(1, 32));
+                    }
+                }
+                try {
+                    app(RecordPmItem::class)->handle($item, $technician, ['result' => PmVisitItem::RESULT_PASSED, 'answers' => $answers]);
+                } catch (ValidationException) {
+                    app(RecordPmItem::class)->handle($item->fresh(), $technician, [
+                        'result' => PmVisitItem::RESULT_NOT_INSPECTED, 'not_inspected_reason' => 'ลูกค้าใช้งานเครื่องอยู่ ไม่สามารถตรวจได้',
+                    ]);
+                }
+            }
+            app(MarkPmVisitDeparture::class)->handle($visit->fresh(), $technician);
+
+            $this->later(30);
+            $visit = app(SubmitPmVisit::class)->handle($visit->fresh(), $technician, [
+                'summary' => 'ทำ PM รอบที่ 1 ครบทุกเครื่องตามแบบฟอร์มของโครงการ อุปกรณ์ทำงานปกติ',
+                'technician_signature' => $this->signature(31),
+                'customer_signature' => $this->signature(37),
+                'customer_signer_name' => 'ปฏิภาณ อินหว่าง',
+                'customer_signer_position' => 'เจ้าหน้าที่ศูนย์คอมพิวเตอร์',
+            ]);
+            $move = app(MovePmVisit::class);
+            foreach ([['review', $office], ['approve', $admin]] as [$action, $actor]) {
+                $this->later(90);
+                $visit = $visit->fresh();
+                if ($action === 'review' && $visit->status !== PmVisit::STATUS_SUBMITTED) {
+                    continue;
+                }
+                $visit = $move->handle($visit, $action, $actor, null);
+            }
+        } finally {
+            Carbon::setTestNow($this->realNow);
+        }
     }
 
     /**
