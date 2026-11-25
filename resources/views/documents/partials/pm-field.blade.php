@@ -112,7 +112,8 @@
     @default
         @php($empty = $answer === null || $answer === '' || $answer === [])
         @php($outcome = match ($check['type']) {
-            'pass_fail' => $empty ? __('document.pm.none') : __('document.pm.'.$answer),
+            // The template's own words (e.g. เรียบร้อย / ยังไม่เรียบร้อย), else the standard ones.
+            'pass_fail' => $empty ? __('document.pm.none') : ($check['labels'][$answer] ?? __('document.pm.'.$answer)),
             'check' => $pending ? __('document.pm.none') : ($answer ? __('document.pm.done') : __('document.pm.not_done')),
             'number', 'measure' => $empty ? __('document.pm.none') : trim($number($answer).' '.($check['unit'] ?? '')),
             'checkbox_group' => $empty ? __('document.pm.none') : implode(', ', (array) $answer),

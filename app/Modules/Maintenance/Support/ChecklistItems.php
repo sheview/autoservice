@@ -12,7 +12,8 @@ use Illuminate\Validation\Rule;
  *
  *   {key, label, type, section?, required?, ...settings}
  *
- *   pass_fail            Pass / Fail / N/A                       "pass" | "fail" | "na"
+ *   pass_fail            Pass / Fail / N/A; labels? {pass, fail, na} — the words shown and
+ *                        printed instead (e.g. เรียบร้อย / ยังไม่เรียบร้อย)  "pass" | "fail" | "na"
  *   text / textarea      free text                               string
  *   number               unit?, min?, max? (out of range = fail) number
  *   measure              the older name of number                number
@@ -25,7 +26,10 @@ use Illuminate\Validation\Rule;
  *                        rows {count} or {from: key of an earlier number field, max}
  *                                                                list of rows {column: value}
  *   photo                photos (how many; media with custom property "question" = key)   no answer
- *   readonly_from_asset  source (a field of the asset register)  the asset's value when recorded
+ *   readonly_from_asset  source: a field of the asset register (ASSET_SOURCES), or "spec.{key}"
+ *                        one of its category's spec fields (hostname, CPU, RAID ...)
+ *                                                                the asset's value when recorded;
+ *                        when the register has none, what the technician typed
  *   check                done / not done (older checklists)      bool
  *
  * "section" puts a field under a heading (the list order is the form order); "required" = must
@@ -49,6 +53,12 @@ final class ChecklistItems
     public const ASSET_SOURCES = ['asset_code', 'name', 'brand', 'model', 'serial_number', 'property_no', 'ip_address', 'location', 'floor', 'room', 'used_by'];
 
     public const PASS_FAIL = ['pass', 'fail', 'na'];
+
+    /** A spec field of the asset's category as a source: "spec.{key}". */
+    public const SPEC_SOURCE = '/^spec\.[a-z0-9_]{1,50}$/';
+
+    /** Words a pass_fail field may show instead of the standard ones. */
+    public const LABEL_MAX = 40;
 
     public const MAX_ITEMS = 80;
 
@@ -95,7 +105,8 @@ final class ChecklistItems
                         : ['count' => min(self::MAX_ROWS, max(1, (int) ($rows['count'] ?? 1)))],
                 ],
                 'photo' => ['photos' => min(10, max(1, (int) ($item['photos'] ?? 1)))],
-                'readonly_from_asset' => ['source' => in_array($item['source'] ?? null, self::ASSET_SOURCES, true) ? $item['source'] : 'asset_code'],
+                'readonly_from_asset' => ['source' => self::isAssetSource($item['source'] ?? null) ? $item['source'] : 'asset_code'],
+                'pass_fail' => self::passFailLabels($item['labels'] ?? null),
                 default => [],
             };
 
@@ -211,8 +222,11 @@ final class ChecklistItems
                     }
                     break;
                 case 'photo':
-                case 'readonly_from_asset':
                     break; // nothing typed in
+                case 'readonly_from_asset':
+                    // Typed by the technician when the register has no value.
+                    $rules[$field] = ['nullable', 'string', 'max:500'];
+                    break;
                 default:
                     $rules[$field] = ['nullable', 'string', 'max:500'];
             }
@@ -244,7 +258,7 @@ final class ChecklistItems
                 'measure_table' => self::measureTable($item, is_array($value) ? $value : []),
                 'repeat_table' => self::repeatTable($item, is_array($value) ? $value : [], $clean),
                 'photo' => null,
-                'readonly_from_asset' => filled($asset[$item['source']] ?? null) ? (string) $asset[$item['source']] : null,
+                'readonly_from_asset' => self::assetValue($asset, $item['source'] ?? '') ?? (filled($value) && is_scalar($value) ? trim((string) $value) : null),
                 default => filled($value) ? trim((string) $value) : null,
             };
         }
@@ -529,5 +543,66 @@ final class ChecklistItems
         }
 
         return $errors;
+    }
+
+    /** A field of the asset register (ASSET_SOURCES) or a spec field of its category ("spec.{key}"). */
+    public static function isAssetSource(mixed $source): bool
+    {
+        return is_string($source) && (in_array($source, self::ASSET_SOURCES, true) || preg_match(self::SPEC_SOURCE, $source) === 1);
+    }
+
+    /**
+     * The register's value for a source, or null when it has none.
+     *
+     * @param  array<string, mixed>  $asset  AssetDetails (with "specs"), or assetFacts()
+     */
+    public static function assetValue(array $asset, string $source): ?string
+    {
+        $value = array_key_exists($source, $asset) ? $asset[$source]
+            : (str_starts_with($source, 'spec.') ? ($asset['specs'][substr($source, 5)] ?? null) : null);
+
+        return filled($value) && is_scalar($value) ? (string) $value : null;
+    }
+
+    /**
+     * What a readonly_from_asset field may show of an asset, flat: the register fields and each
+     * spec as "spec.{key}" (the browser reads them by the field's source).
+     *
+     * @param  array<string, mixed>  $asset  AssetDetails
+     * @return array<string, string>
+     */
+    public static function assetFacts(array $asset): array
+    {
+        $facts = [];
+        foreach (self::ASSET_SOURCES as $source) {
+            if (($value = self::assetValue($asset, $source)) !== null) {
+                $facts[$source] = $value;
+            }
+        }
+        foreach (is_array($asset['specs'] ?? null) ? $asset['specs'] : [] as $key => $value) {
+            if (filled($value) && is_scalar($value)) {
+                $facts['spec.'.$key] = (string) $value;
+            }
+        }
+
+        return $facts;
+    }
+
+    /**
+     * The words a pass_fail field shows instead of the standard ones: only those given.
+     *
+     * @return array{labels?: array<string, string>}
+     */
+    private static function passFailLabels(mixed $labels): array
+    {
+        $clean = [];
+        foreach (self::PASS_FAIL as $answer) {
+            $word = is_array($labels) ? trim((string) ($labels[$answer] ?? '')) : '';
+            if ($word !== '') {
+                $clean[$answer] = mb_substr($word, 0, self::LABEL_MAX);
+            }
+        }
+
+        return $clean === [] ? [] : ['labels' => $clean];
     }
 }

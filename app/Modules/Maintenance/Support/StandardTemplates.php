@@ -59,6 +59,11 @@ final class StandardTemplates
                 layout: PmChecklist::LAYOUT_GROUPED_TABLE, blocks: PmChecklist::BLOCKS),
             self::template('NW-GROUP', 'Network PM (ตารางรวม)', self::NETWORK, ['RT', 'FW', 'AP'], self::networkGroup(),
                 layout: PmChecklist::LAYOUT_GROUPED_TABLE, blocks: ['customer_info', 'case_details', 'parts_usage', 'acknowledgement', 'satisfaction']),
+            // The MOTS project's forms (docs/pm-forms): offered to choose, tied to no category on their own.
+            self::template('MOTS-FW', 'MOTS – Firewall PM', self::NETWORK, [], self::motsFirewall(), needs: ['FW']),
+            self::template('MOTS-STORAGE', 'MOTS – Storage PM', self::DC, [], self::motsStorage(), needs: ['STO']),
+            self::template('MOTS-SERVER', 'MOTS – Server PM', self::DC, [], self::motsServer(), needs: ['SV']),
+            self::template('MOTS-UPS', 'MOTS – UPS PM', self::DC, [], self::motsUps(), needs: ['UPS']),
         ];
 
         $covered = array_merge(...array_column($fromForms, 'prefixes'));
@@ -485,6 +490,134 @@ final class StandardTemplates
                 $phase('r_n', 'R - N'), $phase('s_n', 'S - N'), $phase('t_n', 'T - N'),
                 ['key' => 'n_g', 'label' => 'N - G', 'min' => 0, 'max' => 0.9],
             ]];
+    }
+
+    // ---------------------------------------------------------------- MOTS project
+
+    /** The MOTS sheets' words: เรียบร้อย / ยังไม่เรียบร้อย. */
+    private const MOTS_DONE = ['pass' => 'เรียบร้อย', 'fail' => 'ยังไม่เรียบร้อย', 'na' => 'ไม่ได้ตรวจ'];
+
+    private const MOTS_DEVICE = 'รายละเอียดของอุปกรณ์';
+
+    private const MOTS_CHECKS = 'รายละเอียดการบันทึก';
+
+    /**
+     * A MOTS sheet: the device (from the register; typed when the register has none), the checks
+     * (เรียบร้อย / ยังไม่เรียบร้อย; the report page referred to is written by hand on the print),
+     * the suggestions, then the photos.
+     *
+     * @param  list<array{0: string, 1: string, 2: string}>  $device  key, label, source
+     * @param  list<array{0: string, 1: string}>  $checks  key, label
+     */
+    private static function mots(array $device, array $checks): array
+    {
+        return [
+            ...array_map(fn (array $d) => self::fromAsset($d[0], $d[1], self::MOTS_DEVICE, $d[2]), $device),
+            ...array_map(fn (array $c) => [...self::check($c[0], $c[1], self::MOTS_CHECKS), 'labels' => self::MOTS_DONE], $checks),
+            ['key' => 'suggestion', 'label' => 'ข้อเสนอแนะ', 'type' => 'textarea', 'section' => 'ข้อเสนอแนะ'],
+            ['key' => 'photos', 'label' => 'รูปประกอบ', 'type' => 'photo', 'section' => 'รูปประกอบ', 'photos' => 10],
+        ];
+    }
+
+    private static function motsFirewall(): array
+    {
+        return self::mots([
+            ['model', 'Model', 'model'], ['serial', 'Serial Number', 'serial_number'], ['hostname', 'Hostname', 'spec.hostname'],
+        ], [
+            ['dashboard', 'สถานะภาพรวมของอุปกรณ์ (Dashboard)'],
+            ['network', 'สถานะช่องเชื่อมต่อเครือข่าย (Network)'],
+            ['power', 'สถานะแหล่งจ่ายพลังงาน (Power Supplies)'],
+            ['log', 'ผลการตรวจสอบเหตุการณ์ต่างๆ (Log alerts)'],
+            ['backup_config', 'สำรองค่าการติดตั้งอุปกรณ์ (Backup Configuration)'],
+        ]);
+    }
+
+    private static function motsStorage(): array
+    {
+        return self::mots([
+            ['model', 'Model', 'model'], ['serial', 'Serial Number', 'serial_number'], ['hostname', 'Hostname', 'spec.hostname'],
+            ['controller', 'Controller', 'spec.controller'], ['disk', 'Disk', 'spec.disks'],
+        ], [
+            ['dashboard', 'สถานะภาพรวมของอุปกรณ์ (Dashboard)'],
+            ['controller_status', 'สถานะหน่วยประมวลผล (Controller)'],
+            ['hard_disk', 'สถานะหน่วยจัดเก็บข้อมูล (Hard Disk)'],
+            ['network', 'สถานะช่องเชื่อมต่อเครือข่าย (Network)'],
+            ['power', 'สถานะแหล่งจ่ายพลังงาน (Power Supplies)'],
+            ['log', 'ผลการตรวจสอบเหตุการณ์ต่างๆ (Log alerts)'],
+        ]);
+    }
+
+    private static function motsServer(): array
+    {
+        return self::mots([
+            ['model', 'Model', 'model'], ['serial', 'Serial Number', 'serial_number'], ['hostname', 'Hostname', 'spec.hostname'],
+            ['processor', 'Processor', 'spec.cpu'], ['memory', 'Memory', 'spec.ram_gb'], ['internal_disk', 'Internal Disk', 'spec.storage'],
+            ['raid_controller', 'Raid Controller', 'spec.raid_controller'], ['nic', 'Network Interface', 'spec.nic'],
+            ['os', 'Operating System', 'spec.os'],
+        ], [
+            ['cpu', 'สถานะหน่วยประมวลผล (CPU)'],
+            ['memory_status', 'สถานะหน่วยความจำ (Memory)'],
+            ['hard_disk', 'สถานะหน่วยจัดเก็บข้อมูล (Hard Disk)'],
+            ['network_adapter', 'สถานะช่องเชื่อมต่อเครือข่าย (Network Adapter)'],
+            ['fans', 'สถานะของพัดลม (FANs)'],
+            ['temperature', 'สถานะของอุณหภูมิ (Temperature)'],
+            ['power', 'สถานะแหล่งจ่ายพลังงาน (Power Supplies)'],
+            ['log', 'ผลการตรวจสอบเหตุการณ์ต่างๆ (Log)'],
+        ]);
+    }
+
+    /** The MOTS UPS sheet (PASS / FAIL, readings by phase, the load, the battery test and each block's voltage). */
+    private static function motsUps(): array
+    {
+        $device = 'ข้อมูลเครื่อง';
+        $tests = 'การทดสอบเครื่อง UPS';
+        $load = 'ค่าใช้งาน LOAD';
+        $battery = 'การทดสอบ BATTERY';
+        $care = 'การตรวจสอบสภาพและบำรุงรักษา';
+        $passFail = ['pass' => 'PASS', 'fail' => 'FAIL', 'na' => 'N/A'];
+        $normal = ['pass' => 'ปกติ', 'fail' => 'ผิดปกติ', 'na' => 'ไม่ได้ตรวจ'];
+        $test = fn (string $key, string $label, string $section, array $words) => [...self::check($key, $label, $section), 'labels' => $words];
+        $phases = [['key' => 'r', 'label' => 'R'], ['key' => 's', 'label' => 'S'], ['key' => 't', 'label' => 'T']];
+
+        return [
+            self::fromAsset('model', 'UPS รุ่น', $device, 'model'),
+            self::fromAsset('capacity', 'ขนาดจ่ายกำลัง (VA)', $device, 'spec.capacity_va'),
+            self::fromAsset('serial', 'หมายเลขเครื่อง', $device, 'serial_number'),
+            ...array_map(fn (array $c) => $test($c[0], $c[1], $tests, $passFail), [
+                ['rectifier', '1. RECTIFIER'], ['inverter', '2. INVERTER'], ['static_bypass', '3. STATIC BYPASS SWITCH'],
+                ['led_main_present', '4. LED.MAIN PRESENT'], ['led_main_fail', '5. LED.MAIN FAIL (BEEP)'], ['led_main_return', '6. LED.MAIN RETURN'],
+                ['on_bypass', '7. OPERATION ON BYPASS'], ['on_battery', '8. WORKING ON BATTERY'],
+            ]),
+            ['key' => 'readings', 'label' => 'ค่าที่วัดได้ (NOTE)', 'type' => 'measure_table', 'section' => $tests, 'columns' => $phases, 'rows' => [
+                self::row('v_in', 'V in', 'V'), self::row('v_out', 'V out', 'V'), self::row('i_out', 'I out', 'A'), self::row('v_bypass', 'V bypass', 'V'),
+            ]],
+            ['key' => 'load', 'label' => 'ค่าใช้งาน LOAD', 'type' => 'measure_table', 'section' => $load, 'rows' => [
+                self::row('inv', 'INV'), self::row('bypass', 'BYPASS'),
+            ], 'columns' => [
+                ['key' => 'current_in', 'label' => 'Current (A) Input'], ['key' => 'current_out', 'label' => 'Current (A) Output'],
+                ['key' => 'voltage_in', 'label' => 'Voltage (V) Input'], ['key' => 'voltage_out', 'label' => 'Voltage (V) Output'],
+                ['key' => 'load_percent', 'label' => '% Load'],
+            ]],
+            $test('inv_input', 'INV – Verification Input', $load, $passFail),
+            $test('inv_output', 'INV – Verification Output', $load, $passFail),
+            $test('bypass_input', 'BYPASS – Verification Input', $load, $passFail),
+            $test('bypass_output', 'BYPASS – Verification Output', $load, $passFail),
+            self::number('backup_time', 'BACKUP TIME (การทดสอบที่ 15 MIN)', $battery, 'MIN'),
+            self::number('charge_on_battery', 'VOLTAGE CHARGE FOR BATTERY (On Battery)', $battery, 'VDC'),
+            self::number('charge_off_battery', 'VOLTAGE CHARGE FOR BATTERY (Off Battery)', $battery, 'VDC'),
+            $test('wiring_breaker', 'สภาพสายไฟและเบรกเกอร์', $battery, $normal),
+            $test('exterior', 'สภาพภายนอก (น๊อต, สกรู)', $battery, $normal),
+            ['key' => 'battery_blocks', 'label' => 'VOLT BATTERY (ตรวจสอบขณะ BACKUP ทุกลูก)', 'type' => 'repeat_table', 'section' => $battery,
+                'rows' => ['count' => 32], 'columns' => [['key' => 'volt', 'label' => 'Volt', 'type' => 'number', 'unit' => 'V']]],
+            $test('cleanliness', '1. ความสะอาดภายในและนอกเครื่อง', $care, ['pass' => 'ทำแล้ว', 'fail' => 'ยังไม่ได้ทำ', 'na' => 'ไม่ได้ตรวจ']),
+            $test('abnormal', '2. อาการผิดปกติ (จากการตรวจสอบหรือสอบถามเจ้าหน้าที่)', $care, $normal),
+            ['key' => 'care_note', 'label' => 'NOTE', 'type' => 'textarea', 'section' => $care],
+            ['key' => 'advice', 'label' => 'ข้อเสนอแนะสำหรับลูกค้า', 'type' => 'checkbox_group', 'section' => 'ข้อเสนอแนะสำหรับลูกค้า', 'options' => [
+                'แนะนำให้ลูกค้าทำการทดสอบ Battery เดือนละ 1 ครั้งๆ ละประมาณ 5-10 นาที',
+                'อธิบายวิธีการใช้งานพอสังเขป',
+            ]],
+            ['key' => 'photos', 'label' => 'รูปประกอบ', 'type' => 'photo', 'section' => 'รูปประกอบ', 'photos' => 10],
+        ];
     }
 
     private static function check(string $key, string $label, string $section): array

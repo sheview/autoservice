@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/AppLayout.vue';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
-import { emptyAnswer, sectionsOf, type Answer, type RepeatColumn, type TablePart, type TemplateField } from '@/lib/pmTemplate';
+import { emptyAnswer, PASS_FAIL, sectionsOf, type Answer, type PassFail, type RepeatColumn, type TablePart, type TemplateField } from '@/lib/pmTemplate';
 import type { BreadcrumbItem, SharedData } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-vue-next';
@@ -39,6 +39,8 @@ const props = defineProps<{
     itemTypes: string[];
     repeatColumnTypes: string[];
     assetSources: string[];
+    // The spec fields of the company's asset categories (hostname, CPU, RAID ...).
+    specSources: { key: string; label: string; categories: string[] }[];
     layouts: string[];
     blocks: string[];
     serviceLines: string[];
@@ -108,6 +110,17 @@ const setType = (item: TemplateField, type: string) => {
     if (type === 'readonly_from_asset' && !item.source) item.source = 'serial_number';
     if (type === 'photo' && !item.photos) item.photos = 1;
 };
+// pass_fail: the words it shows, a ready pair or typed; "same for all" copies them to every pass_fail field.
+const PASS_FAIL_WORDS: Record<string, Partial<Record<PassFail, string>>> = {
+    standard: {},
+    done: { pass: 'เรียบร้อย', fail: 'ยังไม่เรียบร้อย', na: 'ไม่ได้ตรวจ' },
+    normal: { pass: 'ปกติ', fail: 'ผิดปกติ', na: 'ไม่ได้ตรวจ' },
+    passed: { pass: 'ผ่าน', fail: 'ไม่ผ่าน', na: 'ไม่ได้ตรวจ' },
+};
+const wordsOf = (item: TemplateField) => (item.labels ??= {});
+const useWords = (item: TemplateField, preset: string) => (item.labels = { ...PASS_FAIL_WORDS[preset] });
+const wordsForAll = (item: TemplateField) =>
+    form.items.filter((other) => other.type === 'pass_fail').forEach((other) => (other.labels = { ...(item.labels ?? {}) }));
 const optionsText = (item: TemplateField) => (item.options ?? []).join('\n');
 const setOptions = (item: TemplateField, text: string) => (item.options = text.split('\n'));
 
@@ -388,13 +401,58 @@ const statusClass: Record<string, string> = {
                                     />
                                 </div>
 
-                                <div v-else-if="item.type === 'readonly_from_asset'" class="grid gap-1 sm:max-w-xs">
+                                <div v-else-if="item.type === 'readonly_from_asset'" class="grid gap-1 sm:max-w-md">
                                     <Label class="text-xs">{{ t('pm_checklists.item_source') }}</Label>
                                     <select v-model="item.source" :class="selectClass">
-                                        <option v-for="source in assetSources" :key="source" :value="source">
-                                            {{ t(`pm_checklists.asset_sources.${source}`) }}
+                                        <optgroup :label="t('pm_checklists.source_register')">
+                                            <option v-for="source in assetSources" :key="source" :value="source">
+                                                {{ t(`pm_checklists.asset_sources.${source}`) }}
+                                            </option>
+                                        </optgroup>
+                                        <optgroup v-if="specSources.length" :label="t('pm_checklists.source_specs')">
+                                            <option v-for="spec in specSources" :key="spec.key" :value="`spec.${spec.key}`">
+                                                {{ spec.label }} ({{ spec.categories.join(', ') }})
+                                            </option>
+                                        </optgroup>
+                                        <!-- a spec this company's categories do not have (yet): kept as it is -->
+                                        <option
+                                            v-if="item.source?.startsWith('spec.') && !specSources.some((s) => `spec.${s.key}` === item.source)"
+                                            :value="item.source"
+                                        >
+                                            {{ item.source }}
                                         </option>
                                     </select>
+                                    <p class="text-xs text-muted-foreground">{{ t('pm_checklists.source_hint') }}</p>
+                                </div>
+
+                                <div v-else-if="item.type === 'pass_fail'" class="space-y-2">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <Label class="text-xs">{{ t('pm_checklists.pass_fail_words') }}</Label>
+                                        <Button
+                                            v-for="(words, preset) in PASS_FAIL_WORDS"
+                                            :key="preset"
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            @click="useWords(item, preset)"
+                                        >
+                                            {{ preset === 'standard' ? t('pm_checklists.words_standard') : `${words.pass} / ${words.fail}` }}
+                                        </Button>
+                                    </div>
+                                    <div class="grid gap-2 sm:grid-cols-3">
+                                        <Input
+                                            v-for="answer in PASS_FAIL"
+                                            :key="answer"
+                                            v-model="wordsOf(item)[answer]"
+                                            maxlength="40"
+                                            :class="smallInput"
+                                            :placeholder="t(`pm_visits.pass_fail.${answer}`)"
+                                            :aria-label="t(`pm_visits.pass_fail.${answer}`)"
+                                        />
+                                    </div>
+                                    <button type="button" class="text-xs text-primary underline" @click="wordsForAll(item)">
+                                        {{ t('pm_checklists.words_for_all') }}
+                                    </button>
                                 </div>
 
                                 <div v-else-if="item.type === 'photo'" class="grid gap-1 sm:max-w-xs">

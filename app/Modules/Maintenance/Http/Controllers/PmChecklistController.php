@@ -5,6 +5,7 @@ namespace App\Modules\Maintenance\Http\Controllers;
 use App\Http\Controllers\Controller;
 use App\Modules\Asset\Actions\CatalogOptions;
 use App\Modules\Asset\Actions\CategoryNames;
+use App\Modules\Asset\Actions\SpecFieldOptions;
 use App\Modules\Maintenance\Actions\AddStandardChecklists;
 use App\Modules\Maintenance\Actions\CopyTemplate;
 use App\Modules\Maintenance\Actions\CreateTemplateVersion;
@@ -177,6 +178,8 @@ class PmChecklistController extends Controller
             'itemTypes' => ChecklistItems::EDITABLE_TYPES,
             'repeatColumnTypes' => ChecklistItems::REPEAT_COLUMN_TYPES,
             'assetSources' => ChecklistItems::ASSET_SOURCES,
+            // The spec fields of the company's categories, shown as "spec.{key}" (hostname, CPU, RAID ...).
+            'specSources' => $assetOn ? app(SpecFieldOptions::class)->handle() : [],
             'layouts' => PmChecklist::LAYOUTS,
             'blocks' => PmChecklist::BLOCKS,
             'serviceLines' => PmChecklist::SERVICE_LINES,

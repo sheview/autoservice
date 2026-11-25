@@ -10,6 +10,7 @@ import {
     repeatRowCount,
     type Answer,
     type MeasureTableAnswer,
+    type PassFail,
     type RepeatRow,
     type TemplateField,
 } from '@/lib/pmTemplate';
@@ -47,6 +48,13 @@ const passFailClass: Record<string, string> = {
     na: 'bg-muted text-muted-foreground',
 };
 
+// The template's own words for pass / fail / N/A (e.g. เรียบร้อย / ยังไม่เรียบร้อย), else the standard ones.
+const word = (option: string) => props.field.labels?.[option as PassFail] || t(`pm_visits.pass_fail.${option}`);
+
+// readonly_from_asset: the register's value; none there = the technician types it while recording.
+const registerValue = computed(() => (props.field.type === 'readonly_from_asset' ? (props.asset?.[props.field.source ?? ''] ?? null) : null));
+const typedFromAsset = computed(() => props.field.type === 'readonly_from_asset' && props.mode === 'edit' && !registerValue.value);
+
 const toggleOption = (option: string) => {
     const chosen = Array.isArray(model.value) ? [...(model.value as string[])] : [];
     model.value = chosen.includes(option) ? chosen.filter((o) => o !== option) : [...chosen, option];
@@ -54,10 +62,9 @@ const toggleOption = (option: string) => {
 
 // What a field shows when read (view mode, and readonly_from_asset while recording).
 const shown = computed(() => {
-    const value =
-        props.field.type === 'readonly_from_asset' && props.mode === 'edit' ? (props.asset?.[props.field.source ?? ''] ?? null) : model.value;
+    const value = props.field.type === 'readonly_from_asset' && props.mode === 'edit' ? registerValue.value : model.value;
     if (props.field.type === 'check') return value ? t('pm_visits.yes') : t('pm_visits.no');
-    if (props.field.type === 'pass_fail') return value ? t(`pm_visits.pass_fail.${value}`) : t('common.none');
+    if (props.field.type === 'pass_fail') return value ? word(String(value)) : t('common.none');
     if (Array.isArray(value)) return value.length ? value.join(', ') : t('common.none');
     if (value === null || value === undefined || value === '') return t('common.none');
     return props.field.unit && (props.field.type === 'number' || props.field.type === 'measure') ? `${value} ${props.field.unit}` : String(value);
@@ -90,7 +97,7 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
                         :aria-pressed="model === option"
                         @click="model = model === option ? null : option"
                     >
-                        {{ t(`pm_visits.pass_fail.${option}`) }}
+                        {{ word(option) }}
                     </button>
                 </div>
                 <div v-else-if="field.type === 'number' || field.type === 'measure'" class="flex items-center gap-2">
@@ -109,7 +116,7 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
                     <option :value="null"></option>
                     <option v-for="option in field.options ?? []" :key="option" :value="option">{{ option }}</option>
                 </select>
-                <span v-else-if="field.type === 'readonly_from_asset'" class="text-sm">{{ shown }}</span>
+                <span v-else-if="field.type === 'readonly_from_asset' && !typedFromAsset" class="text-sm">{{ shown }}</span>
             </template>
             <span v-else-if="!isTable && field.type !== 'photo'" class="text-sm" :class="{ 'font-semibold text-red-700 dark:text-red-300': red }">
                 {{ shown }}
@@ -117,6 +124,10 @@ const selectClass = 'h-10 rounded-md border border-input bg-transparent px-3 tex
         </div>
 
         <template v-if="mode === 'edit'">
+            <template v-if="typedFromAsset">
+                <Input :id="id" v-model="model as string" maxlength="500" />
+                <p class="text-xs text-muted-foreground">{{ t('pm_visits.not_in_register') }}</p>
+            </template>
             <Input v-if="field.type === 'text'" :id="id" v-model="model as string" />
             <textarea
                 v-else-if="field.type === 'textarea'"

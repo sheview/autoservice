@@ -166,7 +166,7 @@ class PmVisitController extends Controller
                 ...$item->only(['id', 'result', 'answers', 'note', 'checklist', 'draft', 'instrument_id', 'not_inspected_reason']),
                 // The register values too: fields of the template that show them (readonly_from_asset).
                 'asset' => isset($assets[$item->asset_id])
-                    ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name', ...ChecklistItems::ASSET_SOURCES])->all(), 'can_view' => $user->can('assets.view')]
+                    ? [...collect($assets[$item->asset_id])->only(['ulid', 'asset_code', 'name'])->all(), ...ChecklistItems::assetFacts($assets[$item->asset_id]), 'can_view' => $user->can('assets.view')]
                     : null,
                 'ticket' => $tickets[$item->ticket_id] ?? null,
                 'remarks' => $item->remarks ?? (object) [],

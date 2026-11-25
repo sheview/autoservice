@@ -14,6 +14,8 @@ class AssetDetails
         'id', 'ulid', 'asset_code', 'name', 'customer_id', 'branch_id', 'category_id',
         'asset_brand_id', 'asset_model_id', 'parent_asset_id',
         'brand', 'model', 'serial_number', 'property_no', 'ip_address', 'used_by', 'location', 'floor', 'room',
+        // The category's spec fields (hostname, CPU, RAID ...), key => value.
+        'specs',
     ];
 
     /**

@@ -66,7 +66,7 @@ class PmFieldController extends Controller
                 'template_code' => $item->template_code,
                 // only what it has: a work order can have hundreds of rows
                 'asset' => isset($assets[$item->asset_id])
-                    ? collect($assets[$item->asset_id])->only(['id', 'ulid', 'parent_asset_id', ...ChecklistItems::ASSET_SOURCES])->filter(fn ($value) => $value !== null && $value !== '')->all()
+                    ? [...collect($assets[$item->asset_id])->only(['id', 'ulid', 'parent_asset_id'])->all(), ...ChecklistItems::assetFacts($assets[$item->asset_id])]
                     : null,
             ])->values(),
             // The questions of each table template, once (not per row).
@@ -95,7 +95,7 @@ class PmFieldController extends Controller
             'item' => [
                 ...$item->only(['id', 'result', 'answers', 'note', 'checklist', 'draft', 'instrument_id', 'not_inspected_reason']),
                 'remarks' => $item->remarks ?? (object) [],
-                'asset' => $asset ? [...collect($asset)->only(['ulid', 'asset_code', 'name', ...ChecklistItems::ASSET_SOURCES])->all(), 'can_view' => $request->user()->can('assets.view')] : null,
+                'asset' => $asset ? [...collect($asset)->only(['ulid', 'asset_code', 'name'])->all(), ...ChecklistItems::assetFacts($asset), 'can_view' => $request->user()->can('assets.view')] : null,
                 'ticket' => $ticket,
                 'photos' => $item->getMedia(PmVisitItem::PHOTOS)->map(fn ($media) => [
                     'id' => $media->id,

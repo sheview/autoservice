@@ -25,6 +25,8 @@ export type TemplateField = {
     columns?: (TablePart | RepeatColumn)[];
     photos?: number;
     source?: string;
+    // pass_fail: the words shown instead of the standard ones (e.g. เรียบร้อย / ยังไม่เรียบร้อย).
+    labels?: Partial<Record<PassFail, string>>;
 };
 
 export type MeasureTableAnswer = Record<string, Record<string, number | string | null>>;

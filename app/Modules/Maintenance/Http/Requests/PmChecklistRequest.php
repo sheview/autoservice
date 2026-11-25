@@ -67,7 +67,13 @@ class PmChecklistRequest extends FormRequest
             'items.*.max' => $number,
             'items.*.options' => ['nullable', 'array', 'max:'.ChecklistItems::MAX_OPTIONS],
             'items.*.options.*' => ['nullable', 'string', 'max:100'],
-            'items.*.source' => ['nullable', Rule::in(ChecklistItems::ASSET_SOURCES)],
+            'items.*.source' => ['nullable', 'string', function (string $attribute, mixed $value, \Closure $fail) {
+                if ($value !== null && ! ChecklistItems::isAssetSource($value)) {
+                    $fail(__('validation.in'));
+                }
+            }],
+            'items.*.labels' => ['nullable', 'array'],
+            'items.*.labels.*' => ['nullable', 'string', 'max:'.ChecklistItems::LABEL_MAX],
             'items.*.photos' => ['nullable', 'integer', 'between:1,10'],
             // measure_table: rows and columns; repeat_table: columns, and rows {count} or {from, max}
             'items.*.rows' => ['nullable', 'array', 'max:'.ChecklistItems::MAX_ROWS],
