@@ -3,9 +3,12 @@
 namespace App\Modules\Service\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Modules\Document\Actions\RenderPdf;
+use App\Modules\Document\Exceptions\PdfUnavailable;
 use App\Modules\Platform\Support\Modules;
 use App\Modules\Platform\Support\PublicLookupGuard;
 use App\Modules\Service\Actions\FieldLinkByToken;
+use App\Modules\Service\Actions\RepairClaimSheet;
 use App\Modules\Service\Actions\RepairPresetList;
 use App\Modules\Service\Actions\SubmitFieldReport;
 use App\Modules\Service\Actions\TicketSheet;
@@ -19,6 +22,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * A ticket's link, without an account, from a phone or an iPad (/job/{token} on the company's host,
@@ -64,6 +68,16 @@ class FieldLinkController extends Controller
         return $this->print(CompanyCodes::tenant($code), $token, $sheet);
     }
 
+    public function claimFormOnHost(PublicTenant $publicTenant, string $token, RepairClaimSheet $sheet, RenderPdf $renderPdf): HttpResponse
+    {
+        return $this->claimForm($publicTenant->resolve(), $token, $sheet, $renderPdf);
+    }
+
+    public function claimFormOnPath(string $code, string $token, RepairClaimSheet $sheet, RenderPdf $renderPdf): HttpResponse
+    {
+        return $this->claimForm(CompanyCodes::tenant($code), $token, $sheet, $renderPdf);
+    }
+
     private function usable(?Tenant $tenant): bool
     {
         return $tenant !== null && ! $tenant->is_platform && $tenant->isActive() && $this->modules->enabled('service', $tenant);
@@ -72,7 +86,8 @@ class FieldLinkController extends Controller
     private function show(?Tenant $tenant, string $token, TicketSheet $sheet, RepairPresetList $presets): Response
     {
         $usable = $this->usable($tenant);
-        $page = $this->context->run($usable ? $tenant : null, function () use ($token, $sheet, $presets) {
+        $claimForm = $usable && $this->modules->enabled('repair_claim', $tenant);
+        $page = $this->context->run($usable ? $tenant : null, function () use ($token, $sheet, $presets, $claimForm) {
             $link = $this->find->handle($token);
             if ($link?->ticket === null) {
                 return null;
@@ -90,6 +105,8 @@ class FieldLinkController extends Controller
                 'ticket' => collect($job['ticket'])->only(['ticket_no', 'title', 'description', 'status', 'customer', 'contact_name', 'contact_phone', 'device', 'branch', 'report'])->all(),
                 'signature' => $job['signature'] ? ['signer' => $job['signature']['signer'], 'signed_at' => $job['signature']['signed_at']] : null,
                 'presets' => $link->mode === TicketFieldLink::MODE_WORK ? $presets->handle() : null,
+                // The repair fee claim form to download: only companies that switched it on.
+                'claim_form' => $claimForm && $link->mode === TicketFieldLink::MODE_WORK,
             ];
         });
         if ($page === null) {
@@ -147,5 +164,26 @@ class FieldLinkController extends Controller
         abort_if($props === null, 404);
 
         return Inertia::render('Service/Tickets/Print', [...$props, 'publicView' => true]);
+    }
+
+    /**
+     * The repair fee claim form for the outside technician to print and fill in (work links only):
+     * a PDF to save, or the same page to print from the browser when the PDF service is down.
+     */
+    private function claimForm(?Tenant $tenant, string $token, RepairClaimSheet $sheet, RenderPdf $renderPdf): HttpResponse
+    {
+        $usable = $this->usable($tenant) && $this->modules->enabled('repair_claim', $tenant);
+        $data = $this->context->run($usable ? $tenant : null, function () use ($token, $sheet) {
+            $link = $this->find->handle($token);
+
+            return $link?->ticket && $link->usable() && $link->mode === TicketFieldLink::MODE_WORK ? $sheet->handle($link) : null;
+        });
+        abort_if($data === null, 404);
+
+        try {
+            return $this->context->run($tenant, fn () => $renderPdf->handle('documents.repair-claim', $data, __('document.repair_claim.file').'.pdf', download: true));
+        } catch (PdfUnavailable) {
+            return $this->context->run($tenant, fn () => response()->view('documents.repair-claim', [...$data, 'forBrowser' => true]));
+        }
     }
 }

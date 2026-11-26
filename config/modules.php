@@ -30,6 +30,12 @@ return [
         'reporting' => ['default' => true],
         // Requests to enter customers' server rooms, with each room's own rules.
         'room_access' => ['default' => true],
+        // The repair fee claim form an outside technician downloads from a ticket's link: only for
+        // the companies that pay outside technicians this way (off until switched on).
+        'repair_claim' => ['default' => false],
+        // The register of outside technicians around the country, who sign up through the
+        // company's link (other companies see it through a share: field-technicians.view).
+        'field_technicians' => ['default' => false],
     ],
 
     // "group" = the sidebar section (a key of lang/{locale}/ui.php "nav_groups"); items of a
@@ -40,6 +46,9 @@ return [
         // The user's work and the one calendar (own work, the team's PM, the server rooms).
         ['group' => 'service', 'title' => 'nav.my_work', 'route' => 'service.my-work', 'icon' => 'user-check', 'permission' => ['tickets.view', 'pm-visits.view', 'room-access.view'], 'module' => 'service', 'staff' => true],
         ['group' => 'service', 'title' => 'nav.tickets', 'route' => 'service.tickets.index', 'icon' => 'wrench', 'permission' => 'tickets.view', 'module' => 'service'],
+        // Outside technicians: the company's own register, or one another company shares with it
+        // ("or_shared": shown when the module is on OR a share gives it).
+        ['group' => 'service', 'title' => 'nav.field_technicians', 'route' => 'service.field-technicians.index', 'icon' => 'user-search', 'permission' => 'field-technicians.view', 'module' => 'field_technicians', 'shared' => ['field-technicians.view'], 'or_shared' => true, 'staff' => true],
         ['group' => 'service', 'title' => 'nav.room_access', 'route' => 'room-access.requests.index', 'icon' => 'door-open', 'permission' => 'room-access.view', 'module' => 'room_access', 'staff' => true, 'company' => true],
         ['group' => 'service', 'title' => 'nav.ip_check', 'route' => 'asset.ip-check', 'icon' => 'network', 'permission' => 'ip-check.view', 'module' => 'asset', 'staff' => true],
 

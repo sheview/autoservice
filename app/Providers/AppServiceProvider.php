@@ -52,6 +52,11 @@ class AppServiceProvider extends ServiceProvider
             Limit::perMinute(120)->by('company:'.mb_strtolower($request->getHost().'/'.$request->string('company')->trim()->value())),
         ]);
         RateLimiter::for('track-link', fn (Request $request) => Limit::perMinute(60)->by('ip:'.$request->ip()));
+        // Outside technicians signing up: a person sends the form once or twice, not in a stream.
+        RateLimiter::for('technician-signup', fn (Request $request) => [
+            Limit::perMinute(10)->by('ip:'.$request->ip()),
+            Limit::perHour(30)->by('ip:'.$request->ip()),
+        ]);
         RateLimiter::for('qr-report', fn (Request $request) => [
             Limit::perMinute(3)->by('ip:'.$request->ip()),
             Limit::perHour(10)->by('ip:'.$request->ip()),

@@ -58,6 +58,8 @@
 <body>
     @yield('content')
 
+    {{-- A document may print its own footer instead: @php($ownFooter = true) in it. --}}
+    @if (empty($ownFooter))
     <div class="footer">
         <span>
             @if ($provider = \App\Modules\Tenancy\Support\CompanyProfile::serviceProvider())
@@ -67,5 +69,6 @@
         </span>
         <span>{{ __('document.printed_at', ['at' => \App\Modules\Document\Support\ThaiDate::format(now(), true)]) }}</span>
     </div>
+    @endif
 </body>
 </html>

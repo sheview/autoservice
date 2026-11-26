@@ -194,6 +194,30 @@ return [
         'done' => ['subject' => 'งานซ่อม :no เสร็จแล้ว', 'line' => 'งานซ่อม :no ดำเนินการเสร็จแล้ว ขอบคุณที่ใช้บริการ'],
     ],
     // Links to work on a ticket without an account (outside technicians, the customer's sign-off).
+    // The register of outside technicians.
+    'field_technicians' => [
+        'signed_up' => 'ส่งข้อมูลลงทะเบียนแล้ว เจ้าหน้าที่จะตรวจสอบและติดต่อกลับ',
+        'phone_taken' => 'เบอร์โทรนี้ลงทะเบียนไว้แล้ว หากต้องการแก้ไขข้อมูลกรุณาติดต่อเจ้าหน้าที่',
+        'captcha_failed' => 'ยืนยันว่าไม่ใช่โปรแกรมอัตโนมัติไม่สำเร็จ กรุณาลองใหม่',
+        'updated' => 'บันทึกข้อมูลช่างแล้ว',
+        'approved' => 'อนุมัติ :name แล้ว',
+        'rejected' => 'ไม่อนุมัติ :name แล้ว',
+        'deleted' => 'ลบ :name ออกจากทะเบียนแล้ว',
+        'fields' => [
+            'name' => 'ชื่อ-นามสกุล',
+            'company' => 'ชื่อร้าน / บริษัท',
+            'phone' => 'เบอร์โทรศัพท์',
+            'line_id' => 'LINE ID',
+            'email' => 'อีเมล',
+            'note' => 'ประสบการณ์ / หมายเหตุ',
+            'provinces' => 'จังหวัดที่รับงาน',
+            'provinces.*' => 'จังหวัด',
+            'skills' => 'ประเภทงานที่รับ',
+            'skills.*' => 'ประเภทงาน',
+            'consent' => 'การยินยอมให้เก็บข้อมูล',
+        ],
+    ],
+
     'field_links' => [
         'ticket_closed' => 'ใบงานนี้ปิดหรือยกเลิกแล้ว สร้างลิงก์ไม่ได้',
         'created' => 'สร้างลิงก์แล้ว คัดลอกหรือส่งทาง LINE ได้เลย',

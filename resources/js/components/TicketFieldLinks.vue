@@ -5,8 +5,8 @@ import { Input } from '@/components/ui/input';
 import { dateTime } from '@/lib/format';
 import { t } from '@/lib/i18n';
 import { router, useForm } from '@inertiajs/vue3';
-import { Copy, ExternalLink, Link2, MessageCircle } from 'lucide-vue-next';
-import { computed, ref } from 'vue';
+import { Copy, ExternalLink, Link2, MapPin, MessageCircle, UserSearch } from 'lucide-vue-next';
+import { computed, ref, watch } from 'vue';
 
 /**
  * A ticket's links for working without an account: an outside technician fills in the job from a
@@ -57,6 +57,52 @@ const copy = async (link: FieldLink) => {
 };
 const line = (link: FieldLink) => `https://line.me/R/msg/text/?${encodeURIComponent(`${t(`field_links.share_${link.mode}`)}\n${link.url}`)}`;
 const state = (link: FieldLink) => (link.revoked_at ? 'revoked' : link.usable ? 'active' : 'expired');
+
+// An outside technician from the register (this company's, or one shared with it), those in the
+// ticket's province first: picking one fills in the name, shop and phone. Hidden for users who
+// may not read a register.
+interface Pickable {
+    ulid: string;
+    name: string;
+    company: string | null;
+    phone: string;
+    line_id: string | null;
+    provinces: string[];
+    in_province: boolean;
+    source: string | null;
+}
+const pickable = ref(true);
+const pickSearch = ref('');
+const pickProvince = ref<string | null>(null);
+const technicians = ref<Pickable[]>([]);
+let pickTimer: ReturnType<typeof setTimeout> | undefined;
+const loadTechnicians = async () => {
+    const response = await fetch(route('service.tickets.field-technicians', { ticket: props.ticketUlid, search: pickSearch.value }), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!response.ok) {
+        pickable.value = false;
+        return;
+    }
+    const data = (await response.json()) as { province: string | null; technicians: Pickable[] };
+    pickProvince.value = data.province;
+    technicians.value = data.technicians;
+};
+watch(
+    () => open.value && form.mode === 'work',
+    (show) => {
+        if (show && pickable.value) loadTechnicians();
+    },
+);
+watch(pickSearch, () => {
+    clearTimeout(pickTimer);
+    pickTimer = setTimeout(loadTechnicians, 300);
+});
+const pick = (technician: Pickable) => {
+    form.holder_name = technician.name;
+    form.holder_company = technician.company ?? technician.name;
+    form.holder_phone = technician.phone;
+};
 </script>
 
 <template>
@@ -67,25 +113,82 @@ const state = (link: FieldLink) => (link.revoked_at ? 'revoked' : link.usable ? 
         </div>
         <p class="text-xs text-muted-foreground">{{ t('field_links.hint') }}</p>
 
-        <div v-if="waiting.length" class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+        <div
+            v-if="waiting.length"
+            class="flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100"
+        >
             <span>{{ t('field_links.waiting', { names: waiting.map((l) => l.holder_name).join(', ') }) }}</span>
             <Button size="sm" @click="review">{{ t('field_links.mark_reviewed') }}</Button>
         </div>
 
         <form v-if="open" class="grid gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-2" @submit.prevent="create">
             <div class="flex flex-wrap gap-4 text-sm sm:col-span-2">
-                <label class="flex items-center gap-2"><input v-model="form.mode" type="radio" value="work" />{{ t('field_links.modes.work') }}</label>
-                <label class="flex items-center gap-2"><input v-model="form.mode" type="radio" value="sign" />{{ t('field_links.modes.sign') }}</label>
+                <label class="flex items-center gap-2"
+                    ><input v-model="form.mode" type="radio" value="work" />{{ t('field_links.modes.work') }}</label
+                >
+                <label class="flex items-center gap-2"
+                    ><input v-model="form.mode" type="radio" value="sign" />{{ t('field_links.modes.sign') }}</label
+                >
             </div>
-            <Input v-model="form.holder_name" required maxlength="255" :placeholder="form.mode === 'work' ? t('field_links.technician_name') : t('field_links.customer_name')" />
-            <Input v-model="form.holder_company" maxlength="255" :placeholder="t('field_links.company')" />
-            <Input v-model="form.holder_phone" maxlength="50" :placeholder="t('field_links.phone')" />
-            <label class="flex items-center gap-2 text-sm">
-                {{ t('field_links.days') }}
-                <Input v-model="form.days" type="number" min="1" max="30" class="w-20" />
+            <!-- Pick from the register of outside technicians -->
+            <div v-if="form.mode === 'work' && pickable" class="grid gap-2 rounded-md border bg-background p-3 text-sm sm:col-span-2">
+                <span class="flex items-center gap-2 font-medium"><UserSearch class="size-4" />{{ t('field_technicians.pick') }}</span>
+                <Input v-model="pickSearch" type="search" :placeholder="t('field_technicians.pick_search')" />
+                <p v-if="pickProvince" class="text-xs text-muted-foreground">
+                    {{ t('field_technicians.pick_province', { province: pickProvince }) }}
+                </p>
+                <ul class="max-h-56 divide-y overflow-y-auto rounded-md border">
+                    <li v-for="technician in technicians" :key="(technician.source ?? '') + technician.ulid">
+                        <button
+                            type="button"
+                            class="flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 px-3 py-2 text-left hover:bg-muted"
+                            @click="pick(technician)"
+                        >
+                            <span class="font-medium">{{ technician.name }}</span>
+                            <span v-if="technician.company" class="text-muted-foreground">· {{ technician.company }}</span>
+                            <span class="text-muted-foreground">· {{ technician.phone }}</span>
+                            <span
+                                v-if="technician.in_province"
+                                class="inline-flex items-center gap-0.5 rounded bg-green-100 px-1.5 text-xs text-green-900 dark:bg-green-950 dark:text-green-100"
+                                ><MapPin class="size-3" />{{ t('field_technicians.in_province') }}</span
+                            >
+                            <span v-if="technician.source" class="text-xs text-muted-foreground">{{
+                                t('field_technicians.from', { company: technician.source })
+                            }}</span>
+                            <span class="w-full truncate text-xs text-muted-foreground">{{ technician.provinces.join(', ') }}</span>
+                        </button>
+                    </li>
+                    <li v-if="technicians.length === 0" class="px-3 py-3 text-center text-xs text-muted-foreground">
+                        {{ t('field_technicians.pick_none') }}
+                    </li>
+                </ul>
+            </div>
+            <label class="grid gap-1 text-sm">
+                <span
+                    >{{ form.mode === 'work' ? t('field_links.technician_name') : t('field_links.customer_name') }}
+                    <span class="text-red-600">*</span></span
+                >
+                <Input v-model="form.holder_name" required maxlength="255" />
+                <InputError :message="form.errors.holder_name" />
             </label>
-            <InputError class="sm:col-span-2" :message="form.errors.holder_name || form.errors.days" />
-            <div class="sm:col-span-2"><Button :disabled="form.processing">{{ t('field_links.create') }}</Button></div>
+            <label class="grid gap-1 text-sm">
+                <span>{{ t('field_links.company') }} <span class="text-red-600">*</span></span>
+                <Input v-model="form.holder_company" required maxlength="255" />
+                <InputError :message="form.errors.holder_company" />
+            </label>
+            <label class="grid gap-1 text-sm">
+                <span>{{ t('field_links.phone') }} <span class="text-red-600">*</span></span>
+                <Input v-model="form.holder_phone" type="tel" inputmode="tel" required maxlength="50" pattern="\+?[0-9][0-9\s\-()]{7,}[0-9]" />
+                <InputError :message="form.errors.holder_phone" />
+            </label>
+            <label class="grid gap-1 text-sm">
+                <span>{{ t('field_links.days') }}</span>
+                <Input v-model="form.days" type="number" min="1" max="30" class="w-20" />
+                <InputError :message="form.errors.days" />
+            </label>
+            <div class="sm:col-span-2">
+                <Button :disabled="form.processing">{{ t('field_links.create') }}</Button>
+            </div>
         </form>
 
         <ul v-if="links.length" class="divide-y rounded-md border text-sm">
@@ -96,17 +199,25 @@ const state = (link: FieldLink) => (link.revoked_at ? 'revoked' : link.usable ? 
                     <span class="rounded bg-muted px-1.5 text-xs">{{ t(`field_links.modes.${link.mode}`) }}</span>
                     <span
                         class="rounded px-1.5 text-xs"
-                        :class="state(link) === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200' : 'bg-muted text-muted-foreground'"
+                        :class="
+                            state(link) === 'active'
+                                ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-200'
+                                : 'bg-muted text-muted-foreground'
+                        "
                         >{{ t(`field_links.states.${state(link)}`) }}</span
                     >
-                    <span v-if="link.submitted_at" class="text-xs text-violet-700">{{ t('field_links.sent_at', { at: dateTime(link.submitted_at) }) }}</span>
+                    <span v-if="link.submitted_at" class="text-xs text-violet-700">{{
+                        t('field_links.sent_at', { at: dateTime(link.submitted_at) })
+                    }}</span>
                 </div>
                 <p class="text-xs text-muted-foreground">
                     {{ t('field_links.until', { at: dateTime(link.expires_at) }) }} · {{ t('field_links.by', { name: link.created_by_name ?? '-' }) }}
                     <template v-if="link.reviewed_at"> · {{ t('field_links.reviewed_by', { name: link.reviewed_by_name ?? '-' }) }}</template>
                 </p>
                 <div v-if="state(link) === 'active'" class="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" @click="copy(link)"><Copy class="size-3.5" />{{ copied === link.id ? t('field_links.copied') : t('field_links.copy') }}</Button>
+                    <Button size="sm" variant="outline" @click="copy(link)"
+                        ><Copy class="size-3.5" />{{ copied === link.id ? t('field_links.copied') : t('field_links.copy') }}</Button
+                    >
                     <Button size="sm" variant="outline" as-child>
                         <a :href="line(link)" target="_blank" rel="noopener"><MessageCircle class="size-3.5" />{{ t('field_links.send_line') }}</a>
                     </Button>

@@ -6,7 +6,7 @@ import { t } from '@/lib/i18n';
 import { shrinkImage } from '@/lib/image';
 import type { SharedData } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { Camera, Check, CircleX, FileSignature, Printer, Trash2, Wrench } from 'lucide-vue-next';
+import { Camera, Check, CircleX, FileDown, FileSignature, Printer, Trash2, Wrench } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 /**
@@ -20,7 +20,14 @@ import { computed, ref } from 'vue';
 const props = defineProps<{
     page: {
         company: string | null;
-        link: { mode: 'work' | 'sign'; holder_name: string; holder_company: string | null; usable: boolean; expires_at: string; submitted_at: string | null };
+        link: {
+            mode: 'work' | 'sign';
+            holder_name: string;
+            holder_company: string | null;
+            usable: boolean;
+            expires_at: string;
+            submitted_at: string | null;
+        };
         ticket: {
             ticket_no: string;
             title: string;
@@ -35,6 +42,7 @@ const props = defineProps<{
         };
         signature: { signer: string | null; signed_at: string | null } | null;
         presets: { symptom: string[]; solution: string[] } | null;
+        claim_form: boolean;
     } | null;
     limits: { photos: number; photo_kb: number };
 }>();
@@ -118,6 +126,9 @@ const addSheet = async (event: Event) => {
 };
 
 const printUrl = computed(() => `${window.location.pathname}/print`);
+const claimFormUrl = computed(() => `${window.location.pathname}/claim-form`);
+const smallButton =
+    'inline-flex items-center gap-1.5 rounded-full border border-violet-300 bg-white px-3 py-1.5 text-sm font-medium text-violet-700 hover:bg-violet-50 dark:border-violet-700 dark:bg-transparent dark:text-violet-300';
 const submit = () =>
     form
         .transform((data) => ({
@@ -145,15 +156,29 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                     <h1 class="text-xl font-semibold">{{ work ? t('field_link.title') : t('field_link.sign_title') }}</h1>
                     <p v-if="page?.company" class="text-sm text-violet-700 dark:text-violet-300">{{ page.company }}</p>
                 </div>
+                <!-- The job sheet (and the claim form) to print: small, up here, out of the way of the work -->
+                <div v-if="work && page?.link.usable" class="ml-auto flex flex-wrap justify-end gap-2">
+                    <a :href="printUrl" target="_blank" :title="t('field_link.print_top_hint')" :class="smallButton">
+                        <Printer class="size-4" />{{ t('field_link.print_top') }}
+                    </a>
+                    <a v-if="page.claim_form" :href="claimFormUrl" target="_blank" :title="t('field_link.claim_form_hint')" :class="smallButton">
+                        <FileDown class="size-4" />{{ t('field_link.claim_form') }}
+                    </a>
+                </div>
             </div>
 
             <div v-if="!page" class="rounded-2xl border bg-background p-6 text-center text-muted-foreground">{{ t('field_link.not_found') }}</div>
 
             <template v-else>
-                <p v-if="shared.props.flash.success" class="flex items-center gap-2 rounded-2xl bg-green-50 p-4 font-semibold text-green-800 dark:bg-green-950 dark:text-green-200">
+                <p
+                    v-if="shared.props.flash.success"
+                    class="flex items-center gap-2 rounded-2xl bg-green-50 p-4 font-semibold text-green-800 dark:bg-green-950 dark:text-green-200"
+                >
                     <Check class="size-5" />{{ shared.props.flash.success }}
                 </p>
-                <p v-else-if="page.link.submitted_at" class="rounded-2xl bg-muted/60 p-3 text-sm">{{ t('field_link.sent_before', { at: dateTime(page.link.submitted_at) }) }}</p>
+                <p v-else-if="page.link.submitted_at" class="rounded-2xl bg-muted/60 p-3 text-sm">
+                    {{ t('field_link.sent_before', { at: dateTime(page.link.submitted_at) }) }}
+                </p>
 
                 <!-- The job -->
                 <section class="space-y-2 rounded-2xl border bg-background p-5 text-sm">
@@ -166,13 +191,17 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                     <dl class="grid gap-2 pt-2 sm:grid-cols-2">
                         <div v-if="page.ticket.customer">
                             <dt class="text-xs text-muted-foreground">{{ t('field_link.customer') }}</dt>
-                            <dd>{{ page.ticket.customer }}<template v-if="page.ticket.branch"> · {{ page.ticket.branch }}</template></dd>
+                            <dd>
+                                {{ page.ticket.customer }}<template v-if="page.ticket.branch"> · {{ page.ticket.branch }}</template>
+                            </dd>
                         </div>
                         <div v-if="page.ticket.contact_name">
                             <dt class="text-xs text-muted-foreground">{{ t('field_link.contact') }}</dt>
                             <dd>
                                 {{ page.ticket.contact_name }}
-                                <a v-if="page.ticket.contact_phone" :href="`tel:${page.ticket.contact_phone}`" class="ml-1 text-primary">{{ page.ticket.contact_phone }}</a>
+                                <a v-if="page.ticket.contact_phone" :href="`tel:${page.ticket.contact_phone}`" class="ml-1 text-primary">{{
+                                    page.ticket.contact_phone
+                                }}</a>
                             </dd>
                         </div>
                         <div v-if="page.ticket.device.name" class="sm:col-span-2">
@@ -180,7 +209,9 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                             <dd>
                                 {{ [page.ticket.device.name, page.ticket.device.brand, page.ticket.device.model].filter(Boolean).join(' · ') }}
                                 <span v-if="page.ticket.device.serial" class="font-mono text-xs"> SN {{ page.ticket.device.serial }}</span>
-                                <span v-if="page.ticket.device.location" class="block text-xs text-muted-foreground">{{ page.ticket.device.location }}</span>
+                                <span v-if="page.ticket.device.location" class="block text-xs text-muted-foreground">{{
+                                    page.ticket.device.location
+                                }}</span>
                             </dd>
                         </div>
                         <div v-if="!work && page.ticket.report.cause" class="sm:col-span-2">
@@ -191,16 +222,6 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                 </section>
 
                 <!-- The job sheet to print: up here, where it is found at once -->
-                <template v-if="work && page.link.usable">
-                    <a
-                        :href="printUrl"
-                        target="_blank"
-                        class="flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-500 text-base font-semibold text-white shadow-lg"
-                    >
-                        <Printer class="size-6" />{{ t('field_link.print_top') }}
-                    </a>
-                    <p class="-mt-3 text-center text-xs text-muted-foreground">{{ t('field_link.print_top_hint') }}</p>
-                </template>
 
                 <p v-if="!page.link.usable" class="flex items-center gap-2 rounded-2xl bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">
                     <CircleX class="size-5" />{{ t('field_link.unusable') }}
@@ -246,11 +267,22 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                         <section class="space-y-3 rounded-2xl border bg-background p-5">
                             <label class="block space-y-1.5 text-sm">
                                 <span class="font-semibold">{{ t('field_link.parts') }}</span>
-                                <textarea v-model="form.parts" rows="2" maxlength="1000" :placeholder="t('field_link.parts_placeholder')" class="w-full rounded-xl border border-input bg-transparent px-3 py-2 text-base" />
+                                <textarea
+                                    v-model="form.parts"
+                                    rows="2"
+                                    maxlength="1000"
+                                    :placeholder="t('field_link.parts_placeholder')"
+                                    class="w-full rounded-xl border border-input bg-transparent px-3 py-2 text-base"
+                                />
                             </label>
                             <label class="block space-y-1.5 text-sm">
                                 <span class="font-semibold">{{ t('field_link.note') }}</span>
-                                <textarea v-model="form.note" rows="3" maxlength="2000" class="w-full rounded-xl border border-input bg-transparent px-3 py-2 text-base" />
+                                <textarea
+                                    v-model="form.note"
+                                    rows="3"
+                                    maxlength="2000"
+                                    class="w-full rounded-xl border border-input bg-transparent px-3 py-2 text-base"
+                                />
                             </label>
                         </section>
                         <section class="space-y-3 rounded-2xl border bg-background p-5">
@@ -260,13 +292,27 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                                 <div class="flex flex-wrap gap-2">
                                     <div v-for="(src, i) in previews[stage]" :key="src" class="relative">
                                         <img :src="src" class="size-20 rounded-lg object-cover" alt="" />
-                                        <button type="button" class="absolute -right-2 -top-2 rounded-full bg-background p-1 shadow" @click="removePhoto(stage, i)">
+                                        <button
+                                            type="button"
+                                            class="absolute -right-2 -top-2 rounded-full bg-background p-1 shadow"
+                                            @click="removePhoto(stage, i)"
+                                        >
                                             <Trash2 class="size-4" />
                                         </button>
                                     </div>
-                                    <label v-if="form[stage].length < limits.photos" class="flex size-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed">
+                                    <label
+                                        v-if="form[stage].length < limits.photos"
+                                        class="flex size-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed"
+                                    >
                                         <Camera class="size-6 text-muted-foreground" />
-                                        <input type="file" accept="image/*" capture="environment" multiple class="hidden" @change="addPhotos(stage, $event)" />
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            capture="environment"
+                                            multiple
+                                            class="hidden"
+                                            @change="addPhotos(stage, $event)"
+                                        />
                                     </label>
                                 </div>
                             </div>
@@ -278,15 +324,30 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                         <h2 class="font-semibold">{{ t('field_link.sign_off') }} <span v-if="work" class="text-red-600">*</span></h2>
                         <p v-if="work" class="text-xs text-muted-foreground">{{ t('field_link.sign_off_hint') }}</p>
                         <div v-if="work" class="flex flex-wrap gap-2">
-                            <button type="button" class="min-h-11 rounded-full border px-4 text-sm" :class="chip(how === 'screen')" @click="how = 'screen'">
+                            <button
+                                type="button"
+                                class="min-h-11 rounded-full border px-4 text-sm"
+                                :class="chip(how === 'screen')"
+                                @click="how = 'screen'"
+                            >
                                 {{ t('field_link.sign_screen') }}
                             </button>
-                            <button type="button" class="min-h-11 rounded-full border px-4 text-sm" :class="chip(how === 'paper')" @click="how = 'paper'">
+                            <button
+                                type="button"
+                                class="min-h-11 rounded-full border px-4 text-sm"
+                                :class="chip(how === 'paper')"
+                                @click="how = 'paper'"
+                            >
                                 {{ t('field_link.sign_paper') }}
                             </button>
                         </div>
                         <p v-if="page.signature" class="text-xs text-muted-foreground">
-                            {{ t('field_link.signed_before', { name: page.signature.signer ?? '-', at: page.signature.signed_at ? dateTime(page.signature.signed_at) : '-' }) }}
+                            {{
+                                t('field_link.signed_before', {
+                                    name: page.signature.signer ?? '-',
+                                    at: page.signature.signed_at ? dateTime(page.signature.signed_at) : '-',
+                                })
+                            }}
                         </p>
                         <label class="block space-y-1.5 text-sm">
                             <span class="font-semibold">{{ t('field_link.signer') }}</span>
@@ -307,7 +368,9 @@ const input = 'h-12 w-full rounded-xl border border-input bg-transparent px-3 te
                                     <p class="text-xs text-muted-foreground">{{ t('field_link.sign_here') }}</p>
                                     <SignaturePad v-model="form.signature" />
                                 </template>
-                                <p v-else class="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground">{{ t('field_link.customer_after_tech') }}</p>
+                                <p v-else class="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground">
+                                    {{ t('field_link.customer_after_tech') }}
+                                </p>
                                 <InputError :message="errors.signature" />
                             </div>
                         </template>

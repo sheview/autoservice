@@ -1,6 +1,8 @@
 <?php
 
 use App\Modules\Service\Http\Controllers\FieldLinkController;
+use App\Modules\Service\Http\Controllers\FieldTechnicianController;
+use App\Modules\Service\Http\Controllers\FieldTechnicianSignupController;
 use App\Modules\Service\Http\Controllers\HolidayController;
 use App\Modules\Service\Http\Controllers\MyWorkController;
 use App\Modules\Service\Http\Controllers\RepairPresetController;
@@ -65,7 +67,20 @@ Route::middleware(['auth', 'verified', 'module:service'])->name('service.')->gro
         ->middleware('module:survey')->name('tickets.survey.paper');
 
     Route::resource('holidays', HolidayController::class)->only(['index', 'store', 'destroy']);
+
+    // Outside technicians who signed up (this company's register, or one shared with it).
+    Route::get('field-technicians', [FieldTechnicianController::class, 'index'])->name('field-technicians.index');
+    Route::put('field-technicians/{technician}', [FieldTechnicianController::class, 'update'])->name('field-technicians.update');
+    Route::post('field-technicians/{technician}/review', [FieldTechnicianController::class, 'review'])->name('field-technicians.review');
+    Route::delete('field-technicians/{technician}', [FieldTechnicianController::class, 'destroy'])->name('field-technicians.destroy');
+    Route::get('tickets/{ticket}/field-technicians', [FieldTechnicianController::class, 'pick'])->name('tickets.field-technicians');
 });
+
+// Outside technicians sign up for the company's register, without signing in.
+Route::get('join-technician', [FieldTechnicianSignupController::class, 'showOnHost'])->middleware('throttle:track-link')->name('service.technician-signup');
+Route::get('t/{code}/join-technician', [FieldTechnicianSignupController::class, 'showOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.technician-signup.path');
+Route::post('join-technician', [FieldTechnicianSignupController::class, 'storeOnHost'])->middleware('throttle:technician-signup')->name('service.technician-signup.store');
+Route::post('t/{code}/join-technician', [FieldTechnicianSignupController::class, 'storeOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:technician-signup')->name('service.technician-signup.store.path');
 
 // A ticket's link for an outside technician or the customer, without signing in.
 Route::get('job/{token}', [FieldLinkController::class, 'showOnHost'])->middleware('throttle:track-link')->name('service.field-link');
@@ -74,6 +89,8 @@ Route::post('job/{token}', [FieldLinkController::class, 'submitOnHost'])->middle
 Route::post('t/{code}/job/{token}', [FieldLinkController::class, 'submitOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.field-link.submit.path');
 Route::get('job/{token}/print', [FieldLinkController::class, 'printOnHost'])->middleware('throttle:track-link')->name('service.field-link.print');
 Route::get('t/{code}/job/{token}/print', [FieldLinkController::class, 'printOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.field-link.print.path');
+Route::get('job/{token}/claim-form', [FieldLinkController::class, 'claimFormOnHost'])->middleware('throttle:track-link')->name('service.field-link.claim-form');
+Route::get('t/{code}/job/{token}/claim-form', [FieldLinkController::class, 'claimFormOnPath'])->where('code', '[0-9]{1,10}')->middleware('throttle:track-link')->name('service.field-link.claim-form.path');
 
 // Track my repair: public, no sign-in (TrackController finds the company); limited against guessing.
 Route::get('track', TrackController::class)->middleware('throttle:track')->name('service.track');

@@ -65,7 +65,7 @@ const props = defineProps<{
 const print = () => window.print();
 
 // The sheet is one A4 page however much was written on it: when its content runs taller than the
-// page (A4 less margins, a little under as the signature blocks may not break), it is scaled down to
+// page (A4 or Letter less margins, a little under as the signature blocks may not break), it is scaled down to
 // fit while printing, no smaller than 70% so it stays readable. On screen the sheet is already as wide
 // as the printed page (210mm less 14mm padding each side), so it is measured as it stands.
 const sheet = ref<HTMLElement | null>(null);
@@ -77,7 +77,7 @@ const fitToPage = () => {
     if (!el || !first || !last) return;
     el.style.zoom = '';
     const height = (last.getBoundingClientRect().bottom - first.getBoundingClientRect().top) / pxPerMm;
-    el.style.zoom = String(Math.max(0.7, Math.min(1, 265 / height)));
+    el.style.zoom = String(Math.max(0.7, Math.min(1, 250 / height)));
 };
 const unfit = () => {
     if (sheet.value) sheet.value.style.zoom = '';
@@ -177,7 +177,7 @@ const blankRows = 2;
 <template>
     <Head :title="`${t('ticket_print.title')} ${ticket.ticket_no}`" />
 
-    <div class="min-h-screen bg-muted/40 print:bg-white">
+    <div class="print-root min-h-screen bg-muted/40 print:min-h-0 print:bg-white">
         <!-- Toolbar (not printed) -->
         <div class="sticky top-0 z-10 flex flex-wrap items-center gap-3 border-b bg-background px-4 py-3 print:hidden">
             <Button variant="outline" as-child>
@@ -404,6 +404,13 @@ const blankRows = 2;
 }
 
 @media print {
+    /* Never a second, empty page: whatever the printer's paper (A4 or Letter) and the page around
+       the sheet, the print is held to the printable height of Letter, the sheet having been fitted
+       to 250mm by fitToPage(). */
+    .print-root {
+        height: 252mm;
+        overflow: hidden;
+    }
     .sheet {
         width: auto;
         min-height: 0;

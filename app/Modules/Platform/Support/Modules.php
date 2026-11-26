@@ -85,15 +85,24 @@ class Modules
             if ($customerAccount && ($item['staff'] ?? false)) {
                 continue;
             }
-            // "module": one key, or several that must all be on.
-            if (isset($item['module']) && collect((array) $item['module'])->contains(fn (string $key) => ! $this->enabled($key))) {
-                continue;
-            }
             // "shared": abilities of which at least one must be shared with the user by another company.
-            if (isset($item['shared']) && ($user === null || collect((array) $item['shared'])->every(
-                fn (string $ability) => app(ShareGateway::class)->targets($user, $ability)->isEmpty()
-            ))) {
-                continue;
+            $shared = fn () => $user !== null && collect((array) $item['shared'])->contains(
+                fn (string $ability) => app(ShareGateway::class)->targets($user, $ability)->isNotEmpty()
+            );
+            $moduleOn = ! isset($item['module']) || ! collect((array) $item['module'])->contains(fn (string $key) => ! $this->enabled($key));
+            // "or_shared": the module being on, or the share, is enough.
+            if ($item['or_shared'] ?? false) {
+                if (! $moduleOn && ! $shared()) {
+                    continue;
+                }
+            } else {
+                // "module": one key, or several that must all be on.
+                if (! $moduleOn) {
+                    continue;
+                }
+                if (isset($item['shared']) && ! $shared()) {
+                    continue;
+                }
             }
             // Pages about the company itself: not in the platform tenant (it is no company).
             if (($item['company'] ?? false) && (app(TenantContext::class)->tenant()?->is_platform ?? true)) {

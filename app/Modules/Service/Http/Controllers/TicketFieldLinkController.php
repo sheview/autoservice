@@ -25,8 +25,9 @@ class TicketFieldLinkController extends Controller
         $data = $request->validate([
             'mode' => ['required', Rule::in(TicketFieldLink::MODES)],
             'holder_name' => ['required', 'string', 'max:255'],
-            'holder_company' => ['nullable', 'string', 'max:255'],
-            'holder_phone' => ['nullable', 'string', 'max:50'],
+            'holder_company' => ['required', 'string', 'max:255'],
+            // A number to call back: 9 digits at least (a Bangkok line), spaces and dashes allowed.
+            'holder_phone' => ['required', 'string', 'max:50', 'regex:/^\+?[0-9][0-9\s\-()]{7,}[0-9]$/'],
             'days' => ['nullable', 'integer', 'min:1', 'max:'.TicketFieldLink::MAX_DAYS],
         ], [], __('service.field_links.fields'));
 

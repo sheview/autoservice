@@ -75,6 +75,9 @@ class PermissionCatalog
         // Entering customers' server rooms: request = ask for oneself; approve = decide (never one's
         // own); manage = rooms, their rules and approvers; view-id = see entrants' full ID numbers.
         'room-access' => ['view', 'request', 'approve', 'manage', 'view-id'],
+        // Outside technicians who signed up: view = find and contact them (also a register another
+        // company shares); manage = approve, correct and remove them in the company's own register.
+        'field-technicians' => ['view', 'manage'],
         'reports' => ['view', 'export'],
         'summary-people' => ['view'],
         'summary-projects' => ['view'],
@@ -102,6 +105,8 @@ class PermissionCatalog
         'dashboard' => [null, null],
         'tickets' => ['service', 'service'],
         'room-access' => ['service', 'room_access'],
+        // No module: a company may read another's register through a share without keeping its own.
+        'field-technicians' => ['service', null],
         'pm-visits' => ['pm', 'maintenance'],
         'pm-plans' => ['pm', 'maintenance'],
         'pm-checklists' => ['pm', 'maintenance'],
@@ -229,6 +234,7 @@ class PermissionCatalog
                 'holidays.view' => 'all',
                 'manuals.view' => 'all',
                 'room-access.view' => 'all', 'room-access.request' => 'all', 'room-access.approve' => 'all', 'room-access.view-id' => 'all',
+                'field-technicians.view' => 'all', 'field-technicians.manage' => 'all',
             ],
         ],
         'technician' => [

@@ -19,7 +19,7 @@ it('builds the sidebar from config, filtered by permission', function () {
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))
             ->toBe([
                 'หน้าหลัก',
-                'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
+                'งานของฉัน', 'ใบงาน (Ticket)', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
                 'ทรัพย์สิน', 'พิมพ์ป้าย QR',
                 'อะไหล่', 'ความเคลื่อนไหวสต็อก', 'ใบขอซื้อ',
                 'เบิก / ยืม',
@@ -39,7 +39,7 @@ it('builds the sidebar from config, filtered by permission', function () {
     // technicians do PM from their own work (งานของฉัน): no PM menu
     $this->actingAs(userWithRole('technician'))->get('/dashboard')
         ->assertInertia(fn (Assert $page) => expect(navigationTitles($page))->toBe([
-            'หน้าหลัก', 'งานของฉัน', 'ใบงาน', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
+            'หน้าหลัก', 'งานของฉัน', 'ใบงาน (Ticket)', 'ขอเข้าห้อง Server', 'เช็ค IP ว่าง',
             'ทรัพย์สิน', 'พิมพ์ป้าย QR', 'อะไหล่', 'ความเคลื่อนไหวสต็อก', 'ใบขอซื้อ', 'เบิก / ยืม',
             'ลูกค้า', 'สัญญา MA', 'สรุปรายบุคคล', 'ผลประเมินความพึงพอใจ', 'คู่มือ',
         ]));
@@ -79,7 +79,7 @@ it('lets a superadmin switch modules of a tenant and logs it', function () {
 
     $this->actingAs($superadmin)->get("/platform/tenants/{$this->customer->ulid}/modules")
         ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('Platform/Tenants/Modules')->where('modules', ['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true]));
+        ->assertInertia(fn (Assert $page) => $page->component('Platform/Tenants/Modules')->where('modules', ['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true, 'repair_claim' => false, 'field_technicians' => false]));
 
     $this->actingAs($superadmin)->put("/platform/tenants/{$this->customer->ulid}/modules", ['modules' => ['asset' => false]])
         ->assertRedirect(route('platform.impersonation.index'))
@@ -89,8 +89,8 @@ it('lets a superadmin switch modules of a tenant and logs it', function () {
 
     $log = asTenant($superadmin->tenant, fn () => Activity::where('event', 'modules_updated')->first());
     // toEqual: JSONB does not keep key order.
-    expect($log->properties['old'])->toEqual(['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true])
-        ->and($log->properties['attributes'])->toEqual(['asset' => false, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true])
+    expect($log->properties['old'])->toEqual(['asset' => true, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true, 'repair_claim' => false, 'field_technicians' => false])
+        ->and($log->properties['attributes'])->toEqual(['asset' => false, 'contract' => true, 'service' => true, 'maintenance' => true, 'labeling' => true, 'inventory' => true, 'survey' => true, 'reporting' => true, 'room_access' => true, 'repair_claim' => false, 'field_technicians' => false])
         ->and($log->properties['actor']['name'])->toBe('Root');
 });
 

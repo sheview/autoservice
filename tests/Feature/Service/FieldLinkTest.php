@@ -2,15 +2,20 @@
 
 use App\Modules\Platform\Actions\SaveAlertSettings;
 use App\Modules\Platform\Jobs\DeliverAlert;
+use App\Modules\Platform\Support\Modules;
 use App\Modules\Service\Actions\AssignTicket;
 use App\Modules\Service\Actions\MoveTicket;
 use App\Modules\Service\Models\Ticket;
 use App\Modules\Service\Models\TicketFieldLink;
 use App\Modules\Tenancy\Support\CompanyCodes;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Laravel\Pennant\Feature;
 
 /*
  * Working on a ticket without an account: the helpdesk (or the technician on the job) sends a link
@@ -48,6 +53,22 @@ it('makes a link from the ticket page for whoever may change the ticket', functi
         ->where('fieldLinks.0.url', "http://localhost/t/001/job/{$link->token}")->where('fieldLinks.0.usable', true));
 
     $this->actingAs(userWithRole('technician'))->post("/tickets/{$this->ticket->ulid}/field-links", ['mode' => 'work', 'holder_name' => 'x'])->assertForbidden();
+});
+
+it('needs the name, company and a phone number of whoever gets the link', function () {
+    $url = "/tickets/{$this->ticket->ulid}/field-links";
+
+    $this->actingAs($this->helpdesk)->post($url, ['mode' => 'work', 'holder_name' => 'ช่างสมชาย', 'days' => 3])
+        ->assertSessionHasErrors(['holder_company', 'holder_phone']);
+    $this->actingAs($this->helpdesk)->post($url, ['mode' => 'sign', 'holder_name' => 'คุณสุดา', 'holder_company' => 'ff', 'holder_phone' => '022', 'days' => 3])
+        ->assertSessionHasErrors(['holder_phone']);
+    expect(TicketFieldLink::count())->toBe(0);
+
+    foreach (['02-111-1111', '089 999 9999', '+66899999999'] as $phone) {
+        $this->actingAs($this->helpdesk)->post($url, ['mode' => 'work', 'holder_name' => 'ช่างสมชาย', 'holder_company' => 'ร้านคอม', 'holder_phone' => $phone, 'days' => 3])
+            ->assertSessionHasNoErrors();
+    }
+    expect(TicketFieldLink::count())->toBe(3);
 });
 
 it('lets the outside technician send the work back without an account, leaving the job for the helpdesk', function () {
@@ -175,4 +196,63 @@ it('works for that ticket only, until revoked, expired or the job is closed', fu
     $fresh = ($this->link)();
     $this->travel(4)->days();
     $this->post("/t/001/job/{$fresh->token}", ['note' => 'x'])->assertSessionHasErrors('link');
+});
+
+it('gives the outside technician the repair fee claim form, with their name and the job on it', function () {
+    Feature::for($this->tenant)->activate(Modules::feature('repair_claim'));
+    config(['services.gotenberg.url' => 'http://gotenberg.test:3000']);
+    Http::fake(['gotenberg.test:3000/*' => Http::response('%PDF-1.7 claim', 200)]);
+    $link = ($this->link)();
+
+    $this->get("/t/001/job/{$link->token}/claim-form")->assertOk()
+        ->assertHeader('Content-Type', 'application/pdf')
+        ->assertHeader('Content-Disposition', 'attachment; filename="แบบฟอร์มขอเบิกค่าซ่อม.pdf"');
+
+    $html = '';
+    Http::assertSent(function (HttpRequest $request) use (&$html) {
+        foreach ($request->data() as $part) {
+            if (($part['name'] ?? null) === 'files' && ($part['filename'] ?? null) === 'index.html') {
+                $html = $part['contents'];
+            }
+        }
+
+        return true;
+    });
+    expect($html)
+        ->toContain('แบบฟอร์มขอเบิกค่าซ่อมคอมพิวเตอร์ต่างจังหวัด')
+        ->toContain($this->tenant->name)
+        ->toContain('ช่างสมชาย')->toContain('ร้านคอมเชียงใหม่')->toContain('0899999999')
+        ->toContain($this->ticket->ticket_no.' Printer jam')
+        ->toContain('ภ.พ.20');
+});
+
+it('shows the claim form to print from the browser when the PDF service is down', function () {
+    Feature::for($this->tenant)->activate(Modules::feature('repair_claim'));
+    config(['services.gotenberg.url' => 'http://gotenberg.test:3000']);
+    Http::fake(fn () => throw new ConnectionException('refused'));
+    $link = ($this->link)();
+
+    $this->get("/t/001/job/{$link->token}/claim-form")->assertOk()
+        ->assertSee('แบบฟอร์มขอเบิกค่าซ่อมคอมพิวเตอร์ต่างจังหวัด')->assertSee('ช่างสมชาย')->assertSee('window.print()', false);
+});
+
+it('gives the claim form only to companies that switched it on, for a usable work link of theirs', function () {
+    Http::fake(['*' => Http::response('%PDF-1.7 claim', 200)]);
+    $off = ($this->link)();
+    $this->get("/t/001/job/{$off->token}")->assertInertia(fn (Assert $page) => $page->where('page.claim_form', false));
+    $this->get("/t/001/job/{$off->token}/claim-form")->assertNotFound();
+
+    Feature::for($this->tenant)->activate(Modules::feature('repair_claim'));
+    $this->get("/t/001/job/{$off->token}")->assertInertia(fn (Assert $page) => $page->where('page.claim_form', true));
+    $sign = ($this->link)('sign');
+    $this->get("/t/001/job/{$sign->token}/claim-form")->assertNotFound();
+
+    $link = ($this->link)();
+    $other = createTenant('other');
+    CompanyCodes::forget();
+    $this->get('/t/'.$other->fresh()->company_code."/job/{$link->token}/claim-form")->assertNotFound();
+
+    $this->actingAs($this->helpdesk)->post("/tickets/{$this->ticket->ulid}/field-links/{$link->id}/revoke")->assertSessionHasNoErrors();
+    auth()->logout();
+    $this->get("/t/001/job/{$link->token}/claim-form")->assertNotFound();
 });
