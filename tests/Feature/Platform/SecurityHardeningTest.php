@@ -1,6 +1,7 @@
 <?php
 
 use App\Modules\Identity\Models\User;
+use App\Providers\AppServiceProvider;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Notification;
 
@@ -82,4 +83,14 @@ it('keeps the session cookie to HTTPS when the site is on HTTPS', function () {
         $appUrl === false ? putenv('APP_URL') : putenv("APP_URL={$appUrl}");
         $cookie === false ? putenv('SESSION_SECURE_COOKIE') : putenv("SESSION_SECURE_COOKIE={$cookie}");
     }
+});
+
+it('builds https links and assets when the app is reached over https behind a proxy that ends TLS', function () {
+    config(['app.url' => 'https://itsm.example.test']);
+    (new AppServiceProvider(app()))->boot();
+
+    // The request itself arrives as plain http from the proxy.
+    expect(url('/dashboard'))->toStartWith('https://')
+        ->and(route('login'))->toStartWith('https://')
+        ->and(asset('build/app.css'))->toStartWith('https://');
 });

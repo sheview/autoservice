@@ -32,6 +32,13 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(AllowKnownHosts::class);
         $middleware->append(SecurityHeaders::class);
 
+        // The reverse proxy in front (e.g. nginx ending HTTPS for the app's container) is believed about
+        // the client's scheme and address: TRUSTED_PROXIES="*" or its addresses, comma separated.
+        // Empty = no proxy, the X-Forwarded-* headers are ignored.
+        if (($proxies = (string) env('TRUSTED_PROXIES', '')) !== '') {
+            $middleware->trustProxies(at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)));
+        }
+
         // Before StartSession, which reads session.lifetime.
         $middleware->web(prepend: [ApplySessionTimeout::class]);
 

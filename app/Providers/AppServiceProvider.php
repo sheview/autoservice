@@ -6,6 +6,7 @@ use App\Validation\Validator;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Validator as ValidatorFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -26,6 +27,13 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->limitPublicPages();
+
+        // Behind a proxy that ends HTTPS (nginx in front of the app's container), the request reaches
+        // PHP as plain http: links, assets and Inertia requests built from it would be http on an https
+        // page, and the browser blocks them (mixed content). An https APP_URL says how users reach us.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
 
         // Every new or changed password: at least 8 characters, upper and lower case, and a special character.
         Password::defaults(fn () => Password::min(8)->mixedCase()->symbols());
