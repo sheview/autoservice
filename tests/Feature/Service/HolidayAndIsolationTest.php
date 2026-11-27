@@ -71,7 +71,7 @@ it('keeps tickets, holidays and their numbers per tenant', function () {
         'customer_id' => $theirCustomer->id, 'title' => 'x', 'priority' => 'low', 'source' => 'phone',
     ])->assertSessionHasErrors('customer_id');
     $this->actingAs($this->admin)->post('/tickets', [
-        'asset_id' => $theirAsset->id, 'title' => 'x', 'priority' => 'low', 'source' => 'phone',
+        'asset_id' => $theirAsset->id, 'title' => 'x', 'priority' => 'low', 'source' => 'phone', 'assignee_id' => $this->admin->id,
     ])->assertSessionHasErrors('asset_id');
     $this->actingAs($this->admin)->post("/tickets/{$mine->ulid}/assign", ['assignee_id' => $theirUser->id])
         ->assertSessionHasErrors('assignee_id');

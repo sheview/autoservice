@@ -2,6 +2,7 @@
 
 use App\Modules\Contract\Models\Customer;
 use Inertia\Testing\AssertableInertia as Assert;
+use Maatwebsite\Excel\Facades\Excel;
 
 beforeEach(function () {
     $this->admin = userWithRole('admin_company');
@@ -87,4 +88,35 @@ it('gives the forms the signature setting as true / false / null, so they show w
         ->assertInertia(fn (Assert $page) => $page->where('contract.require_signature', null));
     $this->actingAs($this->admin)->get("/contracts/{$no->id}/edit")
         ->assertInertia(fn (Assert $page) => $page->where('contract.require_signature', false));
+});
+
+it('exports the customer list with the search and sort on screen, every page', function () {
+    createCustomer(['code' => 'ACME', 'name' => 'Acme', 'tax_id' => '0105561234567', 'contact_name' => 'คุณสมชาย', 'phone' => '02-123-4567']);
+    createCustomer(['code' => 'BETA', 'name' => 'Beta']);
+    createCustomer(['code' => 'ZED', 'name' => 'Zed']);
+
+    $all = $this->actingAs($this->admin)->get('/customers/export?sort=code&direction=desc')->assertOk();
+    $rows = Excel::toCollection(null, $all->getFile()->getPathname())->first()->toArray();
+    expect($rows[0])->toBe(['รหัสลูกค้า', 'ชื่อลูกค้า', 'ชื่อย่อ', 'เลขประจำตัวผู้เสียภาษี', 'ผู้ติดต่อ', 'เบอร์โทรศัพท์', 'อีเมล', 'ที่อยู่', 'สัญญา', 'หมายเหตุ'])
+        ->and(array_column(array_slice($rows, 1), 0))->toBe(['ZED', 'BETA', 'ACME']);
+
+    $acme = $this->actingAs($this->admin)->get('/customers/export?search=สมชาย')->assertOk();
+    $rows = Excel::toCollection(null, $acme->getFile()->getPathname())->first()->toArray();
+    expect($rows)->toHaveCount(2)
+        ->and(array_slice($rows[1], 0, 6))->toEqual(['ACME', 'Acme', null, '0105561234567', 'คุณสมชาย', '02-123-4567']);
+});
+
+it('exports only the customers the user may see, of the own company', function () {
+    createCustomer(['code' => 'MINE', 'name' => 'Mine']);
+    asTenant(createTenant('other'), fn () => createCustomer(['code' => 'THEIRS', 'name' => 'Theirs']));
+
+    $response = $this->actingAs($this->admin)->get('/customers/export')->assertOk();
+    $rows = Excel::toCollection(null, $response->getFile()->getPathname())->first()->toArray();
+    expect(array_column(array_slice($rows, 1), 0))->toBe(['MINE']);
+
+    // a technician (scope own) with no tickets sees no customer
+    $response = $this->actingAs(userWithRole('technician'))->get('/customers/export')->assertOk();
+    expect(Excel::toCollection(null, $response->getFile()->getPathname())->first()->toArray())->toHaveCount(1);
+
+    $this->actingAs(userWithRole('customer_it', ['customer_id' => Customer::first()->id]))->get('/customers/export')->assertForbidden();
 });

@@ -86,17 +86,16 @@ it('makes the PM report PDF of a round with every asset and its checklist answer
         ->toContain('ใบตรวจเช็กบำรุงรักษาเชิงป้องกัน (PM)');
 });
 
-it('sends the user back with a message when Gotenberg is not available', function () {
+it('opens the job sheet to print from the browser when Gotenberg is not available', function () {
     Http::fake(['gotenberg.test:3000/*' => Http::response('boom', 500)]);
     $ticket = openTicket($this->helpdesk);
 
-    $this->actingAs($this->helpdesk)->from("/tickets/{$ticket->ulid}")->get("/tickets/{$ticket->ulid}/pdf")
-        ->assertRedirect("/tickets/{$ticket->ulid}")
-        ->assertSessionHas('error', __('document.unavailable'));
+    $this->actingAs($this->helpdesk)->get("/tickets/{$ticket->ulid}/pdf")
+        ->assertRedirect(route('service.tickets.print', $ticket));
 
     Http::fake(fn () => throw new ConnectionException('refused'));
-    $this->actingAs($this->helpdesk)->from("/tickets/{$ticket->ulid}")->get("/tickets/{$ticket->ulid}/pdf")
-        ->assertSessionHas('error');
+    $this->actingAs($this->helpdesk)->get("/tickets/{$ticket->ulid}/pdf")
+        ->assertRedirect(route('service.tickets.print', $ticket));
 });
 
 it('only makes documents the user may see', function () {
@@ -135,9 +134,10 @@ it('gives staff an empty job sheet to fill in by hand, with the company and boxe
     $this->actingAs(userWithRole('customer_it', ['customer_id' => $this->customer->id]))->get('/tickets/blank-form')->assertForbidden();
 });
 
-it('says so when the empty job sheet cannot be made', function () {
+it('gives the empty job sheet to print from the browser when no PDF can be made', function () {
     Http::fake(fn () => throw new ConnectionException('refused'));
 
-    $this->actingAs($this->tech)->from('/tickets')->get('/tickets/blank-form')
-        ->assertRedirect('/tickets')->assertSessionHas('error', __('document.unavailable'));
+    $this->actingAs($this->tech)->get('/tickets/blank-form')->assertOk()
+        ->assertHeader('Content-Type', 'text/html; charset=UTF-8')
+        ->assertSee('TK ......')->assertSee('window.print()', false);
 });

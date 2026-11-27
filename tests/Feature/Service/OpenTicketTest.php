@@ -34,6 +34,7 @@ function ticketPayload(array $overrides = []): array
         'priority' => 'critical',
         'source' => 'phone',
         'contact_name' => 'คุณสมศรี',
+        'assignee_id' => test()->tech->id,
     ];
 }
 
@@ -42,14 +43,14 @@ it('opens a ticket with a number, the contract SLA and business-hour due times',
 
     $ticket = Ticket::first();
     expect($ticket->ticket_no)->toBe('TK001-2569-00001')
-        ->and($ticket->status)->toBe(Ticket::STATUS_NEW)
+        ->and($ticket->status)->toBe(Ticket::STATUS_ASSIGNED)
         ->and($ticket->branch_id)->toBe($this->branch->id)
         ->and($ticket->service_window)->toBe('8x5')
         ->and($ticket->response_minutes)->toBe(60)
         // Friday 16:00 + 1h = Friday 17:00; + 4h = Friday 17:00 then Monday 08:00-11:00
         ->and($ticket->response_due_at->format('Y-m-d H:i'))->toBe('2026-06-12 17:00')
         ->and($ticket->resolve_due_at->format('Y-m-d H:i'))->toBe('2026-06-15 11:00')
-        ->and($ticket->events()->pluck('type')->all())->toBe(['created']);
+        ->and($ticket->events()->pluck('type')->all())->toBe(['created', 'assigned']);
 
     $ticket->update(['status' => Ticket::STATUS_CLOSED]); // a device has one ticket at a time
     $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['title' => 'Second']));
@@ -104,6 +105,12 @@ it('lets helpdesk assign on opening but not a user without tickets.assign', func
 
     $this->actingAs(userWithRole('user', ['branch_id' => $this->branch->id]))->post('/tickets', ticketPayload(['assignee_id' => $this->tech->id]))
         ->assertSessionHasErrors('assignee_id');
+});
+
+it('makes staff who may assign pick who takes the job', function () {
+    $this->actingAs($this->helpdesk)->post('/tickets', ticketPayload(['assignee_id' => null]))
+        ->assertSessionHasErrors('assignee_id');
+    expect(Ticket::count())->toBe(0);
 });
 
 it('offers the customer\'s people as the person reporting, or our staff without a customer', function () {

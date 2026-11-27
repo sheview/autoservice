@@ -11,6 +11,7 @@ use App\Modules\Contract\Http\Controllers\CustomerSiteController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified', 'module:contract'])->name('contract.')->group(function () {
+    Route::get('customers/export', [CustomerController::class, 'export'])->name('customers.export');
     Route::resource('customers', CustomerController::class)->except(['show']);
     Route::post('customers/{customer}/attachments', [CustomerAttachmentController::class, 'store'])->name('customers.attachments.store');
     Route::get('customers/{customer}/attachments/{attachment}', [CustomerAttachmentController::class, 'show'])

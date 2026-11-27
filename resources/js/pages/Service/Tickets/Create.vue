@@ -385,9 +385,9 @@ const selectClass = 'h-9 w-full rounded-md border border-input bg-transparent px
                     </div>
 
                     <div v-if="assignees.length" class="grid content-start gap-2 sm:col-span-2">
-                        <Label for="assignee_id">{{ t('tickets.assignee') }}</Label>
-                        <select id="assignee_id" v-model="form.assignee_id" :class="selectClass">
-                            <option :value="null">{{ t('tickets.unassigned') }}</option>
+                        <Label for="assignee_id" required>{{ t('tickets.assignee') }}</Label>
+                        <select id="assignee_id" v-model="form.assignee_id" :class="selectClass" required>
+                            <option :value="null" disabled>{{ t('tickets.choose_assignee') }}</option>
                             <option v-for="user in assignees" :key="user.id" :value="user.id">{{ user.name }}</option>
                         </select>
                         <InputError :message="form.errors.assignee_id" />

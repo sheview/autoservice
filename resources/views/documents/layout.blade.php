@@ -14,9 +14,9 @@
         img { max-width: 100%; }
         h1, h2, h3 { margin: 0; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #000; padding-bottom: 8px; }
-        .company { font-size: 14pt; font-weight: 700; }
+        .company { font-size: 14pt; font-weight: 700; white-space: nowrap; }
         .doc-title { font-size: 12pt; font-weight: 600; }
-        .doc-no { font-family: monospace; font-size: 13pt; font-weight: 700; text-align: right; }
+        .doc-no { font-family: monospace; font-size: 12pt; font-weight: 700; text-align: right; white-space: nowrap; }
         .muted { color: #555; }
         .facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 28px; row-gap: 5px; margin-top: 12px; }
         .fact { display: flex; gap: 8px; }

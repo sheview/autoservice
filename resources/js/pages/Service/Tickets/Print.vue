@@ -209,13 +209,13 @@ const blankRows = 2;
                     <div class="flex items-start gap-3">
                         <img v-if="logo" :src="logo" alt="" class="h-[16mm] max-w-[40mm] object-contain" />
                         <div>
-                            <p class="text-[14pt] font-bold">{{ company }}</p>
+                            <p class="text-[14pt] font-bold whitespace-nowrap">{{ company }}</p>
                             <p class="text-[12pt] font-semibold">{{ t('ticket_print.title') }}</p>
                         </div>
                     </div>
                     <div class="flex items-start gap-3 text-right">
                         <div>
-                            <p class="font-mono text-[13pt] font-bold">{{ ticket.ticket_no }}</p>
+                            <p class="font-mono text-[12pt] font-bold whitespace-nowrap">{{ ticket.ticket_no }}</p>
                             <p>{{ t(`tickets.statuses.${ticket.status}`) }}</p>
                         </div>
                         <!-- Track the job: at least 2.5 cm so it scans from small paper, in black and white -->

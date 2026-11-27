@@ -10,6 +10,7 @@ import { t } from '@/lib/i18n';
 import type { BreadcrumbItem, Paginated, SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { ArrowDown, ArrowUp } from 'lucide-vue-next';
+import { computed } from 'vue';
 
 interface CustomerRow {
     id: number;
@@ -46,6 +47,12 @@ const sortBy = (column: string) => {
     filters.sort = column;
 };
 
+// Export what is on screen: the same search and sort, without the page number.
+const exportUrl = computed(() => {
+    const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== null && value !== ''));
+    return route('contract.customers.export', query);
+});
+
 const columns = [
     { key: 'code', sortable: true },
     { key: 'name', sortable: true },
@@ -67,9 +74,14 @@ const destroy = (customer: CustomerRow) => {
         <div class="space-y-6 p-4">
             <div class="flex flex-wrap items-start justify-between gap-4">
                 <Heading :title="t('customers.title')" :description="t('customers.description')" />
-                <Button v-if="can.create" as-child>
-                    <Link :href="route('contract.customers.create')">{{ t('customers.create') }}</Link>
-                </Button>
+                <div class="flex flex-wrap gap-2">
+                    <Button variant="outline" as-child>
+                        <a :href="exportUrl">{{ t('customers.export') }}</a>
+                    </Button>
+                    <Button v-if="can.create" as-child>
+                        <Link :href="route('contract.customers.create')">{{ t('customers.create') }}</Link>
+                    </Button>
+                </div>
             </div>
 
             <p v-if="page.props.flash.success" class="rounded-md bg-green-50 px-4 py-2 text-sm text-green-800 dark:bg-green-950 dark:text-green-200">

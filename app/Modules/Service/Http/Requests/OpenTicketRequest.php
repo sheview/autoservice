@@ -40,6 +40,12 @@ class OpenTicketRequest extends FormRequest
         $this->merge(['device_serial_unknown' => $this->boolean('device_serial_unknown')]);
     }
 
+    /** Our own staff with tickets.assign; a customer account never assigns. */
+    private function mustAssign(): bool
+    {
+        return $this->user()->customer_id === null && $this->user()->can('tickets.assign');
+    }
+
     /** No asset picked: the device is not in the system and must be described by hand. */
     private function unregistered(): bool
     {
@@ -61,7 +67,8 @@ class OpenTicketRequest extends FormRequest
             'source' => ['required', Rule::in(Ticket::SOURCES)],
             'contact_name' => ['nullable', 'string', 'max:255'],
             'contact_phone' => ['nullable', 'string', 'max:50'],
-            'assignee_id' => ['nullable', 'integer', Rule::exists('users', 'id')->where('is_active', true)->whereNull('deleted_at')],
+            // Staff who may assign must pick who takes the job: no ticket is left unassigned on opening.
+            'assignee_id' => [Rule::requiredIf($this->mustAssign()), 'nullable', 'integer', Rule::exists('users', 'id')->where('is_active', true)->whereNull('deleted_at')],
             // A device not in the system: what it is, and its serial unless that is knowingly unknown.
             'device_name' => [Rule::requiredIf($this->unregistered()), 'nullable', 'string', 'max:255'],
             'device_brand' => [Rule::requiredIf($this->unregistered()), 'nullable', 'string', 'max:255'],

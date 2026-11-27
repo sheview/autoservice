@@ -37,7 +37,8 @@ class TicketPrintController extends Controller
         try {
             return $renderPdf->handle('documents.ticket', $sheet->handle(), 'blank-ticket-form.pdf');
         } catch (PdfUnavailable) {
-            return back()->with('error', __('document.unavailable'));
+            // No PDF service (e.g. a shared host without Gotenberg): the same sheet, printed from the browser.
+            return response()->view('documents.ticket', [...$sheet->handle(), 'forBrowser' => true]);
         }
     }
 
@@ -48,7 +49,8 @@ class TicketPrintController extends Controller
         try {
             return $renderPdf->handle('documents.ticket', $sheet->handle($ticket, $request->user()), "{$ticket->ticket_no}.pdf");
         } catch (PdfUnavailable) {
-            return back()->with('error', __('document.unavailable'));
+            // No PDF service: the job sheet page, to print from the browser.
+            return redirect()->route('service.tickets.print', $ticket);
         }
     }
 }

@@ -6,9 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Modules\Contract\Actions\DeleteCustomer;
 use App\Modules\Contract\Actions\ListSites;
 use App\Modules\Contract\Actions\SaveCustomer;
+use App\Modules\Contract\Actions\SearchCustomers;
+use App\Modules\Contract\Exports\CustomersExport;
 use App\Modules\Contract\Http\Requests\CustomerRequest;
 use App\Modules\Contract\Models\Customer;
-use App\Modules\Contract\Support\ContractScope;
 use App\Modules\Document\Actions\AddAttachments;
 use App\Modules\Document\Support\Attachments;
 use Illuminate\Http\RedirectResponse;
@@ -16,33 +17,19 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class CustomerController extends Controller
 {
-    private const SORTABLE = ['code', 'name', 'contracts_count', 'created_at'];
-
-    public function index(Request $request): Response
+    public function index(Request $request, SearchCustomers $searchCustomers): Response
     {
         Gate::authorize('viewAny', Customer::class);
 
-        $filters = [
-            'search' => $request->string('search')->trim()->value(),
-            'sort' => in_array($request->input('sort'), self::SORTABLE, true) ? $request->input('sort') : 'name',
-            'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
-        ];
+        $filters = $this->filters($request);
 
         $user = $request->user();
-        // A customer's contracts all fall within the same reach as the customer (ContractScope).
-        $customers = ContractScope::customers(Customer::query(), $user)
-            ->withCount('contracts')
-            ->when($filters['search'] !== '', fn ($q) => $q->where(fn ($q) => $q
-                ->where('code', 'like', "%{$filters['search']}%")
-                ->orWhere('name', 'like', "%{$filters['search']}%")
-                ->orWhere('short_name', 'like', "%{$filters['search']}%")
-                ->orWhere('contact_name', 'like', "%{$filters['search']}%")
-                ->orWhere('tax_id', 'like', "%{$filters['search']}%")))
-            ->orderBy($filters['sort'], $filters['direction'])
-            ->orderBy('id')
+        $customers = $searchCustomers->handle($user, $filters)
             ->paginate(20)
             ->withQueryString()
             ->through(fn (Customer $customer) => [
@@ -61,6 +48,26 @@ class CustomerController extends Controller
                 'viewContracts' => $user->can('contracts.view'),
             ],
         ]);
+    }
+
+    /** The list as Excel: the same search and sort as on screen, all pages, for whoever may see the list. */
+    public function export(Request $request, SearchCustomers $searchCustomers): BinaryFileResponse
+    {
+        Gate::authorize('viewAny', Customer::class);
+
+        $query = $searchCustomers->handle($request->user(), $this->filters($request));
+
+        return Excel::download(new CustomersExport($query), 'customers-'.now()->format('Ymd-His').'.xlsx');
+    }
+
+    /** @return array{search: string, sort: string, direction: string} */
+    private function filters(Request $request): array
+    {
+        return [
+            'search' => $request->string('search')->trim()->value(),
+            'sort' => in_array($request->input('sort'), SearchCustomers::SORTABLE, true) ? $request->input('sort') : 'name',
+            'direction' => $request->input('direction') === 'desc' ? 'desc' : 'asc',
+        ];
     }
 
     public function create(): Response
